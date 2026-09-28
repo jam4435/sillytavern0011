@@ -24,12 +24,14 @@ const events: GameEvent[] = [
     id: 'rumor',
     title: '射雕第四回01-古墓传闻',
     type: 'RUMOR',
+    clueKind: 'nearby',
     description: '终南山下有人见到白衣女子。',
   },
   {
     id: 'follow-up',
     title: '射雕第三回02-旧案余波',
     type: 'AFTERMATH',
+    clueKind: 'followup',
     description: '客栈掌柜似乎知道内情。',
     remainingTurns: 1,
   },
@@ -72,6 +74,8 @@ describe('EventsPanel', () => {
     fireEvent.click(screen.getByRole('tab', { name: /线索2/ }));
     expect(screen.getByRole('tab', { name: /线索2/ })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('button', { name: /旧案余波 射雕第三回02/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('附近传闻')).toBeInTheDocument();
+    expect(screen.getByText('后续线索')).toBeInTheDocument();
   });
 
   it('removes the duplicated time prefix from the expanded event description', () => {

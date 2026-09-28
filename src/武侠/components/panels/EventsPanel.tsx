@@ -3,6 +3,7 @@ import { ChronicleEntry, GameEvent } from '../../types';
 import {
   getEventCountdownLabel,
   getEventDescription,
+  getEventSemanticClassName,
   getEventSemanticLabel,
   getEventTitleParts,
   isEventUrgent,
@@ -45,9 +46,15 @@ const EventDisclosureRow: React.FC<EventDisclosureRowProps> = ({
   const detailId = useId().replace(/:/g, '');
   const countdown = getEventCountdownLabel(event);
   const titleParts = getEventTitleParts(event.title);
+  const clueLabel = event.type === 'RUMOR' || event.type === 'AFTERMATH' ? getEventSemanticLabel(event) : null;
+  const semanticClass = getEventSemanticClassName(event);
 
   return (
-    <section className={`event-disclosure ${isExpanded ? 'is-expanded' : ''}${isEventUrgent(event) ? ' is-urgent' : ''}`}>
+    <section
+      className={['event-disclosure', isExpanded ? 'is-expanded' : '', isEventUrgent(event) ? 'is-urgent' : '', semanticClass]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <button
         type="button"
         className="event-disclosure-heading"
@@ -56,7 +63,10 @@ const EventDisclosureRow: React.FC<EventDisclosureRowProps> = ({
         aria-controls={detailId}
         onClick={onToggle}
       >
-        <span className="event-disclosure-title">{titleParts.name}</span>
+        <span className="event-disclosure-title-group">
+          {clueLabel && <span className="event-disclosure-kicker">{clueLabel}</span>}
+          <span className="event-disclosure-title">{titleParts.name}</span>
+        </span>
         {titleParts.reference && <span className="event-disclosure-reference">{titleParts.reference}</span>}
         {countdown && <span className="event-disclosure-countdown">{countdown}</span>}
         <span className="event-disclosure-chevron" aria-hidden="true">

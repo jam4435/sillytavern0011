@@ -27,6 +27,7 @@ const events: GameEvent[] = [
     id: 'follow-up',
     title: '射雕第三回02-旧案余波',
     type: 'AFTERMATH',
+    clueKind: 'followup',
     description: '客栈掌柜似乎知道内情。',
     remainingTurns: 1,
   },
@@ -34,7 +35,9 @@ const events: GameEvent[] = [
     id: 'rumor',
     title: '射雕第四回01-古墓传闻',
     type: 'RUMOR',
+    clueKind: 'nearby',
     description: '终南山下有人见到白衣女子。',
+    startsInDays: 4,
   },
 ];
 
@@ -83,7 +86,10 @@ describe('EventTracker', () => {
     expect(screen.getByText('先赴苏州城外，再寻失踪镖师。')).toBeInTheDocument();
     expect(screen.getByText('卷入：陆乘风')).toBeInTheDocument();
     expect(screen.getByText('旧案余波')).toBeInTheDocument();
-    expect(screen.queryByText('古墓传闻')).not.toBeInTheDocument();
+    expect(screen.getByText('古墓传闻')).toBeInTheDocument();
+    expect(screen.getByText('附近传闻')).toBeInTheDocument();
+    expect(screen.getByText('后续线索')).toBeInTheDocument();
+    expect(screen.queryByText('塞外烽烟')).not.toBeInTheDocument();
   });
 
   it('persists the whole-tracker collapse state and only expands one event at a time', () => {

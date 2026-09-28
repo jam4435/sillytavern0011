@@ -418,6 +418,7 @@ describe('getGameVariables ERA 展示投影', () => {
     expect(matchingEvents).toHaveLength(1);
     expect(matchingEvents[0]).toMatchObject({
       type: 'AFTERMATH',
+      clueKind: 'followup',
       description: '瑛姑似乎愿意为黄蓉指一条生路。',
       location: '大宋/川边/黑沼',
       timeText: '1220年12月22日10时',
@@ -528,6 +529,7 @@ describe('getGameVariables ERA 展示投影', () => {
     expect(matchingEvents).toHaveLength(1);
     expect(matchingEvents[0]).toMatchObject({
       type: 'RUMOR',
+      clueKind: 'nearby',
       location: '大宋/临安府/牛家村',
       timeText: '1200年8月20日11时',
       startsInDays: 5,

@@ -1216,30 +1216,40 @@ function parseEvents(variables: GameVariables, worldTime?: WorldTime): GameEvent
     return remaining >= 0 ? remaining : undefined;
   };
 
-  const previewNames = new Set<string>();
+  // 同一事件同时存在于全域预告和附近传闻时，优先保留“附近传闻”语义，
+  // 避免全域预告的去重把“玩家已经靠近目标区域”这一层信息吃掉。
+  const nearbyRumors = Object.entries(variables.附近传闻 || {})
+    .map(([eventName, value]) => {
+      const raw = typeof value === 'string' ? value : formatEventValue(value);
+      return raw.trim() ? { eventName, raw } : null;
+    })
+    .filter((entry): entry is { eventName: string; raw: string } => entry !== null);
+  const nearbyNames = new Set(nearbyRumors.map(entry => entry.eventName));
+
   for (const [eventName, value] of Object.entries(variables.前端变量?.可发现事件 || {})) {
+    if (nearbyNames.has(eventName)) continue;
     const raw = typeof value === 'string' ? value : formatEventValue(value);
     if (!raw.trim()) continue;
     const meta = parseRumorMeta(raw);
-    previewNames.add(eventName);
     events.push({
       id: `preview_${eventName}`,
       title: getDisplayEventName(eventName),
       type: 'RUMOR',
+      clueKind: 'preview',
       ...meta,
       startsInDays: daysUntilStart(meta.timeText),
     });
   }
 
-  for (const [eventName, value] of Object.entries(variables.附近传闻 || {})) {
-    if (previewNames.has(eventName)) continue;
-    const raw = typeof value === 'string' ? value : formatEventValue(value);
-    if (!raw.trim()) continue;
+  for (const { eventName, raw } of nearbyRumors) {
+    const meta = parseRumorMeta(raw);
     events.push({
       id: `rumor_${eventName}`,
       title: getDisplayEventName(eventName),
       type: 'RUMOR',
-      ...parseRumorMeta(raw),
+      clueKind: 'nearby',
+      ...meta,
+      startsInDays: daysUntilStart(meta.timeText),
     });
   }
 
@@ -1305,6 +1315,7 @@ function parseEvents(variables: GameVariables, worldTime?: WorldTime): GameEvent
       id: `followup_persistent_${eventName}`,
       title: getDisplayEventName(eventName),
       type: 'AFTERMATH',
+      clueKind: 'followup',
       description,
       location,
       timeText: startTime ? formatCalendarRecord(startTime) : undefined,
@@ -1326,6 +1337,7 @@ function parseEvents(variables: GameVariables, worldTime?: WorldTime): GameEvent
       id: `followup_legacy_${eventName}`,
       title: getDisplayEventName(eventName),
       type: 'AFTERMATH',
+      clueKind: 'followup',
       description,
       remainingTurns: Number.isFinite(counter) && counter > 0 ? counter : undefined,
     });

@@ -383,6 +383,8 @@ export interface GameEvent {
   location?: string;
   /** 相关时间文本：传闻=事件开始时间，进行中=预计结束时间 */
   timeText?: string;
+  /** 线索来源：preview=全域预告，nearby=附近传闻，followup=已发生事件导出的后续线索 */
+  clueKind?: 'preview' | 'nearby' | 'followup';
   /** 传闻距事件开始的剩余天数（按 12 月×30 天的 360 天简化历法计算） */
   startsInDays?: number;
   /** 距事件结束剩余天数（按 12 月×30 天的 360 天简化历法与当前世界时间求差） */

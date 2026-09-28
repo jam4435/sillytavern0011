@@ -8,8 +8,8 @@ export type EventSemanticCategory = 'participation' | 'world' | 'rumor' | 'after
 export const EVENT_SEMANTIC_LABELS: Record<EventSemanticCategory, string> = {
   participation: '亲历',
   world: '江湖',
-  rumor: '风闻',
-  aftermath: '后续',
+  rumor: '江湖风闻',
+  aftermath: '后续线索',
 };
 
 export function getEventSemanticCategory(event: GameEvent): EventSemanticCategory {
@@ -19,7 +19,15 @@ export function getEventSemanticCategory(event: GameEvent): EventSemanticCategor
 }
 
 export function getEventSemanticLabel(event: GameEvent): string {
+  if (event.type === 'RUMOR' && event.clueKind === 'nearby') return '附近传闻';
   return EVENT_SEMANTIC_LABELS[getEventSemanticCategory(event)];
+}
+
+export function getEventSemanticClassName(event: GameEvent): string {
+  if (event.type === 'AFTERMATH') return 'event-kind-followup';
+  if (event.type === 'RUMOR' && event.clueKind === 'nearby') return 'event-kind-nearby';
+  if (event.type === 'RUMOR') return 'event-kind-rumor';
+  return '';
 }
 
 export interface EventTitleParts {

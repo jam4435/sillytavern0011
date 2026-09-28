@@ -3,6 +3,7 @@ import type { GameEvent } from '../types';
 import {
   getEventCountdownLabel,
   getEventDescription,
+  getEventSemanticClassName,
   getEventSemanticLabel,
   getEventTitleParts,
   getTrackerEvents,
@@ -98,9 +99,18 @@ const EventTracker: React.FC<EventTrackerProps> = ({ events, currentLocation, on
               const countdown = getEventCountdownLabel(event);
               const description = getEventDescription(event);
               const titleParts = getEventTitleParts(event.title);
+              const clueLabel = event.type === 'RUMOR' || event.type === 'AFTERMATH' ? getEventSemanticLabel(event) : null;
+              const semanticClass = getEventSemanticClassName(event);
               return (
                 <section
-                  className={`event-tracker-entry ${isExpanded ? 'is-expanded' : ''}${isEventUrgent(event) ? ' is-urgent' : ''}`}
+                  className={[
+                    'event-tracker-entry',
+                    isExpanded ? 'is-expanded' : '',
+                    isEventUrgent(event) ? 'is-urgent' : '',
+                    semanticClass,
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
                   key={event.id}
                 >
                   <button
@@ -111,7 +121,10 @@ const EventTracker: React.FC<EventTrackerProps> = ({ events, currentLocation, on
                     aria-controls={detailId}
                     onClick={() => setExpandedEventId(current => (current === event.id ? null : event.id))}
                   >
-                    <span className="event-tracker-entry-title">{titleParts.name}</span>
+                    <span className="event-tracker-entry-title-group">
+                      {clueLabel && <span className="event-tracker-entry-kicker">{clueLabel}</span>}
+                      <span className="event-tracker-entry-title">{titleParts.name}</span>
+                    </span>
                     {titleParts.reference && (
                       <span className="event-tracker-entry-reference">{titleParts.reference}</span>
                     )}
