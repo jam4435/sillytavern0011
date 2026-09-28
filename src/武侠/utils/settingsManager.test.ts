@@ -16,7 +16,6 @@ import {
   loadSettings,
   normalizePresetXmlModuleInput,
   saveSettings,
-  shouldOfferVariablePromptTemplateUpdate,
   stripSelectedPresetRegexMatches,
   stripSelectedXmlModules,
 } from './settingsManager';
@@ -250,22 +249,21 @@ describe('settingsManager ui theme', () => {
     expect(loaded.variablePromptBodyStartMarkers).toBe('</thinking>');
   });
 
-  it('places the latest assistant body and execution contract at the end of the default variable prompt', () => {
-    const template = createDefaultDisplaySettings().summarySettings.variablePromptTemplate;
+  it('uses the extra-only variable prompt stack with an editable pseudo-code input template', () => {
+    const settings = createDefaultDisplaySettings().summarySettings;
+    expect(settings.variableUpdateMode).toBe('extra');
+    expect(settings.variablePromptTemplate).toContain('{{variableInputContext}}');
+    expect(settings.variablePromptTemplate).toContain('{{narrativeScale}}');
+    expect(settings.variablePromptTemplate).toContain('{{variableTemplate}}');
+    expect(settings.variablePromptTemplate).toContain('{{variableGuidance}}');
+    expect(settings.variablePromptTemplate).toContain('【最终执行要求】');
 
-    expect(template).toContain('{{readonlyContextRounds}}');
-    expect(template).toContain('{{narrativeScale}}');
-    expect(template).toContain('{{latestUserBody}}');
-    expect(template).toContain('{{latestAssistantBody}}');
-    expect(template.indexOf('{{narrativeScale}}')).toBeLessThan(template.indexOf('{{variableGuidance}}'));
-    expect(template.indexOf('{{variableGuidance}}')).toBeLessThan(template.indexOf('{{latestUserBody}}'));
-    expect(template.indexOf('{{latestUserBody}}')).toBeLessThan(template.indexOf('{{latestAssistantBody}}'));
-    expect(template.indexOf('{{latestAssistantBody}}')).toBeLessThan(template.indexOf('【最终执行要求】'));
-    expect(template).toContain('时间是禁止稀疏更新的原子对象');
-    expect(template).toContain('旧完整时间 + 正文耗时 = 新完整时间');
-    expect(template).toContain('{"世界信息":{"时间":{"年":1200,"月":8,"日":15,"时":13,"分":10}}}');
-    expect(template).toContain('禁止只写“分:10”');
-    expect(template).toContain('当 user 的行动宣称与 assistant 的实际结果冲突时，以 assistant 正文中的实际结果为准');
+    expect(settings.variableInputTemplate).toContain('{{latestUserBody}}');
+    expect(settings.variableInputTemplate).toContain('{{latestAssistantBody}}');
+    expect(settings.variableInputTemplate).toContain('{{playerContext}}');
+    expect(settings.variableInputTemplate).toContain('@if participationEvents');
+    expect(settings.variableStructureTemplate).toContain('<变量模板>');
+    expect(settings.variableGuidanceTemplate).toContain('# ERA 变量更新规则');
   });
 
   it('keeps biography compression focused on old chunks and game-time dates', () => {
@@ -276,130 +274,26 @@ describe('settingsManager ui theme', () => {
     expect(template).toContain('1～3 句');
   });
 
-  it('migrates the 2026-08-27 assistant-only default variable prompt to the current default', () => {
-    const assistantOnlyLegacyTemplate = `你是《金庸群侠传》ERA 变量更新模型。
-任务是核对最新 assistant 正文已经发生的持久变化；不得续写剧情。
-
-【前序只读完整轮次】
-{{readonlyContextRounds}}
-
-【当前变量上下文；JSON 是真实可写快照，方括号内容只读】
-{{variableContext}}
-
-【合法地点】
-{{locationContext}}
-
-【叙事表现标尺】
-{{narrativeScale}}
-
-【ERA 变量领域规则】
-{{variableGuidance}}
-
-【本轮唯一变化来源】
-{{latestAssistantBody}}
-
-【最终执行要求】
-强制判定顺序：
-1. 只有上方 latestAssistantBody 是本轮变化来源；前序对话只用于理解上下文。
-2. 逐级对照当前变量上下文中的真实键名。最终目标键已存在只能使用 VariableEdit，不存在才可使用 VariableInsert；VariableDelete 只能删除已存在的键。
-3. 正文没有改变的事实不得重复 Insert 或无意义 Edit。
-4. 时间是禁止稀疏更新的原子对象。每次时间变化都必须先核算“旧完整时间 + 正文耗时 = 新完整时间”，并完整写出年/月/日/时/分五字段；未变字段也必须写出，不属于无意义 Edit。
-5. 例如当前 1200年8月15日12时55分，正文经过 15 分钟，新时间是 1200年8月15日13时10分；必须输出完整 {"世界信息":{"时间":{"年":1200,"月":8,"日":15,"时":13,"分":10}}}，禁止只写“分:10”。
-6. 只允许修改世界信息.时间、user数据、角色数据，以及当前上下文已有参与事件的结局/insert/update/delete和已有分支标记的 0/1 值。分支标记只能 Edit，禁止新增、删除或改成其他值；禁止写事件分支结果。
-7. 方括号说明、叙事表现标尺、可用地点列表和其他只读内容不得写回变量。
-8. 时间可以跨过参与事件的结束时间；事件结算由事件脚本在时间写入后统一处理。
-9. 没有需要持久化的变化时，只输出简短 VariableThink。
-
-输出要求：
-- 只允许输出 <VariableThink>、<VariableInsert>、<VariableEdit>、<VariableDelete> 块。
-- 不要寒暄、复述正文、续写剧情或输出其他 XML 标签。
-- VariableThink 使用“路径｜当前存在/不存在｜正文变化｜操作”，不展开思维链；时间变化额外简写“旧完整时间 + 耗时 = 新完整时间”。
-- VariableInsert/VariableEdit/VariableDelete 内只能放严格 JSON 对象，不得使用注释、尾随逗号或 JSON5。
-- 相同类型的操作合并到一个块中。
-- 输出前再次核对：操作类型正确、路径逐层嵌套、时间五字段完整且向前、地点逐字来自白名单。`;
-
+  it('preserves explicitly customized variable prompt layers without migration', () => {
     window.localStorage.setItem(
       'wuxia_display_settings',
       JSON.stringify({
         summarySettings: {
-          variablePromptTemplate: assistantOnlyLegacyTemplate,
+          variablePromptTemplate: 'CUSTOM MAIN {{variableInputContext}}',
+          variableInputTemplate: '<x>{{playerContext}}</x>',
+          variableStructureTemplate: 'CUSTOM SCHEMA',
+          variableGuidanceTemplate: 'CUSTOM RULES',
+          variableUpdateMode: 'inline',
         },
       }),
     );
 
-    const template = loadSettings().summarySettings.variablePromptTemplate;
-    expect(template).toBe(createDefaultDisplaySettings().summarySettings.variablePromptTemplate);
-    expect(template).toContain('{{latestUserBody}}');
-    expect(template).toContain('{{latestAssistantBody}}');
-  });
-
-  it('preserves a customized 2026-08-27 assistant-only template and offers an update instead of overwriting it', () => {
-    const customizedLegacyTemplate = `你是《金庸群侠传》ERA 变量更新模型。
-任务是核对最新 assistant 正文已经发生的持久变化；不得续写剧情。
-
-【前序只读完整轮次】
-{{readonlyContextRounds}}
-
-【当前变量上下文；JSON 是真实可写快照，方括号内容只读】
-{{variableContext}}
-
-【本轮唯一变化来源】
-{{latestAssistantBody}}
-
-【我的自定义规则】
-优先保留我自己的变量判定补充。
-
-【最终执行要求】
-1. 只有上方 latestAssistantBody 是本轮变化来源；前序对话只用于理解上下文。`;
-
-    window.localStorage.setItem(
-      'wuxia_display_settings',
-      JSON.stringify({
-        summarySettings: {
-          variablePromptTemplate: customizedLegacyTemplate,
-        },
-      }),
-    );
-
-    const template = loadSettings().summarySettings.variablePromptTemplate;
-    expect(template).toBe(customizedLegacyTemplate);
-    expect(shouldOfferVariablePromptTemplateUpdate(template)).toBe(true);
-  });
-
-  it('preserves customized recentBodies-era templates verbatim and offers an update', () => {
-    const customizedLegacyTemplate =
-      '【最近 5 层正文，已剥离旧 ERA 变量块，按旧到新排列】\n{{recentBodies}}\n【当前变量上下文，来自输出提示词渲染结果或等价快照】\n{{variableContext}}\n{{variableGuidance}}\n{{locationContext}}\n【我的自定义规则】\n不要覆盖这一段。';
-
-    window.localStorage.setItem(
-      'wuxia_display_settings',
-      JSON.stringify({
-        summarySettings: {
-          variablePromptTemplate: customizedLegacyTemplate,
-        },
-      }),
-    );
-
-    const template = loadSettings().summarySettings.variablePromptTemplate;
-    expect(template).toBe(customizedLegacyTemplate);
-    expect(shouldOfferVariablePromptTemplateUpdate(template)).toBe(true);
-  });
-
-  it('does not flag an unrelated custom variable prompt merely because it omits latestUserBody', () => {
-    const customTemplate =
-      'CUSTOM VARIABLE PROMPT\\n{{readonlyContextRounds}}\\n{{latestAssistantBody}}\\n{{variableContext}}';
-
-    window.localStorage.setItem(
-      'wuxia_display_settings',
-      JSON.stringify({
-        summarySettings: {
-          variablePromptTemplate: customTemplate,
-        },
-      }),
-    );
-
-    const template = loadSettings().summarySettings.variablePromptTemplate;
-    expect(template).toBe(customTemplate);
-    expect(shouldOfferVariablePromptTemplateUpdate(template)).toBe(false);
+    const loaded = loadSettings().summarySettings;
+    expect(loaded.variableUpdateMode).toBe('extra');
+    expect(loaded.variablePromptTemplate).toBe('CUSTOM MAIN {{variableInputContext}}');
+    expect(loaded.variableInputTemplate).toBe('<x>{{playerContext}}</x>');
+    expect(loaded.variableStructureTemplate).toBe('CUSTOM SCHEMA');
+    expect(loaded.variableGuidanceTemplate).toBe('CUSTOM RULES');
   });
 
   describe('preset storage cleanup', () => {
