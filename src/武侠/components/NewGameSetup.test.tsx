@@ -58,6 +58,19 @@ describe('NewGameSetup trait and identity structure', () => {
     expect(screen.queryByText('先天属性禀赋 (自然觉醒)')).not.toBeInTheDocument();
   });
 
+  it('天赋自选只保留一套，不再重复展示命格全谱自选', () => {
+    renderSetup();
+    fireEvent.click(screen.getByRole('button', { name: /下一步/ }));
+    fireEvent.click(screen.getByRole('button', { name: /下一步/ }));
+    fireEvent.click(screen.getByRole('button', { name: '天赋自选' }));
+
+    const manualTitles = Array.from(document.querySelectorAll('.traits-step .section-title')).filter(element =>
+      element.textContent?.includes('天赋自选'),
+    );
+    expect(manualTitles).toHaveLength(1);
+    expect(screen.queryByText('命格全谱自选')).not.toBeInTheDocument();
+  });
+
   it('身份步骤不再提供独立宗门选择', () => {
     renderSetup();
     goToIdentityStep();
@@ -131,27 +144,32 @@ describe('NewGameSetup appearance generation', () => {
   });
 });
 
-describe('NewGameSetup custom location validation', () => {
+describe('NewGameSetup custom location selection', () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
-  it('自定义开局地点必须是三级或四级路径，支持统一分隔符规范化', () => {
+  it('自定义开局地点使用地点表的三级联动选择，不再提供自由文本输入', () => {
     renderSetup();
     goToOriginStep();
 
-    fireEvent.click(screen.getByRole('radio', { name: '自定义时间地点' }));
-    const locationInput = screen.getByPlaceholderText('例如：大理/无量山/剑湖宫 或 大宋/临安府/西湖');
+    fireEvent.click(screen.getByRole('button', { name: /自定义时间地点/ }));
 
-    fireEvent.change(locationInput, { target: { value: '牛家村' } });
-    fireEvent.click(screen.getByRole('button', { name: /下一步/ }));
-    expect(screen.getByText(/地点需为三级或四级路径/)).toBeInTheDocument();
-    expect(document.querySelector('[data-wuxia-automation="new-game-setup"]')).toHaveAttribute(
-      'data-wuxia-setup-step',
-      'origin',
-    );
+    const areaSelect = screen.getByLabelText('一级大域') as HTMLSelectElement;
+    fireEvent.change(areaSelect, { target: { value: '大宋' } });
 
-    fireEvent.change(locationInput, { target: { value: '大宋>临安府>西湖' } });
+    const regionSelect = screen.getByLabelText('二级区域') as HTMLSelectElement;
+    fireEvent.change(regionSelect, { target: { value: '临安府' } });
+
+    const placeSelect = screen.getByLabelText('三级地点') as HTMLSelectElement;
+    fireEvent.change(placeSelect, { target: { value: '西湖' } });
+
+    expect(areaSelect.value).toBe('大宋');
+    expect(regionSelect.value).toBe('临安府');
+    expect(placeSelect.value).toBe('西湖');
+    expect(screen.getByText('大宋/临安府/西湖')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/大理\/无量山\/剑湖宫/)).not.toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: /下一步/ }));
     expect(document.querySelector('[data-wuxia-automation="new-game-setup"]')).toHaveAttribute(
       'data-wuxia-setup-step',
@@ -165,32 +183,21 @@ describe('NewGameSetup custom realm picker', () => {
     localStorage.clear();
   });
 
-  it('自定义出身只先列大境界，再选择当前大境界的小阶段', () => {
+  it('自定义出身的起始境界使用单一选择栏，不再铺开全部境界按钮', () => {
     renderSetup();
     goToOriginStep();
 
     fireEvent.click(screen.getByText('自定义出身', { selector: '.origin-name' }));
 
-    const majorGroup = screen.getByRole('group', { name: '选择大境界' });
-    expect(within(majorGroup).getAllByRole('button')).toHaveLength(7);
-    expect(within(majorGroup).getByRole('button', { name: '三流' })).toHaveAttribute('aria-pressed', 'true');
+    const realmSelect = screen.getByLabelText('起始境界') as HTMLSelectElement;
+    expect(realmSelect.value).toBe('三流圆满');
 
-    const stageGroup = screen.getByRole('group', { name: '选择境界阶段' });
-    expect(within(stageGroup).getAllByRole('button')).toHaveLength(4);
-    expect(within(stageGroup).getByRole('button', { name: '圆满' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.change(realmSelect, { target: { value: '宗师后期' } });
+    expect(realmSelect.value).toBe('宗师后期');
+    expect(document.querySelector('.realm-hint')).toHaveTextContent('3800');
 
-    fireEvent.click(within(majorGroup).getByRole('button', { name: '宗师' }));
-    const realmHint = document.querySelector('.realm-hint');
-    expect(realmHint).toHaveTextContent('宗师圆满');
-    expect(realmHint).toHaveTextContent('4200');
-
-    const updatedStageGroup = screen.getByRole('group', { name: '选择境界阶段' });
-    fireEvent.click(within(updatedStageGroup).getByRole('button', { name: '后期' }));
-    expect(realmHint).toHaveTextContent('宗师后期');
-    expect(realmHint).toHaveTextContent('3800');
-
-    expect(screen.queryByRole('button', { name: '宗师初期' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '陆地神仙圆满' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: '选择大境界' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: '选择境界阶段' })).not.toBeInTheDocument();
   }, 15000);
 });
 
