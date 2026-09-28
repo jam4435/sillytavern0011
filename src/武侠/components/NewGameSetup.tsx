@@ -70,6 +70,8 @@ import { gameLogger } from '../utils/logger';
  * 兼容 OLD 格式（"三流初期" → "三流"）与裸 "不入流"（无小境界后缀，原样返回）。
  */
 const realmMajor = (realm: string): string => realm.replace(/(初期|中期|后期|圆满)$/, '');
+const REALM_MAJOR_OPTIONS = Array.from(new Set(REALM_LEVELS.map(realm => realmMajor(realm))));
+const getRealmStageLabel = (realm: string): string => realm.replace(realmMajor(realm), '') || '本境';
 
 // 武功品阶点数消耗（直接选择）- 统一到总点数池
 const RANK_POINT_COST: Record<MartialArtsRank, number> = {
@@ -567,6 +569,12 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
     },
     [allActiveTraitNames, martialArtsDatabase, martialFateCandidates, showNotification],
   );
+
+  const handleAbandonMartialFate = useCallback(() => {
+    if (martialFateCandidates.length === 0) return;
+    setMartialFateCandidates([]);
+    showNotification('info', '已放弃本次武缘，已消耗的 5 点不返还');
+  }, [martialFateCandidates.length, showNotification]);
 
   // ============================================
   // 存档数据验证函数
@@ -1158,9 +1166,6 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
         if (remainingPoints < 0) {
           newErrors.martial = '点数不足，请调整武功选择';
         }
-        if (martialFateCandidates.length > 0) {
-          newErrors.martial = '当前武缘尚未择定，请先从候选中选择一门武功';
-        }
         {
           const forbiddenArts = selectedMartialArts.filter(artName => {
             const artData = martialArtsDatabase.find(a => a.功法名称 === artName) || getMartialArtData(artName);
@@ -1208,7 +1213,6 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
     currentStep,
     customLocation,
     martialArtsDatabase,
-    martialFateCandidates.length,
     name,
     remainingPoints,
     selectedMartialArts,
@@ -1229,16 +1233,11 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
 
   // 返回上一步
   const handlePrevStep = useCallback(() => {
-    if (currentStep === 'martial' && martialFateCandidates.length > 0) {
-      showNotification('warning', '当前武缘已经消耗 5 点，请先从候选中择定一门武功');
-      return;
-    }
-
     const prevIndex = currentStepIndex - 1;
     if (prevIndex >= 0) {
       setCurrentStep(stepOrder[prevIndex]);
     }
-  }, [currentStep, currentStepIndex, martialFateCandidates.length, showNotification, stepOrder]);
+  }, [currentStepIndex, stepOrder]);
 
   // 是否可以进入下一步
   const canProceedToNext = useMemo(() => {
@@ -1250,7 +1249,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
       case 'traits':
         return remainingPoints >= 0;
       case 'martial':
-        return remainingPoints >= 0 && martialFateCandidates.length === 0;
+        return remainingPoints >= 0;
       case 'origin':
         // 如果选择自定义时间地点，必须填写地点
         return useEventLocation || customLocation.trim().length > 0;
@@ -1265,7 +1264,6 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
     appearance,
     currentStep,
     customLocation,
-    martialFateCandidates.length,
     name,
     remainingPoints,
     selectedTalentId,
@@ -2646,14 +2644,19 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                 </div>
                 <p className="section-desc">
                   每次寻访固定消耗 {MARTIAL_ARTS_DRAW_COST} 点，随机显现最多 {MARTIAL_FATE_CHOICE_COUNT} 门武功。
-                  从中择一承下；选中的武功会锁定，不再追加品阶点数。
+                  最多承下一门，也可以全部放弃；选中的武功会锁定，不再追加品阶点数。
                 </p>
 
                 {martialFateCandidateArts.length > 0 ? (
                   <>
                     <div className="martial-fate-pending">
-                      <span>本次武缘已支付 {MARTIAL_ARTS_DRAW_COST} 点</span>
-                      <strong>三者择一，择定后其余武功散去</strong>
+                      <div className="martial-fate-pending-copy">
+                        <span>本次武缘已支付 {MARTIAL_ARTS_DRAW_COST} 点</span>
+                        <strong>可承下一门，也可全部放弃后继续前行</strong>
+                      </div>
+                      <button type="button" className="abandon-martial-fate-btn" onClick={handleAbandonMartialFate}>
+                        放弃本次武缘
+                      </button>
                     </div>
                     <div className="martial-fate-grid">
                       {martialFateCandidateArts.map(art => (
@@ -2822,8 +2825,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                   className="back-step-btn"
                   data-wuxia-automation="setup-previous-step"
                   onClick={handlePrevStep}
-                  disabled={isLoading || martialFateCandidates.length > 0}
-                  title={martialFateCandidates.length > 0 ? '请先择定当前武缘' : undefined}
+                  disabled={isLoading}
                 >
                   <span className="btn-arrow">←</span>
                   <span className="btn-text">上一步</span>
@@ -2834,9 +2836,8 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                   data-wuxia-automation="setup-next-step"
                   onClick={handleNextStep}
                   disabled={isLoading || !canProceedToNext}
-                  title={martialFateCandidates.length > 0 ? '请先择定当前武缘' : undefined}
                 >
-                  <span className="btn-text">{martialFateCandidates.length > 0 ? '请先择定武缘' : '下一步'}</span>
+                  <span className="btn-text">下一步</span>
                   <span className="btn-arrow">→</span>
                   <div className="btn-glow" />
                 </button>
@@ -2948,7 +2949,7 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
                       <div>
                         <span className="custom-origin-kicker">自定义身份</span>
                         <h4 className="subsection-title">自定义出身设置</h4>
-                        <p>只保留开局真正需要填写的身份背景与境界，不再把所有境界铺满页面。</p>
+                        <p>大境界与小阶段分开选择，避免所有完整境界挤在同一个长列表里。</p>
                       </div>
                       <span className={`custom-origin-realm-badge realm-${realmMajor(customRealm)}`}>{customRealm}</span>
                     </div>
@@ -2956,26 +2957,58 @@ const NewGameSetup: React.FC<NewGameSetupProps> = ({ onSubmit, onBack, isLoading
 
                     {/* 自定义境界选择 */}
                     <div className="form-group custom-origin-field">
-                      <label className="form-label" htmlFor="custom-origin-realm">起始境界</label>
-                      <div className="select-wrapper">
-                        <select
-                          id="custom-origin-realm"
-                          className="setup-select"
-                          aria-label="起始境界"
-                          value={customRealm}
-                          onChange={e => setCustomRealm(e.target.value as RealmLevel)}
-                          disabled={isLoading}
-                        >
-                          {REALM_LEVELS.map(realm => (
-                            <option key={realm} value={realm}>
-                              {realm}
-                            </option>
-                          ))}
-                        </select>
-                        <span className="select-chevron" aria-hidden="true">⌄</span>
+                      <label className="form-label">起始境界</label>
+                      <div className="custom-realm-selectors">
+                        <div className="custom-realm-select">
+                          <label className="compact-field-label" htmlFor="custom-origin-realm-major">大境界</label>
+                          <div className="select-wrapper">
+                            <select
+                              id="custom-origin-realm-major"
+                              className="setup-select"
+                              aria-label="大境界"
+                              value={realmMajor(customRealm)}
+                              onChange={e => {
+                                const nextMajor = e.target.value;
+                                const sameMajorRealms = REALM_LEVELS.filter(realm => realmMajor(realm) === nextMajor);
+                                const currentStage = getRealmStageLabel(customRealm);
+                                const sameStageRealm = sameMajorRealms.find(
+                                  realm => getRealmStageLabel(realm) === currentStage,
+                                );
+                                setCustomRealm((sameStageRealm || sameMajorRealms[0]) as RealmLevel);
+                              }}
+                              disabled={isLoading}
+                            >
+                              {REALM_MAJOR_OPTIONS.map(major => (
+                                <option key={major} value={major}>{major}</option>
+                              ))}
+                            </select>
+                            <span className="select-chevron" aria-hidden="true">⌄</span>
+                          </div>
+                        </div>
+                        <div className="custom-realm-select">
+                          <label className="compact-field-label" htmlFor="custom-origin-realm-stage">小境界</label>
+                          <div className="select-wrapper">
+                            <select
+                              id="custom-origin-realm-stage"
+                              className="setup-select"
+                              aria-label="小境界"
+                              value={customRealm}
+                              onChange={e => setCustomRealm(e.target.value as RealmLevel)}
+                              disabled={
+                                isLoading ||
+                                REALM_LEVELS.filter(realm => realmMajor(realm) === realmMajor(customRealm)).length <= 1
+                              }
+                            >
+                              {REALM_LEVELS.filter(realm => realmMajor(realm) === realmMajor(customRealm)).map(realm => (
+                                <option key={realm} value={realm}>{getRealmStageLabel(realm)}</option>
+                              ))}
+                            </select>
+                            <span className="select-chevron" aria-hidden="true">⌄</span>
+                          </div>
+                        </div>
                       </div>
                       <p className="realm-hint">
-                        起始修为 <strong>{REALM_CULTIVATION_MAP[customRealm] ?? 0}</strong>
+                        当前 <strong>{customRealm}</strong> · 起始修为 <strong>{REALM_CULTIVATION_MAP[customRealm] ?? 0}</strong>
                       </p>
                     </div>
 
