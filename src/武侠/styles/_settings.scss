@@ -2417,6 +2417,83 @@
   min-height: 260px;
 }
 
+
+.variable-prompt-slot-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.55rem 0 0.7rem;
+}
+
+.variable-prompt-slot-chip {
+  border: 1px solid rgba(168, 162, 158, 0.35);
+  background: rgba(28, 25, 23, 0.45);
+  color: $stone-400;
+  padding: 0.28rem 0.5rem;
+  font: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+  border-radius: 999px;
+
+  &:hover,
+  &.active {
+    color: $amber-500;
+    border-color: rgba(217, 119, 6, 0.65);
+    background: rgba(120, 53, 15, 0.14);
+  }
+}
+
+.variable-prompt-slot-inspector {
+  margin: 0 0 0.7rem;
+  padding: 0.65rem;
+  border: 1px solid rgba(168, 162, 158, 0.22);
+  background: rgba(28, 25, 23, 0.28);
+}
+
+.variable-prompt-slot-inspector-title,
+.variable-prompt-slot-preview-label {
+  color: $stone-300;
+  font-size: 0.8rem;
+  margin-bottom: 0.45rem;
+}
+
+.variable-prompt-slot-inspector-grid {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.55rem;
+  font-size: 0.75rem;
+
+  > div {
+    display: grid;
+    grid-template-columns: 4.2rem minmax(0, 1fr);
+    gap: 0.45rem;
+  }
+
+  strong {
+    color: $stone-500;
+    font-weight: normal;
+  }
+
+  span {
+    color: $stone-400;
+    overflow-wrap: anywhere;
+  }
+}
+
+.variable-prompt-slot-preview {
+  margin: 0.35rem 0 0;
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 0.6rem;
+  border: 1px solid rgba(168, 162, 158, 0.18);
+  background: rgba(12, 10, 9, 0.55);
+  color: $stone-300;
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+
 .summary-model-control {
   align-items: stretch;
 
