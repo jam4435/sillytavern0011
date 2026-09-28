@@ -148,23 +148,12 @@ type ExtraVariableRunDecision = {
 
 function createExtraVariableRunDecision(
   trigger: ExtraVariableDecisionTrigger,
-  settings: SummarySettings,
 ): ExtraVariableRunDecision {
-  const modeSnapshot = settings.variableUpdateMode;
-  if (modeSnapshot === 'extra') {
-    return {
-      trigger,
-      modeSnapshot,
-      shouldRunExtra: true,
-      skipReason: '',
-    };
-  }
-
   return {
     trigger,
-    modeSnapshot,
-    shouldRunExtra: false,
-    skipReason: `本轮模式快照为 ${modeSnapshot}，跳过额外变量更新。`,
+    modeSnapshot: 'extra',
+    shouldRunExtra: true,
+    skipReason: '',
   };
 }
 
@@ -574,7 +563,7 @@ export function useMessageHandler({
       showLoading('正在生成回复...');
       messageLogger.log('🔄 isLoading 设置为 true');
       const debugRoundId = beginDebugRound(message);
-      const extraVariableDecision = createExtraVariableRunDecision('send', summarySettings);
+      const extraVariableDecision = createExtraVariableRunDecision('send');
       patchLatestDebugRound({
         variable: createInitialExtraVariableDecisionPatch(extraVariableDecision),
       });
@@ -1143,7 +1132,7 @@ export function useMessageHandler({
           : '正在重新生成回复...',
     );
     const debugRoundId = beginDebugRound(actionLabel);
-    const extraVariableDecision = createExtraVariableRunDecision('regenerate', summarySettings);
+    const extraVariableDecision = createExtraVariableRunDecision('regenerate');
     patchLatestDebugRound({
       variable: createInitialExtraVariableDecisionPatch(extraVariableDecision),
     });
