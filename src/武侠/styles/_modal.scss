@@ -28,9 +28,9 @@
     28,
     25,
     23,
-    calc(0.72 * var(--wuxia-modal-opacity-low, 1) + 0.28 * var(--wuxia-modal-opacity-high, 0))
+    calc(0.84 * var(--wuxia-modal-opacity-low, 1) + 0.16 * var(--wuxia-modal-opacity-high, 0))
   );
-  border: 1px solid rgba(133, 77, 14, 0.3);
+  border: 1px solid rgba(181, 137, 80, 0.4);
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.32);
   display: flex;
   flex-direction: column;

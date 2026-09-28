@@ -147,6 +147,19 @@ $z-fullscreen: 100;
   --stone-300: #{$stone-300};
   --stone-200: #{$stone-200};
 
+  // 语义化可读性层级：组件优先使用这些变量，而不是直接依赖 stone 色阶。
+  // 这样黑金 / 水墨主题可以共享同一套层级规则，避免小字被多重透明度压暗。
+  --ui-text-primary: #{$stone-100};
+  --ui-text-secondary: #{$stone-300};
+  --ui-text-muted: #{$stone-400};
+  --ui-text-disabled: #{$stone-600};
+  --ui-border: rgba(168, 162, 158, 0.18);
+  --ui-border-strong: rgba(214, 211, 209, 0.3);
+  --ui-surface-subtle: rgba(255, 255, 255, 0.035);
+  --ui-surface-hover: rgba(255, 255, 255, 0.07);
+  --ui-accent: #{$amber-600};
+  --ui-accent-soft: rgba(217, 119, 6, 0.14);
+
   --yellow-900: #{$yellow-900};
   --yellow-800: #{$yellow-800};
   --yellow-700: #{$yellow-700};
