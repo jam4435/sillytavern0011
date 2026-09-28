@@ -2,21 +2,14 @@
  * 人物特质数据库（草稿/完整重构方案）
  *
  * 统一规范：
- * - 品阶与花费：
- *   粗浅(白): 3点 | 传家(绿): 8点 | 上乘(蓝): 14点 | 镇派(紫): 18点 | 绝世(金): 24点 | 传说(红): 30点
- *   缺陷(负面): 轻度 -3点 | 中度 -6点 | 重度/断门 -10点 | 绝灭 -20点
- * - 分类：天资 | 体质 | 性情 | 气质 | 命格 | 缺陷 （彻底移除“经历”与“专长”，所有特质均严格归入此六类）
- * - 核心设计原则：
- *   1. 拒绝为了凑数强塞属性与特质，很多风味/人际特质纯靠 Prompt 驱动即可，无需生硬堆砌属性。
- *   2. 风格化加成：身体轻灵/厚重直接辐射到对应风格的武学，而非狭隘限制单一兵刃。
- *   3. 牛头人/情缘特质归类与逻辑修正：
- *      - 容貌魅力归入【气质】（天生尤物、倾国倾城）
- *      - 行事心性归入【性情】（红颜知己、移花接木、夺妻之恨、太上忘情）
- *      - 际遇因果归入【命格】（苦主命格、吃软饭、魏武遗风）
- *      - 特殊练功体质归入【体质】（绿帽神功：伴侣与他人在一起时修炼速度翻十倍）
- *   4. 奇人娱乐天赋品阶合理化（纯路人、乌鸦嘴归为粗浅3点，避免虚高）。
- *   5. 全面剔除现代医学词汇（骨质疏松 -> 酥骨宿疾，肌肉萎缩 -> 形销骨立，反应迟缓 -> 神思木讷，视而不见 -> 目不辨微）。
- *   6. 【断根绝阳】作为-10点负面缺陷，通过属性小调整与严谨的 Prompt 引导大模型限制情缘与纯阳童子功。
+ * - 品阶与花费判定法则（严格按收益层级自底向上）：
+ *   1. 缺陷(负面): -3 / -6 / -10 / -20，产生负面影响、伤残、阻碍。
+ *   2. 粗浅(白): 3点。门槛级/纯风味项。无直接属性数值加成，靠纯 Prompt 驱动微弱风味或人际倾向。
+ *   3. 传家(绿): 8点。产生实质影响的初阶项。单一核心属性加成(+10~15) 或 单系武学熟练度折扣(20~25%)。
+ *   4. 上乘(蓝): 14点。复合加成/多系精通/强力剧情特权。多系复合折扣 或 强力保命特权。
+ *   5. 镇派(紫): 18点。质变级核心特质。改变战斗/功法格局的专属机制、巨大数值爆发、强因果律特权。
+ *   6. 绝世(金): 24点 | 传说(红): 30点。改命级先天体质与天地灵胎。
+ * - 分类：天资 | 体质 | 性情 | 气质 | 命格 | 缺陷 （彻底移除“经历”与“专长”）
  */
 
 import type {
@@ -38,94 +31,9 @@ const COMBAT_RULE_PROMPT =
  */
 export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
   // ============================================
-  // 1. 武道天资与风格（天资）
+  // 一、武道天资与技艺风格（天资）
   // ============================================
-  // 剑法专精
-  {
-    name: '剑痴',
-    rank: '传家',
-    category: '性情',
-    cost: 8,
-    description: '对剑有着近乎偏执的痴迷，研习剑法事半功倍，但对其他兵刃兴致缺缺。',
-    discounts: { martialTypeDiscount: { 剑法: 0.25 } },
-    flavorPrompt: COMBAT_RULE_PROMPT,
-  },
-  {
-    name: '剑心通明',
-    rank: '镇派',
-    category: '天资',
-    cost: 18,
-    description: '生具剑心，对于剑路虚实与剑势脉络异常敏锐，研习剑经时往往能早一步参透关窍。',
-    attributeModifiers: { 洞察: 15 },
-    discounts: { martialTypeDiscount: { 剑法: 0.2 } },
-    flavorPrompt: '观剑极具慧眼，能捕捉剑路转折之精微，但不能凭特质直接看穿高深武学或越级取胜。',
-  },
-
-  // 风格化武道：轻灵 vs 沉重
-  {
-    name: '身手矫捷',
-    rank: '上乘',
-    category: '天资',
-    cost: 14,
-    description: '身形轻捷，手随心运，擅长一切走轻灵巧变一路的武学与兵刃。',
-    attributeModifiers: { 机敏: 15 },
-    discounts: { martialTypeDiscount: { 剑法: 0.15, 暗器: 0.15, 轻功: 0.15 } },
-    flavorPrompt: '举手投足灵秀轻捷，出招转换毫无滞涩；战力仍以属性与所学武功为准。',
-  },
-  {
-    name: '沉岳重劲',
-    rank: '上乘',
-    category: '体质',
-    cost: 14,
-    description: '骨重筋强，身藏沉岳之劲，天生适合驾驭厚拙沉兵与大开大阖的刚猛劲力。',
-    attributeModifiers: { 臂力: 15 },
-    discounts: { martialTypeDiscount: { 刀法: 0.15, 枪戟: 0.15, 拳掌: 0.15 } },
-    flavorPrompt: '举重若轻，渊渟岳峙，以浑厚沉劲见长；战力仍以属性与所学武功为准。',
-  },
-
-  // 战场与长兵搏杀
-  {
-    name: '嗜战如狂',
-    rank: '传家',
-    category: '性情',
-    cost: 8,
-    description: '性情好勇斗狠，越逢强敌越容易全神贯注，对凶猛直接的劈砍冲杀有异乎常人的热情。',
-    attributeModifiers: { 臂力: 10 },
-    discounts: { martialTypeDiscount: { 刀法: 0.2, 枪戟: 0.2 } },
-    flavorPrompt: COMBAT_RULE_PROMPT,
-  },
-  {
-    name: '沙场本能',
-    rank: '传家',
-    category: '天资',
-    cost: 8,
-    description: '面对多人围逼临危不乱，擅察群敌进退方位，极善利用丈八长兵的空间之利掌控方圆。',
-    attributeModifiers: { 臂力: 10 },
-    discounts: { martialTypeDiscount: { 枪戟: 0.25 } },
-    flavorPrompt: COMBAT_RULE_PROMPT,
-  },
-  {
-    name: '临阵无惧',
-    rank: '镇派',
-    category: '性情',
-    cost: 18,
-    description: '泰山崩于前而色不变，身陷重围之时心境愈发沉稳，毫无畏难怯战之意。',
-    attributeModifiers: { 臂力: 15, 气血: 10 },
-    discounts: { martialTypeDiscount: { 枪戟: 0.2, 刀法: 0.15 } },
-    flavorPrompt: COMBAT_RULE_PROMPT,
-  },
-
-  // 拳掌与暗器机巧
-  {
-    name: '铁拳天成',
-    rank: '传家',
-    category: '体质',
-    cost: 8,
-    description: '掌骨坚厚，腕肘硬朗，天生一副修炼外家拳掌功夫的强健体格。',
-    attributeModifiers: { 臂力: 10 },
-    discounts: { martialTypeDiscount: { 拳掌: 0.25 } },
-    flavorPrompt: COMBAT_RULE_PROMPT,
-  },
+  // 粗浅 (3点)：纯手法入门，微量单系折扣
   {
     name: '弹指生风',
     rank: '粗浅',
@@ -145,6 +53,65 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: '手脚麻利细密，善于拨弄细小机括与暗锁。',
   },
   {
+    name: '草上飞',
+    rank: '粗浅',
+    category: '天资',
+    cost: 3,
+    description: '下盘轻快灵巧，折转腾挪极具天分，跋山涉水或穿街过巷如履平地。',
+    discounts: { martialTypeDiscount: { 轻功: 0.15 } },
+    flavorPrompt: COMBAT_RULE_PROMPT,
+  },
+  {
+    name: '尝药辨草',
+    rank: '粗浅',
+    category: '天资',
+    cost: 3,
+    description: '略识百草药性，采集山野药材时偶能辨识良药，对医理有天然灵性。',
+    flavorPrompt: '见草木便下意识掐闻辨味，口尝药性习以为常。',
+  },
+
+  // 传家 (8点)：扎实专精或单一属性
+  {
+    name: '沙场本能',
+    rank: '传家',
+    category: '天资',
+    cost: 8,
+    description: '面对多人围逼临危不乱，擅察群敌进退方位，极善利用丈八长兵的空间之利掌控方圆。',
+    attributeModifiers: { 臂力: 10 },
+    discounts: { martialTypeDiscount: { 枪戟: 0.25 } },
+    flavorPrompt: COMBAT_RULE_PROMPT,
+  },
+  {
+    name: '临机迅捷',
+    rank: '传家',
+    category: '天资',
+    cost: 8,
+    description: '灵台警觉，应变若电，遭逢猝变之际机断立决，绝无分秒迟滞。',
+    attributeModifiers: { 机敏: 10 },
+    flavorPrompt: COMBAT_RULE_PROMPT,
+  },
+  {
+    name: '触类旁通',
+    rank: '传家',
+    category: '天资',
+    cost: 8,
+    description: '武学悟性出众，举一反三，研习招式效率过人。',
+    discounts: { savvyRequirementOffset: -1 },
+    flavorPrompt: COMBAT_RULE_PROMPT,
+  },
+
+  // 上乘 (14点)：多系复合与多维折扣
+  {
+    name: '身手矫捷',
+    rank: '上乘',
+    category: '天资',
+    cost: 14,
+    description: '身形轻捷，手随心运，擅长一切走轻灵巧变一路的武学与兵刃。',
+    attributeModifiers: { 机敏: 15 },
+    discounts: { martialTypeDiscount: { 剑法: 0.15, 暗器: 0.15, 轻功: 0.15 } },
+    flavorPrompt: '举手投足灵秀轻捷，出招转换毫无滞涩；战力仍以属性与所学武功为准。',
+  },
+  {
     name: '袖中藏锋',
     rank: '上乘',
     category: '天资',
@@ -154,15 +121,59 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     discounts: { martialTypeDiscount: { 暗器: 0.2 } },
     flavorPrompt: COMBAT_RULE_PROMPT,
   },
-
-  // 身法轻功与全武道通识
   {
-    name: '草上飞',
-    rank: '粗浅',
+    name: '药王转世',
+    rank: '上乘',
     category: '天资',
+    cost: 14,
+    description: '对药性、脉象与人体经络参悟极快，研习医理药道无师自通，丹药吸收与疗伤药效极佳。',
+    attributeModifiers: { 气血: 15, 内力: 15 },
+    flavorPrompt: '望闻问切信手拈来，对诸派毒伤病患胸有成竹，服用丹药药效吸收倍增。',
+  },
+
+  // 镇派 (18点)：顶尖武道直觉
+  {
+    name: '剑心通明',
+    rank: '镇派',
+    category: '天资',
+    cost: 18,
+    description: '生具剑心，对于剑路虚实与剑势脉络异常敏锐，研习剑经时往往能早一步参透关窍。',
+    attributeModifiers: { 洞察: 15 },
+    discounts: { martialTypeDiscount: { 剑法: 0.2 } },
+    flavorPrompt: '观剑极具慧眼，能捕捉剑路转折之精微，但不能凭特质直接看穿高深武学或越级取胜。',
+  },
+  {
+    name: '武学奇才',
+    rank: '镇派',
+    category: '天资',
+    cost: 18,
+    description: '天生百脉具通的绝代奇才，任何深奥武功一看便懂，极难遇到修炼瓶颈。',
+    discounts: { savvyRequirementOffset: -2, globalUpgradeDiscount: 0.15 },
+    flavorPrompt: COMBAT_RULE_PROMPT,
+  },
+
+  // ============================================
+  // 二、肉身体魄与经脉内息（体质）
+  // ============================================
+  // 粗浅 (3点)
+  {
+    name: '体魄强健',
+    rank: '粗浅',
+    category: '体质',
     cost: 3,
-    description: '下盘轻快灵巧，折转腾挪极具天分，跋山涉水或穿街过巷如履平地。',
-    discounts: { martialTypeDiscount: { 轻功: 0.15 } },
+    description: '生来体格健壮，气血充沛，比常人更能经受风霜劳苦。',
+    attributeModifiers: { 根骨: 10, 气血: 10 },
+    flavorPrompt: COMBAT_RULE_PROMPT,
+  },
+
+  // 传家 (8点)
+  {
+    name: '铜皮铁骨',
+    rank: '传家',
+    category: '体质',
+    cost: 8,
+    description: '天生筋厚骨密，肉搏摔打之下耐受远胜常人，不惧寻常刀棍磕碰。',
+    attributeModifiers: { 根骨: 15, 气血: 15 },
     flavorPrompt: COMBAT_RULE_PROMPT,
   },
   {
@@ -176,70 +187,13 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: COMBAT_RULE_PROMPT,
   },
   {
-    name: '临机迅捷',
-    rank: '上乘',
-    category: '天资',
-    cost: 14,
-    description: '灵台警觉，应变若电，遭逢猝变之际机断立决，绝无分秒迟滞。',
-    attributeModifiers: { 机敏: 15 },
-    flavorPrompt: COMBAT_RULE_PROMPT,
-  },
-  {
-    name: '触类旁通',
-    rank: '传家',
-    category: '天资',
-    cost: 8,
-    description: '武学悟性出众，举一反三，研习招式效率过人。',
-    discounts: { savvyRequirementOffset: -1 },
-    flavorPrompt: COMBAT_RULE_PROMPT,
-  },
-  {
-    name: '嗜武如命',
-    rank: '上乘',
-    category: '性情',
-    cost: 14,
-    description: '将武道视为生命，无时无刻不在揣摩切磋，全流派功法精进速度均获得提升。',
-    discounts: { globalUpgradeDiscount: 0.1 },
-    flavorPrompt: COMBAT_RULE_PROMPT,
-  },
-  {
-    name: '武学奇才',
-    rank: '镇派',
-    category: '天资',
-    cost: 18,
-    description: '天生百脉具通的绝代奇才，任何深奥武功一看便懂，极难遇到修炼瓶颈。',
-    discounts: { savvyRequirementOffset: -2, globalUpgradeDiscount: 0.15 },
-    flavorPrompt: COMBAT_RULE_PROMPT,
-  },
-
-  // ============================================
-  // 2. 肉身体魄与经脉内息（体质 / 医毒）
-  // ============================================
-  {
-    name: '体魄强健',
-    rank: '粗浅',
-    category: '体质',
-    cost: 3,
-    description: '生来体格健壮，气血充沛，比常人更能经受风霜劳苦。',
-    attributeModifiers: { 根骨: 10, 气血: 10 },
-    flavorPrompt: COMBAT_RULE_PROMPT,
-  },
-  {
-    name: '铜皮铁骨',
+    name: '铁拳天成',
     rank: '传家',
     category: '体质',
     cost: 8,
-    description: '天生筋厚骨密，肉搏摔打之下耐受远胜常人，不惧寻常刀棍磕碰。',
-    attributeModifiers: { 根骨: 15, 气血: 15 },
-    flavorPrompt: COMBAT_RULE_PROMPT,
-  },
-  {
-    name: '金刚不坏',
-    rank: '镇派',
-    category: '体质',
-    cost: 18,
-    description: '筋骨若精钢交铸，气血如烘炉初沸，是百里挑一的外家横练巅峰胚子。',
-    attributeModifiers: { 根骨: 25, 气血: 25 },
+    description: '掌骨坚厚，腕肘硬朗，天生一副修炼外家拳掌功夫的强健体格。',
+    attributeModifiers: { 臂力: 10 },
+    discounts: { martialTypeDiscount: { 拳掌: 0.25 } },
     flavorPrompt: COMBAT_RULE_PROMPT,
   },
   {
@@ -252,6 +206,58 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     discounts: { martialTypeDiscount: { 内功: 0.15 } },
     flavorPrompt: COMBAT_RULE_PROMPT,
   },
+
+  // 上乘 (14点)
+  {
+    name: '沉岳重劲',
+    rank: '上乘',
+    category: '体质',
+    cost: 14,
+    description: '骨重筋强，身藏沉岳之劲，天生适合驾驭厚拙沉兵与大开大阖的刚猛劲力。',
+    attributeModifiers: { 臂力: 15 },
+    discounts: { martialTypeDiscount: { 刀法: 0.15, 枪戟: 0.15, 拳掌: 0.15 } },
+    flavorPrompt: '举重若轻，渊渟岳峙，以浑厚沉劲见长；战力仍以属性与所学武功为准。',
+  },
+  {
+    name: '百毒不侵',
+    rank: '上乘',
+    category: '体质',
+    cost: 14,
+    description: '体质奇异或服食过天地奇草，寻常草木蛇蝎剧毒入口如饮寻常茶汤。',
+    attributeModifiers: { 根骨: 15 },
+    flavorPrompt: '见毒物面不改色，寻常蒙汗药砒霜入腹毫无波澜。',
+  },
+
+  // 镇派 (18点)
+  {
+    name: '金刚不坏',
+    rank: '镇派',
+    category: '体质',
+    cost: 18,
+    description: '筋骨若精钢交铸，气血如烘炉初沸，是百里挑一的外家横练巅峰胚子。',
+    attributeModifiers: { 根骨: 25, 气血: 25 },
+    flavorPrompt: COMBAT_RULE_PROMPT,
+  },
+  {
+    name: '万毒归宗',
+    rank: '镇派',
+    category: '体质',
+    cost: 18,
+    description: '以身纳毒淬炼肉身，周身血液化为剧毒，筋脉对诸多剧毒产生免疫适应。',
+    attributeModifiers: { 气血: 15, 内力: 15 },
+    flavorPrompt: '体带幽微草药苦香，血色隐泛乌紫，寻常蚊蝇沾体即毙。',
+  },
+  {
+    name: '绿帽神功',
+    rank: '镇派',
+    category: '体质',
+    cost: 18,
+    description: '异种玄异体质。心念与道侣紧密相连，当心爱之人与其他男性亲密或在一起时，体内真气逆流激荡，修炼速度翻十倍！',
+    attributeModifiers: { 内力: 20, 气血: 15 },
+    flavorPrompt: '心念感知到爱人与其他男性苟合或在一起时，不仅心境毫无崩溃，周身真气反倒如江河奔涌，修炼进境一日千里（提升十倍）。',
+  },
+
+  // 绝世 (24点) / 传说 (30点)
   {
     name: '九阳之体',
     rank: '绝世',
@@ -271,50 +277,6 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: COMBAT_RULE_PROMPT,
   },
   {
-    name: '紫气东来',
-    rank: '传说',
-    category: '体质',
-    cost: 30,
-    description: '先天道门灵胎，每日清晨吞吐朝霞紫气，百脉温润无瑕，内息纯阳浩然。',
-    attributeModifiers: { 内力: 30, 根骨: 20, 气血: 20 },
-    flavorPrompt: COMBAT_RULE_PROMPT,
-  },
-  {
-    name: '尝药辨草',
-    rank: '粗浅',
-    category: '天资',
-    cost: 3,
-    description: '略识百草药性，采集山野药材时偶能辨识良药，对医理有天然灵性。',
-    flavorPrompt: '见草木便下意识掐闻辨味，口尝药性习以为常。',
-  },
-  {
-    name: '药王转世',
-    rank: '上乘',
-    category: '天资',
-    cost: 14,
-    description: '对药性、脉象与人体经络参悟极快，研习医理药道往往能触类旁通，丹药吸收更佳。',
-    attributeModifiers: { 气血: 10, 内力: 10 },
-    flavorPrompt: '望闻问切信手拈来，对各门派毒伤病患胸有成竹。',
-  },
-  {
-    name: '百毒不侵',
-    rank: '上乘',
-    category: '体质',
-    cost: 14,
-    description: '体质奇异或服食过天地奇草，寻常草木蛇蝎剧毒入口如饮寻常茶汤。',
-    attributeModifiers: { 根骨: 15 },
-    flavorPrompt: '见毒物面不改色，寻常蒙汗药砒霜入腹毫无波澜。',
-  },
-  {
-    name: '万毒归宗',
-    rank: '镇派',
-    category: '体质',
-    cost: 18,
-    description: '以身纳毒淬炼肉身，周身血液化为剧毒，筋脉对诸多剧毒产生免疫适应。',
-    attributeModifiers: { 气血: 15, 内力: 15 },
-    flavorPrompt: '体带幽微草药苦香，血色隐泛乌紫，寻常蚊蝇沾体即毙。',
-  },
-  {
     name: '本命蛊王',
     rank: '绝世',
     category: '体质',
@@ -323,105 +285,20 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     attributeModifiers: { 气血: 20, 根骨: 15 },
     flavorPrompt: '心房常有微弱异样律动，遇剧毒恶障蛊虫自发护体长鸣。',
   },
-
-  // ============================================
-  // 3. 人际情缘、因果魅力与心性（自然归入 气质/性情/命格/体质）
-  // ============================================
   {
-    name: '眉清目秀',
-    rank: '粗浅',
-    category: '气质',
-    cost: 3,
-    description: '长相干净讨喜，初见之时容易获得江湖长辈与市井豪客的好感照拂。',
-    flavorPrompt: '相貌清秀端正，日常问路打听消息时NPC态度亲和耐烦。',
-  },
-  {
-    name: '天生尤物',
-    rank: '传家',
-    category: '气质',
-    cost: 8,
-    description: '风姿绰约冠绝同侪，举手投足极具异性吸引力，容易引得高手侧目。',
-    flavorPrompt: '容貌气质出众，异性NPC与之对视常有恍惚，非深仇大恨极难痛下杀手。',
-  },
-  {
-    name: '倾国倾城',
-    rank: '绝世',
-    category: '气质',
-    cost: 24,
-    description: '祸水级绝世容姿，一举一动足以牵动数大宗门恩怨，群雄争相折腰。',
-    flavorPrompt: '风华绝代倾国倾城，江湖豪杰、正邪掌门常为其一颦一笑而大动干戈。',
-  },
-  {
-    name: '红颜知己',
-    rank: '传家',
-    category: '性情',
-    cost: 8,
-    description: '极擅倾听异性在伴侣面前无法启齿的委屈，善于在他人情感裂隙中获得深厚信任与依赖。',
-    flavorPrompt: '异性极易视其为知心良友，倾诉夫妻隔阂，剧情中极擅充当感情倾诉与情感慰藉对象。',
-  },
-  {
-    name: '移花接木',
-    rank: '传家',
-    category: '性情',
-    cost: 8,
-    description: '命带绿云，极易遭遇枕边人背叛，却心甘情愿替他人养育子女，抚养后代毫无芥蒂。',
-    flavorPrompt: '极易在剧情中遭遇伴侣背叛并替他人抚育子嗣，且对待非亲生骨肉毫无芥蒂、视若己出。',
-  },
-  {
-    name: '夺妻之恨',
-    rank: '上乘',
-    category: '性情',
-    cost: 14,
-    description: '道侣被夺或被奸人所害后化身复仇修罗，煞气郁结于心，面对仇家时招招致命凶险。',
-    attributeModifiers: { 臂力: 15 },
-    flavorPrompt: '刻骨仇恨铭刻于心，面对仇敌或轻薄之徒时杀伐果断，言语冰冷绝情。',
-  },
-  {
-    name: '太上忘情',
-    rank: '绝世',
-    category: '性情',
-    cost: 24,
-    description: '历尽沧海斩断世俗红尘羁绊，心境无垢，参悟高深武学犹如明镜止水。',
-    discounts: { savvyRequirementOffset: -3, globalUpgradeDiscount: 0.1 },
-    flavorPrompt: '情至极处反归于淡漠，清冷超然，举手投足无半点凡尘情欲纠缠。',
-  },
-  {
-    name: '苦主命格',
-    rank: '传家',
-    category: '命格',
-    cost: 8,
-    description: '命中注定多遇绿帽情劫，伴侣极易红杏出墙或被他人所夺；然而戴绿帽与失所爱时修行速度成倍暴增。',
-    flavorPrompt: '命带苦主绿帽因果，伴侣极易背着主角私通或移情别恋；伴侣背叛后主角心境剧震，化绿帽屈辱为苦修动力。',
-  },
-  {
-    name: '吃软饭',
-    rank: '上乘',
-    category: '命格',
-    cost: 14,
-    description: '命中多逢女贵人庇护，极易引动高境界异性强者的照拂宠溺，危难关头往往有绝顶高手挺身相助。',
-    flavorPrompt: '命格自带软饭气运，极受高阶异性NPC青睐照顾，遇险时常有强者出面护短替其摆平。',
-  },
-  {
-    name: '魏武遗风',
-    rank: '镇派',
-    category: '命格',
-    cost: 18,
-    description: '命中自带曹贼机缘，对已有家室之异性吸引力奇高，且言谈举止反常地常被其夫婿伴侣视为生死兄弟与莫逆之交。',
-    flavorPrompt: '在人妇或名花有主者面前魅力非凡，且其原配伴侣往往对其信任有加、引为知己通家之好。',
-  },
-  {
-    name: '绿帽神功',
-    rank: '镇派',
+    name: '紫气东来',
+    rank: '传说',
     category: '体质',
-    cost: 18,
-    description: '异种玄异体质。心念与道侣紧密相连，当心爱之人与其他男性亲密或在一起时，体内真气逆流激荡，修炼速度翻十倍！',
-    attributeModifiers: { 内力: 20, 气血: 15 },
-    flavorPrompt: '心念感知到爱人与其他男性苟合或在一起时，不仅心境毫无崩溃，周身真气反倒如江河奔涌，修炼进境一日千里（提升十倍）。',
+    cost: 30,
+    description: '先天道门灵胎，每日清晨吞吐朝霞紫气，百脉温润无瑕，内息纯阳浩然。',
+    attributeModifiers: { 内力: 30, 根骨: 20, 气血: 20 },
+    flavorPrompt: COMBAT_RULE_PROMPT,
   },
 
   // ============================================
-  // 4. 江湖性情与奇人因果
+  // 三、心性脾气与为人处世（性情）
   // ============================================
+  // 粗浅 (3点)：纯性格或自虐整活向（无数值加成，纯Prompt）
   {
     name: '古灵精怪',
     rank: '粗浅',
@@ -447,20 +324,41 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: '路见不平一身浩然正气，宁折不弯，侠名远播。',
   },
   {
-    name: '纯路人',
+    name: '移花接木',
     rank: '粗浅',
-    category: '气质',
+    category: '性情',
     cost: 3,
-    description: '气韵平淡如微尘，走入人群或脱战数日后，寻常江湖人极易将其容貌忘得精光。',
-    flavorPrompt: '五官平淡如水，走入人群瞬息无踪，NPC转头便记不清其具体样貌。',
+    description: '命带绿云，极易遭遇枕边人背叛，却心甘情愿替他人养育子女，抚养后代毫无芥蒂。',
+    flavorPrompt: '极易在剧情中遭遇伴侣背叛并替他人抚育子嗣，且对待非亲生骨肉毫无芥蒂、视若己出。',
   },
   {
-    name: '乌鸦嘴',
+    name: '枯木蛰伏',
     rank: '粗浅',
-    category: '命格',
+    category: '性情',
     cost: 3,
-    description: '言语仿佛受无形天道反向牵引，好的不灵坏的灵，一旦把话说得太满，后续往往离奇遭重逆转。',
-    flavorPrompt: '日常聊天立下定论或笃定预测时往往离奇逆转生祸，同伴对其开口提心吊胆，堪称因果律反转。',
+    description: '极擅借助环境收敛生息，耐性如铁，可为达成目的在恶劣环境下潜伏数日静候良机。',
+    flavorPrompt: '耐性极佳气息如枯木，隐匿潜行时极难被旁人察觉动静。',
+  },
+
+  // 传家 (8点)：显著性格倾向或单一机制
+  {
+    name: '剑痴',
+    rank: '传家',
+    category: '性情',
+    cost: 8,
+    description: '对剑有着近乎偏执的痴迷，研习剑法事半功倍，但对其他兵刃兴致缺缺。',
+    discounts: { martialTypeDiscount: { 剑法: 0.25 } },
+    flavorPrompt: COMBAT_RULE_PROMPT,
+  },
+  {
+    name: '嗜战如狂',
+    rank: '传家',
+    category: '性情',
+    cost: 8,
+    description: '性情好勇斗狠，越逢强敌越容易全神贯注，对凶猛直接的劈砍冲杀有异乎常人的热情。',
+    attributeModifiers: { 臂力: 10 },
+    discounts: { martialTypeDiscount: { 刀法: 0.2, 枪戟: 0.2 } },
+    flavorPrompt: COMBAT_RULE_PROMPT,
   },
   {
     name: '扫地僧',
@@ -472,12 +370,12 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: '平平无奇深藏不露，日常粗布麻衣扫阶除尘，无人能看穿其深浅。',
   },
   {
-    name: '菩萨低眉',
+    name: '红颜知己',
     rank: '传家',
-    category: '气质',
+    category: '性情',
     cost: 8,
-    description: '面相慈悲端庄，非血海深仇之敌极难对其生杀心，化解江湖干戈如春风化雨。',
-    flavorPrompt: '神态慈和从容，言辞常具安抚人心之效，擅长化解争端。',
+    description: '极擅倾听异性在伴侣面前无法启齿的委屈，善于在他人情感裂隙中获得深厚信任与依赖。',
+    flavorPrompt: '异性极易视其为知心良友，倾诉夫妻隔阂，剧情中极擅充当感情倾诉与情感慰藉对象。',
   },
   {
     name: '放下屠刀',
@@ -488,20 +386,36 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: '曾造杀业后大彻大悟，眉宇间常带自省与度人之意，面对仇家怨怼时坦然受之，反常能以德报怨感化顽敌。',
   },
   {
-    name: '枯木蛰伏',
+    name: '夺妻之恨',
+    rank: '传家',
+    category: '性情',
+    cost: 8,
+    description: '道侣被夺或被奸人所害后化身复仇修罗，煞气郁结于心，面对仇家时招招致命凶险。',
+    attributeModifiers: { 臂力: 10 },
+    flavorPrompt: '刻骨仇恨铭刻于心，面对仇敌或轻薄之徒时杀伐果断，言语冰冷绝情。',
+  },
+
+  // 上乘 (14点)
+  {
+    name: '嗜武如命',
     rank: '上乘',
     category: '性情',
     cost: 14,
-    description: '极擅借助环境收敛生息，耐性如铁，可为达成目的在恶劣环境下潜伏数日静候良机。',
-    flavorPrompt: '耐性极佳气息如枯木，隐匿潜行时极难被旁人察觉动静。',
+    description: '将武道视为生命，无时无刻不在揣摩切磋，全流派功法精进速度均获得提升。',
+    discounts: { globalUpgradeDiscount: 0.1 },
+    flavorPrompt: COMBAT_RULE_PROMPT,
   },
+
+  // 镇派 (18点)
   {
-    name: '债多不压身',
+    name: '临阵无惧',
     rank: '镇派',
-    category: '命格',
+    category: '性情',
     cost: 18,
-    description: '欠下黑白两道巨额银两，各方债主唯恐其横死血本无归，反倒不得不在暗中保其性命周全。',
-    flavorPrompt: '走到哪里都有巨额债务牵扯，债主们恨得牙痒却生怕其暴毙，常在暗中窥探甚至阻截刺客。',
+    description: '泰山崩于前而色不变，身陷重围之时心境愈发沉稳，毫无畏难怯战之意。',
+    attributeModifiers: { 臂力: 15, 气血: 10 },
+    discounts: { martialTypeDiscount: { 枪戟: 0.2, 刀法: 0.15 } },
+    flavorPrompt: COMBAT_RULE_PROMPT,
   },
   {
     name: '恋爱脑',
@@ -513,8 +427,119 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: '恋爱之时满心唯有道侣一人，痴绝入髓，谁敢犯其道侣必遭疯魔反扑。',
   },
 
+  // 绝世 (24点)
+  {
+    name: '太上忘情',
+    rank: '绝世',
+    category: '性情',
+    cost: 24,
+    description: '历尽沧海斩断世俗红尘羁绊，心境无垢，参悟高深武学犹如明镜止水。',
+    discounts: { savvyRequirementOffset: -3, globalUpgradeDiscount: 0.15 },
+    flavorPrompt: '情至极处反归于淡漠，清冷超然，举手投足无半点凡尘情欲纠缠。',
+  },
+
   // ============================================
-  // 5. 缺陷与负面（固定四档返还点数：-3 / -6 / -10 / -20）
+  // 四、容貌神采与外在风姿（气质）
+  // ============================================
+  // 粗浅 (3点)：纯外在日常风味
+  {
+    name: '眉清目秀',
+    rank: '粗浅',
+    category: '气质',
+    cost: 3,
+    description: '长相干净讨喜，初见之时容易获得江湖长辈与市井豪客的好感照拂。',
+    flavorPrompt: '相貌清秀端正，日常问路打听消息时NPC态度亲和耐烦。',
+  },
+  {
+    name: '纯路人',
+    rank: '粗浅',
+    category: '气质',
+    cost: 3,
+    description: '气韵平淡如微尘，走入人群或脱战数日后，寻常江湖人极易将其容貌忘得精光。',
+    flavorPrompt: '五官平淡如水，走入人群瞬息无踪，NPC转头便记不清其具体样貌。',
+  },
+
+  // 传家 (8点)：显著外在魅力
+  {
+    name: '天生尤物',
+    rank: '传家',
+    category: '气质',
+    cost: 8,
+    description: '风姿绰约冠绝同侪，举手投足极具异性吸引力，容易引得高手侧目。',
+    flavorPrompt: '容貌气质出众，异性NPC与之对视常有恍惚，非深仇大恨极难痛下杀手。',
+  },
+  {
+    name: '菩萨低眉',
+    rank: '传家',
+    category: '气质',
+    cost: 8,
+    description: '面相慈悲端庄，非血海深仇之敌极难对其生杀心，化解江湖干戈如春风化雨。',
+    flavorPrompt: '神态慈和从容，言辞常具安抚人心之效，擅长化解争端。',
+  },
+
+  // 绝世 (24点)：绝世红颜
+  {
+    name: '倾国倾城',
+    rank: '绝世',
+    category: '气质',
+    cost: 24,
+    description: '祸水级绝世容姿，一举一动足以牵动数大宗门恩怨，群雄争相折腰。',
+    flavorPrompt: '风华绝代倾国倾城，江湖豪杰、正邪掌门常为其一颦一笑而大动干戈。',
+  },
+
+  // ============================================
+  // 五、气运机缘与宿命际遇（命格）
+  // ============================================
+  // 粗浅 (3点)：纯娱乐因果风味
+  {
+    name: '乌鸦嘴',
+    rank: '粗浅',
+    category: '命格',
+    cost: 3,
+    description: '言语仿佛受无形天道反向牵引，好的不灵坏的灵，一旦把话说得太满，后续往往离奇遭重逆转。',
+    flavorPrompt: '日常聊天立下定论或笃定预测时往往离奇逆转生祸，同伴对其开口提心吊胆，堪称因果律反转。',
+  },
+
+  // 传家 (8点)：初阶因果宿命
+  {
+    name: '苦主命格',
+    rank: '传家',
+    category: '命格',
+    cost: 8,
+    description: '命中注定多遇绿帽情劫，伴侣极易红杏出墙或被他人所夺；然而戴绿帽与失所爱时修行速度成倍暴增。',
+    flavorPrompt: '命带苦主绿帽因果，伴侣极易背着主角私通或移情别恋；伴侣背叛后主角心境剧震，化绿帽屈辱为苦修动力。',
+  },
+
+  // 上乘 (14点)：强剧情特权
+  {
+    name: '吃软饭',
+    rank: '上乘',
+    category: '命格',
+    cost: 14,
+    description: '命中多逢女贵人庇护，极易引动高境界异性强者的照拂宠溺，危难关头往往有绝顶高手挺身相助。',
+    flavorPrompt: '命格自带软饭气运，极受高阶异性NPC青睐照顾，遇险时常有强者出面护短替其摆平。',
+  },
+
+  // 镇派 (18点)：神级特权因果律
+  {
+    name: '债多不压身',
+    rank: '镇派',
+    category: '命格',
+    cost: 18,
+    description: '欠下黑白两道巨额银两，各方债主唯恐其横死血本无归，反倒不得不在暗中保其性命周全。',
+    flavorPrompt: '走到哪里都有巨额债务牵扯，债主们恨得牙痒却生怕其暴毙，常在暗中窥探甚至阻截刺客。',
+  },
+  {
+    name: '魏武遗风',
+    rank: '镇派',
+    category: '命格',
+    cost: 18,
+    description: '命中自带曹贼机缘，对已有家室之异性吸引力奇高，且言谈举止反常地常被其夫婿伴侣视为生死兄弟与莫逆之交。',
+    flavorPrompt: '在人妇或名花有主者面前魅力非凡，且其原配伴侣往往对其信任有加、引为知己通家之好。',
+  },
+
+  // ============================================
+  // 六、缺陷与负面（固定四档返还点数：-3 / -6 / -10 / -20）
   // ============================================
   // 轻度性格缺陷 (-3)
   {
@@ -671,7 +696,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
   },
 
   // ============================================
-  // 6. 属性极限触发型特质（由初始属性极值自动赋予，无 cost）
+  // 七、属性极限触发型特质（由初始属性极值自动赋予，无 cost）
   // ============================================
   // 臂力
   {
