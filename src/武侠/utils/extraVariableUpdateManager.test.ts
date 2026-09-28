@@ -1113,15 +1113,14 @@ describe('executeExtraVariableUpdate', () => {
 
     expect(fallbackProjection).toBe(normalProjection);
     expect(fallbackProjection).toContain('<status_current_variables>');
-    expect(fallbackProjection).toContain('<时间>\n1219年10月20日13时 到 1219年10月20日15时\n</时间>');
-    expect(fallbackProjection).toContain('<事件详情>\n黄蓉正在事件中\n</事件详情>');
-    expect(fallbackProjection).toContain('{"update":{"黄蓉":{"好感":1}},"分支标记":{"黄蓉对郭靖变心":0}}');
+    expect(fallbackProjection).toContain('时间: 1219年10月20日13时 到 1219年10月20日15时');
+    expect(fallbackProjection).toContain('详情: 黄蓉正在事件中');
+    expect(fallbackProjection).toContain('update:\n    黄蓉:\n      好感: 1');
+    expect(fallbackProjection).toContain('分支标记:\n    黄蓉对郭靖变心: 0');
     expect(fallbackProjection).toContain('<后续未发生事件脉络>');
-    expect(fallbackProjection).toContain('<射雕第一回05-包惜弱巧救颜烈>');
     expect(fallbackProjection).toContain(
-      '"射雕第一回05-包惜弱巧救颜烈": "开始：1200年12月11日3时｜结束：1200年12月12日7时｜地点：大宋/临安府/牛家村/杨家后院｜可能会发生的事件脉络：丘处机虽然杀尽追兵，但一名受伤的金兵颜烈却侥幸未死。"',
+      '射雕第一回05-包惜弱巧救颜烈: 开始：1200年12月11日3时｜结束：1200年12月12日7时｜地点：大宋/临安府/牛家村/杨家后院｜可能会发生的事件脉络：丘处机虽然杀尽追兵，但一名受伤的金兵颜烈却侥幸未死。',
     );
-    expect(fallbackProjection).toContain('</射雕第一回05-包惜弱巧救颜烈>');
     expect(fallbackProjection).toContain('</后续未发生事件脉络>');
     expect(fallbackProjection).toContain('每日修为变化参考:33');
     expect(fallbackProjection).toContain('【参与事件回合变量检查清单】');
