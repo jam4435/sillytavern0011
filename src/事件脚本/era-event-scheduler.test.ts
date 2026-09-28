@@ -4,6 +4,7 @@ import {
   buildEventScheduleState,
   buildRelativeEventRebasePlan,
   getManifestEventCandidateKeys,
+  selectEarliestDiscoverableEventPerRegion,
   sortUnstartedEventsByTrigger,
 } from './era-event-scheduler.js';
 
@@ -91,6 +92,45 @@ describe('manifest event scheduler', () => {
         },
       ),
     ).toEqual([]);
+  });
+});
+
+describe('discoverable event sequencing', () => {
+  it('shows only the earliest discoverable event in each rumor region', () => {
+    const definitions = {
+      后山首事: {
+        事件地点: '大理/无量山/后山森林',
+        触发条件: { 类型: '时间', 年: 1202, 月: 3, 日: 17, 时: 17 },
+      },
+      断魂崖后事: {
+        事件地点: '大理/无量山/断魂崖',
+        触发条件: { 类型: '时间', 年: 1202, 月: 3, 日: 18, 时: 6 },
+      },
+      临安别事: {
+        事件地点: '大宋/临安府/牛家村',
+        触发条件: { 类型: '时间', 年: 1202, 月: 3, 日: 17, 时: 18 },
+      },
+    };
+
+    expect(
+      selectEarliestDiscoverableEventPerRegion(['后山首事', '断魂崖后事', '临安别事'], definitions),
+    ).toEqual(['后山首事', '临安别事']);
+  });
+
+  it('lets an active regional head block later rumors until the next check', () => {
+    const definitions = {
+      当前事件: {
+        事件地点: '大理/无量山/后山森林',
+        触发条件: { 类型: '时间', 年: 1202, 月: 3, 日: 17, 时: 17 },
+      },
+      下一事件: {
+        事件地点: '大理/无量山/断魂崖',
+        触发条件: { 类型: '时间', 年: 1202, 月: 3, 日: 17, 时: 20 },
+      },
+    };
+
+    expect(selectEarliestDiscoverableEventPerRegion(['当前事件', '下一事件'], definitions)).toEqual(['当前事件']);
+    expect(selectEarliestDiscoverableEventPerRegion(['下一事件'], definitions)).toEqual(['下一事件']);
   });
 });
 

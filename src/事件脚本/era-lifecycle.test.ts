@@ -249,6 +249,61 @@ describe('completion persistence and follow-up pairs', () => {
     expect(variables.stat_data.后续事件线索计数).toEqual({});
   });
 
+  it('requires encounter location at opening and derives a relative-duration end after admission', async () => {
+    const encounterName = '奇遇事件-射雕-牛家废店启密室';
+    const encounterDefinition = attachEventMetadata(
+      {
+        事件地点: '大宋/临安府/牛家村',
+        触发条件: { 变量: 'user数据.初始属性.洞察', 大于等于: 13 },
+        事件持续时间: { 时: 3 },
+        事件引子: '牛家村废店似有暗门。',
+        事件详情: '玩家发现密室。',
+        事件概要: '玩家开启密室。',
+        参与人物: ['玩家'],
+        insert: {},
+        update: {},
+        delete: {},
+      },
+      deriveEventRuntimeDescriptor(encounterName),
+    );
+
+    variables.stat_data.世界信息.时间 = { 年: 1202, 月: 3, 日: 16, 时: 19 };
+    variables.stat_data.user数据 = {
+      所在位置: '大理/无量山/剑湖谷底',
+      初始属性: { 洞察: 15 },
+    };
+    variables.stat_data.事件系统 = {
+      未发生事件: {},
+      进行中事件: {},
+      已完成事件: {},
+      已失效事件: {},
+      人物事件占用: {},
+    };
+
+    await initializeEventList({ [encounterName]: encounterDefinition }, { rootBootstrap: true });
+
+    expect(variables.stat_data.事件系统.进行中事件[encounterName]).toBeUndefined();
+    expect(variables.stat_data.事件系统.未发生事件[encounterName]).toEqual(encounterDefinition.触发条件);
+
+    variables.stat_data.user数据.所在位置 = '大宋/临安府/牛家村/曲三酒馆';
+    variables.stat_data.事件系统 = {
+      未发生事件: {},
+      进行中事件: {},
+      已完成事件: {},
+      已失效事件: {},
+      人物事件占用: {},
+    };
+
+    await initializeEventList({ [encounterName]: encounterDefinition }, { rootBootstrap: true });
+
+    expect(variables.stat_data.事件系统.进行中事件[encounterName]).toEqual({
+      年: 1202,
+      月: 3,
+      日: 16,
+      时: 22,
+    });
+  });
+
   it('replays expired opening history in the same transaction', async () => {
     variables.stat_data.世界信息.时间 = { 年: 1219, 月: 11, 日: 1, 时: 0 };
     variables.stat_data.事件系统 = {

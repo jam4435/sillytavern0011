@@ -2,6 +2,7 @@
 
 import { getSingleConditionTimeAnchor } from './era-event-schema.js';
 import { calculateTimeOffset, timeToTotalMinutes } from './era-utils.js';
+import { getLocationRegionPath } from '../shared/locationPath.js';
 
 function isPlainObject(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -157,6 +158,39 @@ export function buildRelativeEventRebasePlan(eventNames, eventDefinitions, curre
     orderedEventNames: candidates.map(candidate => candidate.eventName),
     deferredConditions,
   };
+}
+
+/**
+ * 十天弹性窗口可能同时暴露同一区域的一整串事件。
+ * 传闻层只展示每个“区域（前两级地点）”中最早的一条；当前条进入进行中/完成后，
+ * 下一条才会在下一轮候选计算中浮现。这里只约束传闻/预告展示，不改事件真实触发时间。
+ */
+export function selectEarliestDiscoverableEventPerRegion(eventNames, eventDefinitions) {
+  const winnerByRegion = new Map();
+  const passthrough = new Set();
+
+  eventNames.forEach((eventName, index) => {
+    const eventData = eventDefinitions?.[eventName];
+    const region = getLocationRegionPath(eventData?.事件地点);
+    if (!region) {
+      passthrough.add(eventName);
+      return;
+    }
+
+    const triggerTime = getSingleConditionTimeAnchor(eventData?.触发条件);
+    const triggerMinutes = triggerTime ? timeToTotalMinutes(triggerTime) : Number.POSITIVE_INFINITY;
+    const current = winnerByRegion.get(region);
+    if (
+      !current ||
+      triggerMinutes < current.triggerMinutes ||
+      (triggerMinutes === current.triggerMinutes && index < current.index)
+    ) {
+      winnerByRegion.set(region, { eventName, triggerMinutes, index });
+    }
+  });
+
+  const selected = new Set([...passthrough, ...[...winnerByRegion.values()].map(item => item.eventName)]);
+  return eventNames.filter(eventName => selected.has(eventName));
 }
 
 export function sortUnstartedEventsByTrigger(unstartedEvents) {

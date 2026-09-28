@@ -47,8 +47,12 @@
   const { reconcileWorldEventArchive, syncParticipationOutcomeStates } = await import('./era-world-events.js');
   const { needsEventRuntimeStateReset, resetLegacyEventRuntimeState } = await import('./era-runtime-state.js');
   const { buildFollowupCounterPlan, createSerialTaskQueue } = await import('./era-turn-queue.js');
-  const { buildRelativeEventRebasePlan, getManifestEventCandidateKeys, sortUnstartedEventsByTrigger } =
-    await import('./era-event-scheduler.js');
+  const {
+    buildRelativeEventRebasePlan,
+    getManifestEventCandidateKeys,
+    selectEarliestDiscoverableEventPerRegion,
+    sortUnstartedEventsByTrigger,
+  } = await import('./era-event-scheduler.js');
   const { writeDirectAssign, writeDirectInsert, writeDirectUpdate, writeEraTransaction } =
     await import('./era-write-helper.js');
   const { initializeEventNotificationBridge, notifyEvent } = await import('./era-notifications.js');
@@ -556,7 +560,7 @@
         updatedVariables.stat_data.世界信息.时间,
         updatedVariables.stat_data,
       );
-      const 可发现未发生事件 = (latestManifestCandidates || Object.keys(最新未发生事件)).filter(eventName => {
+      const 可发现候选事件 = (latestManifestCandidates || Object.keys(最新未发生事件)).filter(eventName => {
         const effectiveEventData = withRuntimeTriggerOverride(eventName, eventDefinitions[eventName], 最新未发生事件);
         return isEventDiscoverable(
           updatedVariables.stat_data.世界信息.时间,
@@ -566,6 +570,20 @@
           eventName,
         );
       });
+      // 与“同地点事件只启动最早一个”的运行时调度保持同一原则：
+      // 同一传闻区域（前两级地点）只公开当前顺序最靠前的一条。
+      // 进行中的区域首事件也作为 blocker，避免它尚未结束时就提前泄露下一条。
+      const 传闻串行候选 = [...new Set([...仍在进行事件, ...可发现候选事件])];
+      const 传闻串行定义 = Object.fromEntries(
+        传闻串行候选.map(eventName => [
+          eventName,
+          withRuntimeTriggerOverride(eventName, eventDefinitions[eventName], 最新未发生事件),
+        ]),
+      );
+      const 区域首事件 = new Set(
+        selectEarliestDiscoverableEventPerRegion(传闻串行候选, 传闻串行定义),
+      );
+      const 可发现未发生事件 = 可发现候选事件.filter(eventName => 区域首事件.has(eventName));
       // 即使当前没有候选事件也要执行一次，以清除历史检出后遗留的附近传闻派生缓存。
       await checkPlayerLocationTriggers(
         仍在进行事件,

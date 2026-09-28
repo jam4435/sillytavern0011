@@ -26,7 +26,7 @@ import {
   isDebugEnabled,
 } from './era-utils.js';
 
-import { isTimeForEvent, isTimeAfterEventEnd } from './era-event-checker.js';
+import { isTimeForEvent, isTimeAfterEventEnd, isEventStartLocationSatisfied } from './era-event-checker.js';
 import { writeEraTransaction } from './era-write-helper.js';
 import {
   PARTICIPANT_ENTRY_SOURCE,
@@ -409,21 +409,23 @@ export async function initializeEventList(eventDefinitions, options = {}) {
         const expired = endTime && isTimeAfterEventEnd(currentTime, endTime);
         const conditional = !isPureTimeTrigger(eventData?.触发条件);
         const due = isTimeForEvent(currentTime, eventData, eventName, statData, eventDefinitions);
+        const locationSatisfied = isEventStartLocationSatisfied(eventData, statData.user数据?.所在位置);
 
         if (expired && conditional) {
           statData.事件系统.已失效事件[eventName] = cloneJson(endTime);
           continue;
         }
 
-        if (!expired && !due) {
+        if (!expired && (!due || !locationSatisfied)) {
           if (!sparseFuture) {
             statData.事件系统.未发生事件[eventName] = cloneJson(eventData.触发条件);
           }
           continue;
         }
 
-        if (!expired && due && !isDebutEvent(eventData)) {
-          statData.事件系统.进行中事件[eventName] = cloneJson(endTime);
+        if (!expired && due && locationSatisfied && !isDebutEvent(eventData)) {
+          const actualEndTime = buildActualEventWindow(eventData, currentTime, false).endTime;
+          statData.事件系统.进行中事件[eventName] = cloneJson(actualEndTime);
           continue;
         }
 
