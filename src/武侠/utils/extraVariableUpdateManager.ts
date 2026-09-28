@@ -992,6 +992,13 @@ function formatLocationContext(surroundingLocations: unknown, currentLocation: u
   };
   const normalizedCurrentLocation = normalizeLocationPath(currentLocation);
   const currentScopePath = getLocationScopePath(locationGroups.当前活动区) || getLocationScopePath(currentLocation);
+  const hasAnyLocationContext =
+    Boolean(normalizedCurrentLocation || currentScopePath) ||
+    Object.values(groups).some(paths => paths.length > 0);
+  if (!hasAnyLocationContext) {
+    return '';
+  }
+
   const allowedScopes = new Set<string>();
   if (currentScopePath) allowedScopes.add(currentScopePath);
   Object.values(groups)
