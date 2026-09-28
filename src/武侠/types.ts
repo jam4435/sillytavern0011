@@ -179,6 +179,9 @@ export interface FactionTask {
 
 export type FactionTaskMap = Record<string, FactionTask>;
 
+/** 未接取的势力差事候选池：势力名 -> 与正式任务完全同构的任务映射。 */
+export type FactionTaskPoolMap = Record<string, FactionTaskMap>;
+
 export interface SectMartialNode {
   节点ID: string;
   功法: string;
@@ -310,6 +313,8 @@ export interface FrontendVariableData {
   奇经八脉?: MeridianProgressV1;
   永久属性修正?: Record<string, PermanentAttributeModifierVariableData>;
   可发现事件?: Record<string, unknown>;
+  /** 后台任务生成器产出的未接取候选差事，按势力分组；任务对象与 stat_data.任务 完全同构。 */
+  可选任务?: FactionTaskPoolMap;
   事件线索档案?: Record<string, EventClueArchiveEntry>;
   事件结局状态?: Record<string, EventOutcomeStatus>;
   事件结算进度?: Record<string, { 分支标记?: Record<string, 0 | 1> }>;
@@ -465,6 +470,7 @@ export interface GameState {
   chronicle: ChronicleEntry[];
   social: NPC[];
   tasks?: FactionTaskMap;
+  availableFactionTasks?: FactionTaskPoolMap;
   factions?: UserFactionsMap;
 }
 
@@ -919,7 +925,7 @@ export interface MapData {
 /**
  * 待发送指令类型
  */
-export type CommandType = 'TRAVEL' | 'USE_ITEM' | 'MARTIAL_ART_UPGRADE';
+export type CommandType = 'TRAVEL' | 'USE_ITEM' | 'MARTIAL_ART_UPGRADE' | 'FACTION_TASK';
 
 export interface ResourceDeltaMap {
   气血?: number;
@@ -963,6 +969,9 @@ export interface PendingCommand {
     previousMastery?: string;
     newMastery?: string;
     spentCultivation?: number;
+    factionName?: string;
+    taskName?: string;
+    taskAction?: 'browse' | 'accept';
   };
   timestamp: number;
 }

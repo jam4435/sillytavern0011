@@ -65,6 +65,20 @@ export function useCommandQueue() {
     uiLogger.log('[useCommandQueue] 添加功法精进指令:', command);
   }, []);
 
+  /** 添加势力差事浏览/接取后的叙事指令；只记录已完成的系统事实，不承担变量写入。 */
+  const addFactionTaskCommand = useCallback((commandText: string, data: PendingCommand['data']) => {
+    const command: PendingCommand = {
+      id: `faction_task_${Date.now()}_${Math.random()}`,
+      type: 'FACTION_TASK' as CommandType,
+      text: commandText,
+      data,
+      timestamp: Date.now(),
+    };
+
+    setCommands(prev => [...prev, command]);
+    uiLogger.log('[useCommandQueue] 添加势力差事指令:', command);
+  }, []);
+
   /**
    * 取消指令
    * @param commandId 指令ID
@@ -155,6 +169,7 @@ export function useCommandQueue() {
     setTravelCommand,
     addUseItemCommand,
     addMartialArtUpgradeCommand,
+    addFactionTaskCommand,
     cancelCommand,
     sendMessageWithCommands,
     clearQueue,

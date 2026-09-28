@@ -4,6 +4,7 @@ import type {
   CharacterProfile,
   FactionTask,
   FactionTaskMap,
+  FactionTaskPoolMap,
   FactionType,
   SectMartialNode,
   SectStaticData,
@@ -16,7 +17,6 @@ import {
   buildFactionPromotionUserMessage,
   buildJoinFactionUserMessage,
   buildLearnMartialArtUserMessage,
-  buildRequestTaskUserMessage,
   getAllSects,
   getSectByName,
   learnFactionMartialArt,
@@ -27,8 +27,11 @@ export interface FactionPanelProps {
   stats: CharacterProfile;
   currentLocation: string;
   tasks?: FactionTaskMap;
+  availableTasksByFaction?: FactionTaskPoolMap;
   onSendMessage: (message: string) => Promise<string>;
   onClaimTask: (taskName: string, task: FactionTask) => Promise<void>;
+  onGenerateTaskOptions: (sectName: string) => Promise<void>;
+  onAcceptTask: (sectName: string, taskName: string) => Promise<void>;
   onNavigateLocation?: (location: string) => void;
   onClose?: () => void;
   isBusy?: boolean;
@@ -43,8 +46,11 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
   stats,
   currentLocation,
   tasks = {},
+  availableTasksByFaction = {},
   onSendMessage,
   onClaimTask,
+  onGenerateTaskOptions,
+  onAcceptTask,
   onNavigateLocation,
   onClose,
   isBusy = false,
@@ -171,15 +177,30 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
     }
   };
 
-  // 处理【接取差事】
-  const handleRequestTask = async (sectName: string) => {
+  // 查看/刷新差事：后台模型只生成候选池，不创建聊天回合。
+  const handleGenerateTaskOptions = async (sectName: string) => {
     const sect = getSectByName(sectName);
     if (!sect || isBusy || isActionPending) return;
+    setActionError(null);
     setIsActionPending(true);
     try {
-      const prompt = buildRequestTaskUserMessage(sect, stats.name, stats.realm);
-      if (onClose) onClose();
-      await onSendMessage(prompt);
+      await onGenerateTaskOptions(sectName);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '查看差事出现异常');
+    } finally {
+      setIsActionPending(false);
+    }
+  };
+
+  // 接取已生成的候选差事：由前端确定性搬入正式任务，不调用 AI。
+  const handleAcceptTask = async (sectName: string, taskName: string) => {
+    if (isBusy || isActionPending) return;
+    setActionError(null);
+    setIsActionPending(true);
+    try {
+      await onAcceptTask(sectName, taskName);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '接取差事出现异常');
     } finally {
       setIsActionPending(false);
     }
@@ -451,9 +472,11 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
             <div className="faction-tasks-column">
               <SectTaskList
                 tasks={tasks}
+                availableTasks={availableTasksByFaction[selectedSectName] || {}}
                 activeSectName={selectedSectName}
                 onClaimTask={onClaimTask}
-                onRequestTask={handleRequestTask}
+                onGenerateTaskOptions={handleGenerateTaskOptions}
+                onAcceptTask={handleAcceptTask}
                 onNavigateLocation={onNavigateLocation}
                 isBusy={isBusy || isActionPending}
               />

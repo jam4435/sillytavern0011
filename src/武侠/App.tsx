@@ -46,6 +46,7 @@ import { readLatestDebugRoundSnapshot } from './hooks/useDebugLogs';
 import { shouldDeferSetupEventNotifications } from './hooks/usePageFlow';
 import { ActivePanel, type FactionTask, InventoryItem, type MeridianNodeId, type MeridianUpgradeQuote } from './types';
 import { claimFactionTaskReward } from './utils/factionManager';
+import { acceptFactionTaskOption, generateFactionTaskOptions } from './utils/factionTaskGenerator';
 import { getRandomOpeningLine, initializeNewGameSession, type NewGameFormData } from './utils/gameInitializer';
 import { createAvatarEntityKey, resolveAvatarSource } from './utils/avatarStorage';
 import { migrateAvatarState } from './utils/avatarState';
@@ -178,6 +179,7 @@ const App: React.FC = () => {
     setTravelCommand,
     addUseItemCommand,
     addMartialArtUpgradeCommand,
+    addFactionTaskCommand,
     cancelCommand,
     sendMessageWithCommands,
   } = useCommandQueue();
@@ -1462,6 +1464,58 @@ const App: React.FC = () => {
     ],
   );
 
+  const handleGenerateFactionTaskOptions = useCallback(
+    async (sectName: string) => {
+      const res = await generateFactionTaskOptions({
+        sectName,
+        applicantName: gameState.stats.name,
+        realm: gameState.stats.realm,
+        settings: displaySettings.summarySettings,
+      });
+      if (!res.success) {
+        showError(res.error || '查看差事失败');
+        return;
+      }
+      if (res.commandText) {
+        addFactionTaskCommand(res.commandText, { factionName: sectName, taskAction: 'browse' });
+      }
+      refreshGameStateFromVariables();
+      if (typeof toastr !== 'undefined' && toastr.success) {
+        toastr.success(`已生成 ${Object.keys(res.tasks || {}).length} 项可选差事`);
+      }
+    },
+    [
+      addFactionTaskCommand,
+      displaySettings.summarySettings,
+      gameState.stats.name,
+      gameState.stats.realm,
+      refreshGameStateFromVariables,
+      showError,
+    ],
+  );
+
+  const handleAcceptFactionTask = useCallback(
+    async (sectName: string, taskName: string) => {
+      const res = await acceptFactionTaskOption(sectName, taskName);
+      if (!res.success) {
+        showError(res.error || '接取差事失败');
+        return;
+      }
+      if (res.commandText) {
+        addFactionTaskCommand(res.commandText, {
+          factionName: sectName,
+          taskName,
+          taskAction: 'accept',
+        });
+      }
+      refreshGameStateFromVariables();
+      if (typeof toastr !== 'undefined' && toastr.success) {
+        toastr.success(`已接取差事《${taskName}》`);
+      }
+    },
+    [addFactionTaskCommand, refreshGameStateFromVariables, showError],
+  );
+
   const handleClaimFactionTask = useCallback(
     async (taskName: string, task: FactionTask) => {
       const res = await claimFactionTaskReward(taskName, task);
@@ -1532,8 +1586,11 @@ const App: React.FC = () => {
             stats={gameState.stats}
             currentLocation={gameState.currentLocation}
             tasks={gameState.tasks}
+            availableTasksByFaction={gameState.availableFactionTasks}
             onSendMessage={handlePlayerSend}
             onClaimTask={handleClaimFactionTask}
+            onGenerateTaskOptions={handleGenerateFactionTaskOptions}
+            onAcceptTask={handleAcceptFactionTask}
             onNavigateLocation={handleEventTravelTo}
             onClose={closeModal}
             isBusy={isLoading || historyMutationPending}

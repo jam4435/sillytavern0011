@@ -532,6 +532,50 @@
     }
   }
 
+  .available-task-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px dashed rgba(212, 175, 55, 0.2);
+  }
+
+  .available-task-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #d9c9aa;
+    font-size: 0.86rem;
+  }
+
+  .available-task-count {
+    min-width: 1.5rem;
+    padding: 0.08rem 0.38rem;
+    border-radius: 999px;
+    background: rgba(212, 175, 55, 0.12);
+    color: #d4af37;
+    font-size: 0.72rem;
+    text-align: center;
+  }
+
+  .available-task-empty {
+    padding: 0.65rem 0.7rem;
+    border: 1px dashed rgba(212, 175, 55, 0.16);
+    border-radius: 4px;
+    color: #8f826f;
+    font-size: 0.76rem;
+    line-height: 1.45;
+  }
+
+  .available-task-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    max-height: 46%;
+    overflow-y: auto;
+  }
+
   .task-cards-list {
     display: flex;
     flex-direction: column;
@@ -577,6 +621,11 @@
   border-radius: 4px;
   padding: 0.75rem 0.85rem;
   transition: all 0.2s ease;
+
+  &.is-available {
+    border-color: rgba(212, 175, 55, 0.42);
+    background: rgba(45, 34, 20, 0.66);
+  }
 
   &.is-completed {
     border-color: rgba(76, 175, 80, 0.55);
@@ -633,6 +682,12 @@
       background: rgba(76, 175, 80, 0.25);
       color: #81c784;
       border: 1px solid rgba(76, 175, 80, 0.5);
+    }
+
+    &.可接 {
+      background: rgba(212, 175, 55, 0.16);
+      color: #f0cb64;
+      border: 1px solid rgba(212, 175, 55, 0.38);
     }
   }
 
@@ -705,6 +760,28 @@
     margin-top: 0.4rem;
     padding-top: 0.4rem;
     border-top: 1px dashed rgba(76, 175, 80, 0.3);
+
+    .accept-task-btn {
+      width: 100%;
+      padding: 0.45rem 0.8rem;
+      background: linear-gradient(180deg, #7a5820, #4c3713);
+      border: 1px solid #d4af37;
+      border-radius: 4px;
+      color: #fff0c7;
+      font-size: 0.86rem;
+      font-family: var(--font-serif);
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover:not(:disabled) {
+        background: #8b682d;
+      }
+
+      &:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+    }
 
     .claim-reward-btn {
       width: 100%;
@@ -1663,7 +1740,9 @@
       }
     }
 
+    .available-task-cards,
     .task-cards-list {
+      max-height: none;
       overflow: visible;
       gap: 0.6rem;
     }

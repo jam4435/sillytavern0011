@@ -17,6 +17,7 @@ import type {
   FactionTask,
   FactionTaskExecutionStatus,
   FactionTaskMap,
+  FactionTaskPoolMap,
   FactionTaskReward,
   FactionType,
   FrontendVariableData,
@@ -1678,12 +1679,7 @@ export function parseFactions(userData?: UserProfile): UserFactionsMap | undefin
 /**
  * 从顶层变量读取势力差事/历练任务列表
  */
-export function parseFactionTasks(variables: GameVariables): FactionTaskMap | undefined {
-  const statData = variables.stat_data && typeof variables.stat_data === 'object'
-    ? (variables.stat_data as Record<string, unknown>)
-    : undefined;
-  const rawTasks = variables.任务 || statData?.任务;
-
+function parseFactionTaskMap(rawTasks: unknown): FactionTaskMap | undefined {
   if (!rawTasks || typeof rawTasks !== 'object' || Array.isArray(rawTasks)) {
     return undefined;
   }
@@ -1726,6 +1722,31 @@ export function parseFactionTasks(variables: GameVariables): FactionTaskMap | un
     };
   }
 
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+export function parseFactionTasks(variables: GameVariables): FactionTaskMap | undefined {
+  const statData = variables.stat_data && typeof variables.stat_data === 'object'
+    ? (variables.stat_data as Record<string, unknown>)
+    : undefined;
+  return parseFactionTaskMap(variables.任务 || statData?.任务);
+}
+
+/**
+ * 读取前端变量中的未接取势力差事候选池。
+ * 每个势力下的任务对象与正式 stat_data.任务 使用完全相同的 FactionTask 结构。
+ */
+export function parseAvailableFactionTasks(variables: GameVariables): FactionTaskPoolMap | undefined {
+  const rawPools = variables.前端变量?.可选任务;
+  if (!rawPools || typeof rawPools !== 'object' || Array.isArray(rawPools)) {
+    return undefined;
+  }
+
+  const result: FactionTaskPoolMap = {};
+  for (const [factionName, rawPool] of Object.entries(rawPools as Record<string, unknown>)) {
+    const parsedPool = parseFactionTaskMap(rawPool);
+    if (parsedPool) result[factionName] = parsedPool;
+  }
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
@@ -3768,8 +3789,9 @@ function mapVariablesToGameState(variables: GameVariables): Partial<GameState> {
     state.statusEffects = [];
   }
 
-  // 任务 - 从顶层读取势力差事
+  // 已接取任务从顶层读取；未接取候选任务从前端变量按势力读取。
   state.tasks = parseFactionTasks(variables);
+  state.availableFactionTasks = parseAvailableFactionTasks(variables);
 
   // 事件 - 从事件系统读取（避免全量渲染未发生事件）
   state.events = parseEvents(variables, worldTime);
