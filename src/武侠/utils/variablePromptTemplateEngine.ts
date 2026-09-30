@@ -100,16 +100,16 @@ export const VARIABLE_PROMPT_SLOT_META: readonly VariablePromptSlotMeta[] = [
   {
     name: 'cultivationReference',
     label: '修为变化参考',
-    description: '每日专心修炼基准，只读，用于结合正文实际时长/强度估算修为变化。',
+    description: '修炼一天的修为增幅参考值，只读；默认模板放在<variable><修为>中。',
     source: 'stat_data.前端变量.修为变化参考。',
     emptyBehavior: '不是有限数字时为空；@if cultivationReference 不成立。',
   },
   {
     name: 'decisionChecklist',
     label: '变量检查清单',
-    description: '根据当前是否存在参与事件选择的普通回合/参与事件检查清单。',
-    source: '前端内置确定性规则。',
-    emptyBehavior: '正常情况下始终存在。',
+    description: '旧输入模板兼容占位符；检查清单已迁入可编辑的变量指导。',
+    source: '兼容保留，不再由代码生成检查规则。',
+    emptyBehavior: '始终为空；新模板不应再使用此占位符。',
   },
 ] as const;
 
