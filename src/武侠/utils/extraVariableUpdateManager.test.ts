@@ -335,12 +335,22 @@ describe('executeExtraVariableUpdate', () => {
     expect(prompt).toContain('指令地点:大宋/临安府/临安城/皇宫偏殿');
     expect(prompt).toContain('角色数据:{');
     expect(prompt).toContain('<变量模板>');
+    expect(prompt).toContain('### 包裹');
+    expect(prompt).toContain('### 功法');
+    expect(prompt).toContain('### 新人物初始属性');
+    expect(prompt).not.toContain('### NPC 初始属性');
     expect(prompt).toContain('# ERA 变量更新规则');
     expect(prompt).not.toContain('宏观背景');
-    expect(prompt.indexOf('"content":"正文内容"')).toBeLessThan(prompt.indexOf('传说：基本失传'));
-    expect(prompt.indexOf('传说：基本失传')).toBeLessThan(prompt.indexOf('<变量模板>'));
+    expect(prompt.indexOf('正文内容')).toBeGreaterThan(prompt.indexOf('传说：基本失传'));
+    expect(prompt.indexOf('传说：基本失传')).toBeLessThan(prompt.indexOf('<前序只读轮次>'));
+    expect(prompt.indexOf('<前序只读轮次>')).toBeLessThan(prompt.indexOf('<变量模板>'));
     expect(prompt.indexOf('<变量模板>')).toBeLessThan(prompt.indexOf('# ERA 变量更新规则'));
-    expect(prompt.indexOf('# ERA 变量更新规则')).toBeLessThan(prompt.indexOf('【最终执行要求】'));
+    expect(prompt).not.toContain('【最终执行要求】');
+    expect(prompt).toContain('## 5. <VariableThink>检查与输出');
+    expect(prompt).toContain('<修为>');
+    expect(prompt).toContain('修炼一天的修为增幅参考值:33');
+    expect(prompt).not.toContain('<变量上下文>');
+    expect(prompt).not.toContain('"messageId"');
     expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledWith(
       expect.objectContaining({
         source: 'frontend',
