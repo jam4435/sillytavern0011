@@ -137,6 +137,8 @@ const VARIABLE_BLOCK_TAGS = ['VariableThink', 'VariableInsert', 'VariableEdit', 
 const ACTION_BLOCK_TAGS = new Set(['VariableInsert', 'VariableEdit', 'VariableDelete']);
 const EXTRA_VARIABLE_READONLY_ENTITY_KEYS = new Set(['头像', '出生年份', '年龄', '初始属性', '天赋']);
 const PARTICIPATION_WRITABLE_KEYS = ['结局', 'insert', 'update', 'delete', '分支标记'] as const;
+const TASK_WRITABLE_KEYS = ['任务执行情况'] as const;
+const PLAYER_INITIAL_ATTRIBUTE_ORDER = ['臂力', '根骨', '机敏', '洞察', '悟性', '风姿', '福缘'] as const;
 const NORMAL_TURN_DECISION_CHECKLIST = `【普通回合变量检查清单】
 必须在 <VariableThink> 中按编号逐项给出简短结论；没有变化也要写“无”。
 1. 时间：最新正文是否明确经过时间？若是，先核算“旧完整时间 + 正文耗时 = 新完整时间”，再将年/月/日/时/分五字段作为一个原子更新全部写出；短暂反应、观察和简短交谈不得机械推进。
@@ -878,12 +880,21 @@ export function buildExtraVariableProjection(
         return result;
       }, {})
     : {};
+  const tasks = isRecord(statData.任务) ? statData.任务 : {};
+  const writableTasks = Object.entries(tasks).reduce<Record<string, unknown>>((result, [taskName, taskValue]) => {
+    if (!isRecord(taskValue)) return result;
+    result[taskName] = Object.fromEntries(
+      TASK_WRITABLE_KEYS.filter(key => Object.hasOwn(taskValue, key)).map(key => [key, taskValue[key]]),
+    );
+    return result;
+  }, {});
 
   return sanitizeForPrompt({
     世界信息: Object.hasOwn(worldInfo, '时间') ? { 时间: worldInfo.时间 } : {},
     user数据: omitReadonlyEntityFields(userData),
     角色数据: collectRelevantCharacters(statData, playerLocation, latestAssistantBody, participationEvents),
     参与事件: writableParticipationEvents,
+    任务: writableTasks,
   }) as Record<string, unknown>;
 }
 
@@ -943,6 +954,73 @@ function formatPromptYaml(value: unknown, indent = 0): string {
     .join('\n');
 }
 
+function formatCompactKey(value: unknown): string {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+  if (!text) return '""';
+  return /[\\s,:{}\[\]"'\\|]/.test(text) ? JSON.stringify(text) : text;
+}
+
+function formatCompactScalar(value: unknown): string {
+  if (value === null || value === undefined) return 'null';
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  const text = String(value).replace(/\s+/g, ' ').trim();
+  if (!text) return '""';
+  if (
+    /[,:{}\[\]"'\\|]/.test(text) ||
+    /^(?:true|false|null|-?\d+(?:\.\d+)?)$/i.test(text)
+  ) {
+    return JSON.stringify(text);
+  }
+  return text;
+}
+
+function formatCompactObject(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(item => formatCompactObject(item)).join(',')}]`;
+  }
+  if (!isRecord(value)) {
+    return formatCompactScalar(value);
+  }
+  return `{${Object.entries(value)
+    .filter(([key]) => !key.startsWith('$'))
+    .map(([key, child]) => `${formatCompactKey(key)}:${formatCompactObject(child)}`)
+    .join(',')}}`;
+}
+
+function formatRecordMap(value: unknown, preferredOrder: readonly string[] = []): string {
+  if (!isRecord(value)) return '';
+  const entries = Object.entries(value).filter(([key]) => !key.startsWith('$'));
+  if (entries.length === 0) return '';
+  const order = new Map(preferredOrder.map((key, index) => [key, index]));
+  entries.sort(([left], [right]) => {
+    const leftOrder = order.get(left) ?? Number.MAX_SAFE_INTEGER;
+    const rightOrder = order.get(right) ?? Number.MAX_SAFE_INTEGER;
+    return leftOrder - rightOrder || left.localeCompare(right, 'zh-CN');
+  });
+  return entries.map(([key, child]) => `${formatCompactKey(key)}:${formatCompactObject(child)}`).join('|');
+}
+
+function formatPromptPathTitle(root: string, key: string): string {
+  return `${root}.${String(key).replace(/\s+/g, ' ').trim() || '未命名'}`;
+}
+
+function formatPlayerContext(
+  projection: Record<string, unknown>,
+  initialAttributes: unknown,
+  talents: unknown,
+): string {
+  const lines = [`user数据:${formatCompactObject(projection.user数据 ?? {})}`];
+  const initialAttributeRecords = formatRecordMap(initialAttributes, PLAYER_INITIAL_ATTRIBUTE_ORDER);
+  if (initialAttributeRecords) {
+    lines.push('', 'user数据.初始属性', initialAttributeRecords);
+  }
+  const talentRecords = formatRecordMap(talents);
+  if (talentRecords) {
+    lines.push('', 'user数据.天赋', talentRecords);
+  }
+  return lines.join('\n');
+}
+
 function formatParticipationEventsContext(
   projection: Record<string, unknown>,
   participationEvents: unknown,
@@ -952,25 +1030,52 @@ function formatParticipationEventsContext(
     return '';
   }
 
-  const lines = ['<参与事件>'];
+  const blocks: string[] = [];
   for (const [eventName, writableSnapshot] of Object.entries(writableParticipationEvents)) {
     const eventValue = isRecord(participationEvents[eventName]) ? participationEvents[eventName] : {};
     const readonlyDescription = String(eventValue.描述 ?? '').replace(/\s+/g, ' ').trim();
     const timeRangeMatch = readonlyDescription.match(
       /^((?:\d+年\d+月\d+日\d+时(?:\d+分)?)\s+到\s+(?:\d+年\d+月\d+日\d+时(?:\d+分)?))[，,]\s*([\s\S]+)$/,
     );
-    lines.push(`${formatPromptYamlKey(eventName)}:`);
+    const recordParts: string[] = [];
     if (timeRangeMatch) {
-      lines.push(`  时间: ${timeRangeMatch[1]}`, `  详情: ${timeRangeMatch[2]}`);
-    } else {
-      lines.push(`  详情: ${readonlyDescription || '无'}`);
+      recordParts.push(`时间:${formatCompactScalar(timeRangeMatch[1].replace(/\s+到\s+/, '-'))}`);
     }
-    if (isRecord(writableSnapshot) && Object.keys(writableSnapshot).length > 0) {
-      lines.push(formatPromptYaml(writableSnapshot, 2));
+    if (typeof eventValue.地点 === 'string' && eventValue.地点.trim()) {
+      recordParts.push(`地点:${formatCompactScalar(eventValue.地点)}`);
     }
+    recordParts.push(`详情:${formatCompactScalar(timeRangeMatch?.[2] || readonlyDescription || '无')}`);
+
+    const lines = [
+      formatPromptPathTitle('参与事件', eventName),
+      recordParts.join('|'),
+      `可写:${formatCompactObject(writableSnapshot)}`,
+    ];
+    blocks.push(lines.join('\n'));
   }
-  lines.push('</参与事件>');
-  return lines.join('\n');
+  return blocks.join('\n\n');
+}
+
+function formatTasksContext(projection: Record<string, unknown>, tasks: unknown): string {
+  const writableTasks = isRecord(projection.任务) ? projection.任务 : {};
+  if (!isRecord(tasks) || Object.keys(writableTasks).length === 0) return '';
+
+  return Object.entries(writableTasks)
+    .map(([taskName, writableSnapshot]) => {
+      const taskValue = isRecord(tasks[taskName]) ? tasks[taskName] : {};
+      const readonlyTask = Object.fromEntries(
+        Object.entries(taskValue).filter(([key]) => !key.startsWith('$') && key !== '任务执行情况'),
+      );
+      const readonlyRecords = formatRecordMap(readonlyTask);
+      return [
+        formatPromptPathTitle('任务', taskName),
+        readonlyRecords,
+        `可写:${formatCompactObject(writableSnapshot)}`,
+      ]
+        .filter(Boolean)
+        .join('\n');
+    })
+    .join('\n\n');
 }
 
 function formatFollowupCluesContext(followupClues: unknown): string {
@@ -978,31 +1083,6 @@ function formatFollowupCluesContext(followupClues: unknown): string {
     return '';
   }
   return ['<后续未发生事件脉络>', formatPromptYaml(followupClues), '</后续未发生事件脉络>'].join('\n');
-}
-function formatVariableContext(
-  projection: Record<string, unknown>,
-  participationEvents: unknown,
-  followupClues: unknown,
-  cultivationReference: unknown,
-): string {
-  const participationContext = formatParticipationEventsContext(projection, participationEvents);
-  const followupContext = formatFollowupCluesContext(followupClues);
-  const relevantCharacters = isRecord(projection.角色数据) && Object.keys(projection.角色数据).length > 0
-    ? JSON.stringify(projection.角色数据)
-    : '';
-  const lines = [
-    '<variable>',
-    '<status_current_variables>',
-    `世界信息:${JSON.stringify(projection.世界信息 ?? {})}`,
-    `user数据:${JSON.stringify(projection.user数据 ?? {})}`,
-    participationContext,
-    followupContext,
-    relevantCharacters ? `角色数据:${relevantCharacters}` : '',
-    '</status_current_variables>',
-    formatDecisionChecklist(Boolean(participationContext), cultivationReference),
-    '</variable>',
-  ];
-  return lines.filter(Boolean).join('\n');
 }
 
 function uniqueFullLocationPaths(value: unknown): string[] {
@@ -1014,45 +1094,54 @@ function uniqueFullLocationPaths(value: unknown): string[] {
 
 function formatLocationContext(surroundingLocations: unknown, currentLocation: unknown): string {
   const locationGroups = isRecord(surroundingLocations) ? surroundingLocations : {};
-  const groups = {
-    普通移动: uniqueFullLocationPaths(locationGroups.普通移动),
-    事件目标: uniqueFullLocationPaths(locationGroups.事件目标),
-    地图指定: uniqueFullLocationPaths(locationGroups.地图指定),
-  };
   const normalizedCurrentLocation = normalizeLocationPath(currentLocation);
-  const currentScopePath = getLocationScopePath(locationGroups.当前活动区) || getLocationScopePath(currentLocation);
-  const hasAnyLocationContext =
-    Boolean(normalizedCurrentLocation || currentScopePath) ||
-    Object.values(groups).some(paths => paths.length > 0);
-  if (!hasAnyLocationContext) {
+  const normalPaths = uniqueFullLocationPaths(locationGroups.普通移动);
+  const eventPaths = uniqueFullLocationPaths(locationGroups.事件目标);
+  const instructionPaths = uniqueFullLocationPaths(locationGroups.地图指定);
+  if (!normalizedCurrentLocation && normalPaths.length === 0 && eventPaths.length === 0 && instructionPaths.length === 0) {
     return '';
   }
 
-  const allowedScopes = new Set<string>();
-  if (currentScopePath) allowedScopes.add(currentScopePath);
-  Object.values(groups)
-    .flat()
-    .forEach(path => {
-      const scopePath = getLocationScopePath(path);
-      if (scopePath) allowedScopes.add(scopePath);
-    });
-  const lines = [
-    '<可用地点>',
-    '[路径语义]',
-    '格式为“一级/二级/三级[/四级]”：一级是世界大域或政权，二级是地图旅行区域，三级是严格活动区，第四级是可选的具体镜头场景。',
-    `当前完整位置：${normalizedCurrentLocation || '（无效）'}`,
-    `当前严格活动区：${currentScopePath || '（无效）'}`,
-    '[合法严格活动区]',
-    ...[...allowedScopes].map(path => `- ${path}`),
-  ];
-  for (const [groupName, paths] of Object.entries(groups)) {
-    lines.push(`[${groupName}]${paths.length === 0 ? '（无）' : ''}`, ...paths.map(path => `- ${path}`));
-  }
-  lines.push(
-    '同一前三段只表示处于同一严格活动区，不表示人物已经面对面同场。',
-    '</可用地点>',
-  );
+  const lines: string[] = [];
+  if (normalizedCurrentLocation) lines.push(`当前地点:${formatCompactScalar(normalizedCurrentLocation)}`);
+  if (normalPaths.length > 0) lines.push(`普通移动:${normalPaths.map(formatCompactScalar).join('|')}`);
+  if (eventPaths.length > 0) lines.push(`事件目标:${eventPaths.map(formatCompactScalar).join('|')}`);
+  if (instructionPaths.length > 0) lines.push(`指令地点:${instructionPaths.map(formatCompactScalar).join('|')}`);
   return lines.join('\n');
+}
+
+function formatVariableContext(
+  projection: Record<string, unknown>,
+  participationEvents: unknown,
+  tasks: unknown,
+  followupClues: unknown,
+  cultivationReference: unknown,
+  initialAttributes: unknown,
+  talents: unknown,
+): string {
+  const participationContext = formatParticipationEventsContext(projection, participationEvents);
+  const taskContext = formatTasksContext(projection, tasks);
+  const followupContext = formatFollowupCluesContext(followupClues);
+  const relevantCharacters =
+    isRecord(projection.角色数据) && Object.keys(projection.角色数据).length > 0
+      ? `角色数据:${formatCompactObject(projection.角色数据)}`
+      : '';
+  const lines = [
+    '<variable>',
+    '<当前时间>',
+    `世界信息:${formatCompactObject(projection.世界信息 ?? {})}`,
+    '</当前时间>',
+    '<玩家数据>',
+    formatPlayerContext(projection, initialAttributes, talents),
+    '</玩家数据>',
+    participationContext ? `<参与事件>\n${participationContext}\n</参与事件>` : '',
+    taskContext ? `<任务>\n${taskContext}\n</任务>` : '',
+    followupContext,
+    relevantCharacters ? `<角色数据>\n${relevantCharacters}\n</角色数据>` : '',
+    '</variable>',
+    formatDecisionChecklist(Boolean(participationContext), cultivationReference),
+  ];
+  return lines.filter(Boolean).join('\n');
 }
 
 function buildVariableProjectionSnapshot(
@@ -1063,19 +1152,27 @@ function buildVariableProjectionSnapshot(
   variableContext: string;
   locationContext: string;
   participationEvents: unknown;
+  tasks: unknown;
   followupClues: unknown;
   cultivationReference: unknown;
+  playerInitialAttributes: unknown;
+  playerTalents: unknown;
 } {
   const variables = readAllVariablesSnapshot(assistantMessageId);
   const statDataSource = isRecord(variables.stat_data) ? variables.stat_data : variables;
   const statData = statDataSource as Record<string, unknown>;
   const projection = buildExtraVariableProjection(variables, latestAssistantBody);
   const frontendVariables = getNestedRecord(statData, '前端变量') || {};
+  const rawUserData = getNestedRecord(statData, 'user数据') || getNestedRecord(statData, '玩家数据') || {};
+  const tasks = statData.任务;
   const variableContext = formatVariableContext(
     projection,
     statData.参与事件,
+    tasks,
     statData.后续事件线索,
     frontendVariables.修为变化参考,
+    rawUserData.初始属性,
+    rawUserData.天赋,
   );
   const projectedUserData = isRecord(projection.user数据) ? projection.user数据 : {};
   const locationContext = formatLocationContext(frontendVariables.周围地点, projectedUserData.所在位置);
@@ -1085,8 +1182,11 @@ function buildVariableProjectionSnapshot(
     variableContext,
     locationContext,
     participationEvents: statData.参与事件,
+    tasks,
     followupClues: statData.后续事件线索,
     cultivationReference: frontendVariables.修为变化参考,
+    playerInitialAttributes: rawUserData.初始属性,
+    playerTalents: rawUserData.天赋,
   };
 }
 
@@ -1334,7 +1434,7 @@ function buildVariablePromptSlots(
   const relevantCharacters =
     isRecord(variableProjection.projection.角色数据) &&
     Object.keys(variableProjection.projection.角色数据).length > 0
-      ? JSON.stringify(variableProjection.projection.角色数据)
+      ? `角色数据:${formatCompactObject(variableProjection.projection.角色数据)}`
       : '';
   const cultivationReference =
     typeof variableProjection.cultivationReference === 'number' &&
@@ -1348,14 +1448,20 @@ function buildVariablePromptSlots(
     variableProjection.projection,
     variableProjection.participationEvents,
   );
+  const tasks = formatTasksContext(variableProjection.projection, variableProjection.tasks);
 
   return {
     readonlyContextRounds: recentBodies.serializedReadonlyContextRounds,
     latestUserBody: recentBodies.serializedLatestUserBody,
     latestAssistantBody: recentBodies.serializedLatestAssistantBody,
-    worldContext: JSON.stringify(variableProjection.projection.世界信息 ?? {}),
-    playerContext: JSON.stringify(variableProjection.projection.user数据 ?? {}),
+    worldContext: `世界信息:${formatCompactObject(variableProjection.projection.世界信息 ?? {})}`,
+    playerContext: formatPlayerContext(
+      variableProjection.projection,
+      variableProjection.playerInitialAttributes,
+      variableProjection.playerTalents,
+    ),
     participationEvents,
+    tasks,
     followupClues: formatFollowupCluesContext(variableProjection.followupClues),
     relevantCharacters,
     locationContext: variableProjection.locationContext,
