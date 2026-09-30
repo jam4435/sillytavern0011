@@ -19,9 +19,13 @@ import eventScrollRightUrl from '../assets/ui/event-scroll-right.webp?url';
 import {
   DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
   DEFAULT_VARIABLE_INPUT_TEMPLATE,
-  LEGACY_VARIABLE_INPUT_TEMPLATE_V1,
   DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
   DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE,
+  LEGACY_VARIABLE_GUIDANCE_TEMPLATE_V1,
+  LEGACY_VARIABLE_INPUT_TEMPLATE_V1,
+  LEGACY_VARIABLE_INPUT_TEMPLATE_V2,
+  LEGACY_VARIABLE_STRUCTURE_TEMPLATE_V1,
+  LEGACY_VARIABLE_UPDATE_PROMPT_TEMPLATE_V1,
 } from '../prompts/variablePromptDefaults';
 
 // =========================================
@@ -980,9 +984,13 @@ function normalizeSummaryApiSelection(
   return cloneSummaryApiSelection(fallback);
 }
 
-function normalizeVariableInputTemplate(value: unknown, fallbackValue: string): string {
+function normalizeLegacyDefaultTemplate(
+  value: unknown,
+  fallbackValue: string,
+  legacyValues: readonly string[],
+): string {
   if (typeof value !== 'string') return fallbackValue;
-  return value === LEGACY_VARIABLE_INPUT_TEMPLATE_V1 ? fallbackValue : value;
+  return legacyValues.includes(value) ? fallbackValue : value;
 }
 
 function normalizeSummarySettings(summarySettings: StoredSummarySettings | undefined): SummarySettings {
@@ -1062,22 +1070,26 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
     ),
     promptTemplate:
       typeof summarySettings.promptTemplate === 'string' ? summarySettings.promptTemplate : defaults.promptTemplate,
-    variablePromptTemplate:
-      typeof summarySettings.variablePromptTemplate === 'string'
-        ? summarySettings.variablePromptTemplate
-        : defaults.variablePromptTemplate,
-    variableInputTemplate: normalizeVariableInputTemplate(
+    variablePromptTemplate: normalizeLegacyDefaultTemplate(
+      summarySettings.variablePromptTemplate,
+      defaults.variablePromptTemplate,
+      [LEGACY_VARIABLE_UPDATE_PROMPT_TEMPLATE_V1],
+    ),
+    variableInputTemplate: normalizeLegacyDefaultTemplate(
       summarySettings.variableInputTemplate,
       defaults.variableInputTemplate,
+      [LEGACY_VARIABLE_INPUT_TEMPLATE_V1, LEGACY_VARIABLE_INPUT_TEMPLATE_V2],
     ),
-    variableStructureTemplate:
-      typeof summarySettings.variableStructureTemplate === 'string'
-        ? summarySettings.variableStructureTemplate
-        : defaults.variableStructureTemplate,
-    variableGuidanceTemplate:
-      typeof summarySettings.variableGuidanceTemplate === 'string'
-        ? summarySettings.variableGuidanceTemplate
-        : defaults.variableGuidanceTemplate,
+    variableStructureTemplate: normalizeLegacyDefaultTemplate(
+      summarySettings.variableStructureTemplate,
+      defaults.variableStructureTemplate,
+      [LEGACY_VARIABLE_STRUCTURE_TEMPLATE_V1],
+    ),
+    variableGuidanceTemplate: normalizeLegacyDefaultTemplate(
+      summarySettings.variableGuidanceTemplate,
+      defaults.variableGuidanceTemplate,
+      [LEGACY_VARIABLE_GUIDANCE_TEMPLATE_V1],
+    ),
     variableContextRounds: summarySettings.variableContextRounds === 2 ? 2 : 1,
     variablePromptExcludedTags:
       typeof summarySettings.variablePromptExcludedTags === 'string'
