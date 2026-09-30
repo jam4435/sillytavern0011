@@ -163,7 +163,7 @@ describe('executeExtraVariableUpdate', () => {
           头像: 'preset:legacy-player-avatar',
           出生年份: 1201,
           年龄: 18,
-          初始属性: { 根骨: 10 },
+          初始属性: { 臂力: 10, 根骨: 8, 机敏: 12, 洞察: 9, 悟性: 11, 风姿: 7, 福缘: 10 },
           天赋: { 过目不忘: '只读' },
           属性: { 根骨: 60, $缓存: '隐藏' },
           $meta: { 不应发送: true },
@@ -185,9 +185,19 @@ describe('executeExtraVariableUpdate', () => {
         参与事件: {
           '射雕第七回02-测试事件': {
             描述: '1219年10月20日13时 到 1219年10月20日15时，黄蓉正在事件中',
+            地点: '大宋/临安府/牛家村/曲三酒馆',
             update: { 黄蓉: { 好感: 1 } },
             分支标记: { 黄蓉对郭靖变心: 0 },
             $meta: '隐藏',
+          },
+        },
+        任务: {
+          '牛家村送信': {
+            所属势力: '江湖',
+            任务详情: '把书信送到临安城。',
+            任务地点: '大宋/临安府/临安城',
+            任务执行情况: '未到达地点',
+            任务奖励: { 修为增量: 10 },
           },
         },
         世界事件: { 旧闻: '不应发送' },
@@ -200,6 +210,8 @@ describe('executeExtraVariableUpdate', () => {
           周围地点: {
             当前活动区: '大宋/临安府/牛家村',
             普通移动: ['大宋/临安府/牛家村', '大宋/临安府/临安城'],
+            事件目标: ['大宋/临安府/牛家村/曲三酒馆'],
+            地图指定: ['大宋/临安府/临安城/皇宫偏殿'],
             $内部: ['不应发送'],
           },
           随机数: '不应发送',
@@ -308,11 +320,20 @@ describe('executeExtraVariableUpdate', () => {
     expect(result.finalMessageText).toMatch(/^正文内容\n<VariableEdit>/);
     expect(requestConfiguredTextMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        prompt: expect.stringContaining('合法严格活动区'),
+        prompt: expect.stringContaining('<可用地点>'),
       }),
     );
     const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
     expect(prompt).toContain('传说：基本失传，不得操纵时间空间。');
+    expect(prompt).toContain('世界信息:{时间:{年:1219,月:10,日:20,时:13,分:15}}');
+    expect(prompt).toContain('user数据.初始属性');
+    expect(prompt).toContain('臂力:10|根骨:8|机敏:12|洞察:9|悟性:11|风姿:7|福缘:10');
+    expect(prompt).toContain('参与事件.射雕第七回02-测试事件');
+    expect(prompt).toContain('时间:1219年10月20日13时-1219年10月20日15时|地点:大宋/临安府/牛家村/曲三酒馆|详情:黄蓉正在事件中');
+    expect(prompt).toContain('任务.牛家村送信');
+    expect(prompt).toContain('可写:{任务执行情况:未到达地点}');
+    expect(prompt).toContain('指令地点:大宋/临安府/临安城/皇宫偏殿');
+    expect(prompt).toContain('角色数据:{');
     expect(prompt).toContain('<变量模板>');
     expect(prompt).toContain('# ERA 变量更新规则');
     expect(prompt).not.toContain('宏观背景');
