@@ -19,6 +19,7 @@ import eventScrollRightUrl from '../assets/ui/event-scroll-right.webp?url';
 import {
   DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
   DEFAULT_VARIABLE_INPUT_TEMPLATE,
+  LEGACY_VARIABLE_INPUT_TEMPLATE_V1,
   DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
   DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE,
 } from '../prompts/variablePromptDefaults';
@@ -979,6 +980,11 @@ function normalizeSummaryApiSelection(
   return cloneSummaryApiSelection(fallback);
 }
 
+function normalizeVariableInputTemplate(value: unknown, fallbackValue: string): string {
+  if (typeof value !== 'string') return fallbackValue;
+  return value === LEGACY_VARIABLE_INPUT_TEMPLATE_V1 ? fallbackValue : value;
+}
+
 function normalizeSummarySettings(summarySettings: StoredSummarySettings | undefined): SummarySettings {
   const defaults = createDefaultSummarySettings();
   if (!summarySettings) {
@@ -1060,10 +1066,10 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
       typeof summarySettings.variablePromptTemplate === 'string'
         ? summarySettings.variablePromptTemplate
         : defaults.variablePromptTemplate,
-    variableInputTemplate:
-      typeof summarySettings.variableInputTemplate === 'string'
-        ? summarySettings.variableInputTemplate
-        : defaults.variableInputTemplate,
+    variableInputTemplate: normalizeVariableInputTemplate(
+      summarySettings.variableInputTemplate,
+      defaults.variableInputTemplate,
+    ),
     variableStructureTemplate:
       typeof summarySettings.variableStructureTemplate === 'string'
         ? summarySettings.variableStructureTemplate
