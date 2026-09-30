@@ -12,6 +12,7 @@ const makeSlots = (overrides: Partial<VariablePromptSlots> = {}): VariablePrompt
   worldContext: '{"时间":"now"}',
   playerContext: '{"修为":100}',
   participationEvents: '',
+  tasks: '',
   followupClues: '',
   relevantCharacters: '',
   locationContext: '<可用地点>测试</可用地点>',
