@@ -957,7 +957,7 @@ function formatPromptYaml(value: unknown, indent = 0): string {
 function formatCompactKey(value: unknown): string {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim();
   if (!text) return '""';
-  return /[\\s,:{}\[\]"'\\|]/.test(text) ? JSON.stringify(text) : text;
+  return /[\s,:{}\[\]"'\\|]/.test(text) ? JSON.stringify(text) : text;
 }
 
 function formatCompactScalar(value: unknown): string {
