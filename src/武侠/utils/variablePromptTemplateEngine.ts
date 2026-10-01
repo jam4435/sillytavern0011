@@ -66,7 +66,7 @@ export const VARIABLE_PROMPT_SLOT_META: readonly VariablePromptSlotMeta[] = [
     name: 'participationEvents',
     label: '参与事件',
     description: '每个参与事件使用完整路径标题；时间/地点/详情为只读压缩记录，可写快照使用紧凑对象。',
-    source: 'stat_data.参与事件；事件详情只读，仅保留既有结局/insert/update/delete/分支标记等允许检查的字段。',
+    source: 'stat_data.参与事件；事件详情只读，仅保留既有结局与 insert/update/delete 差分快照。',
     emptyBehavior: '没有有效参与事件时为空；@if participationEvents 不成立。',
   },
   {
@@ -114,44 +114,61 @@ export const VARIABLE_PROMPT_SLOT_META: readonly VariablePromptSlotMeta[] = [
 ] as const;
 
 const IF_RE = /^\s*@if\s+([A-Za-z][A-Za-z0-9_]*)\s*$/;
+const ELSE_RE = /^\s*@else\s*$/;
 const ENDIF_RE = /^\s*@endif\s*$/;
 const SLOT_RE = /\{\{([A-Za-z][A-Za-z0-9_]*)\}\}/g;
 
 const isKnownSlot = (value: string): value is VariablePromptSlotName =>
   (VARIABLE_PROMPT_SLOT_NAMES as readonly string[]).includes(value);
 
-export function renderVariableInputTemplate(
-  template: string,
-  slots: VariablePromptSlots,
-): string {
-  const source = template.trim() ? template : DEFAULT_VARIABLE_INPUT_TEMPLATE;
-  const output: string[] = [];
-  const conditionStack: boolean[] = [];
+type ConditionalFrame = {
+  condition: boolean;
+  branchActive: boolean;
+  elseSeen: boolean;
+};
 
-  for (const line of source.split(/\r?\n/)) {
+export function renderVariableConditionalTemplate(template: string, slots: VariablePromptSlots): string {
+  const output: string[] = [];
+  const conditionStack: ConditionalFrame[] = [];
+
+  for (const line of template.split(/\r?\n/)) {
     const ifMatch = line.match(IF_RE);
     if (ifMatch) {
       const slotName = ifMatch[1];
       if (!isKnownSlot(slotName)) {
-        throw new Error(`变量输入模板引用了未知条件：${slotName}`);
+        throw new Error(`变量提示词模板引用了未知条件：${slotName}`);
       }
-      conditionStack.push(Boolean(slots[slotName].trim()));
+      const condition = Boolean(slots[slotName].trim());
+      conditionStack.push({ condition, branchActive: condition, elseSeen: false });
+      continue;
+    }
+
+    if (ELSE_RE.test(line)) {
+      const frame = conditionStack.at(-1);
+      if (!frame) {
+        throw new Error('变量提示词模板存在多余的 @else。');
+      }
+      if (frame.elseSeen) {
+        throw new Error('变量提示词模板同一条件块出现重复的 @else。');
+      }
+      frame.elseSeen = true;
+      frame.branchActive = !frame.condition;
       continue;
     }
 
     if (ENDIF_RE.test(line)) {
       if (conditionStack.length === 0) {
-        throw new Error('变量输入模板存在多余的 @endif。');
+        throw new Error('变量提示词模板存在多余的 @endif。');
       }
       conditionStack.pop();
       continue;
     }
 
-    if (conditionStack.every(Boolean)) {
+    if (conditionStack.every(frame => frame.branchActive)) {
       output.push(
         line.replace(SLOT_RE, (_match, slotName: string) => {
           if (!isKnownSlot(slotName)) {
-            throw new Error(`变量输入模板引用了未知占位符：${slotName}`);
+            throw new Error(`变量提示词模板引用了未知占位符：${slotName}`);
           }
           return slots[slotName];
         }),
@@ -160,10 +177,15 @@ export function renderVariableInputTemplate(
   }
 
   if (conditionStack.length > 0) {
-    throw new Error('变量输入模板存在未闭合的 @if。');
+    throw new Error('变量提示词模板存在未闭合的 @if。');
   }
 
   return output.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+export function renderVariableInputTemplate(template: string, slots: VariablePromptSlots): string {
+  const source = template.trim() ? template : DEFAULT_VARIABLE_INPUT_TEMPLATE;
+  return renderVariableConditionalTemplate(source, slots);
 }
 
 export function getVariablePromptSlotMeta(name: VariablePromptSlotName): VariablePromptSlotMeta {
