@@ -256,7 +256,8 @@ describe('settingsManager ui theme', () => {
     expect(settings.variablePromptTemplate).toContain('{{narrativeScale}}');
     expect(settings.variablePromptTemplate).toContain('{{variableTemplate}}');
     expect(settings.variablePromptTemplate).toContain('{{variableGuidance}}');
-    expect(settings.variablePromptTemplate).toContain('【最终执行要求】');
+    expect(settings.variablePromptTemplate).not.toContain('【最终执行要求】');
+    expect(settings.variableGuidanceTemplate).toContain('最终执行：');
 
     expect(settings.variableInputTemplate).toContain('{{latestUserBody}}');
     expect(settings.variableInputTemplate).toContain('{{latestAssistantBody}}');
