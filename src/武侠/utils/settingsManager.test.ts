@@ -1,5 +1,16 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
+  DEFAULT_VARIABLE_INPUT_TEMPLATE,
+  DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
+  DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE,
+  getVariablePromptTemplateSignature,
+  KNOWN_VARIABLE_GUIDANCE_DEFAULT_SIGNATURES,
+  KNOWN_VARIABLE_INPUT_TEMPLATE_DEFAULT_SIGNATURES,
+  KNOWN_VARIABLE_MAIN_PROMPT_DEFAULT_SIGNATURES,
+  KNOWN_VARIABLE_STRUCTURE_DEFAULT_SIGNATURES,
+} from '../prompts/variablePromptDefaults';
+import {
   applyRegexRules,
   applySettingsToDOM,
   BATTLE_CHECK_REGEX_RULE,
@@ -273,6 +284,21 @@ describe('settingsManager ui theme', () => {
     expect(template).toContain('(1200.11.26)');
     expect(template).toContain('不得把现实日期写入结果');
     expect(template).toContain('1～3 句');
+  });
+
+  it('keeps the current extracted prompt defaults recognizable as unmodified project defaults', () => {
+    expect(KNOWN_VARIABLE_MAIN_PROMPT_DEFAULT_SIGNATURES).toContain(
+      getVariablePromptTemplateSignature(DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE),
+    );
+    expect(KNOWN_VARIABLE_INPUT_TEMPLATE_DEFAULT_SIGNATURES).toContain(
+      getVariablePromptTemplateSignature(DEFAULT_VARIABLE_INPUT_TEMPLATE),
+    );
+    expect(KNOWN_VARIABLE_STRUCTURE_DEFAULT_SIGNATURES).toContain(
+      getVariablePromptTemplateSignature(DEFAULT_VARIABLE_STRUCTURE_TEMPLATE),
+    );
+    expect(KNOWN_VARIABLE_GUIDANCE_DEFAULT_SIGNATURES).toContain(
+      getVariablePromptTemplateSignature(DEFAULT_VARIABLE_GUIDANCE_TEMPLATE),
+    );
   });
 
   it('preserves explicitly customized variable prompt layers without migration', () => {
