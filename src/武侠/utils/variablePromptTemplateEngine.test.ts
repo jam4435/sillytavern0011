@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   VARIABLE_PROMPT_SLOT_META,
+  renderVariableConditionalTemplate,
   renderVariableInputTemplate,
   type VariablePromptSlots,
 } from './variablePromptTemplateEngine';
@@ -41,6 +42,33 @@ describe('variablePromptTemplateEngine', () => {
         makeSlots({ participationEvents: '<参与事件>事件</参与事件>', relevantCharacters: '{"郭靖":{}}' }),
       ),
     ).toContain('<参与事件>事件</参与事件>');
+  });
+
+  it('支持 @else，并可用于变量指导等非输入模板', () => {
+    const template = [
+      'before',
+      '@if participationEvents',
+      'event-rules',
+      '@else',
+      'normal-rules',
+      '@endif',
+      'after',
+    ].join('\n');
+
+    expect(renderVariableConditionalTemplate(template, makeSlots())).toBe('before\nnormal-rules\nafter');
+    expect(
+      renderVariableConditionalTemplate(template, makeSlots({ participationEvents: '参与事件.测试' })),
+    ).toBe('before\nevent-rules\nafter');
+  });
+
+  it('会拒绝多余或重复的 @else', () => {
+    expect(() => renderVariableConditionalTemplate('@else\nfoo', makeSlots())).toThrow('多余的 @else');
+    expect(() =>
+      renderVariableConditionalTemplate(
+        '@if participationEvents\na\n@else\nb\n@else\nc\n@endif',
+        makeSlots(),
+      ),
+    ).toThrow('重复的 @else');
   });
 
   it('未知 slot 和未闭合条件会明确报错', () => {
