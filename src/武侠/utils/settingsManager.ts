@@ -21,11 +21,11 @@ import {
   DEFAULT_VARIABLE_INPUT_TEMPLATE,
   DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
   DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE,
-  LEGACY_VARIABLE_GUIDANCE_TEMPLATE_V1,
-  LEGACY_VARIABLE_INPUT_TEMPLATE_V1,
-  LEGACY_VARIABLE_INPUT_TEMPLATE_V2,
-  LEGACY_VARIABLE_STRUCTURE_TEMPLATE_V1,
-  LEGACY_VARIABLE_UPDATE_PROMPT_TEMPLATE_V1,
+  getVariablePromptTemplateSignature,
+  KNOWN_VARIABLE_GUIDANCE_DEFAULT_SIGNATURES,
+  KNOWN_VARIABLE_INPUT_TEMPLATE_DEFAULT_SIGNATURES,
+  KNOWN_VARIABLE_MAIN_PROMPT_DEFAULT_SIGNATURES,
+  KNOWN_VARIABLE_STRUCTURE_DEFAULT_SIGNATURES,
 } from '../prompts/variablePromptDefaults';
 
 // =========================================
@@ -987,10 +987,10 @@ function normalizeSummaryApiSelection(
 function normalizeLegacyDefaultTemplate(
   value: unknown,
   fallbackValue: string,
-  legacyValues: readonly string[],
+  knownDefaultSignatures: readonly string[],
 ): string {
   if (typeof value !== 'string') return fallbackValue;
-  return legacyValues.includes(value) ? fallbackValue : value;
+  return knownDefaultSignatures.includes(getVariablePromptTemplateSignature(value)) ? fallbackValue : value;
 }
 
 function normalizeSummarySettings(summarySettings: StoredSummarySettings | undefined): SummarySettings {
@@ -1073,22 +1073,22 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
     variablePromptTemplate: normalizeLegacyDefaultTemplate(
       summarySettings.variablePromptTemplate,
       defaults.variablePromptTemplate,
-      [LEGACY_VARIABLE_UPDATE_PROMPT_TEMPLATE_V1],
+      KNOWN_VARIABLE_MAIN_PROMPT_DEFAULT_SIGNATURES,
     ),
     variableInputTemplate: normalizeLegacyDefaultTemplate(
       summarySettings.variableInputTemplate,
       defaults.variableInputTemplate,
-      [LEGACY_VARIABLE_INPUT_TEMPLATE_V1, LEGACY_VARIABLE_INPUT_TEMPLATE_V2],
+      KNOWN_VARIABLE_INPUT_TEMPLATE_DEFAULT_SIGNATURES,
     ),
     variableStructureTemplate: normalizeLegacyDefaultTemplate(
       summarySettings.variableStructureTemplate,
       defaults.variableStructureTemplate,
-      [LEGACY_VARIABLE_STRUCTURE_TEMPLATE_V1],
+      KNOWN_VARIABLE_STRUCTURE_DEFAULT_SIGNATURES,
     ),
     variableGuidanceTemplate: normalizeLegacyDefaultTemplate(
       summarySettings.variableGuidanceTemplate,
       defaults.variableGuidanceTemplate,
-      [LEGACY_VARIABLE_GUIDANCE_TEMPLATE_V1],
+      KNOWN_VARIABLE_GUIDANCE_DEFAULT_SIGNATURES,
     ),
     variableContextRounds: summarySettings.variableContextRounds === 2 ? 2 : 1,
     variablePromptExcludedTags:
