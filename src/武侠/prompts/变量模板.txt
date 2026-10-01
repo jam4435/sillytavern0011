@@ -10,7 +10,7 @@
 ## 参与事件
 参与事件.【事件名】
 {结局:string,insert:object,update:object,delete:object,分支标记:{【已有标记】:0|1}}
-权限:事件键禁止新增/删除；结局可修改；insert/update/delete/分支标记仅修改已有内容。
+权限:事件键禁止新增/删除；结局可修改；insert/update/delete/分支标记可修改可删除。
 
 ## 人物共有字段
 适用:user数据 | 角色数据.【人物名】
