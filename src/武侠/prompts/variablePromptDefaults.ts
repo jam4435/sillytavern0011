@@ -30,7 +30,24 @@ export const DEFAULT_VARIABLE_GUIDANCE_TEMPLATE = normalizePromptSource(variable
  *
  * 当前这一版默认值的签名也保留在列表里，便于以后只修改 txt 时识别旧默认。
  */
-export const KNOWN_VARIABLE_INPUT_TEMPLATE_DEFAULT_SIGNATURES = ["543:33841a73","591:22098b41","524:ac9d7c79"] as const;
-export const KNOWN_VARIABLE_MAIN_PROMPT_DEFAULT_SIGNATURES = ["779:5e1085bf","174:9eeabf1c"] as const;
-export const KNOWN_VARIABLE_STRUCTURE_DEFAULT_SIGNATURES = ["7004:e20c0ca9","2086:d965dd8e"] as const;
-export const KNOWN_VARIABLE_GUIDANCE_DEFAULT_SIGNATURES = ["3159:ca9e984d","3821:025b4c6a"] as const;
+export const KNOWN_VARIABLE_INPUT_TEMPLATE_DEFAULT_SIGNATURES = [
+  '543:33841a73',
+  '591:22098b41',
+  getVariablePromptTemplateSignature(DEFAULT_VARIABLE_INPUT_TEMPLATE),
+] as const;
+export const KNOWN_VARIABLE_MAIN_PROMPT_DEFAULT_SIGNATURES = [
+  '779:5e1085bf',
+  getVariablePromptTemplateSignature(DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE),
+] as const;
+export const KNOWN_VARIABLE_STRUCTURE_DEFAULT_SIGNATURES = [
+  '7004:e20c0ca9',
+  '2086:d965dd8e',
+  '2090:718235bb',
+  getVariablePromptTemplateSignature(DEFAULT_VARIABLE_STRUCTURE_TEMPLATE),
+] as const;
+export const KNOWN_VARIABLE_GUIDANCE_DEFAULT_SIGNATURES = [
+  '3159:ca9e984d',
+  '3821:025b4c6a',
+  '2912:689fe34c',
+  getVariablePromptTemplateSignature(DEFAULT_VARIABLE_GUIDANCE_TEMPLATE),
+] as const;
