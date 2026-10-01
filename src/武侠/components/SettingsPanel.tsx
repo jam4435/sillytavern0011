@@ -3304,7 +3304,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <h5 className="summary-subsection-title">变量输入模板</h5>
                 <p className="settings-hint">
                   这里只控制上下文怎么排列，不负责计算数据。支持 {'{{slot}}'} 与独占一行的
-                  {' @if slot '} / {' @endif '}；条件在 slot 非空时成立。
+                  {' @if slot '} / {' @else '} / {' @endif '}；条件在 slot 非空时成立。
                 </p>
                 <div className="variable-prompt-slot-list">
                   {VARIABLE_PROMPT_SLOT_META.map(slot => (
@@ -3422,7 +3422,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
               <div className="summary-subsection">
                 <h5 className="summary-subsection-title">变量更新规则</h5>
-                <p className="settings-hint">原世界书「变量指导」内容。只服务额外变量模型。</p>
+                <p className="settings-hint">
+                  原世界书「变量指导」内容。只服务额外变量模型；同样支持独占一行的
+                  {' @if slot '} / {' @else '} / {' @endif '} 条件块。
+                </p>
                 <textarea
                   value={settings.summarySettings.variableGuidanceTemplate}
                   onChange={e => updateSummarySetting('variableGuidanceTemplate', e.target.value)}
