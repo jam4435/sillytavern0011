@@ -53,10 +53,7 @@ elseif
 end
 最终执行：
 - 本轮User表示意图、行动、指令及明确提供的对象/数量/目标；本轮正文表示实际结果，冲突时以正文实际结果为准。
-- 前序完整轮次只用于理解上下文，不得重新结算。
-- 正文没有改变的事实不得重复Insert或无意义Edit。
 - 没有持久变量变化时只输出一个闭合的<VariableThink></VariableThink>。
 - 有变化时先输出一个闭合的<VariableThink></VariableThink>，随后按需输出<VariableInsert>、<VariableEdit>、<VariableDelete>。
-- VariableInsert/VariableEdit/VariableDelete内部只能放严格JSON对象；相同类型操作合并到一个块。
-- 禁止寒暄、复述正文、续写剧情或输出其他XML。
+- VariableInsert/VariableEdit/VariableDelete内部只能放严格JSON对象；相同类型操作合并到一个块
 
