@@ -5,6 +5,7 @@ import {
 } from './settingsManager';
 import {
   VARIABLE_PROMPT_SLOT_META,
+  renderVariableConditionalTemplate,
   renderVariableInputTemplate,
   type VariablePromptSlotName,
   type VariablePromptSlots,
@@ -136,7 +137,7 @@ const ERA_VARIABLE_BLOCK_STRIP_REGEX = /\s*<Variable(Think|Insert|Edit|Delete)>\
 const VARIABLE_BLOCK_TAGS = ['VariableThink', 'VariableInsert', 'VariableEdit', 'VariableDelete'] as const;
 const ACTION_BLOCK_TAGS = new Set(['VariableInsert', 'VariableEdit', 'VariableDelete']);
 const EXTRA_VARIABLE_READONLY_ENTITY_KEYS = new Set(['头像', '出生年份', '年龄', '初始属性', '天赋']);
-const PARTICIPATION_WRITABLE_KEYS = ['结局', 'insert', 'update', 'delete', '分支标记'] as const;
+const PARTICIPATION_WRITABLE_KEYS = ['结局', 'insert', 'update', 'delete'] as const;
 const TASK_WRITABLE_KEYS = ['任务执行情况'] as const;
 const PLAYER_INITIAL_ATTRIBUTE_ORDER = ['臂力', '根骨', '机敏', '洞察', '悟性', '风姿', '福缘'] as const;
 const VARIABLE_ROOT_KEY_ALIASES: Record<string, string> = {
@@ -1471,6 +1472,7 @@ async function buildExtraVariableUpdatePrompt({
   const variableProjection = buildVariableProjectionSnapshot(assistantMessageId, recentBodies.latestAssistantBody);
   const slots = buildVariablePromptSlots(recentBodies, variableProjection);
   const variableInputContext = renderVariableInputTemplate(settings.variableInputTemplate, slots);
+  const variableGuidance = renderVariableConditionalTemplate(settings.variableGuidanceTemplate, slots);
 
   return renderVariablePromptTemplate(settings.variablePromptTemplate, {
     recentBodies: recentBodies.serialized,
@@ -1480,7 +1482,7 @@ async function buildExtraVariableUpdatePrompt({
     variableContext: variableProjection.variableContext,
     variableInputContext,
     variableTemplate: settings.variableStructureTemplate,
-    variableGuidance: settings.variableGuidanceTemplate,
+    variableGuidance,
     locationContext: variableProjection.locationContext,
     narrativeScale,
   });
