@@ -326,13 +326,14 @@ describe('executeExtraVariableUpdate', () => {
     const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
     expect(prompt).toContain('传说：基本失传，不得操纵时间空间。');
     expect(prompt).toContain('世界信息:{时间:{年:1219,月:10,日:20,时:13,分:15}}');
-    expect(prompt).toContain('user数据.初始属性');
-    expect(prompt).toContain('臂力:10|根骨:8|机敏:12|洞察:9|悟性:11|风姿:7|福缘:10');
-    expect(prompt).toContain('参与事件.射雕第七回02-测试事件');
-    expect(prompt).toContain('时间:1219年10月20日13时-1219年10月20日15时|地点:大宋/临安府/牛家村/曲三酒馆|详情:黄蓉正在事件中');
-    expect(prompt).toContain('任务.牛家村送信');
-    expect(prompt).toContain('可写:{任务执行情况:未到达地点}');
-    expect(prompt).toContain('指令地点:大宋/临安府/临安城/皇宫偏殿');
+    expect(prompt).toContain('初始属性:{臂力:10,根骨:8,机敏:12,洞察:9,悟性:11,风姿:7,福缘:10}');
+    expect(prompt).toContain('天赋:{过目不忘:只读}');
+    expect(prompt).toContain('参与事件:{射雕第七回02-测试事件:{描述:1219年10月20日13时 到 1219年10月20日15时，黄蓉正在事件中');
+    expect(prompt).toContain('地点:大宋/临安府/牛家村/曲三酒馆,update:{黄蓉:{好感:1}}');
+    expect(prompt).toContain('任务:{牛家村送信:{所属势力:江湖,任务详情:把书信送到临安城。');
+    expect(prompt).toContain('任务执行情况:未到达地点');
+    expect(prompt).toContain('可用地点:{当前地点:大宋/临安府/牛家村/村西树林');
+    expect(prompt).toContain('指令地点:[大宋/临安府/临安城/皇宫偏殿]');
     expect(prompt).toContain('角色数据:{');
     expect(prompt).toContain('<变量模板>');
     expect(prompt).toContain('### 包裹');
@@ -348,7 +349,7 @@ describe('executeExtraVariableUpdate', () => {
     expect(prompt).not.toContain('【最终执行要求】');
     expect(prompt).toContain('## 5. <VariableThink>检查与输出');
     expect(prompt).toContain('<修为>');
-    expect(prompt).toContain('修炼一天的修为增幅参考值:33');
+    expect(prompt).toContain('修为参考:{一天增幅:33}');
     expect(prompt).not.toContain('<变量上下文>');
     expect(prompt).not.toContain('"messageId"');
     expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledWith(
@@ -1144,19 +1145,17 @@ describe('executeExtraVariableUpdate', () => {
     const fallbackProjection = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt;
 
     expect(fallbackProjection).toBe(normalProjection);
-    expect(fallbackProjection).toContain('<status_current_variables>');
-    expect(fallbackProjection).toContain('时间: 1219年10月20日13时 到 1219年10月20日15时');
-    expect(fallbackProjection).toContain('详情: 黄蓉正在事件中');
-    expect(fallbackProjection).toContain('update:\n    黄蓉:\n      好感: 1');
-    expect(fallbackProjection).toContain('分支标记:\n    黄蓉对郭靖变心: 0');
+    expect(fallbackProjection).toContain('<variable>');
+    expect(fallbackProjection).toContain('世界信息:{时间:{年:1219,月:10,日:20,时:13,分:15}}');
+    expect(fallbackProjection).toContain('参与事件:{射雕第七回02-测试事件:{描述:1219年10月20日13时 到 1219年10月20日15时，黄蓉正在事件中');
+    expect(fallbackProjection).toContain('update:{黄蓉:{好感:1}}');
+    expect(fallbackProjection).not.toContain('分支标记');
     expect(fallbackProjection).toContain('<后续未发生事件脉络>');
     expect(fallbackProjection).toContain(
-      '射雕第一回05-包惜弱巧救颜烈: 开始：1200年12月11日3时｜结束：1200年12月12日7时｜地点：大宋/临安府/牛家村/杨家后院｜可能会发生的事件脉络：丘处机虽然杀尽追兵，但一名受伤的金兵颜烈却侥幸未死。',
+      '后续事件线索:{射雕第一回05-包惜弱巧救颜烈:',
     );
     expect(fallbackProjection).toContain('</后续未发生事件脉络>');
-    expect(fallbackProjection).toContain('每日修为变化参考:33');
-    expect(fallbackProjection).toContain('【参与事件回合变量检查清单】');
-    expect(fallbackProjection).toContain('未涉及/开端/发展/后段/收束/已完成');
+    expect(fallbackProjection).toContain('修为参考:{一天增幅:33}');
     expect(fallbackProjection).not.toContain('前端变量');
   });
 
@@ -1176,11 +1175,9 @@ describe('executeExtraVariableUpdate', () => {
     });
 
     const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
-    expect(prompt).toContain('每日修为变化参考:33');
-    expect(prompt).toContain('【普通回合变量检查清单】');
-    expect(prompt).not.toContain('【参与事件回合变量检查清单】');
-    expect(prompt).toContain('本身始终只读且不得作为写入目标');
-    expect(prompt).toContain('修炼、战斗或其他可能产生修为的实际行为');
+    expect(prompt).toContain('修为参考:{一天增幅:33}');
+    expect(prompt).not.toContain('<参与事件>');
+    expect(prompt).not.toContain('参与事件:{');
   });
 });
 
