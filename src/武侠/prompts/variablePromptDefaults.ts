@@ -33,6 +33,7 @@ export const DEFAULT_VARIABLE_GUIDANCE_TEMPLATE = normalizePromptSource(variable
  * 当前这一版默认值的签名也保留在列表里，便于以后只修改 txt 时识别旧默认。
  */
 export const KNOWN_VARIABLE_INPUT_TEMPLATE_DEFAULT_SIGNATURES = [
+  '524:ac9d7c79',
   '543:33841a73',
   '591:22098b41',
   getVariablePromptTemplateSignature(DEFAULT_VARIABLE_INPUT_TEMPLATE),
