@@ -96,7 +96,7 @@ export const VARIABLE_PROMPT_SLOT_META: readonly VariablePromptSlotMeta[] = [
   {
     name: 'locationContext',
     label: '可用地点',
-    description: '当前地点与可移动地点的压缩记录；底层地图指定目标在提示词中显示为“指令地点”。',
+    description: '当前地点与可移动地点的压缩记录；底层地图移动目的地目标在提示词中显示为“地图移动目的地”。',
     source: 'stat_data.前端变量.周围地点 + user数据.所在位置。',
     emptyBehavior: '无法形成地点上下文时为空；@if locationContext 不成立。',
   },
