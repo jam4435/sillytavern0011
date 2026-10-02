@@ -35,9 +35,9 @@ export interface DynamicLocationContext {
 
 export interface DynamicLocationContextVariable {
   当前活动区: string;
-  普通移动: string[];
-  事件目标: string[];
-  地图指定: string[];
+  附近地点: string[];
+  目标事件地点: string[];
+  地图移动目的地: string[];
 }
 
 export interface DynamicLocationContextVariableOptions {
@@ -239,9 +239,9 @@ export function createDynamicLocationContextVariable(
   const explicitMapTargets = normalizeCompleteLocationPaths(options.explicitMapTargets || []);
   return {
     当前活动区: context.currentScopePath,
-    普通移动: [...new Set(context.allowedLocationPaths)],
-    事件目标: eventTargets,
-    地图指定: explicitMapTargets,
+    附近地点: [...new Set(context.allowedLocationPaths)],
+    目标事件地点: eventTargets,
+    地图移动目的地: explicitMapTargets,
   };
 }
 
