@@ -1,0 +1,45 @@
+<variable>
+<当前时间>
+{{worldContext}}
+</当前时间>
+
+<玩家数据>
+{{playerContext}}
+</玩家数据>
+
+@if participationEvents
+<参与事件>
+{{participationEvents}}
+</参与事件>
+@endif
+
+@if tasks
+<任务>
+{{tasks}}
+</任务>
+@endif
+
+@if locationContext
+<可用地点>
+{{locationContext}}
+</可用地点>
+@endif
+
+@if relevantCharacters
+<角色数据>
+{{relevantCharacters}}
+</角色数据>
+@endif
+
+@if followupClues
+<后续未发生事件脉络>
+{{followupClues}}
+</后续未发生事件脉络>
+@endif
+
+@if cultivationReference
+<修为>
+{{cultivationReference}}
+</修为>
+@endif
+</variable>
