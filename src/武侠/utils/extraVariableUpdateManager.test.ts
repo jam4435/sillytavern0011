@@ -209,9 +209,9 @@ describe('executeExtraVariableUpdate', () => {
         前端变量: {
           周围地点: {
             当前活动区: '大宋/临安府/牛家村',
-            普通移动: ['大宋/临安府/牛家村', '大宋/临安府/临安城'],
-            事件目标: ['大宋/临安府/牛家村/曲三酒馆'],
-            地图指定: ['大宋/临安府/临安城/皇宫偏殿'],
+            附近地点: ['大宋/临安府/牛家村', '大宋/临安府/临安城'],
+            目标事件地点: ['大宋/临安府/牛家村/曲三酒馆'],
+            地图移动目的地: ['大宋/临安府/临安城/皇宫偏殿'],
             $内部: ['不应发送'],
           },
           随机数: '不应发送',
@@ -335,7 +335,7 @@ describe('executeExtraVariableUpdate', () => {
     expect(prompt).toContain('所属势力:江湖|任务详情:把书信送到临安城。|任务地点:大宋/临安府/临安城|任务奖励:{修为增量:10}');
     expect(prompt).toContain('任务:{牛家村送信:{任务执行情况:未到达地点}}');
     expect(prompt).toContain('当前地点:大宋/临安府/牛家村/村西树林');
-    expect(prompt).toContain('指令地点:大宋/临安府/临安城/皇宫偏殿');
+    expect(prompt).toContain('地图移动目的地:大宋/临安府/临安城/皇宫偏殿');
     expect(prompt).toContain('角色数据:{');
     expect(prompt).toContain('<变量模板>');
     expect(prompt).toContain('### 包裹');
