@@ -1,9 +1,13 @@
-import { DEFAULT_VARIABLE_INPUT_TEMPLATE } from '../prompts/variablePromptDefaults';
+import {
+  DEFAULT_VARIABLE_DATA_FORMAT_TEMPLATE,
+  DEFAULT_VARIABLE_INPUT_TEMPLATE,
+} from '../prompts/variablePromptDefaults';
 
 export const VARIABLE_PROMPT_SLOT_NAMES = [
   'readonlyContextRounds',
   'latestUserBody',
   'latestAssistantBody',
+  'variableData',
   'worldContext',
   'playerContext',
   'participationEvents',
@@ -49,31 +53,38 @@ export const VARIABLE_PROMPT_SLOT_META: readonly VariablePromptSlotMeta[] = [
     emptyBehavior: '无法取得时使用“无可用正文”的只读 payload。',
   },
   {
+    name: 'variableData',
+    label: '变量数据',
+    description: '按 src/武侠/prompts/变量数据格式.txt 渲染后的完整 <variable> 动态数据块。',
+    source: 'worldContext/playerContext/participationEvents/tasks/relevantCharacters/locationContext 等动态槽位。',
+    emptyBehavior: '构建前为空；渲染变量数据格式后写入。',
+  },
+  {
     name: 'worldContext',
     label: '世界信息',
-    description: '当前世界时间，以完整真实路径开头的紧凑对象表示。',
+    description: '当前世界信息，以世界信息根键开头的紧凑嵌套对象表示。',
     source: 'stat_data.世界信息；当前仅投影时间。',
     emptyBehavior: '没有可用世界信息时为 {}。',
   },
   {
     name: 'playerContext',
     label: '玩家变量',
-    description: '玩家可写状态使用紧凑对象；初始属性与天赋另以真实路径标题 + 压缩记录表示。',
-    source: 'stat_data.user数据；移除头像、出生年份、年龄、初始属性、天赋及内部字段。',
+    description: '玩家状态以 user数据 根键开头的紧凑嵌套对象表示；初始属性与天赋按真实子键合并回同一对象。',
+    source: 'stat_data.user数据；过滤头像、出生年份、年龄和内部字段，同时保留只读初始属性与天赋作为判断参考。',
     emptyBehavior: '没有玩家数据时为 {}。',
   },
   {
     name: 'participationEvents',
     label: '参与事件',
-    description: '每个参与事件使用完整路径标题；时间/地点/详情为只读压缩记录，可写快照使用紧凑对象。',
-    source: 'stat_data.参与事件；事件详情只读，仅保留既有结局与 insert/update/delete 差分快照。',
+    description: '参与事件以参与事件根键开头的紧凑嵌套对象表示；描述/地点与既有结局、insert/update/delete 保持同一真实层级。',
+    source: 'stat_data.参与事件；只发送相关事件的描述、地点和既有可写快照。',
     emptyBehavior: '没有有效参与事件时为空；@if participationEvents 不成立。',
   },
   {
     name: 'tasks',
     label: '正式任务',
-    description: '已接取正式任务；只读信息使用压缩记录，任务执行情况使用紧凑对象。',
-    source: 'stat_data.任务；任务名是完整真实路径键，常规变量模型只允许修改已有任务的任务执行情况。',
+    description: '已接取正式任务以任务根键开头的紧凑嵌套对象表示，保持任务真实字段层级。',
+    source: 'stat_data.任务；发送已有任务完整公开字段，常规变量模型仍只允许修改任务执行情况。',
     emptyBehavior: '没有正式任务时为空；@if tasks 不成立。',
   },
   {
@@ -86,7 +97,7 @@ export const VARIABLE_PROMPT_SLOT_META: readonly VariablePromptSlotMeta[] = [
   {
     name: 'relevantCharacters',
     label: '相关人物',
-    description: '本轮变量判断相关 NPC 的当前持久状态，以角色数据完整路径开头的紧凑对象表示。',
+    description: '本轮变量判断相关 NPC 的当前持久状态，以角色数据根键开头的紧凑嵌套对象表示。',
     source: 'stat_data.角色数据；筛选同一严格活动区、参与事件或本轮正文提及的角色，并移除只读/内部字段。',
     emptyBehavior: '没有命中人物时为空；@if relevantCharacters 不成立。',
   },
@@ -181,6 +192,11 @@ export function renderVariableConditionalTemplate(template: string, slots: Varia
   }
 
   return output.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+export function renderVariableDataTemplate(template: string, slots: VariablePromptSlots): string {
+  const source = template.trim() ? template : DEFAULT_VARIABLE_DATA_FORMAT_TEMPLATE;
+  return renderVariableConditionalTemplate(source, slots);
 }
 
 export function renderVariableInputTemplate(template: string, slots: VariablePromptSlots): string {
