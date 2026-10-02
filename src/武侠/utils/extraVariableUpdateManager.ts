@@ -251,7 +251,7 @@ function validateDeclaredLocations(declaredChanges: VariableDeclaredChange[]): {
     if (scopePath) allowedLocationScopes.add(scopePath);
   };
   addAllowedScope(surroundingLocations.当前活动区);
-  for (const key of ['普通移动', '事件目标', '地图指定']) {
+  for (const key of ['附近地点', '目标事件地点', '地图移动目的地']) {
     const paths = surroundingLocations[key];
     if (Array.isArray(paths)) paths.forEach(addAllowedScope);
   }
@@ -1009,18 +1009,18 @@ function uniqueFullLocationPaths(value: unknown): string[] {
 function formatLocationContext(surroundingLocations: unknown, currentLocation: unknown): string {
   const locationGroups = isRecord(surroundingLocations) ? surroundingLocations : {};
   const normalizedCurrentLocation = normalizeLocationPath(currentLocation);
-  const normalPaths = uniqueFullLocationPaths(locationGroups.普通移动);
-  const eventPaths = uniqueFullLocationPaths(locationGroups.事件目标);
-  const instructionPaths = uniqueFullLocationPaths(locationGroups.地图指定);
+  const normalPaths = uniqueFullLocationPaths(locationGroups.附近地点);
+  const eventPaths = uniqueFullLocationPaths(locationGroups.目标事件地点);
+  const instructionPaths = uniqueFullLocationPaths(locationGroups.地图移动目的地);
   if (!normalizedCurrentLocation && normalPaths.length === 0 && eventPaths.length === 0 && instructionPaths.length === 0) {
     return '';
   }
 
   const lines: string[] = [];
   if (normalizedCurrentLocation) lines.push(`当前地点:${formatCompactScalar(normalizedCurrentLocation)}`);
-  if (normalPaths.length > 0) lines.push(`普通移动:${normalPaths.map(formatCompactScalar).join('|')}`);
-  if (eventPaths.length > 0) lines.push(`事件目标:${eventPaths.map(formatCompactScalar).join('|')}`);
-  if (instructionPaths.length > 0) lines.push(`指令地点:${instructionPaths.map(formatCompactScalar).join('|')}`);
+  if (normalPaths.length > 0) lines.push(`附近地点:${normalPaths.map(formatCompactScalar).join('|')}`);
+  if (eventPaths.length > 0) lines.push(`目标事件地点:${eventPaths.map(formatCompactScalar).join('|')}`);
+  if (instructionPaths.length > 0) lines.push(`地图移动目的地:${instructionPaths.map(formatCompactScalar).join('|')}`);
   return lines.join('\n');
 }
 
