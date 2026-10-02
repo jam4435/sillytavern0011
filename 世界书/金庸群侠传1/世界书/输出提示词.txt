@@ -66,9 +66,697 @@ function trimTrailingPunctuation(text) {
 function describeTalents(talents) {
   if (!talents || typeof talents !== 'object') return '';
   return Object.entries(talents)
-    .filter(([key]) => !key.startsWith('$'))
+    .filter(([key]) => !key.startsWith('function formatNearbyRumorForPrompt(value) {
+  const source = String(value ?? '').replace(/\s+/g, ' ').trim().replace(/\|/g, '／');
+  const match = source.match(/^(.*?)\s*\[([^/\]]+)\/(.+)\]$/);
+  if (!match) return `未知日期|未知地点|${source}`;
+  const date = match[2].match(/\d+年\d+月\d+日/)?.[0] || '未知日期';
+  return `${date}|${match[3].trim().replace(/\|/g, '／')}|${match[1].trim().replace(/\|/g, '／')}`;
+}
+function normalizeFullLocationPath(value) {
+  if (typeof value !== 'string') return '';
+  const segments = value.trim().replace(/[\\＞>›→]+/g, '/').split('/').map(part => part.trim());
+  if ((segments.length !== 3 && segments.length !== 4) || segments.some(part => !part)) return '';
+  return segments.join('/');
+}
+function getLocationScopePath(value) {
+  const normalized = normalizeFullLocationPath(value);
+  return normalized ? normalized.split('/').slice(0, 3).join('/') : '';
+}
+function isSameLocationScope(left, right) {
+  const leftScope = getLocationScopePath(left);
+  return Boolean(leftScope) && leftScope === getLocationScopePath(right);
+}
+function uniqueFullLocationPaths(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map(normalizeFullLocationPath).filter(Boolean))];
+}
+-%>
+
+<%
+const promptWorldTime = variables.stat_data.世界信息?.时间;
+if (promptWorldTime && typeof promptWorldTime === 'object') {
+-%>
+<时间><%- formatWorldTime(promptWorldTime) %></时间>
+<% } -%>
+
+<%
+const p = variables.stat_data.user数据;
+const worldTime = variables.stat_data.世界信息?.时间;
+if (p && worldTime) {
+  const userData = {};
+  for (const key in p) {
+    if (key.startsWith('$') || key === '初始属性' || key === '天赋') continue;
+    if (key === '出生年份') userData.年龄 = (worldTime.年 || 0) - (p.出生年份 || 0);
+    else userData[key] = p[key];
+  }
+  const attrs = describeInitialAttributes(p.初始属性);
+  const talents = describeTalents(p.天赋);
+-%>
+<玩家>
+<%- toPromptYaml(userData) %>
+<% if (attrs) { -%>
+资质: <%- attrs %>
+<% } -%>
+<% if (talents) { -%>
+天赋: <%- talents %>
+<% } -%>
+叙事约束: 资质与天赋通过人物表现自然体现，不在正文直白报数值。
+</玩家>
+<% } else { -%>
+<上下文错误>
+玩家数据或世界时间加载失败
+</上下文错误>
+<% } -%>
+
+<%
+const rawParticipation = getvar('stat_data.参与事件', { scope: 'local' });
+const participation = rawParticipation && typeof rawParticipation === 'object' && !Array.isArray(rawParticipation)
+  ? rawParticipation
+  : {};
+if (Object.keys(participation).length > 0) {
+-%>
+<参与事件>
+<% for (const [eventName, event] of Object.entries(participation)) {
+  if (!event || typeof event !== 'object' || Array.isArray(event)) continue;
+  const detail = String(event.描述 ?? '').replace(/\s+/g, ' ').trim();
+  const outcome = typeof event.结局 === 'string' ? event.结局.trim() : '';
+-%>
+<%- compactPromptKey(eventName) %>:
+  详情: <%- detail || '无' %>
+<% if (outcome) { -%>
+  当前结局: <%- outcome %>
+<% } -%>
+<% } -%>
+</参与事件>
+<% } -%>
+
+<%
+const rawTasks = getvar('stat_data.任务', { scope: 'local' });
+const narrativeTasks = {};
+if (rawTasks && typeof rawTasks === 'object' && !Array.isArray(rawTasks)) {
+  for (const [taskName, task] of Object.entries(rawTasks)) {
+    if (!task || typeof task !== 'object' || Array.isArray(task) || taskName.startsWith('
+if (followupClues && typeof followupClues === 'object' && Object.keys(followupClues).length > 0) {
+-%>
+<后续事件线索>
+<%- toPromptYaml(followupClues) %>
+</后续事件线索>
+<% } -%>
+
+<%
+const nearbyRumors = getvar('stat_data.附近传闻', { scope: 'local' });
+if (nearbyRumors && typeof nearbyRumors === 'object' && Object.keys(nearbyRumors).length > 0) {
+-%>
+<附近传闻>
+<% for (const rumor of Object.values(nearbyRumors)) { -%>
+- <%- formatNearbyRumorForPrompt(rumor) %>
+<% } -%>
+</附近传闻>
+<% } -%>
+
+<%
+const currentLocationInfo = getvar('stat_data.前端变量.当前地点信息', { scope: 'local' });
+if (currentLocationInfo && typeof currentLocationInfo === 'object' && !Array.isArray(currentLocationInfo)) {
+-%>
+<当前地点信息>
+<%- toPromptYaml(currentLocationInfo) %>
+</当前地点信息>
+<% } -%>
+
+<%
+const rawSurrounding = getvar('stat_data.前端变量.周围地点', { scope: 'local' });
+const surrounding = rawSurrounding && typeof rawSurrounding === 'object' && !Array.isArray(rawSurrounding)
+  ? rawSurrounding
+  : {};
+const reachableLocations = uniqueFullLocationPaths([
+  ...(Array.isArray(surrounding.普通移动) ? surrounding.普通移动 : []),
+  ...(Array.isArray(surrounding.事件目标) ? surrounding.事件目标 : []),
+  ...(Array.isArray(surrounding.地图指定) ? surrounding.地图指定 : []),
+]);
+const currentFullLocation = normalizeFullLocationPath(variables.stat_data.user数据?.所在位置);
+const currentScope = getLocationScopePath(surrounding.当前活动区) || getLocationScopePath(currentFullLocation);
+-%>
+<可用地点>
+当前: <%- currentFullLocation || '无效' %>
+活动区: <%- currentScope || '无效' %>
+<% if (reachableLocations.length > 0) { -%>
+可前往:
+<% for (const location of reachableLocations) { -%>
+  - <%- location %>
+<% } -%>
+<% } else { -%>
+可前往: 无
+<% } -%>
+规则: 路径=一级/二级/三级[/四级]；前三段相同仅表示同一活动区，不代表人物面对面同场。
+</可用地点>
+
+<%
+const allCharacters = variables.stat_data.角色数据;
+const playerLocation = variables.stat_data.user数据?.所在位置;
+const presentCharacters = {};
+if (playerLocation && allCharacters) {
+  for (const charName in allCharacters) {
+    if (!Object.prototype.hasOwnProperty.call(allCharacters, charName) || charName === '$template') continue;
+    const character = allCharacters[charName];
+    if (!isSameLocationScope(character.所在位置, playerLocation)) continue;
+    const filtered = {};
+    for (const key in character) {
+      if (key !== '初始属性' && !key.startsWith('$')) filtered[key] = character[key];
+    }
+    presentCharacters[charName] = filtered;
+  }
+}
+if (Object.keys(presentCharacters).length > 0) {
+-%>
+<角色数据>
+<%- toPromptYaml(presentCharacters) %>
+</角色数据>
+<% } -%>))
     .map(([key, value]) => `${key}:${trimTrailingPunctuation(value)}`)
     .join('|');
+}
+function formatWorldTime(time) {
+  if (!time || typeof time !== 'object') return '';
+  const year = compactPromptScalar(time.年);
+  const month = compactPromptScalar(time.月);
+  const day = compactPromptScalar(time.日);
+  const hour = compactPromptScalar(time.时);
+  const minute = compactPromptScalar(time.分);
+  return `${year}年${month}月${day}日 ${hour}时${minute}分`;
+}
+function formatNearbyRumorForPrompt(value) {
+  const source = String(value ?? '').replace(/\s+/g, ' ').trim().replace(/\|/g, '／');
+  const match = source.match(/^(.*?)\s*\[([^/\]]+)\/(.+)\]$/);
+  if (!match) return `未知日期|未知地点|${source}`;
+  const date = match[2].match(/\d+年\d+月\d+日/)?.[0] || '未知日期';
+  return `${date}|${match[3].trim().replace(/\|/g, '／')}|${match[1].trim().replace(/\|/g, '／')}`;
+}
+function normalizeFullLocationPath(value) {
+  if (typeof value !== 'string') return '';
+  const segments = value.trim().replace(/[\\＞>›→]+/g, '/').split('/').map(part => part.trim());
+  if ((segments.length !== 3 && segments.length !== 4) || segments.some(part => !part)) return '';
+  return segments.join('/');
+}
+function getLocationScopePath(value) {
+  const normalized = normalizeFullLocationPath(value);
+  return normalized ? normalized.split('/').slice(0, 3).join('/') : '';
+}
+function isSameLocationScope(left, right) {
+  const leftScope = getLocationScopePath(left);
+  return Boolean(leftScope) && leftScope === getLocationScopePath(right);
+}
+function uniqueFullLocationPaths(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map(normalizeFullLocationPath).filter(Boolean))];
+}
+-%>
+
+<世界信息>
+<%- toPromptYaml(variables.stat_data.世界信息 ?? {}) %>
+</世界信息>
+
+<%
+const p = variables.stat_data.user数据;
+const worldTime = variables.stat_data.世界信息?.时间;
+if (p && worldTime) {
+  const userData = {};
+  for (const key in p) {
+    if (key.startsWith('$') || key === '初始属性' || key === '天赋') continue;
+    if (key === '出生年份') userData.年龄 = (worldTime.年 || 0) - (p.出生年份 || 0);
+    else userData[key] = p[key];
+  }
+  const attrs = describeInitialAttributes(p.初始属性);
+  const talents = describeTalents(p.天赋);
+-%>
+<玩家>
+<%- toPromptYaml(userData) %>
+<% if (attrs) { -%>
+资质: <%- attrs %>
+<% } -%>
+<% if (talents) { -%>
+天赋: <%- talents %>
+<% } -%>
+叙事约束: 资质与天赋通过人物表现自然体现，不在正文直白报数值。
+</玩家>
+<% } else { -%>
+<上下文错误>
+玩家数据或世界时间加载失败
+</上下文错误>
+<% } -%>
+
+<%
+const rawParticipation = getvar('stat_data.参与事件', { scope: 'local' });
+const participation = rawParticipation && typeof rawParticipation === 'object' && !Array.isArray(rawParticipation)
+  ? rawParticipation
+  : {};
+if (Object.keys(participation).length > 0) {
+-%>
+<参与事件>
+<% for (const [eventName, event] of Object.entries(participation)) {
+  if (!event || typeof event !== 'object' || Array.isArray(event)) continue;
+  const detail = String(event.描述 ?? '').replace(/\s+/g, ' ').trim();
+  const outcome = typeof event.结局 === 'string' ? event.结局.trim() : '';
+-%>
+<%- compactPromptKey(eventName) %>:
+  详情: <%- detail || '无' %>
+<% if (outcome) { -%>
+  当前结局: <%- outcome %>
+<% } -%>
+<% } -%>
+</参与事件>
+<% } -%>
+
+<%
+const followupClues = getvar('stat_data.后续事件线索', { scope: 'local' });
+if (followupClues && typeof followupClues === 'object' && Object.keys(followupClues).length > 0) {
+-%>
+<后续事件线索>
+<%- toPromptYaml(followupClues) %>
+</后续事件线索>
+<% } -%>
+
+<%
+const nearbyRumors = getvar('stat_data.附近传闻', { scope: 'local' });
+if (nearbyRumors && typeof nearbyRumors === 'object' && Object.keys(nearbyRumors).length > 0) {
+-%>
+<附近传闻>
+<% for (const rumor of Object.values(nearbyRumors)) { -%>
+- <%- formatNearbyRumorForPrompt(rumor) %>
+<% } -%>
+</附近传闻>
+<% } -%>
+
+<%
+const currentLocationInfo = getvar('stat_data.前端变量.当前地点信息', { scope: 'local' });
+if (currentLocationInfo && typeof currentLocationInfo === 'object' && !Array.isArray(currentLocationInfo)) {
+-%>
+<当前地点信息>
+<%- toPromptYaml(currentLocationInfo) %>
+</当前地点信息>
+<% } -%>
+
+<%
+const rawSurrounding = getvar('stat_data.前端变量.周围地点', { scope: 'local' });
+const surrounding = rawSurrounding && typeof rawSurrounding === 'object' && !Array.isArray(rawSurrounding)
+  ? rawSurrounding
+  : {};
+const locationGroups = {
+  普通移动: uniqueFullLocationPaths(surrounding.普通移动),
+  事件目标: uniqueFullLocationPaths(surrounding.事件目标),
+  地图指定: uniqueFullLocationPaths(surrounding.地图指定),
+};
+const currentFullLocation = normalizeFullLocationPath(variables.stat_data.user数据?.所在位置);
+const currentScope = getLocationScopePath(surrounding.当前活动区) || getLocationScopePath(currentFullLocation);
+const allowedScopes = [...new Set([
+  currentScope,
+  ...Object.values(locationGroups).flat().map(getLocationScopePath),
+].filter(Boolean))];
+-%>
+<可用地点>
+当前: <%- currentFullLocation || '无效' %>
+严格活动区: <%- currentScope || '无效' %>
+合法活动区: <%- allowedScopes.join('|') || '无' %>
+普通移动: <%- locationGroups.普通移动.join('|') || '无' %>
+事件目标: <%- locationGroups.事件目标.join('|') || '无' %>
+地图指定: <%- locationGroups.地图指定.join('|') || '无' %>
+规则: 路径=一级/二级/三级[/四级]；前三段相同仅表示同一严格活动区，不代表人物面对面同场。
+</可用地点>
+
+<%
+const allCharacters = variables.stat_data.角色数据;
+const playerLocation = variables.stat_data.user数据?.所在位置;
+const presentCharacters = {};
+if (playerLocation && allCharacters) {
+  for (const charName in allCharacters) {
+    if (!Object.prototype.hasOwnProperty.call(allCharacters, charName) || charName === '$template') continue;
+    const character = allCharacters[charName];
+    if (!isSameLocationScope(character.所在位置, playerLocation)) continue;
+    const filtered = {};
+    for (const key in character) {
+      if (key !== '初始属性' && !key.startsWith('$')) filtered[key] = character[key];
+    }
+    presentCharacters[charName] = filtered;
+  }
+}
+if (Object.keys(presentCharacters).length > 0) {
+-%>
+<角色数据>
+<%- toPromptYaml(presentCharacters) %>
+</角色数据>
+<% } -%>)) continue;
+    const projectedTask = {};
+    for (const [key, value] of Object.entries(task)) {
+      if (key.startsWith('
+if (followupClues && typeof followupClues === 'object' && Object.keys(followupClues).length > 0) {
+-%>
+<后续事件线索>
+<%- toPromptYaml(followupClues) %>
+</后续事件线索>
+<% } -%>
+
+<%
+const nearbyRumors = getvar('stat_data.附近传闻', { scope: 'local' });
+if (nearbyRumors && typeof nearbyRumors === 'object' && Object.keys(nearbyRumors).length > 0) {
+-%>
+<附近传闻>
+<% for (const rumor of Object.values(nearbyRumors)) { -%>
+- <%- formatNearbyRumorForPrompt(rumor) %>
+<% } -%>
+</附近传闻>
+<% } -%>
+
+<%
+const currentLocationInfo = getvar('stat_data.前端变量.当前地点信息', { scope: 'local' });
+if (currentLocationInfo && typeof currentLocationInfo === 'object' && !Array.isArray(currentLocationInfo)) {
+-%>
+<当前地点信息>
+<%- toPromptYaml(currentLocationInfo) %>
+</当前地点信息>
+<% } -%>
+
+<%
+const rawSurrounding = getvar('stat_data.前端变量.周围地点', { scope: 'local' });
+const surrounding = rawSurrounding && typeof rawSurrounding === 'object' && !Array.isArray(rawSurrounding)
+  ? rawSurrounding
+  : {};
+const locationGroups = {
+  普通移动: uniqueFullLocationPaths(surrounding.普通移动),
+  事件目标: uniqueFullLocationPaths(surrounding.事件目标),
+  地图指定: uniqueFullLocationPaths(surrounding.地图指定),
+};
+const currentFullLocation = normalizeFullLocationPath(variables.stat_data.user数据?.所在位置);
+const currentScope = getLocationScopePath(surrounding.当前活动区) || getLocationScopePath(currentFullLocation);
+const allowedScopes = [...new Set([
+  currentScope,
+  ...Object.values(locationGroups).flat().map(getLocationScopePath),
+].filter(Boolean))];
+-%>
+<可用地点>
+当前: <%- currentFullLocation || '无效' %>
+严格活动区: <%- currentScope || '无效' %>
+合法活动区: <%- allowedScopes.join('|') || '无' %>
+普通移动: <%- locationGroups.普通移动.join('|') || '无' %>
+事件目标: <%- locationGroups.事件目标.join('|') || '无' %>
+地图指定: <%- locationGroups.地图指定.join('|') || '无' %>
+规则: 路径=一级/二级/三级[/四级]；前三段相同仅表示同一严格活动区，不代表人物面对面同场。
+</可用地点>
+
+<%
+const allCharacters = variables.stat_data.角色数据;
+const playerLocation = variables.stat_data.user数据?.所在位置;
+const presentCharacters = {};
+if (playerLocation && allCharacters) {
+  for (const charName in allCharacters) {
+    if (!Object.prototype.hasOwnProperty.call(allCharacters, charName) || charName === '$template') continue;
+    const character = allCharacters[charName];
+    if (!isSameLocationScope(character.所在位置, playerLocation)) continue;
+    const filtered = {};
+    for (const key in character) {
+      if (key !== '初始属性' && !key.startsWith('$')) filtered[key] = character[key];
+    }
+    presentCharacters[charName] = filtered;
+  }
+}
+if (Object.keys(presentCharacters).length > 0) {
+-%>
+<角色数据>
+<%- toPromptYaml(presentCharacters) %>
+</角色数据>
+<% } -%>))
+    .map(([key, value]) => `${key}:${trimTrailingPunctuation(value)}`)
+    .join('|');
+}
+function formatWorldTime(time) {
+  if (!time || typeof time !== 'object') return '';
+  const year = compactPromptScalar(time.年);
+  const month = compactPromptScalar(time.月);
+  const day = compactPromptScalar(time.日);
+  const hour = compactPromptScalar(time.时);
+  const minute = compactPromptScalar(time.分);
+  return `${year}年${month}月${day}日 ${hour}时${minute}分`;
+}
+function formatNearbyRumorForPrompt(value) {
+  const source = String(value ?? '').replace(/\s+/g, ' ').trim().replace(/\|/g, '／');
+  const match = source.match(/^(.*?)\s*\[([^/\]]+)\/(.+)\]$/);
+  if (!match) return `未知日期|未知地点|${source}`;
+  const date = match[2].match(/\d+年\d+月\d+日/)?.[0] || '未知日期';
+  return `${date}|${match[3].trim().replace(/\|/g, '／')}|${match[1].trim().replace(/\|/g, '／')}`;
+}
+function normalizeFullLocationPath(value) {
+  if (typeof value !== 'string') return '';
+  const segments = value.trim().replace(/[\\＞>›→]+/g, '/').split('/').map(part => part.trim());
+  if ((segments.length !== 3 && segments.length !== 4) || segments.some(part => !part)) return '';
+  return segments.join('/');
+}
+function getLocationScopePath(value) {
+  const normalized = normalizeFullLocationPath(value);
+  return normalized ? normalized.split('/').slice(0, 3).join('/') : '';
+}
+function isSameLocationScope(left, right) {
+  const leftScope = getLocationScopePath(left);
+  return Boolean(leftScope) && leftScope === getLocationScopePath(right);
+}
+function uniqueFullLocationPaths(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map(normalizeFullLocationPath).filter(Boolean))];
+}
+-%>
+
+<世界信息>
+<%- toPromptYaml(variables.stat_data.世界信息 ?? {}) %>
+</世界信息>
+
+<%
+const p = variables.stat_data.user数据;
+const worldTime = variables.stat_data.世界信息?.时间;
+if (p && worldTime) {
+  const userData = {};
+  for (const key in p) {
+    if (key.startsWith('$') || key === '初始属性' || key === '天赋') continue;
+    if (key === '出生年份') userData.年龄 = (worldTime.年 || 0) - (p.出生年份 || 0);
+    else userData[key] = p[key];
+  }
+  const attrs = describeInitialAttributes(p.初始属性);
+  const talents = describeTalents(p.天赋);
+-%>
+<玩家>
+<%- toPromptYaml(userData) %>
+<% if (attrs) { -%>
+资质: <%- attrs %>
+<% } -%>
+<% if (talents) { -%>
+天赋: <%- talents %>
+<% } -%>
+叙事约束: 资质与天赋通过人物表现自然体现，不在正文直白报数值。
+</玩家>
+<% } else { -%>
+<上下文错误>
+玩家数据或世界时间加载失败
+</上下文错误>
+<% } -%>
+
+<%
+const rawParticipation = getvar('stat_data.参与事件', { scope: 'local' });
+const participation = rawParticipation && typeof rawParticipation === 'object' && !Array.isArray(rawParticipation)
+  ? rawParticipation
+  : {};
+if (Object.keys(participation).length > 0) {
+-%>
+<参与事件>
+<% for (const [eventName, event] of Object.entries(participation)) {
+  if (!event || typeof event !== 'object' || Array.isArray(event)) continue;
+  const detail = String(event.描述 ?? '').replace(/\s+/g, ' ').trim();
+  const outcome = typeof event.结局 === 'string' ? event.结局.trim() : '';
+-%>
+<%- compactPromptKey(eventName) %>:
+  详情: <%- detail || '无' %>
+<% if (outcome) { -%>
+  当前结局: <%- outcome %>
+<% } -%>
+<% } -%>
+</参与事件>
+<% } -%>
+
+<%
+const followupClues = getvar('stat_data.后续事件线索', { scope: 'local' });
+if (followupClues && typeof followupClues === 'object' && Object.keys(followupClues).length > 0) {
+-%>
+<后续事件线索>
+<%- toPromptYaml(followupClues) %>
+</后续事件线索>
+<% } -%>
+
+<%
+const nearbyRumors = getvar('stat_data.附近传闻', { scope: 'local' });
+if (nearbyRumors && typeof nearbyRumors === 'object' && Object.keys(nearbyRumors).length > 0) {
+-%>
+<附近传闻>
+<% for (const rumor of Object.values(nearbyRumors)) { -%>
+- <%- formatNearbyRumorForPrompt(rumor) %>
+<% } -%>
+</附近传闻>
+<% } -%>
+
+<%
+const currentLocationInfo = getvar('stat_data.前端变量.当前地点信息', { scope: 'local' });
+if (currentLocationInfo && typeof currentLocationInfo === 'object' && !Array.isArray(currentLocationInfo)) {
+-%>
+<当前地点信息>
+<%- toPromptYaml(currentLocationInfo) %>
+</当前地点信息>
+<% } -%>
+
+<%
+const rawSurrounding = getvar('stat_data.前端变量.周围地点', { scope: 'local' });
+const surrounding = rawSurrounding && typeof rawSurrounding === 'object' && !Array.isArray(rawSurrounding)
+  ? rawSurrounding
+  : {};
+const locationGroups = {
+  普通移动: uniqueFullLocationPaths(surrounding.普通移动),
+  事件目标: uniqueFullLocationPaths(surrounding.事件目标),
+  地图指定: uniqueFullLocationPaths(surrounding.地图指定),
+};
+const currentFullLocation = normalizeFullLocationPath(variables.stat_data.user数据?.所在位置);
+const currentScope = getLocationScopePath(surrounding.当前活动区) || getLocationScopePath(currentFullLocation);
+const allowedScopes = [...new Set([
+  currentScope,
+  ...Object.values(locationGroups).flat().map(getLocationScopePath),
+].filter(Boolean))];
+-%>
+<可用地点>
+当前: <%- currentFullLocation || '无效' %>
+严格活动区: <%- currentScope || '无效' %>
+合法活动区: <%- allowedScopes.join('|') || '无' %>
+普通移动: <%- locationGroups.普通移动.join('|') || '无' %>
+事件目标: <%- locationGroups.事件目标.join('|') || '无' %>
+地图指定: <%- locationGroups.地图指定.join('|') || '无' %>
+规则: 路径=一级/二级/三级[/四级]；前三段相同仅表示同一严格活动区，不代表人物面对面同场。
+</可用地点>
+
+<%
+const allCharacters = variables.stat_data.角色数据;
+const playerLocation = variables.stat_data.user数据?.所在位置;
+const presentCharacters = {};
+if (playerLocation && allCharacters) {
+  for (const charName in allCharacters) {
+    if (!Object.prototype.hasOwnProperty.call(allCharacters, charName) || charName === '$template') continue;
+    const character = allCharacters[charName];
+    if (!isSameLocationScope(character.所在位置, playerLocation)) continue;
+    const filtered = {};
+    for (const key in character) {
+      if (key !== '初始属性' && !key.startsWith('$')) filtered[key] = character[key];
+    }
+    presentCharacters[charName] = filtered;
+  }
+}
+if (Object.keys(presentCharacters).length > 0) {
+-%>
+<角色数据>
+<%- toPromptYaml(presentCharacters) %>
+</角色数据>
+<% } -%>) || key === '任务奖励') continue;
+      projectedTask[key] = value;
+    }
+    if (Object.keys(projectedTask).length > 0) narrativeTasks[taskName] = projectedTask;
+  }
+}
+if (Object.keys(narrativeTasks).length > 0) {
+-%>
+<任务>
+<%- toPromptYaml(narrativeTasks) %>
+</任务>
+<% } -%>
+
+<%
+const followupClues = getvar('stat_data.后续事件线索', { scope: 'local' });
+if (followupClues && typeof followupClues === 'object' && Object.keys(followupClues).length > 0) {
+-%>
+<后续事件线索>
+<%- toPromptYaml(followupClues) %>
+</后续事件线索>
+<% } -%>
+
+<%
+const nearbyRumors = getvar('stat_data.附近传闻', { scope: 'local' });
+if (nearbyRumors && typeof nearbyRumors === 'object' && Object.keys(nearbyRumors).length > 0) {
+-%>
+<附近传闻>
+<% for (const rumor of Object.values(nearbyRumors)) { -%>
+- <%- formatNearbyRumorForPrompt(rumor) %>
+<% } -%>
+</附近传闻>
+<% } -%>
+
+<%
+const currentLocationInfo = getvar('stat_data.前端变量.当前地点信息', { scope: 'local' });
+if (currentLocationInfo && typeof currentLocationInfo === 'object' && !Array.isArray(currentLocationInfo)) {
+-%>
+<当前地点信息>
+<%- toPromptYaml(currentLocationInfo) %>
+</当前地点信息>
+<% } -%>
+
+<%
+const rawSurrounding = getvar('stat_data.前端变量.周围地点', { scope: 'local' });
+const surrounding = rawSurrounding && typeof rawSurrounding === 'object' && !Array.isArray(rawSurrounding)
+  ? rawSurrounding
+  : {};
+const locationGroups = {
+  普通移动: uniqueFullLocationPaths(surrounding.普通移动),
+  事件目标: uniqueFullLocationPaths(surrounding.事件目标),
+  地图指定: uniqueFullLocationPaths(surrounding.地图指定),
+};
+const currentFullLocation = normalizeFullLocationPath(variables.stat_data.user数据?.所在位置);
+const currentScope = getLocationScopePath(surrounding.当前活动区) || getLocationScopePath(currentFullLocation);
+const allowedScopes = [...new Set([
+  currentScope,
+  ...Object.values(locationGroups).flat().map(getLocationScopePath),
+].filter(Boolean))];
+-%>
+<可用地点>
+当前: <%- currentFullLocation || '无效' %>
+严格活动区: <%- currentScope || '无效' %>
+合法活动区: <%- allowedScopes.join('|') || '无' %>
+普通移动: <%- locationGroups.普通移动.join('|') || '无' %>
+事件目标: <%- locationGroups.事件目标.join('|') || '无' %>
+地图指定: <%- locationGroups.地图指定.join('|') || '无' %>
+规则: 路径=一级/二级/三级[/四级]；前三段相同仅表示同一严格活动区，不代表人物面对面同场。
+</可用地点>
+
+<%
+const allCharacters = variables.stat_data.角色数据;
+const playerLocation = variables.stat_data.user数据?.所在位置;
+const presentCharacters = {};
+if (playerLocation && allCharacters) {
+  for (const charName in allCharacters) {
+    if (!Object.prototype.hasOwnProperty.call(allCharacters, charName) || charName === '$template') continue;
+    const character = allCharacters[charName];
+    if (!isSameLocationScope(character.所在位置, playerLocation)) continue;
+    const filtered = {};
+    for (const key in character) {
+      if (key !== '初始属性' && !key.startsWith('$')) filtered[key] = character[key];
+    }
+    presentCharacters[charName] = filtered;
+  }
+}
+if (Object.keys(presentCharacters).length > 0) {
+-%>
+<角色数据>
+<%- toPromptYaml(presentCharacters) %>
+</角色数据>
+<% } -%>))
+    .map(([key, value]) => `${key}:${trimTrailingPunctuation(value)}`)
+    .join('|');
+}
+function formatWorldTime(time) {
+  if (!time || typeof time !== 'object') return '';
+  const year = compactPromptScalar(time.年);
+  const month = compactPromptScalar(time.月);
+  const day = compactPromptScalar(time.日);
+  const hour = compactPromptScalar(time.时);
+  const minute = compactPromptScalar(time.分);
+  return `${year}年${month}月${day}日 ${hour}时${minute}分`;
 }
 function formatNearbyRumorForPrompt(value) {
   const source = String(value ?? '').replace(/\s+/g, ' ').trim().replace(/\|/g, '／');
