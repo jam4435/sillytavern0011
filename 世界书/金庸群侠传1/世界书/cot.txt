@@ -47,7 +47,7 @@ const cot有事件接驳 = !cot有参与事件 && cotIsNonEmptyRecord(cot原始�
 有参与事件时，整条回复只能按以下顺序输出：
 
 ```text
-<event_audit>四行审计</event_audit>
+<event_audit>三行审计</event_audit>
 叙事正文
 整条回复最后的一个事件短标签
 ```
