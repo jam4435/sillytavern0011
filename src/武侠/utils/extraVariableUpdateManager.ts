@@ -930,7 +930,7 @@ function formatPlayerContext(
   if (isRecord(sanitizedTalents) && Object.keys(sanitizedTalents).length > 0) {
     userData.天赋 = sanitizedTalents;
   }
-  return `user数据:${formatCompactObject(userData)}`;
+  return formatCompactObject(userData);
 }
 
 function formatParticipationEventsContext(
@@ -955,7 +955,7 @@ function formatParticipationEventsContext(
     }
     nestedEvents[eventName] = sanitizeForPrompt(eventContext);
   }
-  return `参与事件:${formatCompactObject(nestedEvents)}`;
+  return formatCompactObject(nestedEvents);
 }
 
 function formatTasksContext(projection: Record<string, unknown>, tasks: unknown): string {
@@ -969,14 +969,14 @@ function formatTasksContext(projection: Record<string, unknown>, tasks: unknown)
       Object.fromEntries(Object.entries(taskValue).filter(([key]) => !key.startsWith('$'))),
     );
   }
-  return `任务:${formatCompactObject(nestedTasks)}`;
+  return formatCompactObject(nestedTasks);
 }
 
 function formatFollowupCluesContext(followupClues: unknown): string {
   if (!isRecord(followupClues) || Object.keys(followupClues).length === 0) {
     return '';
   }
-  return `后续事件线索:${formatCompactObject(sanitizeForPrompt(followupClues))}`;
+  return formatCompactObject(sanitizeForPrompt(followupClues));
 }
 
 function uniqueFullLocationPaths(value: unknown): string[] {
@@ -1001,7 +1001,7 @@ function formatLocationContext(surroundingLocations: unknown, currentLocation: u
   if (normalPaths.length > 0) locationContext.普通移动 = normalPaths;
   if (eventPaths.length > 0) locationContext.事件目标 = eventPaths;
   if (instructionPaths.length > 0) locationContext.指令地点 = instructionPaths;
-  return `可用地点:${formatCompactObject(locationContext)}`;
+  return formatCompactObject(locationContext);
 }
 
 function buildVariableProjectionSnapshot(
@@ -1269,12 +1269,12 @@ function buildVariablePromptSlots(
   const relevantCharacters =
     isRecord(variableProjection.projection.角色数据) &&
     Object.keys(variableProjection.projection.角色数据).length > 0
-      ? `角色数据:${formatCompactObject(variableProjection.projection.角色数据)}`
+      ? formatCompactObject(variableProjection.projection.角色数据)
       : '';
   const cultivationReference =
     typeof variableProjection.cultivationReference === 'number' &&
     Number.isFinite(variableProjection.cultivationReference)
-      ? `修为参考:{一天增幅:${variableProjection.cultivationReference}}`
+      ? formatCompactObject({ 一天增幅: variableProjection.cultivationReference })
       : '';
   const participationEvents = formatParticipationEventsContext(
     variableProjection.projection,
@@ -1287,7 +1287,7 @@ function buildVariablePromptSlots(
     variableData: '',
     latestUserBody: recentBodies.serializedLatestUserBody,
     latestAssistantBody: recentBodies.serializedLatestAssistantBody,
-    worldContext: `世界信息:${formatCompactObject(variableProjection.projection.世界信息 ?? {})}`,
+    worldContext: formatCompactObject(variableProjection.projection.世界信息 ?? {}),
     playerContext: formatPlayerContext(
       variableProjection.projection,
       variableProjection.playerInitialAttributes,
