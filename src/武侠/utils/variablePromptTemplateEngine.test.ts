@@ -10,6 +10,7 @@ const makeSlots = (overrides: Partial<VariablePromptSlots> = {}): VariablePrompt
   readonlyContextRounds: '[]',
   latestUserBody: '{"content":"user"}',
   latestAssistantBody: '{"content":"assistant"}',
+  variableData: '',
   worldContext: '{"时间":"now"}',
   playerContext: '{"修为":100}',
   participationEvents: '',
