@@ -1,4 +1,5 @@
 /** 额外变量模型内置提示词默认值。实际文本放在同目录 txt，方便直接编辑。 */
+import variableDataFormatText from './变量数据格式.txt?raw';
 import variableGuidanceText from './变量指导.txt?raw';
 import variableInputTemplateText from './变量输入模板.txt?raw';
 import variableStructureText from './变量模板.txt?raw';
@@ -18,6 +19,7 @@ export function getVariablePromptTemplateSignature(value: string): string {
   return `${normalized.length}:${(hash >>> 0).toString(16).padStart(8, '0')}`;
 }
 
+export const DEFAULT_VARIABLE_DATA_FORMAT_TEMPLATE = normalizePromptSource(variableDataFormatText);
 export const DEFAULT_VARIABLE_INPUT_TEMPLATE = normalizePromptSource(variableInputTemplateText);
 export const DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE = normalizePromptSource(variableMainPromptText);
 export const DEFAULT_VARIABLE_STRUCTURE_TEMPLATE = normalizePromptSource(variableStructureText);
