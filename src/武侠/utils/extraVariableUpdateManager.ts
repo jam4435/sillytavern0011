@@ -1,4 +1,5 @@
 import {
+  DEFAULT_VARIABLE_DATA_FORMAT_TEMPLATE,
   DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE,
   applyCurrentPresetModuleFilter,
   type SummarySettings,
@@ -6,6 +7,7 @@ import {
 import {
   VARIABLE_PROMPT_SLOT_META,
   renderVariableConditionalTemplate,
+  renderVariableDataTemplate,
   renderVariableInputTemplate,
   type VariablePromptSlotName,
   type VariablePromptSlots,
@@ -139,7 +141,6 @@ const ACTION_BLOCK_TAGS = new Set(['VariableInsert', 'VariableEdit', 'VariableDe
 const EXTRA_VARIABLE_READONLY_ENTITY_KEYS = new Set(['头像', '出生年份', '年龄', '初始属性', '天赋']);
 const PARTICIPATION_WRITABLE_KEYS = ['结局', 'insert', 'update', 'delete'] as const;
 const TASK_WRITABLE_KEYS = ['任务执行情况'] as const;
-const PLAYER_INITIAL_ATTRIBUTE_ORDER = ['臂力', '根骨', '机敏', '洞察', '悟性', '风姿', '福缘'] as const;
 const VARIABLE_ROOT_KEY_ALIASES: Record<string, string> = {
   玩家数据: 'user数据',
   同场景角色: '角色数据',
@@ -881,45 +882,6 @@ export function buildExtraVariableProjection(
   }) as Record<string, unknown>;
 }
 
-function formatPromptYamlKey(value: unknown): string {
-  return String(value ?? '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/:/g, '：') || '未命名';
-}
-
-function formatPromptYamlScalar(value: unknown): string {
-  if (value === null || value === undefined) return '无';
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  const text = String(value).replace(/\s+/g, ' ').trim();
-  return text || '无';
-}
-
-function formatPromptYaml(value: unknown, indent = 0): string {
-  const pad = ' '.repeat(indent);
-  if (Array.isArray(value)) {
-    if (value.length === 0) return `${pad}[]`;
-    return value
-      .map(item =>
-        isRecord(item) || Array.isArray(item)
-          ? `${pad}-\n${formatPromptYaml(item, indent + 2)}`
-          : `${pad}- ${formatPromptYamlScalar(item)}`,
-      )
-      .join('\n');
-  }
-  if (!isRecord(value)) return `${pad}${formatPromptYamlScalar(value)}`;
-  const entries = Object.entries(value).filter(([key]) => !key.startsWith('$'));
-  if (entries.length === 0) return `${pad}{}`;
-  return entries
-    .map(([key, child]) => {
-      const safeKey = formatPromptYamlKey(key);
-      return isRecord(child) || Array.isArray(child)
-        ? `${pad}${safeKey}:\n${formatPromptYaml(child, indent + 2)}`
-        : `${pad}${safeKey}: ${formatPromptYamlScalar(child)}`;
-    })
-    .join('\n');
-}
-
 function formatCompactKey(value: unknown): string {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim();
   if (!text) return '""';
@@ -953,38 +915,22 @@ function formatCompactObject(value: unknown): string {
     .join(',')}}`;
 }
 
-function formatRecordMap(value: unknown, preferredOrder: readonly string[] = []): string {
-  if (!isRecord(value)) return '';
-  const entries = Object.entries(value).filter(([key]) => !key.startsWith('$'));
-  if (entries.length === 0) return '';
-  const order = new Map(preferredOrder.map((key, index) => [key, index]));
-  entries.sort(([left], [right]) => {
-    const leftOrder = order.get(left) ?? Number.MAX_SAFE_INTEGER;
-    const rightOrder = order.get(right) ?? Number.MAX_SAFE_INTEGER;
-    return leftOrder - rightOrder || left.localeCompare(right, 'zh-CN');
-  });
-  return entries.map(([key, child]) => `${formatCompactKey(key)}:${formatCompactObject(child)}`).join('|');
-}
-
-function formatPromptPathTitle(root: string, key: string): string {
-  return `${root}.${String(key).replace(/\s+/g, ' ').trim() || '未命名'}`;
-}
-
 function formatPlayerContext(
   projection: Record<string, unknown>,
   initialAttributes: unknown,
   talents: unknown,
 ): string {
-  const lines = [`user数据:${formatCompactObject(projection.user数据 ?? {})}`];
-  const initialAttributeRecords = formatRecordMap(initialAttributes, PLAYER_INITIAL_ATTRIBUTE_ORDER);
-  if (initialAttributeRecords) {
-    lines.push('', 'user数据.初始属性', initialAttributeRecords);
+  const projectedUserData = isRecord(projection.user数据) ? projection.user数据 : {};
+  const userData: Record<string, unknown> = { ...projectedUserData };
+  const sanitizedInitialAttributes = sanitizeForPrompt(initialAttributes);
+  const sanitizedTalents = sanitizeForPrompt(talents);
+  if (isRecord(sanitizedInitialAttributes) && Object.keys(sanitizedInitialAttributes).length > 0) {
+    userData.初始属性 = sanitizedInitialAttributes;
   }
-  const talentRecords = formatRecordMap(talents);
-  if (talentRecords) {
-    lines.push('', 'user数据.天赋', talentRecords);
+  if (isRecord(sanitizedTalents) && Object.keys(sanitizedTalents).length > 0) {
+    userData.天赋 = sanitizedTalents;
   }
-  return lines.join('\n');
+  return `user数据:${formatCompactObject(userData)}`;
 }
 
 function formatParticipationEventsContext(
@@ -996,59 +942,41 @@ function formatParticipationEventsContext(
     return '';
   }
 
-  const blocks: string[] = [];
+  const nestedEvents: Record<string, unknown> = {};
   for (const [eventName, writableSnapshot] of Object.entries(writableParticipationEvents)) {
     const eventValue = isRecord(participationEvents[eventName]) ? participationEvents[eventName] : {};
-    const readonlyDescription = String(eventValue.描述 ?? '').replace(/\s+/g, ' ').trim();
-    const timeRangeMatch = readonlyDescription.match(
-      /^((?:\d+年\d+月\d+日\d+时(?:\d+分)?)\s+到\s+(?:\d+年\d+月\d+日\d+时(?:\d+分)?))[，,]\s*([\s\S]+)$/,
-    );
-    const recordParts: string[] = [];
-    if (timeRangeMatch) {
-      recordParts.push(`时间:${formatCompactScalar(timeRangeMatch[1].replace(/\s+到\s+/, '-'))}`);
+    const eventContext: Record<string, unknown> = {};
+    if (Object.hasOwn(eventValue, '描述')) eventContext.描述 = eventValue.描述;
+    if (Object.hasOwn(eventValue, '地点')) eventContext.地点 = eventValue.地点;
+    if (isRecord(writableSnapshot)) {
+      for (const key of PARTICIPATION_WRITABLE_KEYS) {
+        if (Object.hasOwn(writableSnapshot, key)) eventContext[key] = writableSnapshot[key];
+      }
     }
-    if (typeof eventValue.地点 === 'string' && eventValue.地点.trim()) {
-      recordParts.push(`地点:${formatCompactScalar(eventValue.地点)}`);
-    }
-    recordParts.push(`详情:${formatCompactScalar(timeRangeMatch?.[2] || readonlyDescription || '无')}`);
-
-    const lines = [
-      formatPromptPathTitle('参与事件', eventName),
-      recordParts.join('|'),
-      `可写:${formatCompactObject(writableSnapshot)}`,
-    ];
-    blocks.push(lines.join('\n'));
+    nestedEvents[eventName] = sanitizeForPrompt(eventContext);
   }
-  return blocks.join('\n\n');
+  return `参与事件:${formatCompactObject(nestedEvents)}`;
 }
 
 function formatTasksContext(projection: Record<string, unknown>, tasks: unknown): string {
   const writableTasks = isRecord(projection.任务) ? projection.任务 : {};
   if (!isRecord(tasks) || Object.keys(writableTasks).length === 0) return '';
 
-  return Object.entries(writableTasks)
-    .map(([taskName, writableSnapshot]) => {
-      const taskValue = isRecord(tasks[taskName]) ? tasks[taskName] : {};
-      const readonlyTask = Object.fromEntries(
-        Object.entries(taskValue).filter(([key]) => !key.startsWith('$') && key !== '任务执行情况'),
-      );
-      const readonlyRecords = formatRecordMap(readonlyTask);
-      return [
-        formatPromptPathTitle('任务', taskName),
-        readonlyRecords,
-        `可写:${formatCompactObject(writableSnapshot)}`,
-      ]
-        .filter(Boolean)
-        .join('\n');
-    })
-    .join('\n\n');
+  const nestedTasks: Record<string, unknown> = {};
+  for (const taskName of Object.keys(writableTasks)) {
+    const taskValue = isRecord(tasks[taskName]) ? tasks[taskName] : {};
+    nestedTasks[taskName] = sanitizeForPrompt(
+      Object.fromEntries(Object.entries(taskValue).filter(([key]) => !key.startsWith('$'))),
+    );
+  }
+  return `任务:${formatCompactObject(nestedTasks)}`;
 }
 
 function formatFollowupCluesContext(followupClues: unknown): string {
   if (!isRecord(followupClues) || Object.keys(followupClues).length === 0) {
     return '';
   }
-  return ['<后续未发生事件脉络>', formatPromptYaml(followupClues), '</后续未发生事件脉络>'].join('\n');
+  return `后续事件线索:${formatCompactObject(sanitizeForPrompt(followupClues))}`;
 }
 
 function uniqueFullLocationPaths(value: unknown): string[] {
@@ -1068,50 +996,12 @@ function formatLocationContext(surroundingLocations: unknown, currentLocation: u
     return '';
   }
 
-  const lines: string[] = [];
-  if (normalizedCurrentLocation) lines.push(`当前地点:${formatCompactScalar(normalizedCurrentLocation)}`);
-  if (normalPaths.length > 0) lines.push(`普通移动:${normalPaths.map(formatCompactScalar).join('|')}`);
-  if (eventPaths.length > 0) lines.push(`事件目标:${eventPaths.map(formatCompactScalar).join('|')}`);
-  if (instructionPaths.length > 0) lines.push(`指令地点:${instructionPaths.map(formatCompactScalar).join('|')}`);
-  return lines.join('\n');
-}
-
-function formatVariableContext(
-  projection: Record<string, unknown>,
-  participationEvents: unknown,
-  tasks: unknown,
-  followupClues: unknown,
-  cultivationReference: unknown,
-  initialAttributes: unknown,
-  talents: unknown,
-): string {
-  const participationContext = formatParticipationEventsContext(projection, participationEvents);
-  const taskContext = formatTasksContext(projection, tasks);
-  const followupContext = formatFollowupCluesContext(followupClues);
-  const relevantCharacters =
-    isRecord(projection.角色数据) && Object.keys(projection.角色数据).length > 0
-      ? `角色数据:${formatCompactObject(projection.角色数据)}`
-      : '';
-  const cultivationContext =
-    typeof cultivationReference === 'number' && Number.isFinite(cultivationReference)
-      ? `<修为>\n修炼一天的修为增幅参考值:${cultivationReference}\n</修为>`
-      : '';
-  const lines = [
-    '<variable>',
-    '<当前时间>',
-    `世界信息:${formatCompactObject(projection.世界信息 ?? {})}`,
-    '</当前时间>',
-    '<玩家数据>',
-    formatPlayerContext(projection, initialAttributes, talents),
-    '</玩家数据>',
-    participationContext ? `<参与事件>\n${participationContext}\n</参与事件>` : '',
-    taskContext ? `<任务>\n${taskContext}\n</任务>` : '',
-    followupContext,
-    relevantCharacters ? `<角色数据>\n${relevantCharacters}\n</角色数据>` : '',
-    cultivationContext,
-    '</variable>',
-  ];
-  return lines.filter(Boolean).join('\n');
+  const locationContext: Record<string, unknown> = {};
+  if (normalizedCurrentLocation) locationContext.当前地点 = normalizedCurrentLocation;
+  if (normalPaths.length > 0) locationContext.普通移动 = normalPaths;
+  if (eventPaths.length > 0) locationContext.事件目标 = eventPaths;
+  if (instructionPaths.length > 0) locationContext.指令地点 = instructionPaths;
+  return `可用地点:${formatCompactObject(locationContext)}`;
 }
 
 function buildVariableProjectionSnapshot(
@@ -1119,7 +1009,6 @@ function buildVariableProjectionSnapshot(
   latestAssistantBody: string,
 ): {
   projection: Record<string, unknown>;
-  variableContext: string;
   locationContext: string;
   participationEvents: unknown;
   tasks: unknown;
@@ -1135,21 +1024,11 @@ function buildVariableProjectionSnapshot(
   const frontendVariables = getNestedRecord(statData, '前端变量') || {};
   const rawUserData = getNestedRecord(statData, 'user数据') || getNestedRecord(statData, '玩家数据') || {};
   const tasks = statData.任务;
-  const variableContext = formatVariableContext(
-    projection,
-    statData.参与事件,
-    tasks,
-    statData.后续事件线索,
-    frontendVariables.修为变化参考,
-    rawUserData.初始属性,
-    rawUserData.天赋,
-  );
   const projectedUserData = isRecord(projection.user数据) ? projection.user数据 : {};
   const locationContext = formatLocationContext(frontendVariables.周围地点, projectedUserData.所在位置);
 
   return {
     projection,
-    variableContext,
     locationContext,
     participationEvents: statData.参与事件,
     tasks,
@@ -1395,7 +1274,7 @@ function buildVariablePromptSlots(
   const cultivationReference =
     typeof variableProjection.cultivationReference === 'number' &&
     Number.isFinite(variableProjection.cultivationReference)
-      ? `修炼一天的修为增幅参考值:${variableProjection.cultivationReference}`
+      ? `修为参考:{一天增幅:${variableProjection.cultivationReference}}`
       : '';
   const participationEvents = formatParticipationEventsContext(
     variableProjection.projection,
@@ -1405,6 +1284,7 @@ function buildVariablePromptSlots(
 
   return {
     readonlyContextRounds: recentBodies.serializedReadonlyContextRounds,
+    variableData: '',
     latestUserBody: recentBodies.serializedLatestUserBody,
     latestAssistantBody: recentBodies.serializedLatestAssistantBody,
     worldContext: `世界信息:${formatCompactObject(variableProjection.projection.世界信息 ?? {})}`,
@@ -1471,6 +1351,8 @@ async function buildExtraVariableUpdatePrompt({
   );
   const variableProjection = buildVariableProjectionSnapshot(assistantMessageId, recentBodies.latestAssistantBody);
   const slots = buildVariablePromptSlots(recentBodies, variableProjection);
+  const variableData = renderVariableDataTemplate(DEFAULT_VARIABLE_DATA_FORMAT_TEMPLATE, slots);
+  slots.variableData = variableData;
   const variableInputContext = renderVariableInputTemplate(settings.variableInputTemplate, slots);
   const variableGuidance = renderVariableConditionalTemplate(settings.variableGuidanceTemplate, slots);
 
@@ -1479,7 +1361,7 @@ async function buildExtraVariableUpdatePrompt({
     readonlyContextRounds: recentBodies.serializedReadonlyContextRounds,
     latestUserBody: recentBodies.serializedLatestUserBody,
     latestAssistantBody: recentBodies.serializedLatestAssistantBody,
-    variableContext: variableProjection.variableContext,
+    variableContext: variableData,
     variableInputContext,
     variableTemplate: settings.variableStructureTemplate,
     variableGuidance,
@@ -1524,6 +1406,7 @@ export function inspectVariablePromptSlots(settings: SummarySettings): VariableP
     const recentBodies = getRecentBodyMessages(target.message_id, rawReply, settings.variableContextRounds, settings);
     const variableProjection = buildVariableProjectionSnapshot(target.message_id, recentBodies.latestAssistantBody);
     const slots = buildVariablePromptSlots(recentBodies, variableProjection);
+    slots.variableData = renderVariableDataTemplate(DEFAULT_VARIABLE_DATA_FORMAT_TEMPLATE, slots);
     return {
       assistantMessageId: target.message_id,
       renderedInput: renderVariableInputTemplate(settings.variableInputTemplate, slots),
