@@ -326,14 +326,16 @@ describe('executeExtraVariableUpdate', () => {
     const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
     expect(prompt).toContain('传说：基本失传，不得操纵时间空间。');
     expect(prompt).toContain('世界信息:{时间:{年:1219,月:10,日:20,时:13,分:15}}');
-    expect(prompt).toContain('初始属性:{臂力:10,根骨:8,机敏:12,洞察:9,悟性:11,风姿:7,福缘:10}');
-    expect(prompt).toContain('天赋:{过目不忘:只读}');
-    expect(prompt).toContain('参与事件:{射雕第七回02-测试事件:{描述:1219年10月20日13时 到 1219年10月20日15时，黄蓉正在事件中');
-    expect(prompt).toContain('地点:大宋/临安府/牛家村/曲三酒馆,update:{黄蓉:{好感:1}}');
-    expect(prompt).toContain('任务:{牛家村送信:{所属势力:江湖,任务详情:把书信送到临安城。');
-    expect(prompt).toContain('任务执行情况:未到达地点');
-    expect(prompt).toContain('可用地点:{当前地点:大宋/临安府/牛家村/村西树林');
-    expect(prompt).toContain('指令地点:[大宋/临安府/临安城/皇宫偏殿]');
+    expect(prompt).toContain('初始属性:\n臂力:10|根骨:8|机敏:12|洞察:9|悟性:11|风姿:7|福缘:10');
+    expect(prompt).toContain('天赋:\n过目不忘:只读');
+    expect(prompt).toContain('射雕第七回02-测试事件');
+    expect(prompt).toContain('时间:1219年10月20日13时-1219年10月20日15时|地点:大宋/临安府/牛家村/曲三酒馆|详情:黄蓉正在事件中');
+    expect(prompt).toContain('参与事件:{射雕第七回02-测试事件:{update:{黄蓉:{好感:1}}}}');
+    expect(prompt).toContain('牛家村送信');
+    expect(prompt).toContain('所属势力:江湖|任务详情:把书信送到临安城。|任务地点:大宋/临安府/临安城|任务奖励:{修为增量:10}');
+    expect(prompt).toContain('任务:{牛家村送信:{任务执行情况:未到达地点}}');
+    expect(prompt).toContain('当前地点:大宋/临安府/牛家村/村西树林');
+    expect(prompt).toContain('指令地点:大宋/临安府/临安城/皇宫偏殿');
     expect(prompt).toContain('角色数据:{');
     expect(prompt).toContain('<变量模板>');
     expect(prompt).toContain('### 包裹');
@@ -349,7 +351,7 @@ describe('executeExtraVariableUpdate', () => {
     expect(prompt).not.toContain('【最终执行要求】');
     expect(prompt).toContain('## 5. <VariableThink>检查与输出');
     expect(prompt).toContain('<修为>');
-    expect(prompt).toContain('修为参考:{一天增幅:33}');
+    expect(prompt).toContain('修炼一天的修为增幅参考值:33');
     expect(prompt).not.toContain('<变量上下文>');
     expect(prompt).not.toContain('"messageId"');
     expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledWith(
@@ -1147,15 +1149,13 @@ describe('executeExtraVariableUpdate', () => {
     expect(fallbackProjection).toBe(normalProjection);
     expect(fallbackProjection).toContain('<variable>');
     expect(fallbackProjection).toContain('世界信息:{时间:{年:1219,月:10,日:20,时:13,分:15}}');
-    expect(fallbackProjection).toContain('参与事件:{射雕第七回02-测试事件:{描述:1219年10月20日13时 到 1219年10月20日15时，黄蓉正在事件中');
-    expect(fallbackProjection).toContain('update:{黄蓉:{好感:1}}');
+    expect(fallbackProjection).toContain('射雕第七回02-测试事件');
+    expect(fallbackProjection).toContain('时间:1219年10月20日13时-1219年10月20日15时|地点:大宋/临安府/牛家村/曲三酒馆|详情:黄蓉正在事件中');
+    expect(fallbackProjection).toContain('参与事件:{射雕第七回02-测试事件:{update:{黄蓉:{好感:1}}}}');
     expect(fallbackProjection).not.toContain('分支标记');
-    expect(fallbackProjection).toContain('<后续未发生事件脉络>');
-    expect(fallbackProjection).toContain(
-      '后续事件线索:{射雕第一回05-包惜弱巧救颜烈:',
-    );
-    expect(fallbackProjection).toContain('</后续未发生事件脉络>');
-    expect(fallbackProjection).toContain('修为参考:{一天增幅:33}');
+    expect(fallbackProjection).not.toContain('<后续未发生事件脉络>');
+    expect(fallbackProjection).not.toContain('后续事件线索');
+    expect(fallbackProjection).toContain('修炼一天的修为增幅参考值:33');
     expect(fallbackProjection).not.toContain('前端变量');
   });
 
@@ -1175,7 +1175,7 @@ describe('executeExtraVariableUpdate', () => {
     });
 
     const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
-    expect(prompt).toContain('修为参考:{一天增幅:33}');
+    expect(prompt).toContain('修炼一天的修为增幅参考值:33');
     expect(prompt).not.toContain('<参与事件>');
     expect(prompt).not.toContain('参与事件:{');
   });
