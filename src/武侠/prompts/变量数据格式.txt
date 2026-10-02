@@ -1,45 +1,39 @@
 <variable>
 <当前时间>
-世界信息:{{worldContext}}
+{{worldContext}}
 </当前时间>
 
 <玩家数据>
-user数据:{{playerContext}}
+{{playerContext}}
 </玩家数据>
 
 @if participationEvents
 <参与事件>
-参与事件:{{participationEvents}}
+{{participationEvents}}
 </参与事件>
 @endif
 
 @if tasks
 <任务>
-任务:{{tasks}}
+{{tasks}}
 </任务>
 @endif
 
 @if locationContext
 <可用地点>
-可用地点:{{locationContext}}
+{{locationContext}}
 </可用地点>
 @endif
 
 @if relevantCharacters
 <角色数据>
-角色数据:{{relevantCharacters}}
+{{relevantCharacters}}
 </角色数据>
-@endif
-
-@if followupClues
-<后续未发生事件脉络>
-后续事件线索:{{followupClues}}
-</后续未发生事件脉络>
 @endif
 
 @if cultivationReference
 <修为>
-修为参考:{{cultivationReference}}
+{{cultivationReference}}
 </修为>
 @endif
 </variable>
