@@ -87,12 +87,12 @@ describe('locationContext', () => {
   it('生成可供世界书读取的结构化聊天变量', () => {
     const value = createDynamicLocationContextVariable(buildDynamicLocationContext(mapData, '大宋/临安府/牛家村', 1));
 
-    expect(Object.keys(value)).toEqual(['当前活动区', '普通移动', '事件目标', '地图指定']);
+    expect(Object.keys(value)).toEqual(['当前活动区', '附近地点', '目标事件地点', '地图移动目的地']);
     expect(value.当前活动区).toBe('大宋/临安府/牛家村');
-    expect(value.普通移动).toContain('大宋/临安府/西湖');
-    expect(value.普通移动).toContain('大宋/嘉兴府/烟雨楼');
-    expect(value.事件目标).toEqual([]);
-    expect(value.地图指定).toEqual([]);
+    expect(value.附近地点).toContain('大宋/临安府/西湖');
+    expect(value.附近地点).toContain('大宋/嘉兴府/烟雨楼');
+    expect(value.目标事件地点).toEqual([]);
+    expect(value.地图移动目的地).toEqual([]);
   });
 
   it('过滤相邻区域中尚未解锁的三级地点', () => {
@@ -152,7 +152,7 @@ describe('locationContext', () => {
 
     const value = await syncDynamicLocationContextVariable();
 
-    expect(value?.普通移动).toContain('大宋/临安府/牛家村');
+    expect(value?.附近地点).toContain('大宋/临安府/牛家村');
     expect(updateVariablesWithMock).toHaveBeenCalledWith(expect.any(Function), { type: 'chat' });
     expect(eventEmitMock).toHaveBeenCalledWith(
       'wuxia:directVariableWriteDone',
@@ -175,9 +175,9 @@ describe('locationContext', () => {
         前端变量: {
           周围地点: {
             当前活动区: '大宋/临安府/牛家村',
-            普通移动: expect.arrayContaining(['大宋/临安府/牛家村']),
-            事件目标: [],
-            地图指定: [],
+            附近地点: expect.arrayContaining(['大宋/临安府/牛家村']),
+            目标事件地点: [],
+            地图移动目的地: [],
           },
         },
         世界信息: {
