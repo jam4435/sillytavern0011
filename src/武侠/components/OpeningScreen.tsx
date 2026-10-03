@@ -3,7 +3,19 @@ import ChatInput from './ChatInput';
 import FullscreenButton from './FullscreenButton';
 import { Icons } from './Icons';
 
-interface OpeningScreenProps {
+type OpeningChatInputProps = Pick<
+  React.ComponentProps<typeof ChatInput>,
+  | 'onRegenerate'
+  | 'onEditRegenerateInput'
+  | 'onRegenerateDraftModeChange'
+  | 'onCancelRegenerateDraft'
+  | 'canRegenerate'
+  | 'isRegenerating'
+  | 'regenerateDraftMode'
+  | 'regenerateDraftPrefill'
+>;
+
+interface OpeningScreenProps extends OpeningChatInputProps {
   welcomeLine: string;
   playerName?: string;
   location?: string;
@@ -19,6 +31,14 @@ const OpeningScreen: React.FC<OpeningScreenProps> = ({
   isLoading = false,
   onSend,
   onOpenSettings,
+  onRegenerate,
+  onEditRegenerateInput,
+  onRegenerateDraftModeChange,
+  onCancelRegenerateDraft,
+  canRegenerate = false,
+  isRegenerating = false,
+  regenerateDraftMode = null,
+  regenerateDraftPrefill = null,
 }) => {
   return (
     <div className="opening-screen" data-wuxia-automation="opening-screen">
@@ -56,7 +76,25 @@ const OpeningScreen: React.FC<OpeningScreenProps> = ({
         </section>
 
         <div className="opening-input-wrap">
-          <ChatInput onSend={onSend} placeholder="例如：我在一个山洞醒来，身边只有半截断剑..." disabled={isLoading} />
+          <ChatInput
+            onSend={onSend}
+            onRegenerate={onRegenerate}
+            onEditRegenerateInput={onEditRegenerateInput}
+            onRegenerateDraftModeChange={onRegenerateDraftModeChange}
+            onCancelRegenerateDraft={onCancelRegenerateDraft}
+            canRegenerate={canRegenerate}
+            isRegenerating={isRegenerating}
+            regenerateDraftMode={regenerateDraftMode}
+            regenerateDraftPrefill={regenerateDraftPrefill}
+            placeholder={
+              regenerateDraftMode === 'user-input'
+                ? '修改上一轮输入后，点击右侧重新生成...'
+                : regenerateDraftMode === 'assistant-append'
+                  ? '输入要追加到上一轮 AI 输出的信息...'
+                  : '例如：我在一个山洞醒来，身边只有半截断剑...'
+            }
+            disabled={isLoading}
+          />
         </div>
       </main>
     </div>
