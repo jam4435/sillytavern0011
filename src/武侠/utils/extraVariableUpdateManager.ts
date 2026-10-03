@@ -1519,7 +1519,7 @@ ${previousFailure ? `\n【上一次纠错仍失败】\n${previousFailure}\n上�
 1. 原回复声明的耗时和目标时间已经由程序锁定；禁止根据正文、事件边界或自己的判断重新估算、缩短或延长耗时。
 2. 你只能把“锁定新时间”原样补全为年/月/日/时/分五字段；任何字段与锁定值不同都视为纠错失败。
 3. VariableThink 必须简写“旧完整时间 + 锁定耗时 = 锁定新时间”，不得换用其他耗时。
-4. 只允许输出 <VariableThink> 以及路径为 世界信息.时间 的 VariableEdit/VariableInsert。不得输出正文、解释、选项或任何其他变量路径。
+4. 只允许输出 <VariableThink>，以及针对 `世界信息` 下 `时间` 对象的 VariableEdit/VariableInsert。不得输出正文、解释、选项或任何其他变量。
 5. 时间字段已存在用 Edit；仅旧档缺分时，分用 Insert、其余四字段用 Edit。`;
 }
 

@@ -353,6 +353,8 @@ describe('executeExtraVariableUpdate', () => {
     expect(prompt).toContain('<修为>');
     expect(prompt).toContain('修炼一天的修为增幅参考值:33');
     expect(prompt).not.toContain('<变量上下文>');
+    expect(prompt).not.toContain('世界信息.时间');
+    expect(prompt).not.toContain('user数据.包裹');
     expect(prompt).not.toContain('"messageId"');
     expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -471,6 +473,9 @@ describe('executeExtraVariableUpdate', () => {
     });
 
     expect(requestConfiguredTextMock).toHaveBeenCalledTimes(2);
+    const repairPrompt = requestConfiguredTextMock.mock.calls[1][0].prompt as string;
+    expect(repairPrompt).not.toContain('世界信息.时间');
+    expect(repairPrompt).toContain('针对 `世界信息` 下 `时间` 对象');
     expect(setChatMessagesMock).toHaveBeenCalledTimes(1);
     expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({ appended: true, actionBlockCount: 6, timeRepairAttempted: true });
