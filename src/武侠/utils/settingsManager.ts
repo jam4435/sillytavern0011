@@ -2319,9 +2319,11 @@ export function applyRegexRules(text: string, rules: RegexRule[]): string {
 
 /** 系统级 ERA 清理：显示层、正文 AI 与额外变量 AI 共用同一条基础正则。 */
 export function applyEraBaseRegexRule(text: string): string {
-  return applyRegexRules(text, [ERA_BASE_REGEX_RULE])
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  const filtered = applyRegexRules(text, [ERA_BASE_REGEX_RULE]);
+  if (filtered === text) {
+    return text;
+  }
+  return filtered.replace(/\n{3,}/g, '\n\n').trim();
 }
 
 /**
