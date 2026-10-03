@@ -14,6 +14,7 @@ import { syncFrontendDerivedVariables } from './frontendDerivedVariables';
 import { extractExplicitMapTargetsFromText } from './locationContext';
 import { WUXIA_INPUT_HISTORY_DATA_KEY } from './inputHistory';
 import { messageLogger } from './logger';
+import { applyEraBaseRegexRule } from './settingsManager';
 import { runWith429Retry } from './rateLimitRetry';
 
 type ChatRole = 'system' | 'assistant' | 'user';
@@ -569,7 +570,8 @@ function buildHistoryPrompts(messages: ChatMessageWithSwipes[], lastMessageId: n
     .filter(message => !message.is_hidden)
     .map(message => {
       const rawText = getActiveMessageText(message);
-      const content = message.role === 'assistant' ? normalizeDisplayedMessageContent(rawText) : rawText.trim();
+      const normalized = message.role === 'assistant' ? normalizeDisplayedMessageContent(rawText) : rawText.trim();
+      const content = applyEraBaseRegexRule(normalized);
       return {
         role: message.role,
         content,
