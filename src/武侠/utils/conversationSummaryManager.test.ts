@@ -5,6 +5,7 @@ import {
   applyConversationSummaryModeState,
   buildConversationSummaryRegexes,
   filterArchivedSummariesFromPrompt,
+  filterEraBaseContextFromPrompt,
   filterHistoricalBackfillTurnsFromPrompt,
   filterPresetSummaryContextFromPrompt,
   filterSelectedPresetModulesFromPrompt,
@@ -114,6 +115,28 @@ describe('conversationSummaryManager', () => {
     expect(status).toContain('本次初始化未改写角色正则');
     expect(updateWorldbook).not.toHaveBeenCalled();
     expect(updateRegex).not.toHaveBeenCalled();
+  });
+
+  it('filters ERA metadata from user and assistant prompt messages while leaving system text untouched', () => {
+    const chat = [
+      { role: 'system' as const, content: '说明示例：<era_data>文档内容</era_data>' },
+      {
+        role: 'user' as const,
+        content: '<era_data>{\n  "era-message-key": "user-1"\n}</era_data>\n合理融入剧情',
+      },
+      {
+        role: 'assistant' as const,
+        content:
+          '正文\n<VariableEdit>{"stat_data":{"测试":1}}</VariableEdit>\n<era_data>{"era-message-key":"assistant-1"}</era_data>',
+      },
+    ];
+
+    expect(filterEraBaseContextFromPrompt(chat)).toBe(2);
+    expect(chat).toEqual([
+      { role: 'system', content: '说明示例：<era_data>文档内容</era_data>' },
+      { role: 'user', content: '合理融入剧情' },
+      { role: 'assistant', content: '正文' },
+    ]);
   });
 
   it('filters player-confirmed useless preset modules from the final chat-completion prompt', () => {
