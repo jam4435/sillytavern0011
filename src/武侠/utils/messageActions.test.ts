@@ -486,8 +486,9 @@ describe('regenerateLastAssistantSwipe', () => {
     expect(prompts[0]?.content).toContain('补充：上一轮还有隐藏信息。');
     expect(prompts.at(-1)).toEqual({
       role: 'user',
-      content: '修改后的玩家输入\n\n<era_data>{"user":"meta"}</era_data>',
+      content: '修改后的玩家输入',
     });
+    expect(prompts.some(prompt => prompt.content.includes('<era_data>'))).toBe(false);
     expect(messages[2].message).toBe('同时修改后的新回复');
   });
 
