@@ -2,6 +2,7 @@ import {
   DEFAULT_VARIABLE_DATA_FORMAT_TEMPLATE,
   DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE,
   applyCurrentPresetModuleFilter,
+  applyEraBaseRegexRule,
   type SummarySettings,
 } from './settingsManager';
 import {
@@ -606,11 +607,11 @@ function normalizeBodyMessageForPrompt(
       ? stripConfiguredAssistantBlocks(tavernRegexed, settings.variablePromptExcludedTags)
       : tavernRegexed;
 
-  return stripEraVariableBlocksForPrompt(
-    normalizeDisplayedMessageContent(stripEraVariableBlocksForPrompt(withoutConfiguredBlocks)),
-  )
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  return applyEraBaseRegexRule(
+    stripEraVariableBlocksForPrompt(
+      normalizeDisplayedMessageContent(stripEraVariableBlocksForPrompt(withoutConfiguredBlocks)),
+    ),
+  );
 }
 
 function mergePatchValue(previous: unknown, next: unknown): unknown {
