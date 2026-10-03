@@ -301,10 +301,11 @@ type StoredDisplaySettings = Partial<
 // 默认设置
 // =========================================
 
-/** ERA基础正则规则 - 用于移除ERA框架的变量标签 */
+/** ERA基础正则规则 - 用于从显示文本与送模上下文移除ERA框架元数据 */
 export const ERA_BASE_REGEX_RULE: RegexRule = {
   id: 'era-base-regex',
-  pattern: '/<era_data>{.*?}<\\/era_data>|<Variable(Think|Insert|Edit|Delete)>[\\s\\S]*?<\\/Variable\\1>/gi',
+  pattern:
+    '/<era_data\\b[^>]*>[\\s\\S]*?<\\/era_data>|<Variable(Think|Insert|Edit|Delete)>[\\s\\S]*?<\\/Variable\\1>/gi',
   replacement: '',
   enabled: true,
   description: 'ERA基础正则',
@@ -2314,6 +2315,13 @@ export function applyRegexRules(text: string, rules: RegexRule[]): string {
     }
   }
   return result;
+}
+
+/** 系统级 ERA 清理：显示层、正文 AI 与额外变量 AI 共用同一条基础正则。 */
+export function applyEraBaseRegexRule(text: string): string {
+  return applyRegexRules(text, [ERA_BASE_REGEX_RULE])
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 /**
