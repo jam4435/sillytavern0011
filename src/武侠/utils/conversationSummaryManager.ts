@@ -1,5 +1,6 @@
 import { dataLogger } from './logger';
 import {
+  applyEraBaseRegexRule,
   getLoadedPresetNameSafe,
   getPresetStorageCleanupCandidates,
   getRegexRuleContentSignature,
@@ -296,6 +297,26 @@ function setSendingMessageText(message: SillyTavern.SendingMessage, text: string
     replaced = true;
     return { ...part, text };
   });
+}
+
+/**
+ * ERA 元数据只属于聊天持久化层，不应进入正文模型上下文。
+ * 这里复用设置页的 ERA_BASE_REGEX_RULE，只处理真实 user / assistant 对话，
+ * 避免误伤 system / worldbook 中的说明文本或示例。
+ */
+export function filterEraBaseContextFromPrompt(chat: SillyTavern.SendingMessage[]): number {
+  let changed = 0;
+  for (const message of chat) {
+    if (message.role !== 'user' && message.role !== 'assistant') continue;
+    const text = getSendingMessageText(message);
+    if (!text) continue;
+    const filtered = applyEraBaseRegexRule(text);
+    if (filtered !== text) {
+      setSendingMessageText(message, filtered);
+      changed += 1;
+    }
+  }
+  return changed;
 }
 
 function escapeSummaryTagForRegex(value: string): string {
@@ -780,6 +801,11 @@ export function installConversationSummaryPromptFilter(): () => void {
         : CONVERSATION_SUMMARY_TAG;
     const coverage = readArchivedConversationCoverage();
     const initialPromptRefs = alignPromptMessagesToHistory(eventData.chat, coverage.history);
+
+    const eraFilteredMessages = filterEraBaseContextFromPrompt(eventData.chat);
+    if (eraFilteredMessages > 0) {
+      dataLogger.log(`[conversationFilter] 已用 ERA 基础正则清理 ${eraFilteredMessages} 条最终正文提示词消息。`);
+    }
 
     const filteredModules = filterSelectedPresetModulesFromPrompt(eventData.chat);
     if (filteredModules > 0) {
