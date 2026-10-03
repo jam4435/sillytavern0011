@@ -943,41 +943,6 @@ describe('executeExtraVariableUpdate', () => {
     expect(getIsExtraVariableUpdating()).toBe(false);
   });
 
-  it('自定义模板未放置 locationContext 时不会强行追加地点约束', async () => {
-    await executeExtraVariableUpdate({
-      settings: {
-        ...DEFAULT_SUMMARY_SETTINGS,
-        variableUpdateMode: 'extra',
-        variablePromptTemplate: '正文：{{recentBodies}}\n变量：{{variableContext}}',
-      },
-      assistantMessageId: 28,
-      latestRawReply: '正文内容',
-    });
-
-    expect(requestConfiguredTextMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        prompt: expect.not.stringContaining('合法地点完整路径'),
-      }),
-    );
-  });
-
-  it('自定义主提示词可直接只渲染变量指导，不隐式追加其他模板', async () => {
-    await executeExtraVariableUpdate({
-      settings: {
-        ...DEFAULT_SUMMARY_SETTINGS,
-        variablePromptTemplate: '{{variableGuidance}}',
-      },
-      assistantMessageId: 28,
-      latestRawReply: '正文内容',
-    });
-
-    const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
-    expect(prompt).toContain('# ERA 变量更新规则');
-    expect(prompt).not.toContain('传说：基本失传，不得操纵时间空间。');
-    expect(prompt).not.toContain('<变量模板>');
-    expect(prompt).not.toContain('宏观背景');
-  });
-
   it('构造严格范围投影，递归清理所有 $ 字段并只选择相关 NPC', () => {
     const projection = buildExtraVariableProjection(variableSnapshot, '洪七公忽然现身。');
     const serialized = JSON.stringify(projection);
@@ -1011,52 +976,25 @@ describe('executeExtraVariableUpdate', () => {
       settings: {
         ...DEFAULT_SUMMARY_SETTINGS,
         variableUpdateMode: 'extra',
-        variablePromptTemplate: '{{recentBodies}}',
       },
       assistantMessageId: 28,
       latestRawReply: '洪七公忽然现身。',
     });
 
     const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
-    const context = JSON.parse(prompt) as {
-      readonlyContextRounds: Array<{ user: { messageId: number; content: string }; assistant: { messageId: number; content: string } }>;
-      latestUserBody: { messageId: number; content: string; role: string; isCurrentTurnInput: boolean };
-      latestAssistantBody: { messageId: number; content: string; role: string; isCurrentTurnOutcome: boolean };
-    };
-    expect(context.readonlyContextRounds).toEqual([
+    const readonlyMatch = prompt.match(/<前序只读轮次>\n([\s\S]*?)\n<\/前序只读轮次>/);
+    const userMatch = prompt.match(/<本轮User>\n([\s\S]*?)\n<\/本轮User>/);
+    const assistantMatch = prompt.match(/<本轮正文>\n([\s\S]*?)\n<\/本轮正文>/);
+    expect(JSON.parse(readonlyMatch?.[1] || '[]')).toEqual([
       { user: { messageId: 20, content: '上一轮用户正文' }, assistant: { messageId: 21, content: '上一轮助手正文' } },
     ]);
-    expect(context.latestUserBody).toEqual({
-      messageId: 27,
-      content: '触发本轮的用户输入',
-      role: 'user',
-      isCurrentTurnInput: true,
+    expect(JSON.parse(userMatch?.[1] || '{}')).toEqual({
+      messageId: 27, content: '触发本轮的用户输入', role: 'user', isCurrentTurnInput: true,
     });
-    expect(context.latestAssistantBody).toEqual({
-      messageId: 28,
-      content: '洪七公忽然现身。',
-      role: 'assistant',
-      isCurrentTurnOutcome: true,
+    expect(JSON.parse(assistantMatch?.[1] || '{}')).toEqual({
+      messageId: 28, content: '洪七公忽然现身。', role: 'assistant', isCurrentTurnOutcome: true,
     });
     expect(prompt).not.toContain('更早用户正文');
-  });
-
-  it('支持在自定义提示词模板中分别渲染 {{latestUserBody}} 和 {{latestAssistantBody}}', async () => {
-    requestConfiguredTextMock.mockResolvedValue('<VariableThink>无变化</VariableThink>');
-
-    await executeExtraVariableUpdate({
-      settings: {
-        ...DEFAULT_SUMMARY_SETTINGS,
-        variableUpdateMode: 'extra',
-        variablePromptTemplate: 'USER:{{latestUserBody}}\nAI:{{latestAssistantBody}}',
-      },
-      assistantMessageId: 28,
-      latestRawReply: '洪七公忽然现身。',
-    });
-
-    const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
-    expect(prompt).toContain('USER:{"messageId":27,"content":"触发本轮的用户输入","role":"user","isCurrentTurnInput":true}');
-    expect(prompt).toContain('AI:{"messageId":28,"content":"洪七公忽然现身。","role":"assistant","isCurrentTurnOutcome":true}');
   });
 
   it('先应用当前酒馆提示词正则，再按额外变量设置精确剥离规划前缀和附属标签', async () => {
@@ -1069,7 +1007,6 @@ describe('executeExtraVariableUpdate', () => {
       settings: {
         ...DEFAULT_SUMMARY_SETTINGS,
         variableUpdateMode: 'extra',
-        variablePromptTemplate: '{{recentBodies}}',
         variablePromptExcludedTags: 'tucao\ncurrent_event, progress',
         variablePromptBodyStartMarkers: '</konatan_planning~>',
       },
@@ -1087,14 +1024,13 @@ describe('executeExtraVariableUpdate', () => {
     });
 
     const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
-    const context = JSON.parse(prompt) as { latestAssistantBody: { content: string } };
-    expect(context.latestAssistantBody.content).toContain('真正正文。');
-    expect(context.latestAssistantBody.content).toContain('<unknown>未配置标签需要保留</unknown>');
-    expect(context.latestAssistantBody.content).not.toContain('主模型规划内容');
-    expect(context.latestAssistantBody.content).not.toContain('吐槽');
-    expect(context.latestAssistantBody.content).not.toContain('事件摘要');
-    expect(context.latestAssistantBody.content).not.toContain('进度');
-    expect(context.latestAssistantBody.content).not.toContain('由当前预设正则处理');
+    expect(prompt).toContain('真正正文。');
+    expect(prompt).toContain('<unknown>未配置标签需要保留</unknown>');
+    expect(prompt).not.toContain('主模型规划内容');
+    expect(prompt).not.toContain('吐槽');
+    expect(prompt).not.toContain('事件摘要');
+    expect(prompt).not.toContain('<progress>进度</progress>');
+    expect(prompt).not.toContain('由当前预设正则处理');
     expect(globalScope.formatAsTavernRegexedString).toHaveBeenCalledWith(expect.any(String), 'ai_output', 'prompt', {
       depth: 0,
     });
@@ -1108,15 +1044,14 @@ describe('executeExtraVariableUpdate', () => {
         ...DEFAULT_SUMMARY_SETTINGS,
         variableUpdateMode: 'extra',
         variableContextRounds: 2,
-        variablePromptTemplate: '{{recentBodies}}',
       },
       assistantMessageId: 28,
       latestRawReply: '正文内容',
     });
 
     const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
-    const context = JSON.parse(prompt) as { readonlyContextRounds: unknown[] };
-    expect(context.readonlyContextRounds).toHaveLength(2);
+    const readonlyMatch = prompt.match(/<前序只读轮次>\n([\s\S]*?)\n<\/前序只读轮次>/);
+    expect(JSON.parse(readonlyMatch?.[1] || '[]')).toHaveLength(2);
     expect(prompt).toContain('更早用户正文');
     expect(prompt).toContain('上一轮助手正文');
   });
@@ -1126,7 +1061,6 @@ describe('executeExtraVariableUpdate', () => {
     const settings = {
       ...DEFAULT_SUMMARY_SETTINGS,
       variableUpdateMode: 'extra' as const,
-      variablePromptTemplate: '{{variableContext}}',
     };
 
     await executeExtraVariableUpdate({
@@ -1168,7 +1102,6 @@ describe('executeExtraVariableUpdate', () => {
       settings: {
         ...DEFAULT_SUMMARY_SETTINGS,
         variableUpdateMode: 'extra',
-        variablePromptTemplate: '{{variableContext}}',
       },
       assistantMessageId: 28,
       latestRawReply: '正文内容',

@@ -3301,10 +3301,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
 
               <div className="summary-subsection">
-                <h5 className="summary-subsection-title">变量输入模板</h5>
+                <h5 className="summary-subsection-title">变量模型输入预览</h5>
                 <p className="settings-hint">
-                  这里只控制上下文怎么排列，不负责计算数据。支持 {'{{slot}}'} 与独占一行的
-                  {' @if slot '} / {' @else '} / {' @endif '}；条件在 slot 非空时成立。
+                  上下文骨架由代码固定生成，不在设置中编辑。可以点击下面的 slot 查看语义、来源、空值行为和当前实际内容，
+                  或直接预览变量模型的完整输入上下文。
                 </p>
                 <div className="variable-prompt-slot-list">
                   {VARIABLE_PROMPT_SLOT_META.map(slot => (
@@ -3315,23 +3315,20 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       onClick={() => handleInspectVariablePromptSlot(slot.name)}
                       title={`查看 {{${slot.name}}} 当前实际内容`}
                     >
-                      { `{{${slot.name}}}` }
+                      {`{{${slot.name}}}`}
                     </button>
                   ))}
                 </div>
                 {selectedVariablePromptSlotDetail && (
                   <div className="variable-prompt-slot-inspector">
                     <div className="variable-prompt-slot-inspector-title">
-                      { `{{${selectedVariablePromptSlotDetail.name}}}` } · {selectedVariablePromptSlotDetail.label}
+                      {`{{${selectedVariablePromptSlotDetail.name}}}`} · {selectedVariablePromptSlotDetail.label}
                     </div>
                     <div className="variable-prompt-slot-inspector-grid">
                       <div><strong>含义</strong><span>{selectedVariablePromptSlotDetail.description}</span></div>
                       <div><strong>来源</strong><span>{selectedVariablePromptSlotDetail.source}</span></div>
                       <div><strong>空值</strong><span>{selectedVariablePromptSlotDetail.emptyBehavior}</span></div>
-                      <div>
-                        <strong>当前条件</strong>
-                        <span>{selectedVariablePromptSlotDetail.active ? '有内容；@if 条件成立' : '为空；@if 条件不成立'}</span>
-                      </div>
+                      <div><strong>当前状态</strong><span>{selectedVariablePromptSlotDetail.active ? '有内容' : '为空'}</span></div>
                     </div>
                     {variablePromptInspection?.error && (
                       <div className="summary-api-status warning">{variablePromptInspection.error}</div>
@@ -3342,13 +3339,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     </pre>
                   </div>
                 )}
-                <textarea
-                  value={settings.summarySettings.variableInputTemplate}
-                  onChange={e => updateSummarySetting('variableInputTemplate', e.target.value)}
-                  placeholder="请输入变量上下文伪代码模板..."
-                  className="settings-textarea variable-prompt-template-input"
-                  rows={16}
-                />
                 <div className="summary-actions">
                   <button
                     type="button"
@@ -3361,14 +3351,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   >
                     预览当前完整输入
                   </button>
-                  <button
-                    className="settings-reset-template-btn"
-                    onClick={() =>
-                      updateSummarySetting('variableInputTemplate', DEFAULT_SUMMARY_SETTINGS.variableInputTemplate)
-                    }
-                  >
-                    恢复默认输入模板
-                  </button>
                 </div>
                 {variablePromptInspection && !selectedVariablePromptSlot && (
                   <pre className="variable-prompt-slot-preview">
@@ -3378,31 +3360,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
 
               <div className="summary-subsection">
-                <h5 className="summary-subsection-title">变量模型主提示词</h5>
-                <p className="settings-hint">
-                  可用：{'{{variableInputContext}}'}、{'{{narrativeScale}}'}、{'{{variableTemplate}}'}、
-                  {'{{variableGuidance}}'}。前者由上面的变量输入模板渲染。
-                </p>
-                <textarea
-                  value={settings.summarySettings.variablePromptTemplate}
-                  onChange={e => updateSummarySetting('variablePromptTemplate', e.target.value)}
-                  placeholder="请输入额外变量模型主提示词..."
-                  className="settings-textarea variable-prompt-template-input"
-                  rows={14}
-                />
-                <button
-                  className="settings-reset-template-btn"
-                  onClick={() =>
-                    updateSummarySetting('variablePromptTemplate', DEFAULT_SUMMARY_SETTINGS.variablePromptTemplate)
-                  }
-                >
-                  恢复默认主提示词
-                </button>
-              </div>
-
-              <div className="summary-subsection">
-                <h5 className="summary-subsection-title">变量结构模板</h5>
-                <p className="settings-hint">原世界书「变量模板」内容。现在直接由额外变量模型设置维护。</p>
+                <h5 className="summary-subsection-title">变量模板</h5>
+                <p className="settings-hint">定义真实变量路径、结构、枚举与写入权限；这是可编辑的变量 Schema。</p>
                 <textarea
                   value={settings.summarySettings.variableStructureTemplate}
                   onChange={e => updateSummarySetting('variableStructureTemplate', e.target.value)}
@@ -3416,14 +3375,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     updateSummarySetting('variableStructureTemplate', DEFAULT_SUMMARY_SETTINGS.variableStructureTemplate)
                   }
                 >
-                  恢复默认变量结构
+                  恢复默认变量模板
                 </button>
               </div>
 
               <div className="summary-subsection">
-                <h5 className="summary-subsection-title">变量更新规则</h5>
+                <h5 className="summary-subsection-title">变量指导</h5>
                 <p className="settings-hint">
-                  原世界书「变量指导」内容。只服务额外变量模型；同样支持独占一行的
+                  定义变量模型的判断、更新与输出规则。支持独占一行的
                   {' @if slot '} / {' @else '} / {' @endif '} 条件块。
                 </p>
                 <textarea
@@ -3439,7 +3398,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     updateSummarySetting('variableGuidanceTemplate', DEFAULT_SUMMARY_SETTINGS.variableGuidanceTemplate)
                   }
                 >
-                  恢复默认变量规则
+                  恢复默认变量指导
                 </button>
               </div>
 

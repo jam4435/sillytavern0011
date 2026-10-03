@@ -18,13 +18,9 @@ import eventScrollMidUrl from '../assets/ui/event-scroll-mid.webp?url';
 import eventScrollRightUrl from '../assets/ui/event-scroll-right.webp?url';
 import {
   DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
-  DEFAULT_VARIABLE_INPUT_TEMPLATE,
   DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
-  DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE,
   getVariablePromptTemplateSignature,
   KNOWN_VARIABLE_GUIDANCE_DEFAULT_SIGNATURES,
-  KNOWN_VARIABLE_INPUT_TEMPLATE_DEFAULT_SIGNATURES,
-  KNOWN_VARIABLE_MAIN_PROMPT_DEFAULT_SIGNATURES,
   KNOWN_VARIABLE_STRUCTURE_DEFAULT_SIGNATURES,
 } from '../prompts/variablePromptDefaults';
 
@@ -137,10 +133,6 @@ export interface SummarySettings {
   variableApiSelection: SummaryApiSelection;
   /** 提示词模板 */
   promptTemplate: string;
-  /** 额外变量更新主提示词模板 */
-  variablePromptTemplate: string;
-  /** 变量模型输入上下文的轻量伪代码模板 */
-  variableInputTemplate: string;
   /** 变量结构与写入权限模板 */
   variableStructureTemplate: string;
   /** 变量领域更新规则 */
@@ -394,11 +386,8 @@ export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你负责压缩《金庸群侠�
 </summary>`;
 
 export {
-  DEFAULT_VARIABLE_DATA_FORMAT_TEMPLATE,
   DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
-  DEFAULT_VARIABLE_INPUT_TEMPLATE,
   DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
-  DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE,
 } from '../prompts/variablePromptDefaults';
 
 export const DEFAULT_VARIABLE_PROMPT_EXCLUDED_TAGS = ['tucao', 'current_event', 'progress'].join('\n');
@@ -533,8 +522,6 @@ export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
   summaryApiSelection: PRESET_SUMMARY_API_SELECTION,
   variableApiSelection: PRESET_SUMMARY_API_SELECTION,
   promptTemplate: DEFAULT_SUMMARY_PROMPT_TEMPLATE,
-  variablePromptTemplate: DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE,
-  variableInputTemplate: DEFAULT_VARIABLE_INPUT_TEMPLATE,
   variableStructureTemplate: DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
   variableGuidanceTemplate: DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
   variableContextRounds: 1,
@@ -1072,16 +1059,6 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
     ),
     promptTemplate:
       typeof summarySettings.promptTemplate === 'string' ? summarySettings.promptTemplate : defaults.promptTemplate,
-    variablePromptTemplate: normalizeLegacyDefaultTemplate(
-      summarySettings.variablePromptTemplate,
-      defaults.variablePromptTemplate,
-      KNOWN_VARIABLE_MAIN_PROMPT_DEFAULT_SIGNATURES,
-    ),
-    variableInputTemplate: normalizeLegacyDefaultTemplate(
-      summarySettings.variableInputTemplate,
-      defaults.variableInputTemplate,
-      KNOWN_VARIABLE_INPUT_TEMPLATE_DEFAULT_SIGNATURES,
-    ),
     variableStructureTemplate: normalizeLegacyDefaultTemplate(
       summarySettings.variableStructureTemplate,
       defaults.variableStructureTemplate,

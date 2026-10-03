@@ -1,8 +1,3 @@
-import {
-  DEFAULT_VARIABLE_DATA_FORMAT_TEMPLATE,
-  DEFAULT_VARIABLE_INPUT_TEMPLATE,
-} from '../prompts/variablePromptDefaults';
-
 export const VARIABLE_PROMPT_SLOT_NAMES = [
   'readonlyContextRounds',
   'latestUserBody',
@@ -15,7 +10,6 @@ export const VARIABLE_PROMPT_SLOT_NAMES = [
   'relevantCharacters',
   'locationContext',
   'cultivationReference',
-  'decisionChecklist',
 ] as const;
 
 export type VariablePromptSlotName = (typeof VARIABLE_PROMPT_SLOT_NAMES)[number];
@@ -54,7 +48,7 @@ export const VARIABLE_PROMPT_SLOT_META: readonly VariablePromptSlotMeta[] = [
   {
     name: 'variableData',
     label: '变量数据',
-    description: '按 src/武侠/prompts/变量数据格式.txt 渲染后的完整 <variable> 动态数据块。',
+    description: '由代码固定组装的完整 <variable> 动态数据块。',
     source: 'worldContext/playerContext/participationEvents/tasks/relevantCharacters/locationContext 等动态槽位。',
     emptyBehavior: '构建前为空；渲染变量数据格式后写入。',
   },
@@ -106,13 +100,6 @@ export const VARIABLE_PROMPT_SLOT_META: readonly VariablePromptSlotMeta[] = [
     description: '修炼一天的修为增幅参考值，只读；默认模板放在<variable><修为>中。',
     source: 'stat_data.前端变量.修为变化参考。',
     emptyBehavior: '不是有限数字时为空；@if cultivationReference 不成立。',
-  },
-  {
-    name: 'decisionChecklist',
-    label: '变量检查清单',
-    description: '旧输入模板兼容占位符；检查清单已迁入可编辑的变量指导。',
-    source: '兼容保留，不再由代码生成检查规则。',
-    emptyBehavior: '始终为空；新模板不应再使用此占位符。',
   },
 ] as const;
 
@@ -186,14 +173,50 @@ export function renderVariableConditionalTemplate(template: string, slots: Varia
   return output.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-export function renderVariableDataTemplate(template: string, slots: VariablePromptSlots): string {
-  const source = template.trim() ? template : DEFAULT_VARIABLE_DATA_FORMAT_TEMPLATE;
-  return renderVariableConditionalTemplate(source, slots);
+function wrapVariablePromptSection(tag: string, content: string): string {
+  return `<${tag}>\n${content}\n</${tag}>`;
 }
 
-export function renderVariableInputTemplate(template: string, slots: VariablePromptSlots): string {
-  const source = template.trim() ? template : DEFAULT_VARIABLE_INPUT_TEMPLATE;
-  return renderVariableConditionalTemplate(source, slots);
+export function renderVariableData(slots: VariablePromptSlots): string {
+  const sections = [
+    wrapVariablePromptSection('当前时间', slots.worldContext),
+    wrapVariablePromptSection('玩家数据', slots.playerContext),
+  ];
+  if (slots.participationEvents.trim()) sections.push(wrapVariablePromptSection('参与事件', slots.participationEvents));
+  if (slots.tasks.trim()) sections.push(wrapVariablePromptSection('任务', slots.tasks));
+  if (slots.locationContext.trim()) sections.push(wrapVariablePromptSection('可用地点', slots.locationContext));
+  if (slots.relevantCharacters.trim()) sections.push(wrapVariablePromptSection('角色数据', slots.relevantCharacters));
+  if (slots.cultivationReference.trim()) sections.push(wrapVariablePromptSection('修为', slots.cultivationReference));
+  return `<variable>\n${sections.join('\n\n')}\n</variable>`;
+}
+
+export function renderVariableInput(slots: VariablePromptSlots): string {
+  return [
+    wrapVariablePromptSection('前序只读轮次', slots.readonlyContextRounds),
+    wrapVariablePromptSection('本轮User', slots.latestUserBody),
+    wrapVariablePromptSection('本轮正文', slots.latestAssistantBody),
+    slots.variableData.trim(),
+  ].filter(Boolean).join('\n\n').trim();
+}
+
+export function renderVariableModelPrompt({
+  narrativeScale,
+  variableInputContext,
+  variableTemplate,
+  variableGuidance,
+}: {
+  narrativeScale: string;
+  variableInputContext: string;
+  variableTemplate: string;
+  variableGuidance: string;
+}): string {
+  return [
+    '你是《金庸群侠传》ERA 变量更新模型。\n任务是核对本轮玩家输入与最新 assistant 正文已经发生的持久变化；不得续写剧情。',
+    `<叙事表现标尺>\n${narrativeScale}\n</叙事表现标尺>`,
+    variableInputContext,
+    variableTemplate,
+    variableGuidance,
+  ].filter(Boolean).join('\n\n').trim();
 }
 
 export function getVariablePromptSlotMeta(name: VariablePromptSlotName): VariablePromptSlotMeta {

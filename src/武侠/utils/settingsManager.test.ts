@@ -1,13 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
-  DEFAULT_VARIABLE_INPUT_TEMPLATE,
   DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
-  DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE,
   getVariablePromptTemplateSignature,
   KNOWN_VARIABLE_GUIDANCE_DEFAULT_SIGNATURES,
-  KNOWN_VARIABLE_INPUT_TEMPLATE_DEFAULT_SIGNATURES,
-  KNOWN_VARIABLE_MAIN_PROMPT_DEFAULT_SIGNATURES,
   KNOWN_VARIABLE_STRUCTURE_DEFAULT_SIGNATURES,
 } from '../prompts/variablePromptDefaults';
 import {
@@ -260,22 +256,14 @@ describe('settingsManager ui theme', () => {
     expect(loaded.variablePromptBodyStartMarkers).toBe('</thinking>');
   });
 
-  it('uses the extra-only variable prompt stack with an editable pseudo-code input template', () => {
+  it('keeps only variable schema and guidance as editable prompt layers', () => {
     const settings = createDefaultDisplaySettings().summarySettings;
     expect(settings.variableUpdateMode).toBe('extra');
-    expect(settings.variablePromptTemplate).toContain('{{variableInputContext}}');
-    expect(settings.variablePromptTemplate).toContain('{{narrativeScale}}');
-    expect(settings.variablePromptTemplate).toContain('{{variableTemplate}}');
-    expect(settings.variablePromptTemplate).toContain('{{variableGuidance}}');
-    expect(settings.variablePromptTemplate).not.toContain('【最终执行要求】');
-    expect(settings.variableGuidanceTemplate).toContain('最终执行：');
-
-    expect(settings.variableInputTemplate).toContain('{{latestUserBody}}');
-    expect(settings.variableInputTemplate).toContain('{{latestAssistantBody}}');
-    expect(settings.variableInputTemplate).toContain('{{playerContext}}');
-    expect(settings.variableInputTemplate).toContain('@if participationEvents');
+    expect('variablePromptTemplate' in settings).toBe(false);
+    expect('variableInputTemplate' in settings).toBe(false);
     expect(settings.variableStructureTemplate).toContain('<变量模板>');
     expect(settings.variableGuidanceTemplate).toContain('# ERA 变量更新规则');
+    expect(settings.variableGuidanceTemplate).toContain('最终执行：');
   });
 
   it('keeps biography compression focused on old chunks and game-time dates', () => {
@@ -286,39 +274,25 @@ describe('settingsManager ui theme', () => {
     expect(template).toContain('1～3 句');
   });
 
-  it('keeps the current extracted prompt defaults recognizable as unmodified project defaults', () => {
-    expect(KNOWN_VARIABLE_MAIN_PROMPT_DEFAULT_SIGNATURES).toContain(
-      getVariablePromptTemplateSignature(DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE),
-    );
-    expect(KNOWN_VARIABLE_INPUT_TEMPLATE_DEFAULT_SIGNATURES).toContain(
-      getVariablePromptTemplateSignature(DEFAULT_VARIABLE_INPUT_TEMPLATE),
-    );
-    expect(KNOWN_VARIABLE_STRUCTURE_DEFAULT_SIGNATURES).toContain(
-      getVariablePromptTemplateSignature(DEFAULT_VARIABLE_STRUCTURE_TEMPLATE),
-    );
-    expect(KNOWN_VARIABLE_GUIDANCE_DEFAULT_SIGNATURES).toContain(
-      getVariablePromptTemplateSignature(DEFAULT_VARIABLE_GUIDANCE_TEMPLATE),
-    );
+  it('keeps the two editable prompt defaults recognizable as unmodified project defaults', () => {
+    expect(KNOWN_VARIABLE_STRUCTURE_DEFAULT_SIGNATURES).toContain(getVariablePromptTemplateSignature(DEFAULT_VARIABLE_STRUCTURE_TEMPLATE));
+    expect(KNOWN_VARIABLE_GUIDANCE_DEFAULT_SIGNATURES).toContain(getVariablePromptTemplateSignature(DEFAULT_VARIABLE_GUIDANCE_TEMPLATE));
   });
 
-  it('preserves explicitly customized variable prompt layers without migration', () => {
-    window.localStorage.setItem(
-      'wuxia_display_settings',
-      JSON.stringify({
-        summarySettings: {
-          variablePromptTemplate: 'CUSTOM MAIN {{variableInputContext}}',
-          variableInputTemplate: '<x>{{playerContext}}</x>',
-          variableStructureTemplate: 'CUSTOM SCHEMA',
-          variableGuidanceTemplate: 'CUSTOM RULES',
-          variableUpdateMode: 'inline',
-        },
-      }),
-    );
-
+  it('ignores retired prompt skeleton settings while preserving custom schema and guidance', () => {
+    window.localStorage.setItem('wuxia_display_settings', JSON.stringify({
+      summarySettings: {
+        variablePromptTemplate: 'CUSTOM MAIN {{variableInputContext}}',
+        variableInputTemplate: '<x>{{playerContext}}</x>',
+        variableStructureTemplate: 'CUSTOM SCHEMA',
+        variableGuidanceTemplate: 'CUSTOM RULES',
+        variableUpdateMode: 'inline',
+      },
+    }));
     const loaded = loadSettings().summarySettings;
     expect(loaded.variableUpdateMode).toBe('extra');
-    expect(loaded.variablePromptTemplate).toBe('CUSTOM MAIN {{variableInputContext}}');
-    expect(loaded.variableInputTemplate).toBe('<x>{{playerContext}}</x>');
+    expect('variablePromptTemplate' in loaded).toBe(false);
+    expect('variableInputTemplate' in loaded).toBe(false);
     expect(loaded.variableStructureTemplate).toBe('CUSTOM SCHEMA');
     expect(loaded.variableGuidanceTemplate).toBe('CUSTOM RULES');
   });

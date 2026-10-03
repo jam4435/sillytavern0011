@@ -1,6 +1,4 @@
 import {
-  DEFAULT_VARIABLE_DATA_FORMAT_TEMPLATE,
-  DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE,
   applyCurrentPresetModuleFilter,
   applyEraBaseRegexRule,
   type SummarySettings,
@@ -8,8 +6,9 @@ import {
 import {
   VARIABLE_PROMPT_SLOT_META,
   renderVariableConditionalTemplate,
-  renderVariableDataTemplate,
-  renderVariableInputTemplate,
+  renderVariableData,
+  renderVariableInput,
+  renderVariableModelPrompt,
   type VariablePromptSlotName,
   type VariablePromptSlots,
 } from './variablePromptTemplateEngine';
@@ -1317,37 +1316,7 @@ function buildVariablePromptSlots(
     relevantCharacters,
     locationContext: variableProjection.locationContext,
     cultivationReference,
-    decisionChecklist: '',
   };
-}
-
-function renderVariablePromptTemplate(
-  template: string,
-  values: {
-    recentBodies: string;
-    readonlyContextRounds: string;
-    latestUserBody: string;
-    latestAssistantBody: string;
-    variableContext: string;
-    variableInputContext: string;
-    variableTemplate: string;
-    variableGuidance: string;
-    locationContext: string;
-    narrativeScale: string;
-  },
-): string {
-  const sourceTemplate = template.trim() ? template : DEFAULT_VARIABLE_UPDATE_PROMPT_TEMPLATE;
-  return sourceTemplate
-    .replace(/\{\{recentBodies\}\}/g, values.recentBodies)
-    .replace(/\{\{readonlyContextRounds\}\}/g, values.readonlyContextRounds)
-    .replace(/\{\{latestUserBody\}\}/g, values.latestUserBody)
-    .replace(/\{\{latestAssistantBody\}\}/g, values.latestAssistantBody)
-    .replace(/\{\{variableContext\}\}/g, values.variableContext)
-    .replace(/\{\{variableInputContext\}\}/g, values.variableInputContext)
-    .replace(/\{\{variableTemplate\}\}/g, values.variableTemplate)
-    .replace(/\{\{variableGuidance\}\}/g, values.variableGuidance)
-    .replace(/\{\{locationContext\}\}/g, values.locationContext)
-    .replace(/\{\{narrativeScale\}\}/g, values.narrativeScale);
 }
 
 async function buildExtraVariableUpdatePrompt({
@@ -1369,22 +1338,16 @@ async function buildExtraVariableUpdatePrompt({
   );
   const variableProjection = buildVariableProjectionSnapshot(assistantMessageId, recentBodies.latestAssistantBody);
   const slots = buildVariablePromptSlots(recentBodies, variableProjection);
-  const variableData = renderVariableDataTemplate(DEFAULT_VARIABLE_DATA_FORMAT_TEMPLATE, slots);
+  const variableData = renderVariableData(slots);
   slots.variableData = variableData;
-  const variableInputContext = renderVariableInputTemplate(settings.variableInputTemplate, slots);
+  const variableInputContext = renderVariableInput(slots);
   const variableGuidance = renderVariableConditionalTemplate(settings.variableGuidanceTemplate, slots);
 
-  return renderVariablePromptTemplate(settings.variablePromptTemplate, {
-    recentBodies: recentBodies.serialized,
-    readonlyContextRounds: recentBodies.serializedReadonlyContextRounds,
-    latestUserBody: recentBodies.serializedLatestUserBody,
-    latestAssistantBody: recentBodies.serializedLatestAssistantBody,
-    variableContext: variableData,
+  return renderVariableModelPrompt({
+    narrativeScale,
     variableInputContext,
     variableTemplate: settings.variableStructureTemplate,
     variableGuidance,
-    locationContext: variableProjection.locationContext,
-    narrativeScale,
   });
 }
 
@@ -1424,10 +1387,10 @@ export function inspectVariablePromptSlots(settings: SummarySettings): VariableP
     const recentBodies = getRecentBodyMessages(target.message_id, rawReply, settings.variableContextRounds, settings);
     const variableProjection = buildVariableProjectionSnapshot(target.message_id, recentBodies.latestAssistantBody);
     const slots = buildVariablePromptSlots(recentBodies, variableProjection);
-    slots.variableData = renderVariableDataTemplate(DEFAULT_VARIABLE_DATA_FORMAT_TEMPLATE, slots);
+    slots.variableData = renderVariableData(slots);
     return {
       assistantMessageId: target.message_id,
-      renderedInput: renderVariableInputTemplate(settings.variableInputTemplate, slots),
+      renderedInput: renderVariableInput(slots),
       items: VARIABLE_PROMPT_SLOT_META.map(meta => ({
         ...meta,
         value: slots[meta.name],
