@@ -480,7 +480,8 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
-    if (currentPage !== 'game' || isLoading || historyMutationPending) {
+    const canUseChatInputRegenerate = currentPage === 'game' || currentPage === 'opening';
+    if (!canUseChatInputRegenerate || isLoading || historyMutationPending) {
       setCanRegenerate(false);
       return;
     }
@@ -1120,10 +1121,28 @@ const App: React.FC = () => {
         setRegenerateDraftMode(null);
         setRegenerateDraftPrefill(null);
         setInputPrefill(null);
+
+        if (currentPage === 'opening') {
+          const lastContent = getLastMessageContent();
+          if (lastContent) {
+            setCurrentMaintext(lastContent);
+            setCurrentOptions(parseOptions(lastContent));
+            setCurrentPage('game');
+          }
+        }
       }
       return success;
     },
-    [handleRegenerateLastAssistant, historyMutationPending, refreshRecentInputHistory, showError],
+    [
+      currentPage,
+      handleRegenerateLastAssistant,
+      historyMutationPending,
+      refreshRecentInputHistory,
+      setCurrentMaintext,
+      setCurrentOptions,
+      setCurrentPage,
+      showError,
+    ],
   );
 
   const handleSafeAutoAdvance = useCallback(
@@ -1730,6 +1749,14 @@ const App: React.FC = () => {
           location={gameState.currentLocation}
           isLoading={isLoading || historyMutationPending}
           onSend={handleOpeningSend}
+          onRegenerate={handleSafeRegenerate}
+          onEditRegenerateInput={handlePrepareRegenerateInputEdit}
+          onRegenerateDraftModeChange={handlePrepareRegenerateDraftMode}
+          onCancelRegenerateDraft={handleCancelRegenerateInputEdit}
+          canRegenerate={canRegenerate && !historyMutationPending}
+          isRegenerating={isLoading || historyMutationPending}
+          regenerateDraftMode={regenerateDraftMode}
+          regenerateDraftPrefill={regenerateDraftPrefill}
           onOpenSettings={() => setActivePanel(ActivePanel.SETTINGS)}
         />
         <Modal
