@@ -19,9 +19,6 @@ import eventScrollRightUrl from '../assets/ui/event-scroll-right.webp?url';
 import {
   DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
   DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
-  getVariablePromptTemplateSignature,
-  KNOWN_VARIABLE_GUIDANCE_DEFAULT_SIGNATURES,
-  KNOWN_VARIABLE_STRUCTURE_DEFAULT_SIGNATURES,
 } from '../prompts/variablePromptDefaults';
 
 // =========================================
@@ -135,8 +132,12 @@ export interface SummarySettings {
   promptTemplate: string;
   /** 变量结构与写入权限模板 */
   variableStructureTemplate: string;
+  /** 用户是否显式修改过变量结构模板；false 时始终跟随项目当前默认值 */
+  variableStructureTemplateCustomized: boolean;
   /** 变量领域更新规则 */
   variableGuidanceTemplate: string;
+  /** 用户是否显式修改过变量指导；false 时始终跟随项目当前默认值 */
+  variableGuidanceTemplateCustomized: boolean;
   /** 最新正文之前作为只读上下文发送的完整 user + assistant 轮数 */
   variableContextRounds: VariableContextRounds;
   /** 额外变量正文中需要精确移除的 XML 附属块标签名，每行或逗号分隔 */
@@ -523,7 +524,9 @@ export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
   variableApiSelection: PRESET_SUMMARY_API_SELECTION,
   promptTemplate: DEFAULT_SUMMARY_PROMPT_TEMPLATE,
   variableStructureTemplate: DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
+  variableStructureTemplateCustomized: false,
   variableGuidanceTemplate: DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
+  variableGuidanceTemplateCustomized: false,
   variableContextRounds: 1,
   variablePromptExcludedTags: DEFAULT_VARIABLE_PROMPT_EXCLUDED_TAGS,
   variablePromptBodyStartMarkers: DEFAULT_VARIABLE_PROMPT_BODY_START_MARKERS,
@@ -973,15 +976,6 @@ function normalizeSummaryApiSelection(
   return cloneSummaryApiSelection(fallback);
 }
 
-function normalizeLegacyDefaultTemplate(
-  value: unknown,
-  fallbackValue: string,
-  knownDefaultSignatures: readonly string[],
-): string {
-  if (typeof value !== 'string') return fallbackValue;
-  return knownDefaultSignatures.includes(getVariablePromptTemplateSignature(value)) ? fallbackValue : value;
-}
-
 function normalizeSummarySettings(summarySettings: StoredSummarySettings | undefined): SummarySettings {
   const defaults = createDefaultSummarySettings();
   if (!summarySettings) {
@@ -1015,6 +1009,13 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
     shouldMigrateLegacyApi && profileIds.has('legacy-custom-api')
       ? { type: 'profile', profileId: 'legacy-custom-api' }
       : { type: 'preset' };
+
+  const hasCustomVariableStructureTemplate =
+    summarySettings.variableStructureTemplateCustomized === true &&
+    typeof summarySettings.variableStructureTemplate === 'string';
+  const hasCustomVariableGuidanceTemplate =
+    summarySettings.variableGuidanceTemplateCustomized === true &&
+    typeof summarySettings.variableGuidanceTemplate === 'string';
 
   return {
     ...defaults,
@@ -1059,16 +1060,14 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
     ),
     promptTemplate:
       typeof summarySettings.promptTemplate === 'string' ? summarySettings.promptTemplate : defaults.promptTemplate,
-    variableStructureTemplate: normalizeLegacyDefaultTemplate(
-      summarySettings.variableStructureTemplate,
-      defaults.variableStructureTemplate,
-      KNOWN_VARIABLE_STRUCTURE_DEFAULT_SIGNATURES,
-    ),
-    variableGuidanceTemplate: normalizeLegacyDefaultTemplate(
-      summarySettings.variableGuidanceTemplate,
-      defaults.variableGuidanceTemplate,
-      KNOWN_VARIABLE_GUIDANCE_DEFAULT_SIGNATURES,
-    ),
+    variableStructureTemplate: hasCustomVariableStructureTemplate
+      ? summarySettings.variableStructureTemplate!
+      : defaults.variableStructureTemplate,
+    variableStructureTemplateCustomized: hasCustomVariableStructureTemplate,
+    variableGuidanceTemplate: hasCustomVariableGuidanceTemplate
+      ? summarySettings.variableGuidanceTemplate!
+      : defaults.variableGuidanceTemplate,
+    variableGuidanceTemplateCustomized: hasCustomVariableGuidanceTemplate,
     variableContextRounds: summarySettings.variableContextRounds === 2 ? 2 : 1,
     variablePromptExcludedTags:
       typeof summarySettings.variablePromptExcludedTags === 'string'

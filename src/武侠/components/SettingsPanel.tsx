@@ -1596,6 +1596,27 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     [settings, onSettingsChange],
   );
 
+  const updateVariablePromptSetting = useCallback(
+    (kind: 'structure' | 'guidance', value: string, customized: boolean) => {
+      onSettingsChange({
+        ...settings,
+        summarySettings: {
+          ...settings.summarySettings,
+          ...(kind === 'structure'
+            ? {
+                variableStructureTemplate: value,
+                variableStructureTemplateCustomized: customized,
+              }
+            : {
+                variableGuidanceTemplate: value,
+                variableGuidanceTemplateCustomized: customized,
+              }),
+        },
+      });
+    },
+    [settings, onSettingsChange],
+  );
+
   const updateApiProfileDraft = useCallback(
     <K extends keyof SummaryApiProfileDraft>(key: K, value: SummaryApiProfileDraft[K]) => {
       setSummaryModelStatus('');
@@ -3361,10 +3382,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
               <div className="summary-subsection">
                 <h5 className="summary-subsection-title">变量模板</h5>
-                <p className="settings-hint">定义真实变量路径、结构、枚举与写入权限；这是可编辑的变量 Schema。</p>
+                <p className="settings-hint">
+                  定义真实变量路径、结构、枚举与写入权限；这是可编辑的变量 Schema。
+                  当前状态：{settings.summarySettings.variableStructureTemplateCustomized
+                    ? '已自定义，版本更新不会覆盖'
+                    : '跟随项目默认，版本更新自动更新'}。
+                </p>
                 <textarea
                   value={settings.summarySettings.variableStructureTemplate}
-                  onChange={e => updateSummarySetting('variableStructureTemplate', e.target.value)}
+                  onChange={e => updateVariablePromptSetting('structure', e.target.value, true)}
                   placeholder="请输入变量结构与权限模板..."
                   className="settings-textarea variable-prompt-template-input"
                   rows={16}
@@ -3372,7 +3398,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <button
                   className="settings-reset-template-btn"
                   onClick={() =>
-                    updateSummarySetting('variableStructureTemplate', DEFAULT_SUMMARY_SETTINGS.variableStructureTemplate)
+                    updateVariablePromptSetting('structure', DEFAULT_SUMMARY_SETTINGS.variableStructureTemplate, false)
                   }
                 >
                   恢复默认变量模板
@@ -3384,10 +3410,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <p className="settings-hint">
                   定义变量模型的判断、更新与输出规则。支持独占一行的
                   {' @if slot '} / {' @else '} / {' @endif '} 条件块。
+                  当前状态：{settings.summarySettings.variableGuidanceTemplateCustomized
+                    ? '已自定义，版本更新不会覆盖'
+                    : '跟随项目默认，版本更新自动更新'}。
                 </p>
                 <textarea
                   value={settings.summarySettings.variableGuidanceTemplate}
-                  onChange={e => updateSummarySetting('variableGuidanceTemplate', e.target.value)}
+                  onChange={e => updateVariablePromptSetting('guidance', e.target.value, true)}
                   placeholder="请输入变量更新规则..."
                   className="settings-textarea variable-prompt-template-input"
                   rows={16}
@@ -3395,7 +3424,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <button
                   className="settings-reset-template-btn"
                   onClick={() =>
-                    updateSummarySetting('variableGuidanceTemplate', DEFAULT_SUMMARY_SETTINGS.variableGuidanceTemplate)
+                    updateVariablePromptSetting('guidance', DEFAULT_SUMMARY_SETTINGS.variableGuidanceTemplate, false)
                   }
                 >
                   恢复默认变量指导

@@ -2,9 +2,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
   DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
-  getVariablePromptTemplateSignature,
-  KNOWN_VARIABLE_GUIDANCE_DEFAULT_SIGNATURES,
-  KNOWN_VARIABLE_STRUCTURE_DEFAULT_SIGNATURES,
 } from '../prompts/variablePromptDefaults';
 import {
   applyRegexRules,
@@ -262,8 +259,10 @@ describe('settingsManager ui theme', () => {
     expect('variablePromptTemplate' in settings).toBe(false);
     expect('variableInputTemplate' in settings).toBe(false);
     expect(settings.variableStructureTemplate).toContain('<变量模板>');
+    expect(settings.variableStructureTemplateCustomized).toBe(false);
     expect(settings.variableGuidanceTemplate).toContain('# ERA 变量更新规则');
     expect(settings.variableGuidanceTemplate).toContain('最终执行：');
+    expect(settings.variableGuidanceTemplateCustomized).toBe(false);
   });
 
   it('keeps biography compression focused on old chunks and game-time dates', () => {
@@ -274,18 +273,29 @@ describe('settingsManager ui theme', () => {
     expect(template).toContain('1～3 句');
   });
 
-  it('keeps the two editable prompt defaults recognizable as unmodified project defaults', () => {
-    expect(KNOWN_VARIABLE_STRUCTURE_DEFAULT_SIGNATURES).toContain(getVariablePromptTemplateSignature(DEFAULT_VARIABLE_STRUCTURE_TEMPLATE));
-    expect(KNOWN_VARIABLE_GUIDANCE_DEFAULT_SIGNATURES).toContain(getVariablePromptTemplateSignature(DEFAULT_VARIABLE_GUIDANCE_TEMPLATE));
+  it('ignores stored variable prompt text unless it is explicitly marked customized', () => {
+    window.localStorage.setItem('wuxia_display_settings', JSON.stringify({
+      summarySettings: {
+        variableStructureTemplate: 'OLD OR CUSTOM SCHEMA WITHOUT FLAG',
+        variableGuidanceTemplate: 'OLD OR CUSTOM RULES WITHOUT FLAG',
+      },
+    }));
+    const loaded = loadSettings().summarySettings;
+    expect(loaded.variableStructureTemplate).toBe(DEFAULT_VARIABLE_STRUCTURE_TEMPLATE);
+    expect(loaded.variableStructureTemplateCustomized).toBe(false);
+    expect(loaded.variableGuidanceTemplate).toBe(DEFAULT_VARIABLE_GUIDANCE_TEMPLATE);
+    expect(loaded.variableGuidanceTemplateCustomized).toBe(false);
   });
 
-  it('ignores retired prompt skeleton settings while preserving custom schema and guidance', () => {
+  it('preserves variable prompt text only when explicit customized flags are true', () => {
     window.localStorage.setItem('wuxia_display_settings', JSON.stringify({
       summarySettings: {
         variablePromptTemplate: 'CUSTOM MAIN {{variableInputContext}}',
         variableInputTemplate: '<x>{{playerContext}}</x>',
         variableStructureTemplate: 'CUSTOM SCHEMA',
+        variableStructureTemplateCustomized: true,
         variableGuidanceTemplate: 'CUSTOM RULES',
+        variableGuidanceTemplateCustomized: true,
         variableUpdateMode: 'inline',
       },
     }));
@@ -294,7 +304,9 @@ describe('settingsManager ui theme', () => {
     expect('variablePromptTemplate' in loaded).toBe(false);
     expect('variableInputTemplate' in loaded).toBe(false);
     expect(loaded.variableStructureTemplate).toBe('CUSTOM SCHEMA');
+    expect(loaded.variableStructureTemplateCustomized).toBe(true);
     expect(loaded.variableGuidanceTemplate).toBe('CUSTOM RULES');
+    expect(loaded.variableGuidanceTemplateCustomized).toBe(true);
   });
 
   describe('preset storage cleanup', () => {
