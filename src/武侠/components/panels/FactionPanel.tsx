@@ -72,7 +72,7 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
 
   // 当前选中的势力名称（我的势力视图下为已加入的门派之一；天下势力鉴赏下为任意门派）
   const [selectedSectName, setSelectedSectName] = useState<string>(
-    joinedSectNames[0] || allPublicFactions[0]?.势力名称 || '全真教',
+    joinedSectNames[0] || getPublicFactionByName('全真教')?.势力名称 || allPublicFactions[0]?.势力名称 || '全真教',
   );
 
   // 天下势力分类过滤
@@ -206,7 +206,7 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
       }
 
       // 扣费事务落库后，发送 User 消息请求 AI 生成生动教学剧情
-      const teacher = currentFactionMembership?.师承 || currentSectData.掌舵人[0] || '恩师';
+      const teacher = currentFactionMembership?.师承 || '本门长辈';
       const prompt = buildLearnMartialArtUserMessage(stats.name, teacher, node.功法, node.传承层级);
       setInspectingNode(null);
       if (onClose) onClose();
@@ -252,7 +252,8 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
     if (isBusy || isActionPending) return;
     setIsActionPending(true);
     try {
-      const prompt = buildJoinFactionUserMessage(sect, stats.name);
+      const teacher = publicRuntimeState?.当前掌舵人[0];
+      const prompt = buildJoinFactionUserMessage(sect, stats.name, teacher);
       if (onClose) onClose();
       await onSendMessage(prompt);
     } finally {
@@ -292,7 +293,13 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
 
     setIsActionPending(true);
     try {
-      const prompt = buildFactionPromotionUserMessage(stats.name, currentSectData, currentId, nextId);
+      const prompt = buildFactionPromotionUserMessage(
+        stats.name,
+        currentSectData,
+        currentId,
+        nextId,
+        currentFactionMembership.师承 || '本门长辈',
+      );
       if (onClose) onClose();
       await onSendMessage(prompt);
     } finally {
@@ -341,7 +348,12 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
             onClick={() => {
               setViewMode('all-factions');
               const publicSelection = getPublicFactionByName(selectedSectName);
-              setSelectedSectName(publicSelection?.势力名称 || allPublicFactions[0]?.势力名称 || '');
+              setSelectedSectName(
+                publicSelection?.势力名称 ||
+                  getPublicFactionByName('全真教')?.势力名称 ||
+                  allPublicFactions[0]?.势力名称 ||
+                  '',
+              );
               setInspectingNode(null);
             }}
           >
