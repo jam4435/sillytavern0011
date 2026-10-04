@@ -1,11 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { isSameLocationScope } from '../../../shared/locationPath.js';
 import type {
   CharacterProfile,
   FactionTask,
   FactionTaskMap,
   FactionTaskPoolMap,
-  FactionType,
+  InitialAttributes,
+  PublicFactionCategory,
+  PublicFactionRuntimeState,
   SectMartialNode,
   SectStaticData,
   UserFactionEntry,
@@ -22,6 +24,12 @@ import {
   learnFactionMartialArt,
   quoteMartialArtLearn,
 } from '../../utils/factionManager';
+import {
+  getAllPublicFactions,
+  getPublicFactionByName,
+  getPublicFactionRelations,
+  resolveFactionPublicState,
+} from '../../utils/publicFactionManager';
 
 export interface FactionPanelProps {
   stats: CharacterProfile;
@@ -38,7 +46,7 @@ export interface FactionPanelProps {
 }
 
 type PanelViewMode = 'my-faction' | 'all-factions';
-type FilterCategory = '全部' | FactionType;
+type FilterCategory = '全部' | PublicFactionCategory;
 
 const TIER_ORDER: Array<SectMartialNode['传承层级']> = ['入门', '基础', '进阶', '核心', '镇派'];
 
@@ -56,6 +64,7 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
   isBusy = false,
 }) => {
   const allSects = useMemo(() => getAllSects(), []);
+  const allPublicFactions = useMemo(() => getAllPublicFactions(), []);
   const playerFactions = stats.factions || {};
   const joinedSectNames = Object.keys(playerFactions);
   const hasJoinedAny = joinedSectNames.length > 0;
@@ -65,7 +74,7 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
 
   // 当前选中的势力名称（我的势力视图下为已加入的门派之一；天下势力鉴赏下为任意门派）
   const [selectedSectName, setSelectedSectName] = useState<string>(
-    joinedSectNames[0] || allSects[0]?.门派名称 || '全真教',
+    joinedSectNames[0] || allPublicFactions[0]?.势力名称 || '全真教',
   );
 
   // 天下势力分类过滤
@@ -79,22 +88,56 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
   const [actionError, setActionError] = useState<string | null>(null);
   const [isActionPending, setIsActionPending] = useState(false);
 
-  // 当前查看的势力静态数据
-  const currentSectData: SectStaticData | undefined = useMemo(() => {
-    const matched = getSectByName(selectedSectName);
-    if (matched) return matched;
-    return viewMode === 'all-factions' ? allSects[0] : undefined;
-  }, [selectedSectName, allSects, viewMode]);
+  // 天下势力鉴赏与 17 门派玩法库彻底分离；可加入势力通过 sectId 桥接回现有玩法数据。
+  const currentPublicFaction = useMemo(
+    () => getPublicFactionByName(selectedSectName),
+    [selectedSectName],
+  );
 
-  // 当前玩家在该势力的归属信息（若已加入）
-  const currentFactionMembership: UserFactionEntry | undefined = playerFactions[selectedSectName];
+  const currentSectData: SectStaticData | undefined = useMemo(() => {
+    const direct = getSectByName(selectedSectName);
+    if (direct) return direct;
+    if (currentPublicFaction?.sectId) return getSectByName(currentPublicFaction.sectId);
+    return undefined;
+  }, [selectedSectName, currentPublicFaction]);
+
+  // 当前玩家在该势力的归属信息（若已加入）；公开 canonical 名与玩法门派名允许不同。
+  const currentFactionMembership: UserFactionEntry | undefined =
+    playerFactions[selectedSectName] ||
+    (currentSectData ? playerFactions[currentSectData.门派名称] : undefined);
   const isMemberOfSelected = Boolean(currentFactionMembership && currentFactionMembership.状态 !== '叛门');
 
   // 过滤后的天下势力列表
-  const filteredAllSects = useMemo(() => {
-    if (categoryFilter === '全部') return allSects;
-    return allSects.filter(s => s.体系类型 === categoryFilter);
-  }, [allSects, categoryFilter]);
+  const filteredPublicFactions = useMemo(() => {
+    if (categoryFilter === '全部') return allPublicFactions;
+    return allPublicFactions.filter(faction => faction.分类 === categoryFilter);
+  }, [allPublicFactions, categoryFilter]);
+
+  const [publicRuntimeState, setPublicRuntimeState] = useState<PublicFactionRuntimeState | null>(null);
+
+  useEffect(() => {
+    let disposed = false;
+    if (viewMode !== 'all-factions' || !currentPublicFaction) {
+      setPublicRuntimeState(null);
+      return () => {
+        disposed = true;
+      };
+    }
+
+    setPublicRuntimeState(null);
+    void resolveFactionPublicState(currentPublicFaction).then(state => {
+      if (!disposed) setPublicRuntimeState(state);
+    });
+
+    return () => {
+      disposed = true;
+    };
+  }, [viewMode, currentPublicFaction, stats]);
+
+  const currentPublicRelations = useMemo(
+    () => (currentPublicFaction ? getPublicFactionRelations(currentPublicFaction.势力ID) : []),
+    [currentPublicFaction],
+  );
 
   // 地点判定统一按前三层范围比较；第四层叙事场景不应阻止驻地交互。
   const isAtSectBase = useMemo(() => {
@@ -299,10 +342,9 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
             className={`view-tab-btn ${viewMode === 'all-factions' ? 'active' : ''}`}
             onClick={() => {
               setViewMode('all-factions');
-              if (!getSectByName(selectedSectName)) {
-                setSelectedSectName(allSects[0]?.门派名称 || '');
-                setInspectingNode(null);
-              }
+              const publicSelection = getPublicFactionByName(selectedSectName);
+              setSelectedSectName(publicSelection?.势力名称 || allPublicFactions[0]?.势力名称 || '');
+              setInspectingNode(null);
             }}
           >
             <Icons.Faction size={16} className="tab-icon" />
@@ -582,7 +624,7 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
           {/* 侧栏势力列表 */}
           <div className="world-sects-sidebar">
             <div className="category-filter-bar">
-              {(['全部', '宗门', '帮会', '世家', '行伍'] as FilterCategory[]).map(cat => (
+              {(['全部', '宗门', '帮会', '世家', '行伍', '政权', '组织'] as FilterCategory[]).map(cat => (
                 <button
                   key={cat}
                   type="button"
@@ -595,48 +637,54 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
             </div>
 
             <div className="sects-card-list">
-              {filteredAllSects.map(s => {
-                const isSelected = s.门派名称 === selectedSectName;
-                const isMember = Boolean(playerFactions[s.门派名称]);
+              {filteredPublicFactions.map(faction => {
+                const isSelected = faction.势力名称 === currentPublicFaction?.势力名称;
+                const joinableSect = faction.sectId ? getSectByName(faction.sectId) : undefined;
+                const isMember = Boolean(
+                  playerFactions[faction.势力名称] ||
+                    (joinableSect ? playerFactions[joinableSect.门派名称] : undefined),
+                );
+                const summary = faction.规模资料[faction.规模资料.length - 1]?.描述 || '公开资料待补充';
 
                 return (
                   <button
-                    key={s.门派ID}
+                    key={faction.势力ID}
                     type="button"
                     className={`sect-summary-card ${isSelected ? 'active' : ''}`}
                     onClick={() => {
-                      setSelectedSectName(s.门派名称);
+                      setSelectedSectName(faction.势力名称);
                       setInspectingNode(null);
                     }}
                   >
                     <div className="card-top">
-                      <span className="sect-title">{s.门派名称}</span>
-                      <span className={`type-tag ${s.体系类型}`}>{s.体系类型}</span>
+                      <span className="sect-title">{faction.势力名称}</span>
+                      <span className={`type-tag ${faction.分类}`}>{faction.分类}</span>
                     </div>
-                    <div className="card-desc">{s.设计定位}</div>
-                    {isMember && <span className="member-mark">已拜入</span>}
+                    <div className="card-desc">{summary}</div>
+                    {isMember && <span className="member-mark">已加入</span>}
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* 右侧势力详细大图谱 */}
-          {currentSectData && (
+          {/* 右侧公开势力详情：稳定资料 + 当前变量状态，不再公开完整武学谱系。 */}
+          {currentPublicFaction && (
             <div className="world-sect-detail-main">
               <div className="detail-top-card">
                 <div className="detail-header-left">
-                  <h3 className="sect-hero-title">{currentSectData.门派名称}</h3>
+                  <h3 className="sect-hero-title">{currentPublicFaction.势力名称}</h3>
                   <div className="sect-tags-row">
-                    <span className="badge-tag">{currentSectData.体系类型}</span>
-                    <span className="badge-tag location">
-                      驻地: {currentSectData.主峰驻地}
-                    </span>
-                    {onNavigateLocation && (
+                    <span className="badge-tag">{currentPublicFaction.分类}</span>
+                    {currentPublicFaction.驻地 && (
+                      <span className="badge-tag location">驻地: {currentPublicFaction.驻地}</span>
+                    )}
+                    {currentPublicFaction.可加入 && <span className="badge-tag">可加入</span>}
+                    {currentPublicFaction.驻地 && onNavigateLocation && (
                       <button
                         type="button"
                         className="quick-loc-btn"
-                        onClick={() => onNavigateLocation(currentSectData.主峰驻地)}
+                        onClick={() => onNavigateLocation(currentPublicFaction.驻地)}
                       >
                         查看地图
                       </button>
@@ -645,15 +693,18 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
                 </div>
 
                 <div className="detail-header-right">
-                  {isMemberOfSelected ? (
+                  {currentSectData && isMemberOfSelected ? (
                     <button
                       type="button"
                       className="enter-my-sect-btn"
-                      onClick={() => setViewMode('my-faction')}
+                      onClick={() => {
+                        setSelectedSectName(currentSectData.门派名称);
+                        setViewMode('my-faction');
+                      }}
                     >
-                      进入门派主页
+                      进入我的势力
                     </button>
-                  ) : isAtSectBase ? (
+                  ) : currentSectData && isAtSectBase ? (
                     <button
                       type="button"
                       className="join-sect-btn at-base"
@@ -663,7 +714,7 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
                     >
                       拜入门派 / 投身麾下
                     </button>
-                  ) : (
+                  ) : currentSectData ? (
                     <button
                       type="button"
                       className="travel-sect-btn"
@@ -673,55 +724,101 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
                     >
                       前往{sectBaseLabel}
                     </button>
+                  ) : (
+                    <span className="sect-status-tag">公开势力资料</span>
                   )}
                 </div>
               </div>
 
               <div className="detail-intro-section">
-                <h4 className="section-heading">势力综述与底蕴</h4>
-                <p className="intro-text">{currentSectData.特色描述}</p>
-
+                <h4 className="section-heading">当前掌舵与公开规模</h4>
                 <div className="sect-leaders-row">
-                  <span className="leaders-label">历代执牛耳者：</span>
-                  {currentSectData.掌舵人.map(leader => (
-                    <span key={leader} className="leader-pill">
-                      {leader}
-                    </span>
+                  <span className="leaders-label">当前掌舵人：</span>
+                  {publicRuntimeState?.当前掌舵人.length ? (
+                    publicRuntimeState.当前掌舵人.map(leader => (
+                      <span key={leader} className="leader-pill">{leader}</span>
+                    ))
+                  ) : (
+                    <span className="column-hint">当前人物变量尚未确认</span>
+                  )}
+                </div>
+
+                {currentPublicFaction.资料首领.length > 0 && (
+                  <div className="sect-leaders-row">
+                    <span className="leaders-label">来源资料记载：</span>
+                    {currentPublicFaction.资料首领.map((leader, index) => (
+                      <span key={`${leader.来源}-${index}`} className="leader-pill">
+                        {leader.来源} · {leader.人物 || leader.称谓}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="public-faction-scale-list">
+                  {currentPublicFaction.规模资料.map((record, index) => (
+                    <p key={`${record.来源}-${index}`} className="intro-text">
+                      <strong>{record.来源}：</strong>{record.描述}
+                    </p>
                   ))}
                 </div>
               </div>
 
-              <div className="detail-martial-preview-section">
-                <h4 className="section-heading">
-                  传承武学谱系图鉴 ({currentSectData.武学传承树.length} 门)
-                </h4>
-                <div className="tier-levels-container">
-                  {TIER_ORDER.map(tier => {
-                    const nodes = martialNodesByTier[tier] || [];
-                    if (nodes.length === 0) return null;
-
-                    return (
-                      <div key={tier} className="tier-level-row">
-                        <div className="tier-header-badge">
-                          <span className="tier-name">{tier}</span>
+              <div className="detail-intro-section">
+                <h4 className="section-heading">公开组织结构</h4>
+                {currentPublicFaction.组织结构.length > 0 ? (
+                  <div className="public-faction-structure-list">
+                    {currentPublicFaction.组织结构.map(layer => (
+                      <div key={layer.名称} className="public-faction-structure-item">
+                        <div className="card-top">
+                          <span className="sect-title">{layer.名称}</span>
+                          {layer.显示人数 && <span className="member-mark">{layer.显示人数}</span>}
                         </div>
-                        <div className="tier-nodes-list">
-                          {nodes.map(node => (
-                            <div
-                              key={node.节点ID}
-                              className="martial-node-card preview-only"
-                              onClick={() => setInspectingNode(node)}
-                            >
-                              <div className="node-art-name">{node.功法}</div>
-                              <div className="node-branch-tag">{node.分支}</div>
-                            </div>
-                          ))}
-                        </div>
+                        {layer.已知人物.length > 0 && (
+                          <div className="sect-leaders-row">
+                            {layer.已知人物.map(person => (
+                              <span key={person} className="leader-pill">{person}</span>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="column-hint">现有来源没有提供可公开的组织层级。</p>
+                )}
               </div>
+
+              {currentPublicFaction.重要人物.length > 0 && (
+                <div className="detail-intro-section">
+                  <h4 className="section-heading">公开重要人物</h4>
+                  <div className="public-faction-people-list">
+                    {currentPublicFaction.重要人物.map((person, index) => (
+                      <div key={`${person.人物}-${person.来源}-${index}`} className="public-faction-person-item">
+                        <strong>{person.人物}</strong>
+                        <span>{person.身份}</span>
+                        <small>{person.来源}</small>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {currentPublicRelations.length > 0 && (
+                <div className="detail-intro-section">
+                  <h4 className="section-heading">势力关系</h4>
+                  <div className="sect-leaders-row">
+                    {currentPublicRelations.map((relation, index) => {
+                      const counterpart =
+                        relation.from === currentPublicFaction.势力ID ? relation.to : relation.from;
+                      return (
+                        <span key={`${relation.from}-${relation.to}-${index}`} className="leader-pill">
+                          {relation.type} · {counterpart} · {relation.scope}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
