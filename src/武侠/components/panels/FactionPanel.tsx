@@ -19,7 +19,6 @@ import {
   buildFactionPromotionUserMessage,
   buildJoinFactionUserMessage,
   buildLearnMartialArtUserMessage,
-  getAllSects,
   getSectByName,
   learnFactionMartialArt,
   quoteMartialArtLearn,
@@ -63,7 +62,6 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
   onClose,
   isBusy = false,
 }) => {
-  const allSects = useMemo(() => getAllSects(), []);
   const allPublicFactions = useMemo(() => getAllPublicFactions(), []);
   const playerFactions = stats.factions || {};
   const joinedSectNames = Object.keys(playerFactions);
