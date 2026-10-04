@@ -60,17 +60,19 @@ const createBackgroundChange = ({
   beforeValue,
   afterValue,
   id,
+  action = 'edit',
 }: {
   path: Array<string | number>;
   beforeValue: unknown;
   afterValue: unknown;
   id: string;
+  action?: VariableActualChange['action'];
 }): VariableActualChange => ({
   id,
   source: 'observed-diff',
   origin: 'background',
   producer: 'event-script',
-  action: 'edit',
+  action,
   path,
   displayPath: `stat_data › ${path.join(' › ')}`,
   copyPath: `stat_data.${path.join('.')}`,
@@ -269,6 +271,60 @@ describe('VariableChangeBar', () => {
     fireEvent.click(aiButton);
     expect(screen.queryByText('时间')).not.toBeInTheDocument();
     expect(screen.getByText('本轮 AI 声明均未产生净变化。')).toBeInTheDocument();
+  });
+
+  it('事件对象的叶子级删除在 UI 中合并成一个逻辑对象变化', () => {
+    const backgroundChanges = [
+      ['年', 1202],
+      ['月', 3],
+      ['日', 16],
+      ['时', 14],
+      ['分', 8],
+    ].map(([field, beforeValue], index) => createBackgroundChange({
+      id: `event-delete-${index}`,
+      path: ['事件系统', '进行中事件', '测试事件', String(field)],
+      beforeValue,
+      afterValue: undefined,
+      action: 'delete',
+    }));
+
+    render(<VariableChangeBar summary={createSummary({ backgroundChanges })} />);
+
+    const backgroundButton = screen.getByRole('button', { name: /后台变更/ });
+    expect(backgroundButton).toHaveTextContent('后台变更1项');
+
+    fireEvent.click(backgroundButton);
+    expect(screen.getByText('stat_data › 事件系统 › 进行中事件 › 测试事件')).toBeInTheDocument();
+    expect(screen.getByText('对象 5')).toBeInTheDocument();
+    expect(screen.getByText('未定义')).toBeInTheDocument();
+    expect(screen.queryByText('stat_data › 事件系统 › 进行中事件 › 测试事件 › 年')).not.toBeInTheDocument();
+  });
+
+  it('同一路径后台先新增后删除且最终无净变化时不占 UI 项数', () => {
+    const path = ['前端变量', '事件结算进度', '测试事件', '分支标记'];
+    const backgroundChanges = [
+      createBackgroundChange({
+        id: 'branch-insert',
+        path,
+        beforeValue: undefined,
+        afterValue: {},
+        action: 'insert',
+      }),
+      createBackgroundChange({
+        id: 'branch-delete',
+        path,
+        beforeValue: {},
+        afterValue: undefined,
+        action: 'delete',
+      }),
+    ];
+
+    render(<VariableChangeBar summary={createSummary({ backgroundChanges })} />);
+
+    const backgroundButton = screen.getByRole('button', { name: /后台变更/ });
+    expect(backgroundButton).toHaveTextContent('后台变更0项');
+    fireEvent.click(backgroundButton);
+    expect(screen.getByText('本轮尚未观察到后台变量变更。')).toBeInTheDocument();
   });
 
   it('后台年月日时变化也合并成一个逻辑时间项', () => {

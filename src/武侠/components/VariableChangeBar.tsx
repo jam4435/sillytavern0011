@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
   formatVariableDetailValue,
+  getVariableCopyPath,
+  getVariableDisplayPath,
   stableStringify,
   type VariableActualChange,
   type VariableAiComparison,
@@ -8,6 +10,7 @@ import {
   type VariableChangeProducer,
   type VariableChangeSummary,
   type VariableComparisonStatus,
+  type VariablePath,
 } from '../utils/variableChanges';
 import { Icons } from './Icons';
 import { variableBarLogger } from '../utils/logger';
@@ -123,9 +126,92 @@ type BackgroundLogicalItem =
     beforePreview: string;
     afterPreview: string;
     title: string;
+  }
+  | {
+    kind: 'group';
+    id: string;
+    action: 'insert' | 'delete';
+    producer: VariableChangeProducer;
+    displayPath: string;
+    copyPath: string;
+    beforePreview: string;
+    afterPreview: string;
+    title: string;
+    leafCount: number;
   };
 
 const TIME_FIELDS: TimeField[] = ['年', '月', '日', '时', '分'];
+
+const BACKGROUND_OBJECT_GROUP_RULES: Array<{ prefix: VariablePath; depth: number }> = [
+  { prefix: ['事件系统', '进行中事件'], depth: 3 },
+  { prefix: ['事件系统', '人物事件占用'], depth: 3 },
+  { prefix: ['参与事件'], depth: 2 },
+  { prefix: ['世界事件'], depth: 2 },
+  { prefix: ['前端变量', '事件结算进度'], depth: 3 },
+  { prefix: ['前端变量', '事件线索档案'], depth: 3 },
+];
+
+const pathStartsWith = (path: VariablePath, prefix: VariablePath): boolean =>
+  prefix.length <= path.length && prefix.every((segment, index) => path[index] === segment);
+
+const getBackgroundObjectGroupPath = (path: VariablePath): VariablePath | null => {
+  for (const rule of BACKGROUND_OBJECT_GROUP_RULES) {
+    if (path.length > rule.depth && pathStartsWith(path, rule.prefix)) {
+      return path.slice(0, rule.depth);
+    }
+  }
+  return null;
+};
+
+const getActionFromValues = (beforeValue: unknown, afterValue: unknown): VariableChangeAction => {
+  if (beforeValue === undefined) return 'insert';
+  if (afterValue === undefined) return 'delete';
+  return 'edit';
+};
+
+const collapseRepeatedBackgroundChanges = (changes: VariableActualChange[]): VariableActualChange[] => {
+  const order: string[] = [];
+  const collapsed = new Map<string, VariableActualChange>();
+
+  for (const change of changes) {
+    const key = `${change.producer}:${JSON.stringify(change.path)}`;
+    const previous = collapsed.get(key);
+    if (!previous) {
+      order.push(key);
+      collapsed.set(key, change);
+      continue;
+    }
+
+    collapsed.set(key, {
+      ...change,
+      id: previous.id,
+      beforeValue: previous.beforeValue,
+      beforePreview: previous.beforePreview,
+      action: getActionFromValues(previous.beforeValue, change.afterValue),
+    });
+  }
+
+  return order.flatMap(key => {
+    const change = collapsed.get(key);
+    if (!change || stableStringify(change.beforeValue) === stableStringify(change.afterValue)) return [];
+    return [change];
+  });
+};
+
+const countObjectGroupFields = (
+  changes: VariableActualChange[],
+  groupPath: VariablePath,
+  side: 'before' | 'after',
+): number => {
+  const fields = new Set<string>();
+  for (const change of changes) {
+    const value = side === 'before' ? change.beforeValue : change.afterValue;
+    if (value === undefined) continue;
+    const relativePath = change.path.slice(groupPath.length);
+    fields.add(relativePath.length > 0 ? String(relativePath[0]) : '$root');
+  }
+  return fields.size;
+};
 
 const getTimeField = (path: Array<string | number>): TimeField | undefined => {
   if (path.length !== 3 || path[0] !== '世界信息' || path[1] !== '时间') {
@@ -245,7 +331,8 @@ const buildAiLogicalItems = (comparisons: VariableAiComparison[]): AiLogicalItem
 };
 
 const buildBackgroundLogicalItems = (changes: VariableActualChange[]): BackgroundLogicalItem[] => {
-  const timeChanges = changes
+  const compactedChanges = collapseRepeatedBackgroundChanges(changes);
+  const timeChanges = compactedChanges
     .filter(change => getTimeField(change.path))
     .sort((left, right) => left.timestamp - right.timestamp || left.id.localeCompare(right.id));
 
@@ -255,12 +342,8 @@ const buildBackgroundLogicalItems = (changes: VariableActualChange[]): Backgroun
     const after = new Map<TimeField, unknown>();
     for (const change of timeChanges) {
       const field = getTimeField(change.path);
-      if (!field) {
-        continue;
-      }
-      if (!before.has(field)) {
-        before.set(field, change.beforeValue);
-      }
+      if (!field) continue;
+      if (!before.has(field)) before.set(field, change.beforeValue);
       after.set(field, change.afterValue);
     }
     const latest = timeChanges[timeChanges.length - 1];
@@ -278,9 +361,50 @@ const buildBackgroundLogicalItems = (changes: VariableActualChange[]): Backgroun
     };
   }
 
+  const groupCandidates = new Map<string, { path: VariablePath; changes: VariableActualChange[] }>();
+  for (const change of compactedChanges) {
+    if (getTimeField(change.path)) continue;
+    const groupPath = getBackgroundObjectGroupPath(change.path);
+    if (!groupPath) continue;
+    const key = `${change.producer}:${JSON.stringify(groupPath)}`;
+    const existing = groupCandidates.get(key);
+    if (existing) existing.changes.push(change);
+    else groupCandidates.set(key, { path: groupPath, changes: [change] });
+  }
+
+  const groupedItems = new Map<string, Extract<BackgroundLogicalItem, { kind: 'group' }>>();
+  for (const [key, candidate] of groupCandidates) {
+    const actions = candidate.changes.map(change => change.action);
+    const action = getGroupAction(actions);
+    const canGroup = candidate.changes.length >= 2
+      && (action === 'insert' || action === 'delete')
+      && actions.every(candidateAction => candidateAction === action);
+    if (!canGroup) continue;
+
+    const producer = candidate.changes[candidate.changes.length - 1].producer;
+    const reasons = Array.from(new Set(
+      candidate.changes.map(change => change.reason).filter((reason): reason is string => Boolean(reason)),
+    ));
+    const beforeCount = countObjectGroupFields(candidate.changes, candidate.path, 'before');
+    const afterCount = countObjectGroupFields(candidate.changes, candidate.path, 'after');
+    groupedItems.set(key, {
+      kind: 'group',
+      id: `logical:background-group:${key}`,
+      action,
+      producer,
+      displayPath: getVariableDisplayPath(candidate.path),
+      copyPath: getVariableCopyPath(candidate.path),
+      beforePreview: action === 'insert' ? '未定义' : `对象 ${beforeCount}`,
+      afterPreview: action === 'delete' ? '未定义' : `对象 ${afterCount}`,
+      title: reasons.join(' · ') || getProducerMeta(producer).label,
+      leafCount: candidate.changes.length,
+    });
+  }
+
   let timeEmitted = false;
+  const emittedGroups = new Set<string>();
   const result: BackgroundLogicalItem[] = [];
-  for (const change of changes) {
+  for (const change of compactedChanges) {
     if (getTimeField(change.path)) {
       if (!timeEmitted && timeItem) {
         result.push(timeItem);
@@ -288,6 +412,18 @@ const buildBackgroundLogicalItems = (changes: VariableActualChange[]): Backgroun
       }
       continue;
     }
+
+    const groupPath = getBackgroundObjectGroupPath(change.path);
+    const groupKey = groupPath ? `${change.producer}:${JSON.stringify(groupPath)}` : null;
+    const groupItem = groupKey ? groupedItems.get(groupKey) : undefined;
+    if (groupItem && groupKey) {
+      if (!emittedGroups.has(groupKey)) {
+        result.push(groupItem);
+        emittedGroups.add(groupKey);
+      }
+      continue;
+    }
+
     result.push({ kind: 'change', id: change.id, change });
   }
   return result;
@@ -487,7 +623,9 @@ const VariableChangeBar: React.FC<VariableChangeBarProps> = ({ summary }) => {
                   {backgroundLogicalItems.map(item =>
                     item.kind === 'time'
                       ? <BackgroundTimeRow key={item.id} item={item} />
-                      : <ActualChangeRow key={item.id} change={item.change} />,
+                      : item.kind === 'group'
+                        ? <BackgroundGroupRow key={item.id} item={item} />
+                        : <ActualChangeRow key={item.id} change={item.change} />,
                   )}
                   {summary.background.omittedObservedCount > 0 && (
                     <div className="variable-change-omitted">
@@ -635,6 +773,33 @@ const ActualChangeRow: React.FC<ActualChangeRowProps> = ({ change }) => {
         <span className="variable-change-value new" title={formatVariableDetailValue(change.afterValue)}>
           {change.afterPreview}
         </span>
+      </div>
+    </div>
+  );
+};
+
+interface BackgroundGroupRowProps {
+  item: Extract<BackgroundLogicalItem, { kind: 'group' }>;
+}
+
+const BackgroundGroupRow: React.FC<BackgroundGroupRowProps> = ({ item }) => {
+  const source = getProducerMeta(item.producer);
+  return (
+    <div className="variable-change-row actual">
+      <div className="variable-change-row-head">
+        <span className={`variable-change-action ${item.action}`}>{ACTION_LABELS[item.action]}</span>
+        <span className="variable-change-path" title={item.copyPath}>{item.displayPath}</span>
+        <span
+          className={`variable-change-source-badge ${source.tone}`}
+          title={`${item.title} · 合并 ${item.leafCount} 条底层变更`}
+        >
+          {source.label}
+        </span>
+      </div>
+      <div className="variable-change-row-body diff">
+        <span className="variable-change-value old">{item.beforePreview}</span>
+        <span className="variable-change-arrow">→</span>
+        <span className="variable-change-value new">{item.afterPreview}</span>
       </div>
     </div>
   );

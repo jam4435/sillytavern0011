@@ -402,6 +402,63 @@ describe('useVariableChangeTracker block/source model', () => {
     ]);
   });
 
+  it('父对象删除已被来源明确的叶子 diff 完整覆盖时，不再补 unknown 父对象删除', () => {
+    currentStatData = {
+      事件系统: {
+        进行中事件: {
+          测试事件: { 年: 1202, 月: 3, 日: 16, 时: 14, 分: 8 },
+        },
+      },
+    };
+    currentAssistantText = '<VariableDelete>{"事件系统":{"进行中事件":{"测试事件":{}}}}</VariableDelete>';
+    const { result } = renderHook(() => useVariableChangeTracker());
+
+    act(() => {
+      result.current.handleGlobalMessageSent(1);
+      result.current.handleVariableAssistantReply('纯正文', 2);
+    });
+
+    currentStatData = { 事件系统: { 进行中事件: {} } };
+    act(() => {
+      result.current.handleEraVariableWriteDone({
+        version: 1,
+        writeId: 'event-object-delete',
+        source: 'event-script',
+        operation: 'delete',
+        reason: 'event-settlement',
+        eventName: 'era:transactionByObject',
+        attribution: 'background',
+        message_id: 2,
+        actions: { apiWrite: true },
+        changes: ['年', '月', '日', '时', '分'].map(field => ({
+          action: 'delete' as const,
+          path: ['事件系统', '进行中事件', '测试事件', field],
+          beforeValue: ({ 年: 1202, 月: 3, 日: 16, 时: 14, 分: 8 } as Record<string, number>)[field],
+          afterValue: undefined,
+        })),
+      });
+      result.current.handleVariableTurnSettled(2);
+    });
+
+    expect(result.current.variableChanges?.background.observedChanges).toHaveLength(5);
+    expect(result.current.variableChanges?.background.observedChanges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ['事件系统', '进行中事件', '测试事件', '年'],
+          producer: 'event-script',
+        }),
+      ]),
+    );
+    expect(result.current.variableChanges?.background.observedChanges).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ['事件系统', '进行中事件', '测试事件'],
+          producer: 'unknown',
+        }),
+      ]),
+    );
+  });
+
   it('最终楼层 fallback 使用真实 AI checkpoint，而不是把 AI 声明值伪装成实际 before', () => {
     currentAssistantText = `${inlineAiBlock}\n${backgroundSamePathBlock}`;
     const { result } = renderHook(() => useVariableChangeTracker());

@@ -235,6 +235,26 @@ const getValueAtPath = (source: unknown, path: VariablePath): unknown => {
 const valuesEqual = (left: unknown, right: unknown): boolean =>
   stableStringify(left) === stableStringify(right);
 
+const pathStartsWith = (path: VariablePath, prefix: VariablePath): boolean =>
+  prefix.length <= path.length && prefix.every((segment, index) => path[index] === segment);
+
+const isFinalSubtreeCoveredByRecordedChanges = (
+  path: VariablePath,
+  finalChanges: VariableActualChange[],
+  recordedChanges: VariableActualChange[],
+): boolean => {
+  const subtreeFinalChanges = finalChanges.filter(change => pathStartsWith(change.path, path));
+  if (subtreeFinalChanges.length === 0) return false;
+
+  return subtreeFinalChanges.every(finalChange => {
+    const finalPathKey = getPathKey(finalChange.path);
+    const latestRecorded = [...recordedChanges]
+      .reverse()
+      .find(recorded => getPathKey(recorded.path) === finalPathKey);
+    return Boolean(latestRecorded) && valuesEqual(latestRecorded?.afterValue, finalChange.afterValue);
+  });
+};
+
 const resolveObservedAction = (beforeValue: unknown, afterValue: unknown): VariableChangeAction => {
   if (beforeValue === undefined) return 'insert';
   if (afterValue === undefined) return 'delete';
@@ -624,6 +644,13 @@ export function useVariableChangeTracker() {
         .find(change => getPathKey(change.path) === pathKey);
       if (latestRecorded && valuesEqual(latestRecorded.afterValue, expectedValue)) continue;
       if (!valuesEqual(finalValue, expectedValue)) continue;
+      // 最终楼层可能用父对象 VariableDelete/Insert 表达，而来源明确的 writer 已按叶子路径完整记账。
+      // 若该父路径下最终发生的全部叶子 diff 都已由已知后台来源解释，就不能再补一条 unknown 父对象变化。
+      if (isFinalSubtreeCoveredByRecordedChanges(
+        declaration.path,
+        overallFinalDiff.observedChanges,
+        backgroundChanges,
+      )) continue;
 
       const beforeValue = latestRecorded
         ? latestRecorded.afterValue
