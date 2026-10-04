@@ -444,9 +444,13 @@ export function getFactionCandidateLocations(sect: SectStaticData): string[] {
 /**
  * 构造拜入门派系统指令消息
  */
-export function buildJoinFactionUserMessage(sect: SectStaticData, applicantName: string): string {
+export function buildJoinFactionUserMessage(
+  sect: SectStaticData,
+  applicantName: string,
+  teacherOverride?: string,
+): string {
   const starterArt = sect.武学传承树.find(n => n.传承层级 === '入门')?.功法 || '吐纳功';
-  const teacher = sect.掌舵人[0] || '掌门';
+  const teacher = teacherOverride?.trim() || '本门长辈';
 
   return `${applicantName}前去拜入${sect.门派名称}门下。
 
@@ -486,7 +490,7 @@ export function buildRequestTaskUserMessage(
   realm: string,
 ): string {
   const candidateLocations = getFactionCandidateLocations(sect);
-  const teacher = sect.掌舵人[0] || '长辈';
+  const teacher = '本门长辈';
   const randomLoc = candidateLocations[Math.floor(Math.random() * candidateLocations.length)] || sect.主峰驻地;
 
   return `${applicantName}前去查看势力差事。
@@ -544,8 +548,9 @@ export function buildFactionPromotionUserMessage(
   sect: SectStaticData,
   currentIdentity: string,
   targetIdentity: string,
+  teacherOverride?: string,
 ): string {
-  const teacher = sect.掌舵人[0] || '掌门';
+  const teacher = teacherOverride?.trim() || '本门长辈';
   return `${applicantName}在${sect.门派名称}立下诸多功绩，特向长辈申请晋升。
 
 [系统指令：门派身份晋升]
