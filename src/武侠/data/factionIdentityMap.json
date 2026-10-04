@@ -1,0 +1,578 @@
+{
+  "version": 1,
+  "sourceRecordCount": 54,
+  "canonicalFactionCount": 46,
+  "note": "作品来源只用于资料归一，不作为运行时代；运行时首领优先由人物身份变量解析。",
+  "mappings": [
+    {
+      "source": "天龙八部::大理段氏/大理国",
+      "targets": [
+        {
+          "canonical": "大理国",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::大理天龙寺",
+      "targets": [
+        {
+          "canonical": "大理天龙寺",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::少林派",
+      "targets": [
+        {
+          "canonical": "少林",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::丐帮",
+      "targets": [
+        {
+          "canonical": "丐帮",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::丐帮四大长老及分舵",
+      "targets": [
+        {
+          "canonical": "丐帮",
+          "mode": "absorb"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::逍遥派",
+      "targets": [
+        {
+          "canonical": "逍遥派",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::天山缥缈峰灵鹫宫及九天九部三十六洞七十二岛",
+      "targets": [
+        {
+          "canonical": "灵鹫宫",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::三十六洞七十二岛",
+      "targets": [
+        {
+          "canonical": "三十六洞七十二岛",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::星宿派",
+      "targets": [
+        {
+          "canonical": "星宿派",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::姑苏慕容氏/燕子坞",
+      "targets": [
+        {
+          "canonical": "姑苏慕容氏",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::西夏一品堂/西夏皇室",
+      "targets": [
+        {
+          "canonical": "西夏皇室",
+          "mode": "split"
+        },
+        {
+          "canonical": "西夏一品堂",
+          "mode": "split"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::大辽南院大王府",
+      "targets": [
+        {
+          "canonical": "大辽南院大王府",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::吐蕃",
+      "targets": [
+        {
+          "canonical": "吐蕃",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::无量剑派",
+      "targets": [
+        {
+          "canonical": "无量剑派",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::万劫谷",
+      "targets": [
+        {
+          "canonical": "万劫谷",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::伏牛派",
+      "targets": [
+        {
+          "canonical": "伏牛派",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::青城派",
+      "targets": [
+        {
+          "canonical": "青城派",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::蓬莱派",
+      "targets": [
+        {
+          "canonical": "蓬莱派",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::云州秦家寨",
+      "targets": [
+        {
+          "canonical": "云州秦家寨",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::神农帮",
+      "targets": [
+        {
+          "canonical": "神农帮",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::聚贤庄",
+      "targets": [
+        {
+          "canonical": "聚贤庄",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::曼陀山庄",
+      "targets": [
+        {
+          "canonical": "曼陀山庄",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::四大恶人",
+      "targets": [
+        {
+          "canonical": "四大恶人",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::福建建阳一字慧剑门",
+      "targets": [
+        {
+          "canonical": "一字慧剑门",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::泰山单家庄",
+      "targets": [
+        {
+          "canonical": "泰山单家庄",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "天龙八部::五台山清凉寺",
+      "targets": [
+        {
+          "canonical": "五台山清凉寺",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "射雕英雄传::全真教",
+      "targets": [
+        {
+          "canonical": "全真教",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "射雕英雄传::丐帮",
+      "targets": [
+        {
+          "canonical": "丐帮",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "射雕英雄传::桃花岛",
+      "targets": [
+        {
+          "canonical": "桃花岛",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "射雕英雄传::白驼山庄",
+      "targets": [
+        {
+          "canonical": "白驼山庄",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "射雕英雄传::大理段氏 / 一灯门下",
+      "targets": [
+        {
+          "canonical": "一灯门下",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "射雕英雄传::铁掌帮",
+      "targets": [
+        {
+          "canonical": "铁掌帮",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "射雕英雄传::蒙古部族 / 成吉思汗铁木真部",
+      "targets": [
+        {
+          "canonical": "蒙古",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "射雕英雄传::金国赵王府",
+      "targets": [
+        {
+          "canonical": "金国赵王府",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "射雕英雄传::江南七怪",
+      "targets": [
+        {
+          "canonical": "江南七怪",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "射雕英雄传::仙霞派",
+      "targets": [
+        {
+          "canonical": "仙霞派",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "射雕英雄传::枯木派（云栖寺枯木门下）",
+      "targets": [
+        {
+          "canonical": "云栖寺枯木门下",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "射雕英雄传::黄河帮",
+      "targets": [
+        {
+          "canonical": "黄河帮",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "射雕英雄传::归云庄（太湖水寨 / 太湖群盗）",
+      "targets": [
+        {
+          "canonical": "归云庄 / 太湖水寨",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "射雕英雄传::嘉兴法华寺",
+      "targets": [
+        {
+          "canonical": "嘉兴法华寺",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "射雕英雄传::王罕部",
+      "targets": [
+        {
+          "canonical": "王罕部",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "射雕英雄传::札木合部",
+      "targets": [
+        {
+          "canonical": "札木合部",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "神雕侠侣::全真教",
+      "targets": [
+        {
+          "canonical": "全真教",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "神雕侠侣::古墓派",
+      "targets": [
+        {
+          "canonical": "古墓派",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "神雕侠侣::丐帮",
+      "targets": [
+        {
+          "canonical": "丐帮",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "神雕侠侣::绝情谷",
+      "targets": [
+        {
+          "canonical": "绝情谷",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "神雕侠侣::蒙古忽必烈营帐 / 蒙古军政势力",
+      "targets": [
+        {
+          "canonical": "蒙古",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "神雕侠侣::桃花岛",
+      "targets": [
+        {
+          "canonical": "桃花岛",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "神雕侠侣::大理段氏 / 一灯门下",
+      "targets": [
+        {
+          "canonical": "一灯门下",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "神雕侠侣::铁掌帮余部（及历史铁掌帮）",
+      "targets": [
+        {
+          "canonical": "铁掌帮",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "神雕侠侣::万兽山庄",
+      "targets": [
+        {
+          "canonical": "万兽山庄",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "神雕侠侣::少林寺",
+      "targets": [
+        {
+          "canonical": "少林",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "神雕侠侣::西山一窟鬼",
+      "targets": [
+        {
+          "canonical": "西山一窟鬼",
+          "mode": "merge"
+        }
+      ]
+    },
+    {
+      "source": "神雕侠侣::西藏密宗（金轮法王门下）",
+      "targets": [
+        {
+          "canonical": "金轮法王门下",
+          "mode": "merge"
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "大理天龙寺",
+      "to": "大理国",
+      "type": "皇室寺院",
+      "scope": "长期"
+    },
+    {
+      "from": "一灯门下",
+      "to": "大理国",
+      "type": "宗室源流",
+      "scope": "长期"
+    },
+    {
+      "from": "灵鹫宫",
+      "to": "逍遥派",
+      "type": "门派支系",
+      "scope": "长期"
+    },
+    {
+      "from": "星宿派",
+      "to": "逍遥派",
+      "type": "武学源流",
+      "scope": "历史"
+    },
+    {
+      "from": "三十六洞七十二岛",
+      "to": "灵鹫宫",
+      "type": "受辖",
+      "scope": "历史"
+    },
+    {
+      "from": "无量剑派",
+      "to": "灵鹫宫",
+      "type": "后期受辖",
+      "scope": "历史"
+    },
+    {
+      "from": "神农帮",
+      "to": "灵鹫宫",
+      "type": "后期受辖",
+      "scope": "历史"
+    },
+    {
+      "from": "西夏一品堂",
+      "to": "西夏皇室",
+      "type": "直属机构",
+      "scope": "长期"
+    },
+    {
+      "from": "四大恶人",
+      "to": "西夏一品堂",
+      "type": "受雇客卿",
+      "scope": "历史"
+    },
+    {
+      "from": "云栖寺枯木门下",
+      "to": "仙霞派",
+      "type": "门派分支",
+      "scope": "长期"
+    },
+    {
+      "from": "黄河帮",
+      "to": "金国赵王府",
+      "type": "曾投效",
+      "scope": "历史"
+    },
+    {
+      "from": "归云庄 / 太湖水寨",
+      "to": "桃花岛",
+      "type": "门人渊源",
+      "scope": "长期"
+    },
+    {
+      "from": "金轮法王门下",
+      "to": "蒙古",
+      "type": "受封依附",
+      "scope": "历史"
+    }
+  ]
+}
