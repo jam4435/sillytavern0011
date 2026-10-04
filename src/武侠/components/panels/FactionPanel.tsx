@@ -433,7 +433,7 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
                   </span>
                   <span className="meta-item">
                     <strong>授业恩师：</strong>
-                    {currentFactionMembership?.师承 || currentSectData.掌舵人[0] || '长辈'}
+                    {currentFactionMembership?.师承 || '本门长辈'}
                   </span>
                 </div>
               </div>
