@@ -44,6 +44,7 @@ import {
   completeMartialArts,
   getMartialArtData,
   loadMartialArtsDatabase,
+  matchMartialArtsInSecretName,
   type CompleteMartialArt,
   type SimpleMartialArt,
 } from './martialArtsDatabase';
@@ -1029,9 +1030,16 @@ function parseInventory(用户档案?: UserProfile): InventoryItem[] {
     if (name.startsWith('$')) continue;
 
     const type = mapItemType(item.类型);
-    const martialArtData = item.类型 === '秘籍' ? getMartialArtData(name) : null;
-    const description = martialArtData?.功法描述 || item.物品描述 || '';
-    const rankSource = martialArtData?.功法品阶 || item.品阶;
+    const directMartialArtData = item.类型 === '秘籍' ? getMartialArtData(name) : null;
+    const martialArtMatches =
+      item.类型 !== '秘籍'
+        ? []
+        : directMartialArtData
+          ? [directMartialArtData]
+          : matchMartialArtsInSecretName(name);
+    const primaryMartialArtData = martialArtMatches.length === 1 ? martialArtMatches[0] : null;
+    const description = primaryMartialArtData?.功法描述 || item.物品描述 || '';
+    const rankSource = primaryMartialArtData?.功法品阶 || item.品阶 || martialArtMatches[0]?.功法品阶;
 
     result.push({
       id: `item_${index++}`,
@@ -1042,13 +1050,22 @@ function parseInventory(用户档案?: UserProfile): InventoryItem[] {
       description,
       equipInfo: type === 'EQUIP' ? parseEquipInfo(name, item, equipmentSlots) : undefined,
       elixirInfo: type === 'ELIXIR' ? parseElixirInfo(item) : undefined,
-      martialArtInfo: martialArtData
+      martialArtInfo: primaryMartialArtData
         ? {
-            description: martialArtData.功法描述,
-            rank: martialArtData.功法品阶,
-            requirements: martialArtData.修炼限制,
+            description: primaryMartialArtData.功法描述,
+            rank: primaryMartialArtData.功法品阶,
+            requirements: primaryMartialArtData.修炼限制,
           }
         : undefined,
+      martialArtInfos:
+        martialArtMatches.length > 0
+          ? martialArtMatches.map(art => ({
+              name: art.功法名称,
+              description: art.功法描述,
+              rank: art.功法品阶,
+              requirements: art.修炼限制,
+            }))
+          : undefined,
     });
   }
 
