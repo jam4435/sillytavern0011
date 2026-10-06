@@ -326,7 +326,7 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
                             </div>
                             <button
                               className="wuxia-btn primary workbench-secret-art-action"
-                              aria-label={eligibility.alreadyLearned ? `已习得${art.name}` : eligibility.canStudy ? `参悟${art.name}` : `${art.name}条件未满足`}
+                              aria-label={selectedSecretEntries.length === 1 ? (eligibility.alreadyLearned ? '已习得' : eligibility.canStudy ? '参悟' : '条件未满足') : eligibility.alreadyLearned ? `已习得${art.name}` : eligibility.canStudy ? `参悟${art.name}` : `${art.name}条件未满足`}
                               disabled={isActing || !onItemAction || !eligibility.canStudy}
                               onClick={() => handleSecretArtAction(art.name, eligibility.canStudy)}
                               title={eligibility.alreadyLearned ? `已习得《${art.name}》，无需重复参悟` : eligibility.canStudy ? `参悟《${art.name}》` : eligibility.reasons.join('；')}
