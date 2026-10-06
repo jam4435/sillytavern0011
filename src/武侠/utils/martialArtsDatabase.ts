@@ -332,6 +332,42 @@ export function getAllMartialArtNames(): string[] {
   return Array.from(martialArtsCache.keys());
 }
 
+/**
+ * 从秘籍物品名中识别功法数据库里的功法名。
+ * 同一段文字可能同时命中长短包含关系时，优先保留更长且不重叠的命中。
+ */
+export function matchMartialArtsInSecretName(itemName: string): MartialArtData[] {
+  if (!martialArtsCache) {
+    initMartialArtsDatabase();
+    return [];
+  }
+
+  const source = itemName.trim();
+  if (!source) return [];
+
+  const candidates = Array.from(martialArtsCache.values())
+    .map(art => {
+      const name = art.功法名称.trim();
+      const start = name ? source.indexOf(name) : -1;
+      return { art, start, end: start >= 0 ? start + name.length : -1 };
+    })
+    .filter(candidate => candidate.start >= 0)
+    .sort((a, b) => {
+      const lengthDiff = b.end - b.start - (a.end - a.start);
+      return lengthDiff !== 0 ? lengthDiff : a.start - b.start;
+    });
+
+  const selected: typeof candidates = [];
+  for (const candidate of candidates) {
+    const overlapsSelected = selected.some(
+      selectedCandidate => candidate.start < selectedCandidate.end && selectedCandidate.start < candidate.end,
+    );
+    if (!overlapsSelected) selected.push(candidate);
+  }
+
+  return selected.sort((a, b) => a.start - b.start).map(candidate => candidate.art);
+}
+
 // ============================================
 // 功法补完功能
 // ============================================
