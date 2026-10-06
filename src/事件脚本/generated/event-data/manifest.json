@@ -1242,11 +1242,11 @@
       "discoveryHour": 10386857.2,
       "location": "大理/无量山/琅嬛福地",
       "intro": "石室内幽光静谧，白玉雕像宛若谪仙，足前旧蒲团经连番叩首破裂绽开，内里隐现斑驳绢光。",
-      "summary": "段誉于玉像前虔诚叩拜，叩裂旧蒲团而意外起获暗藏的道家绝学卷轴，展阅得见《北冥神功》与《凌波微步》图谱。段誉遵遗训将秘笈妥善贴身收藏，辞别玉像经密道逃出生天，马不停蹄奔赴万劫谷求药救助钟灵。",
+      "summary": "段誉叩裂蒲团起获逍遥派秘籍，展卷惊见三十六幅与玉像一般无二的娇媚裸身行气图，含羞敬畏下览毕《北冥神功》与《凌波微步》。段誉遵遗训妥善珍藏卷轴，依后山密道逃出生天，全速赶奔万劫谷求药解救钟灵。",
       "participants": [
         "段誉"
       ],
-      "hash": "b6ca9f4bad96de5224c2d2aced712a8c6a8eb0b55431dce360d84f4da7d71782",
+      "hash": "1cd2e2969dd93ceef877f33ca42a1c2f9e541bb1f13c41ea484516eb76da360f",
       "shardId": "shard-0001"
     },
     {
@@ -45483,7 +45483,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "射雕第一回00-人物登场",
       "lastRuntimeKey": "天龙第五回04-展卷参详易理初演步法",
-      "byteLength": 145713
+      "byteLength": 145719
     },
     {
       "id": "shard-0002",
@@ -59949,5 +59949,5 @@
     ]
   },
   "unresolvedReferences": [],
-  "contentHash": "f05bf3603281537d4c5e5aa42f93e4a639c14cf95575ddd24d01afb5ad166a37"
+  "contentHash": "15338f4f0eafdcb134f51c5be4670367fbfcfa167f13947aa5359ec916ae062a"
 }
