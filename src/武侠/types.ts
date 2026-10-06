@@ -431,6 +431,13 @@ export interface InventoryItem {
     rank: string;
     requirements?: Record<string, number>; // e.g., { "臂力": 20, "根骨": 15 }
   };
+  /** 由秘籍物品名匹配功法数据库得到的纯前端派生结果，不写入 stat_data。 */
+  martialArtInfos?: Array<{
+    name: string;
+    description: string;
+    rank: string;
+    requirements?: Record<string, number>;
+  }>;
 }
 
 export interface GameEvent {
