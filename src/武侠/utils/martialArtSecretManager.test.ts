@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import { setMartialArtsDatabase } from './martialArtsDatabase';
-import { learnMartialArtFromSecret, undoLearnMartialArtFromSecret } from './martialArtSecretManager';
+import { buildNarrativeSecretStudyCommand, learnMartialArtFromSecret, undoLearnMartialArtFromSecret } from './martialArtSecretManager';
 
 vi.mock('../../shared/directVariableWrite', () => ({
   emitSourcedEraVariableWriteAndWait: vi.fn(),
@@ -56,6 +56,8 @@ describe('martialArtSecretManager', () => {
         功法描述: '至阳至刚的绝世内功。',
         修炼限制: { 悟性: 12, 根骨: 11 },
       },
+      { 功法名称: '北冥神功', 类型: '内功', 功法品阶: '绝世', 功法描述: '海纳百川的逍遥派内功。' },
+      { 功法名称: '凌波微步', 类型: '轻功', 功法品阶: '绝世', 功法描述: '依易理而行的绝世步法。' },
     ]);
     emitWriteMock.mockReset();
     emitWriteMock.mockResolvedValue({
@@ -285,5 +287,50 @@ describe('martialArtSecretManager', () => {
         }),
       }),
     );
+  });
+
+  it('合册秘籍学习第一门时不消耗，学完最后一门才消耗一本', async () => {
+    const itemName = '北冥神功与凌波微步帛卷';
+    const userData: any = structuredClone(baseUserData);
+    userData.功法 = {};
+    userData.包裹 = {
+      [itemName]: { 类型: '秘籍', 品阶: '绝世', 物品描述: '一卷并录两门绝学的绸帛。', 数量: 1 },
+    };
+    vi.mocked(globalThis.getVariables).mockResolvedValue({ stat_data: { user数据: userData } });
+
+    const first = await learnMartialArtFromSecret(itemName, '凌波微步');
+    expect(first).toMatchObject({ success: true, artName: '凌波微步', newCount: 1 });
+    expect(emitWriteMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        detail: expect.objectContaining({
+          operations: [
+            { type: 'insert', payload: { user数据: { 功法: { 凌波微步: { 掌握程度: '初窥门径' } } } } },
+          ],
+        }),
+      }),
+    );
+
+    emitWriteMock.mockClear();
+    userData.功法 = { 凌波微步: { 掌握程度: '初窥门径' } };
+    vi.mocked(globalThis.getVariables).mockResolvedValue({ stat_data: { user数据: userData } });
+
+    const lastArt = await learnMartialArtFromSecret(itemName, '北冥神功');
+    expect(lastArt).toMatchObject({ success: true, artName: '北冥神功', newCount: 0 });
+    expect(emitWriteMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        detail: expect.objectContaining({
+          operations: expect.arrayContaining([
+            { type: 'delete', payload: { user数据: { 包裹: { [itemName]: {} } } },
+          ]),
+        }),
+      }),
+    );
+  });
+
+  it('数据库外秘籍生成剧情参悟指令而不是前端伪造功法数据', () => {
+    const command = buildNarrativeSecretStudyCommand('松风十三剑剑谱');
+    expect(command).toContain('未收录于现有功法谱');
+    expect(command).toContain('成功初步掌握');
+    expect(command).toContain('否则保留秘籍');
   });
 });
