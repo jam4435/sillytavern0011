@@ -1198,6 +1198,9 @@ function parseEvents(variables: GameVariables, worldTime?: WorldTime): GameEvent
   const eventSystem = variables.事件系统 || {};
   const occupancy = eventSystem.人物事件占用 || {};
   const ongoing = eventSystem.进行中事件 || {};
+  const completed = eventSystem.已完成事件 || {};
+  const expired = eventSystem.已失效事件 || {};
+  const persistentClues = variables.前端变量?.事件线索档案 || {};
   const nowDays = worldTime
     ? wuxiaCalendarDateToTotalDays({ 年: worldTime.year, 月: worldTime.month, 日: worldTime.day })
     : undefined;
@@ -1216,18 +1219,46 @@ function parseEvents(variables: GameVariables, worldTime?: WorldTime): GameEvent
     return remaining >= 0 ? remaining : undefined;
   };
 
-  // 同一事件同时存在于全域预告和附近传闻时，优先保留“附近传闻”语义，
-  // 避免全域预告的去重把“玩家已经靠近目标区域”这一层信息吃掉。
+  // 同一事件可能同时从“可发现事件 / 附近传闻 / 后续线索”进入前端。
+  // 先确定实际会展示的后续线索，再按事件原始键执行稳定优先级：
+  // 后续线索 > 附近传闻 > 全域预告。低优先级条目不进入 GameState.events，
+  // 这样事件页、江湖事簿和数量统计都会保持一致。
+  const persistentClueEntries = Object.entries(persistentClues).filter(([eventName, value]) => {
+    return (
+      !Object.prototype.hasOwnProperty.call(ongoing, eventName) &&
+      !Object.prototype.hasOwnProperty.call(completed, eventName) &&
+      !Object.prototype.hasOwnProperty.call(expired, eventName) &&
+      isRecord(value)
+    );
+  });
+  const persistentClueNames = new Set(persistentClueEntries.map(([eventName]) => eventName));
+
+  const legacyFollowupEntries = Object.entries(variables.后续事件线索 || {})
+    .map(([eventName, value]) => {
+      if (persistentClueNames.has(eventName)) return null;
+      const description = formatEventValue(value);
+      return description.trim() && description !== '{}' ? { eventName, description } : null;
+    })
+    .filter(
+      (entry): entry is { eventName: string; description: string } => entry !== null,
+    );
+
+  const followupNames = new Set([
+    ...persistentClueNames,
+    ...legacyFollowupEntries.map(entry => entry.eventName),
+  ]);
+
   const nearbyRumors = Object.entries(variables.附近传闻 || {})
     .map(([eventName, value]) => {
       const raw = typeof value === 'string' ? value : formatEventValue(value);
       return raw.trim() ? { eventName, raw } : null;
     })
-    .filter((entry): entry is { eventName: string; raw: string } => entry !== null);
+    .filter((entry): entry is { eventName: string; raw: string } => entry !== null)
+    .filter(entry => !followupNames.has(entry.eventName));
   const nearbyNames = new Set(nearbyRumors.map(entry => entry.eventName));
 
   for (const [eventName, value] of Object.entries(variables.前端变量?.可发现事件 || {})) {
-    if (nearbyNames.has(eventName)) continue;
+    if (followupNames.has(eventName) || nearbyNames.has(eventName)) continue;
     const raw = typeof value === 'string' ? value : formatEventValue(value);
     if (!raw.trim()) continue;
     const meta = parseRumorMeta(raw);
@@ -1292,25 +1323,10 @@ function parseEvents(variables: GameVariables, worldTime?: WorldTime): GameEvent
     });
   }
 
-  const completed = eventSystem.已完成事件 || {};
-  const expired = eventSystem.已失效事件 || {};
-  const persistentClues = variables.前端变量?.事件线索档案 || {};
-  const persistentClueNames = new Set<string>();
-
-  for (const [eventName, value] of Object.entries(persistentClues)) {
-    if (
-      Object.prototype.hasOwnProperty.call(ongoing, eventName) ||
-      Object.prototype.hasOwnProperty.call(completed, eventName) ||
-      Object.prototype.hasOwnProperty.call(expired, eventName) ||
-      !isRecord(value)
-    ) {
-      continue;
-    }
-
+  for (const [eventName, value] of persistentClueEntries) {
     const description = typeof value.线索 === 'string' ? value.线索.trim() : '';
     const location = typeof value.地点 === 'string' && value.地点.trim() ? value.地点.trim() : undefined;
     const startTime = isCalendarRecord(value.开始时间) ? value.开始时间 : undefined;
-    persistentClueNames.add(eventName);
     events.push({
       id: `followup_persistent_${eventName}`,
       title: getDisplayEventName(eventName),
@@ -1328,10 +1344,7 @@ function parseEvents(variables: GameVariables, worldTime?: WorldTime): GameEvent
 
   // 兼容旧存档：尚未迁移到前端变量.事件线索档案时，仍临时显示三回合 AI 线索。
   const clueCounters = variables.后续事件线索计数 || {};
-  for (const [eventName, value] of Object.entries(variables.后续事件线索 || {})) {
-    if (persistentClueNames.has(eventName)) continue;
-    const description = formatEventValue(value);
-    if (!description.trim() || description === '{}') continue;
+  for (const { eventName, description } of legacyFollowupEntries) {
     const counter = Number(clueCounters[eventName]);
     events.push({
       id: `followup_legacy_${eventName}`,
