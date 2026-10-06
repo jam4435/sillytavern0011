@@ -5,6 +5,7 @@
 - 只有最新 assistant 正文中已经发生、且需要长期保存的变化才写变量；前序正文只读，无变化时不输出 Insert/Edit/Delete。
 - 必须逐级对照<variable>中的嵌套对象：目标键已经存在用 `<VariableEdit>`；目标键不存在才用 `<VariableInsert>`；删除已存在的键用 `<VariableDelete>`。
 - 对象的父级存在不代表子键存在；判断的是最终目标键。反过来，最终目标键已经存在时，禁止对父级容器再次 Insert 同名键。
+- 删除或清空已有对象内容时，禁止 Edit 为 `{}`；必须用 `<VariableDelete>` 删除具体已有叶子。
 
 ## 2. 时间和地点
 
