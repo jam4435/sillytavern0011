@@ -60,11 +60,11 @@ const getItemDisplayRankLabel = (item: InventoryItem) => {
   return getRankVisual(item.rank, item.type === 'SECRET' ? 'secret' : 'item').label;
 };
 
-const getMartialArtRequirementEntries = (item: InventoryItem) => {
-  if (item.type !== 'SECRET' || !item.martialArtInfo?.requirements) {
-    return [];
-  }
-  return Object.entries(item.martialArtInfo.requirements).filter(([, value]) => typeof value === 'number');
+const getSecretMartialArtInfos = (item: InventoryItem) => {
+  if (item.type !== 'SECRET') return [];
+  if (item.martialArtInfos && item.martialArtInfos.length > 0) return item.martialArtInfos;
+  if (!item.martialArtInfo) return [];
+  return [{ name: item.name, ...item.martialArtInfo }];
 };
 
 const getAttributeModifierEntries = (modifiers?: Record<string, number>) => {
@@ -102,7 +102,7 @@ interface InventoryPanelProps {
   initialAttributes?: InitialAttributes;
   traits?: Record<string, string>;
   knownMartialArts?: Record<string, MartialArt>;
-  onItemAction?: (item: InventoryItem) => void | Promise<void>;
+  onItemAction?: (item: InventoryItem, martialArtName?: string) => void | Promise<void>;
 }
 
 export const InventoryPanel: React.FC<InventoryPanelProps> = ({
@@ -131,7 +131,6 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
   const selectedRank = selectedItem
     ? getRankVisual(selectedItem.rank, selectedItem.type === 'SECRET' ? 'secret' : 'item')
     : null;
-  const selectedItemRequirementEntries = selectedItem ? getMartialArtRequirementEntries(selectedItem) : [];
   const selectedItemModifierEntries = selectedItem ? getItemModifierEntries(selectedItem) : [];
   const selectedEquipSlot = selectedItem?.type === 'EQUIP' ? selectedItem.equipInfo?.slot : undefined;
   const selectedEquipStatus = selectedItem?.type === 'EQUIP' ? selectedItem.equipInfo?.status : undefined;
@@ -141,21 +140,25 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
     selectedItem && baseAttributes && attributes
       ? buildItemAttributePreview(selectedItem, items, statusEffects, baseAttributes, attributes)
       : [];
-  const selectedSecretEligibility =
+  const selectedSecretInfos = selectedItem ? getSecretMartialArtInfos(selectedItem) : [];
+  const selectedSecretEntries =
     selectedItem?.type === 'SECRET'
-      ? quoteMartialArtStudyEligibility({
-          item: selectedItem,
-          initialAttributes,
-          traits,
-          knownMartialArts,
-        })
-      : null;
+      ? selectedSecretInfos.map(art => ({
+          art,
+          eligibility: quoteMartialArtStudyEligibility({
+            item: { ...selectedItem, name: art.name, martialArtInfo: { description: art.description, rank: art.rank, requirements: art.requirements } },
+            initialAttributes,
+            traits,
+            knownMartialArts,
+          }),
+        }))
+      : [];
   const selectedActionDisabled =
     isActing ||
     !onItemAction ||
     !selectedItem ||
     !['EQUIP', 'ELIXIR', 'SECRET'].includes(selectedItem.type) ||
-    (selectedItem.type === 'SECRET' && !selectedSecretEligibility?.canStudy);
+    (selectedItem.type === 'SECRET' && selectedSecretEntries.length > 0);
 
   const handleSelectItem = (item: InventoryItem) => {
     setSelectedItemId(item.id);
@@ -170,6 +173,18 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
     setIsActing(true);
     try {
       await onItemAction?.(selectedItem);
+      setIsDetailOpen(false);
+    } finally {
+      setIsActing(false);
+    }
+  };
+
+  const handleSecretArtAction = async (artName: string, canStudy: boolean) => {
+    if (!selectedItem || selectedItem.type !== 'SECRET' || !onItemAction || isActing || !canStudy) return;
+    setIsActing(true);
+    try {
+      if (selectedSecretEntries.length === 1) await onItemAction(selectedItem);
+      else await onItemAction(selectedItem, artName);
       setIsDetailOpen(false);
     } finally {
       setIsActing(false);
@@ -279,40 +294,56 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
             <div className="workbench-detail-content">
               <p className="workbench-detail-desc">{getItemDisplayDescription(selectedItem)}</p>
 
-              {selectedItem.type === 'SECRET' && (
-                <>
-                  <DetailSection title="参悟条件">
-                    {selectedSecretEligibility && selectedSecretEligibility.requirementStatuses.length > 0 ? (
-                      selectedSecretEligibility.requirementStatuses.map(status => (
-                        <span key={status.attribute} className="workbench-chip">
-                          {status.attribute} {status.current} / {status.required}
-                          {status.met ? '（已满足）' : `（尚缺 ${status.deficit}）`}
-                        </span>
-                      ))
-                    ) : selectedItemRequirementEntries.length > 0 ? (
-                      selectedItemRequirementEntries.map(([attribute, value]) => (
-                        <span key={attribute} className="workbench-chip">
-                          {attribute} &gt;= {value}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="workbench-chip">无属性门槛</span>
-                    )}
+              {selectedItem.type === 'SECRET' &&
+                (selectedSecretEntries.length > 0 ? (
+                  <DetailSection title="秘籍所载武学">
+                    <div className="workbench-secret-art-list">
+                      {selectedSecretEntries.map(({ art, eligibility }) => {
+                        const artRank = getRankVisual(art.rank, 'secret');
+                        return (
+                          <div key={art.name} className="workbench-secret-art">
+                            <div className="workbench-secret-art-head">
+                              <strong style={{ color: artRank.color }}>{art.name}</strong>
+                              <span className="workbench-chip">{art.rank}</span>
+                            </div>
+                            {art.description && <p className="workbench-secret-art-desc">{art.description}</p>}
+                            <div className="workbench-chip-list">
+                              {eligibility.requirementStatuses.length > 0 ? (
+                                eligibility.requirementStatuses.map(status => (
+                                  <span key={status.attribute} className="workbench-chip">
+                                    {status.attribute} {status.current} / {status.required}
+                                    {status.met ? '（已满足）' : `（尚缺 ${status.deficit}）`}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="workbench-chip">无属性门槛</span>
+                              )}
+                              {eligibility.canStudy ? (
+                                <span className="workbench-chip">条件已满足</span>
+                              ) : (
+                                eligibility.reasons.map(reason => <span key={reason} className="workbench-chip">{reason}</span>)
+                              )}
+                            </div>
+                            <button
+                              className="wuxia-btn primary workbench-secret-art-action"
+                              aria-label={eligibility.alreadyLearned ? `已习得${art.name}` : eligibility.canStudy ? `参悟${art.name}` : `${art.name}条件未满足`}
+                              disabled={isActing || !onItemAction || !eligibility.canStudy}
+                              onClick={() => handleSecretArtAction(art.name, eligibility.canStudy)}
+                              title={eligibility.alreadyLearned ? `已习得《${art.name}》，无需重复参悟` : eligibility.canStudy ? `参悟《${art.name}》` : eligibility.reasons.join('；')}
+                              style={{ color: artRank.color, borderColor: `${artRank.color}60` }}
+                            >
+                              {isActing ? '处理中' : eligibility.alreadyLearned ? '已习得' : eligibility.canStudy ? '参悟' : '条件未满足'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </DetailSection>
-
-                  <DetailSection title="参悟资格">
-                    {selectedSecretEligibility?.canStudy ? (
-                      <span className="workbench-chip">条件已满足</span>
-                    ) : (
-                      (selectedSecretEligibility?.reasons || ['暂无法判断参悟资格']).map(reason => (
-                        <span key={reason} className="workbench-chip">
-                          {reason}
-                        </span>
-                      ))
-                    )}
+                ) : (
+                  <DetailSection title="参悟方式">
+                    <span className="workbench-chip">此秘籍未收录于功法谱，将作为剧情行动参悟；是否习得由本轮正文实际结果决定。</span>
                   </DetailSection>
-                </>
-              )}
+                ))}
 
               {selectedItem.type === 'EQUIP' &&
                 (selectedEquipSlot || selectedEquipStatus || selectedItemModifierEntries.length > 0) && (
@@ -355,33 +386,19 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
               )}
             </div>
 
-            <footer className="workbench-detail-actions">
-              <button
-                className="wuxia-btn primary"
-                disabled={selectedActionDisabled}
-                onClick={handleSelectedItemAction}
-                title={
-                  selectedItem.type === 'SECRET'
-                    ? selectedSecretEligibility?.alreadyLearned
-                      ? '已习得此功法'
-                      : selectedSecretEligibility && !selectedSecretEligibility.canStudy
-                        ? selectedSecretEligibility.reasons.join('；')
-                        : '条件已满足，点击参悟并习得此功法'
-                    : undefined
-                }
-                style={{ color: selectedRank.color, borderColor: `${selectedRank.color}60` }}
-              >
-                {isActing
-                  ? '处理中'
-                  : selectedItem.type === 'SECRET'
-                    ? selectedSecretEligibility?.alreadyLearned
-                      ? '已习得'
-                      : selectedSecretEligibility && !selectedSecretEligibility.canStudy
-                        ? '条件未满足'
-                        : getActionLabel(selectedItem.type)
-                    : getActionLabel(selectedItem.type)}
-              </button>
-            </footer>
+            {(selectedItem.type !== 'SECRET' || selectedSecretEntries.length === 0) && (
+              <footer className="workbench-detail-actions">
+                <button
+                  className="wuxia-btn primary"
+                  disabled={selectedActionDisabled}
+                  onClick={handleSelectedItemAction}
+                  title={selectedItem.type === 'SECRET' ? '此秘籍未收录于功法谱，点击后作为正常剧情行为参悟' : undefined}
+                  style={{ color: selectedRank.color, borderColor: `${selectedRank.color}60` }}
+                >
+                  {isActing ? '处理中' : getActionLabel(selectedItem.type)}
+                </button>
+              </footer>
+            )}
           </div>
         ) : (
           <div className="workbench-detail-placeholder">从左侧选择一件物品。</div>
