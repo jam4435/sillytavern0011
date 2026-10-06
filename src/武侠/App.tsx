@@ -52,7 +52,7 @@ import { createAvatarEntityKey, resolveAvatarSource } from './utils/avatarStorag
 import { migrateAvatarState } from './utils/avatarState';
 import { migratePlayerLuckScale } from './utils/luckScaleMigration';
 import { equipInventoryItem, useMedicineItem } from './utils/itemManager';
-import { learnMartialArtFromSecret } from './utils/martialArtSecretManager';
+import { buildNarrativeSecretStudyCommand, learnMartialArtFromSecret } from './utils/martialArtSecretManager';
 import { upgradeMeridianNode } from './utils/meridianManager';
 import { buildItemAttributePreview, type AttributePreviewRow } from './utils/inventoryAttributePreview';
 import { gameLogger, getRuntimeDebugInfo, initLogger, variableTraceLogger } from './utils/logger';
@@ -834,7 +834,7 @@ const App: React.FC = () => {
   );
 
   const handleInventoryItemAction = useCallback(
-    async (item: InventoryItem) => {
+    async (item: InventoryItem, martialArtName?: string) => {
       try {
         const previewRows = gameState.stats.baseAttributes
           ? buildItemAttributePreview(
@@ -864,20 +864,29 @@ const App: React.FC = () => {
         }
 
         if (item.type === 'SECRET') {
-          const result = await learnMartialArtFromSecret(item.name);
-          if (!result.success || !result.commandText || !result.rollback) {
-            showError(result.error || `参悟《${item.name}》失败`);
+          const recognizedArts = item.martialArtInfos?.map(art => art.name) || (item.martialArtInfo ? [item.name] : []);
+          if (recognizedArts.length === 0) {
+            addUseItemCommand(buildNarrativeSecretStudyCommand(item.name), {});
             return;
           }
 
-          addUseItemCommand(result.commandText, {
-            itemName: result.itemName,
-            martialArtLearnRollback: result.rollback,
-          });
+          const targetArtName = martialArtName || (recognizedArts.length === 1 ? recognizedArts[0] : undefined);
+          if (!targetArtName) {
+            showError(`秘籍《${item.name}》记载多门功法，请先选择要参悟的武学。`);
+            return;
+          }
+
+          const result = await learnMartialArtFromSecret(item.name, targetArtName);
+          if (!result.success || !result.commandText || !result.rollback) {
+            showError(result.error || `参悟《${targetArtName}》失败`);
+            return;
+          }
+          addUseItemCommand(result.commandText, { itemName: result.itemName, martialArtLearnRollback: result.rollback });
           await syncPlayerAttributesFromVariables();
           refreshGameStateFromVariables();
           return;
         }
+
 
         if (item.type === 'ELIXIR') {
           const result = await useMedicineItem(item.name);
