@@ -179,4 +179,50 @@ describe('InventoryPanel', () => {
 
     expect(screen.getByText('包袱空空如也。')).toBeInTheDocument();
   });
+
+  it('合册秘籍分别展示并可指定参悟其中一门功法', async () => {
+    const combinedSecret: InventoryItem = {
+      id: 'combined-secret',
+      name: '北冥神功与凌波微步帛卷',
+      type: 'SECRET',
+      rank: 'GOLD',
+      count: 1,
+      description: '一卷并录两门绝学的绸帛。',
+      martialArtInfos: [
+        { name: '北冥神功', description: '海纳百川。', rank: '绝世' },
+        { name: '凌波微步', description: '凌波而行。', rank: '绝世' },
+      ],
+    };
+    const onItemAction = vi.fn(async () => undefined);
+    render(<InventoryPanel items={[combinedSecret]} initialAttributes={initialAttributes} onItemAction={onItemAction} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '查看北冥神功与凌波微步帛卷' }));
+    expect(screen.getByText('北冥神功')).toBeInTheDocument();
+    expect(screen.getByText('凌波微步')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '参悟北冥神功' }));
+    await waitFor(() => {
+      expect(onItemAction).toHaveBeenCalledWith(expect.objectContaining({ name: combinedSecret.name }), '北冥神功');
+    });
+  });
+
+  it('数据库外秘籍保留参悟按钮并明确走剧情判定', async () => {
+    const dynamicSecret: InventoryItem = {
+      id: 'dynamic-secret',
+      name: '松风十三剑剑谱',
+      type: 'SECRET',
+      rank: 'GREEN',
+      count: 1,
+      description: '无名剑客手录的十三式剑谱。',
+    };
+    const onItemAction = vi.fn(async () => undefined);
+    render(<InventoryPanel items={[dynamicSecret]} onItemAction={onItemAction} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '查看松风十三剑剑谱' }));
+    expect(screen.getByText(/未收录于功法谱/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '参悟' }));
+    await waitFor(() => {
+      expect(onItemAction).toHaveBeenCalledWith(expect.objectContaining({ name: '松风十三剑剑谱' }));
+    });
+  });
 });
