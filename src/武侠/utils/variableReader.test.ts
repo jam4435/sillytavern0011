@@ -506,6 +506,88 @@ describe('getGameVariables ERA 展示投影', () => {
     });
   });
 
+  it('同一事件同时存在长期后续线索、附近传闻和全域预告时只投影后续线索', () => {
+    const eventName = '天龙第二回06-段誉入秘洞痴拜神仙姐姐玉像';
+    const rumor =
+      '月光斜照幽谷碧湖，杂草掩映下的沉重石门半掩。 [1202年3月16日15时40分/大理/无量山/琅嬛福地]';
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        世界信息: { 时间: { 年: 1202, 月: 3, 日: 16, 时: 15, 分: 20 } },
+        user数据: {
+          用户名: '段誉',
+          性别: '男',
+          境界: '不入流',
+          所在位置: '大理/无量山/剑湖谷底',
+          初始属性: { 臂力: 10, 根骨: 10, 机敏: 10, 悟性: 10, 洞察: 10 },
+        },
+        事件系统: {
+          未发生事件: { [eventName]: {} },
+          进行中事件: {},
+          已完成事件: {},
+          已失效事件: {},
+        },
+        前端变量: {
+          可发现事件: { [eventName]: rumor },
+          事件线索档案: {
+            [eventName]: {
+              来源事件: '天龙第二回05-段誉失足坠崖幸存睹无量玉壁',
+              线索: '谷底石门之后另有洞天，段誉可循前事继续深入。',
+              开始时间: { 年: 1202, 月: 3, 日: 16, 时: 15, 分: 40 },
+              地点: '大理/无量山/琅嬛福地',
+            },
+          },
+        },
+        附近传闻: { [eventName]: rumor },
+      },
+    });
+
+    const state = readGameDataSync();
+    const matchingEvents = state?.events?.filter(event => event.title.includes('段誉入秘洞')) || [];
+
+    expect(matchingEvents).toHaveLength(1);
+    expect(matchingEvents[0]).toMatchObject({
+      type: 'AFTERMATH',
+      clueKind: 'followup',
+      description: '谷底石门之后另有洞天，段誉可循前事继续深入。',
+      location: '大理/无量山/琅嬛福地',
+    });
+  });
+
+  it('旧版后续事件线索同样优先于附近传闻和全域预告', () => {
+    const eventName = '天龙第二回06-段誉入秘洞痴拜神仙姐姐玉像';
+    const rumor =
+      '月光斜照幽谷碧湖，杂草掩映下的沉重石门半掩。 [1202年3月16日15时40分/大理/无量山/琅嬛福地]';
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        世界信息: { 时间: { 年: 1202, 月: 3, 日: 16, 时: 15, 分: 20 } },
+        user数据: {
+          用户名: '段誉',
+          性别: '男',
+          境界: '不入流',
+          所在位置: '大理/无量山/剑湖谷底',
+          初始属性: { 臂力: 10, 根骨: 10, 机敏: 10, 悟性: 10, 洞察: 10 },
+        },
+        前端变量: { 可发现事件: { [eventName]: rumor } },
+        附近传闻: { [eventName]: rumor },
+        后续事件线索: {
+          [eventName]: '石门之后另有洞天，这条旧版后续线索应覆盖普通传闻。',
+        },
+        后续事件线索计数: { [eventName]: 2 },
+      },
+    });
+
+    const state = readGameDataSync();
+    const matchingEvents = state?.events?.filter(event => event.title.includes('段誉入秘洞')) || [];
+
+    expect(matchingEvents).toHaveLength(1);
+    expect(matchingEvents[0]).toMatchObject({
+      type: 'AFTERMATH',
+      clueKind: 'followup',
+      description: '石门之后另有洞天，这条旧版后续线索应覆盖普通传闻。',
+      remainingTurns: 2,
+    });
+  });
+
   it('将全域可发现事件投影为带开始倒计时和地点的唯一风闻', () => {
     const eventName = '射雕第一回03-远方风波';
     const rumor = '临安府近来暗流涌动。 [1200年8月20日11时/大宋/临安府/牛家村]';
