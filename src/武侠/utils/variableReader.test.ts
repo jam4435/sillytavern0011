@@ -4,6 +4,7 @@ vi.mock('./martialArtsDatabase', () => ({
   completeMartialArts: vi.fn(),
   getMartialArtData: vi.fn(),
   loadMartialArtsDatabase: vi.fn(async () => true),
+  matchMartialArtsInSecretName: vi.fn(() => []),
 }));
 
 vi.mock('../../shared/directVariableWrite', () => ({
