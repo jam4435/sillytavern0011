@@ -5,7 +5,7 @@ import type {
   InventoryItemVariableData,
   MartialArtLearnRollbackData,
 } from '../types';
-import { getMartialArtData } from './martialArtsDatabase';
+import { matchMartialArtsInSecretName } from './martialArtsDatabase';
 import { quoteMartialArtStudyEligibility } from './martialArtStudyEligibility';
 import { gameLogger } from './logger';
 
@@ -52,13 +52,17 @@ function toCompleteInitialAttributes(value?: Partial<InitialAttributes>): Initia
   return value as InitialAttributes;
 }
 
-function buildSecretInventoryItem(itemName: string, rawItem: InventoryItemVariableData): InventoryItem | null {
-  const dbData = getMartialArtData(itemName);
+function buildSecretInventoryItem(
+  itemName: string,
+  artName: string,
+  rawItem: InventoryItemVariableData,
+): InventoryItem | null {
+  const dbData = matchMartialArtsInSecretName(itemName).find(art => art.功法名称 === artName);
   if (!dbData) return null;
 
   return {
-    id: `secret:${itemName}`,
-    name: itemName,
+    id: `secret:${itemName}:${artName}`,
+    name: artName,
     type: 'SECRET',
     rank: dbData.功法品阶,
     count: rawItem.数量 ?? 1,
@@ -71,13 +75,18 @@ function buildSecretInventoryItem(itemName: string, rawItem: InventoryItemVariab
   };
 }
 
+/** 数据库外秘籍不直接改变量，而是作为一次正常剧情参悟行为进入下一轮。 */
+export function buildNarrativeSecretStudyCommand(itemName: string): string {
+  return `参悟秘籍《${itemName}》。此秘籍未收录于现有功法谱，请在剧情中自然表现参悟过程；只有本轮实际成功初步掌握其中武学时，才新增对应完整功法并结算秘籍，否则保留秘籍。`;
+}
+
 /**
  * 从背包秘籍真正习得功法。
  *
  * 再次读取当前 chat 变量并重新校验，避免 UI 打开后属性/天赋/功法发生变化造成陈旧判定。
  * 功法写入与秘籍扣除使用同一个 era:transactionByObject 窗口提交。
  */
-export async function learnMartialArtFromSecret(itemName: string): Promise<LearnMartialArtFromSecretResult> {
+export async function learnMartialArtFromSecret(itemName: string, artName?: string): Promise<LearnMartialArtFromSecretResult> {
   const variables = await getVariables({ type: 'chat' });
   const userData = (variables?.stat_data?.user数据 || {}) as SecretUserData;
   const rawItem = userData.包裹?.[itemName];
@@ -91,9 +100,22 @@ export async function learnMartialArtFromSecret(itemName: string): Promise<Learn
     return { success: false, error: `秘籍《${itemName}》数量不足。` };
   }
 
-  const secretItem = buildSecretInventoryItem(itemName, rawItem);
+  const matchedArts = matchMartialArtsInSecretName(itemName);
+  if (matchedArts.length === 0) {
+    return { success: false, error: `秘籍《${itemName}》未收录于功法数据库，应作为剧情参悟处理。` };
+  }
+
+  const resolvedArtName = artName || (matchedArts.length === 1 ? matchedArts[0].功法名称 : '');
+  if (!resolvedArtName) {
+    return { success: false, error: `秘籍《${itemName}》记载多门功法，请先选择要参悟的武学。` };
+  }
+  if (!matchedArts.some(art => art.功法名称 === resolvedArtName)) {
+    return { success: false, error: `《${resolvedArtName}》并非秘籍《${itemName}》中识别出的功法。` };
+  }
+
+  const secretItem = buildSecretInventoryItem(itemName, resolvedArtName, rawItem);
   if (!secretItem) {
-    return { success: false, error: `功法数据库中找不到《${itemName}》，无法确认修炼条件。` };
+    return { success: false, error: `无法读取《${resolvedArtName}》的功法数据。` };
   }
 
   const eligibility = quoteMartialArtStudyEligibility({
@@ -110,29 +132,29 @@ export async function learnMartialArtFromSecret(itemName: string): Promise<Learn
   }
 
   const originalItem = cloneItem(rawItem);
-  const newCount = Math.max(0, currentCount - 1);
-  const itemOperation =
-    newCount > 0
+  const shouldConsumeSecret = matchedArts.every(
+    art => art.功法名称 === resolvedArtName || Boolean(userData.功法?.[art.功法名称]),
+  );
+  const newCount = shouldConsumeSecret ? Math.max(0, currentCount - 1) : currentCount;
+  const itemOperation = shouldConsumeSecret
+    ? newCount > 0
       ? {
           type: 'update' as const,
-          payload: {
-            user数据: {
-              包裹: {
-                [itemName]: { 数量: newCount },
-              },
-            },
-          },
+          payload: { user数据: { 包裹: { [itemName]: { 数量: newCount } } } },
         }
       : {
           type: 'delete' as const,
-          payload: {
-            user数据: {
-              包裹: {
-                [itemName]: {},
-              },
-            },
-          },
-        };
+          payload: { user数据: { 包裹: { [itemName]: {} } } },
+        }
+    : null;
+
+  const operations: Array<{ type: 'insert' | 'update' | 'delete'; payload: Record<string, unknown> }> = [
+    {
+      type: 'insert',
+      payload: { user数据: { 功法: { [resolvedArtName]: { 掌握程度: '初窥门径' } } } },
+    },
+  ];
+  if (itemOperation) operations.push(itemOperation);
 
   const transactionId = createTransactionId('secret-learn');
   try {
@@ -145,21 +167,7 @@ export async function learnMartialArtFromSecret(itemName: string): Promise<Learn
       attribution: 'background',
       detail: {
         transactionId,
-        operations: [
-          {
-            type: 'insert',
-            payload: {
-              user数据: {
-                功法: {
-                  [itemName]: {
-                    掌握程度: '初窥门径',
-                  },
-                },
-              },
-            },
-          },
-          itemOperation,
-        ],
+        operations,
       },
       expectedAction: 'apiWrite',
       expectedTransactionId: transactionId,
@@ -168,18 +176,18 @@ export async function learnMartialArtFromSecret(itemName: string): Promise<Learn
     });
 
     const rollback: MartialArtLearnRollbackData = {
-      artName: itemName,
+      artName: resolvedArtName,
       itemName,
       originalItem,
     };
-    gameLogger.log(`[martialArtSecretManager] 已从秘籍习得功法：${itemName}`);
+    gameLogger.log(`[martialArtSecretManager] 已从秘籍《${itemName}》习得功法：${resolvedArtName}`);
     return {
       success: true,
-      artName: itemName,
+      artName: resolvedArtName,
       itemName,
       newCount,
       rollback,
-      commandText: `参悟秘籍《${itemName}》，已初步习得${itemName}（初窥门径），请在剧情中自然体现参悟过程。`,
+      commandText: `参悟秘籍《${itemName}》，已初步习得${resolvedArtName}（初窥门径）；功法与秘籍变量已由前端处理，请勿重复写入变量，并在剧情中自然体现参悟过程。`,
     };
   } catch (error) {
     gameLogger.error('[martialArtSecretManager] 秘籍参悟事务失败:', error);
