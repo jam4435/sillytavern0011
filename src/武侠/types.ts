@@ -222,6 +222,68 @@ export interface SectStaticData {
   武学传承树: SectMartialNode[];
 }
 
+export type PublicFactionCategory = FactionType | '政权' | '组织';
+
+export interface PublicFactionSourceRecord {
+  作品: string;
+  来源势力: string;
+  归一方式: 'merge' | 'absorb' | 'split' | 'supplement' | string;
+}
+
+export interface PublicFactionLeaderRecord {
+  来源: string;
+  称谓: string;
+  人物: string;
+}
+
+export interface PublicFactionOrganizationLayer {
+  名称: string;
+  显示人数: string;
+  已知人物: string[];
+}
+
+export interface PublicFactionImportantPerson {
+  人物: string;
+  身份: string;
+  来源: string;
+}
+
+export interface PublicFactionScaleRecord {
+  来源: string;
+  描述: string;
+}
+
+export interface PublicFactionCatalogEntry {
+  势力ID: string;
+  势力名称: string;
+  分类: PublicFactionCategory;
+  别名: string[];
+  可加入: boolean;
+  sectId: string | null;
+  驻地: string;
+  首领身份键: string[];
+  资料首领: PublicFactionLeaderRecord[];
+  组织结构: PublicFactionOrganizationLayer[];
+  重要人物: PublicFactionImportantPerson[];
+  规模资料: PublicFactionScaleRecord[];
+  来源记录: PublicFactionSourceRecord[];
+}
+
+export interface PublicFactionRelation {
+  from: string;
+  to: string;
+  type: string;
+  scope: '长期' | '历史' | string;
+}
+
+export interface PublicFactionRuntimeState {
+  势力ID: string;
+  当前掌舵人: string[];
+  当前掌舵人来源: 'variable' | 'unresolved';
+  命中身份键: string[];
+}
+
+
 // The main User Profile structure
 export interface CharacterProfile {
   name: string; // Internal use, though not strictly in JSON, needed for UI
