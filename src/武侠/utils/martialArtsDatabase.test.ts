@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { eventEmitMock } from '../test/setup';
-import { setMartialArtsDatabase, upgradeMartialArt } from './martialArtsDatabase';
+import { matchMartialArtsInSecretName, setMartialArtsDatabase, upgradeMartialArt } from './martialArtsDatabase';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -16,6 +16,29 @@ function applyUpdate(target: Record<string, unknown>, patch: Record<string, unkn
     }
   }
 }
+
+describe('matchMartialArtsInSecretName', () => {
+  it('能从合册秘籍名识别多门功法', () => {
+    setMartialArtsDatabase([
+      { 功法名称: '北冥神功', 类型: '内功', 功法品阶: '绝世', 功法描述: '北冥真气。' },
+      { 功法名称: '凌波微步', 类型: '轻功', 功法品阶: '绝世', 功法描述: '凌波步法。' },
+    ]);
+
+    expect(matchMartialArtsInSecretName('北冥神功与凌波微步帛卷').map(art => art.功法名称)).toEqual([
+      '北冥神功',
+      '凌波微步',
+    ]);
+  });
+
+  it('长短功法名重叠时只保留最长命中', () => {
+    setMartialArtsDatabase([
+      { 功法名称: '九阴真经', 类型: '内功', 功法品阶: '绝世', 功法描述: '真经。' },
+      { 功法名称: '九阴真经总纲', 类型: '内功', 功法品阶: '绝世', 功法描述: '总纲。' },
+    ]);
+
+    expect(matchMartialArtsInSecretName('九阴真经总纲抄本').map(art => art.功法名称)).toEqual(['九阴真经总纲']);
+  });
+});
 
 describe('upgradeMartialArt', () => {
   let variables: any;
