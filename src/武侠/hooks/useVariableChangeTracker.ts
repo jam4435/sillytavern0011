@@ -388,6 +388,7 @@ const buildSummary = (
     observedChanges: aiObserved,
     baselineStatData: activeTurn.baselineStatData,
     currentStatData,
+    appliedStatData: activeTurn.aiCheckpointStatData,
   });
 
   const next: VariableChangeSummary = {

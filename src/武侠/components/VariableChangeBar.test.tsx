@@ -168,6 +168,27 @@ describe('VariableChangeBar', () => {
     expect(screen.getByText('值不一致')).toBeInTheDocument();
   });
 
+  it('AI 已落地后被后台继续处理时显示“后续已变化”，但不计入异常', () => {
+    const comparison = createComparison({
+      path: ['参与事件', '测试事件', '结局'],
+      baselineValue: '原结局',
+      expectedValue: '改写结局',
+      finalValue: undefined,
+      status: 'applied',
+    });
+
+    render(<VariableChangeBar summary={createSummary({ comparisons: [comparison] })} />);
+
+    const aiButton = screen.getByRole('button', { name: /AI回复/ });
+    expect(aiButton).toHaveTextContent('AI回复1项');
+    expect(aiButton).not.toHaveTextContent('异常');
+
+    fireEvent.click(aiButton);
+    expect(screen.getByText('后续已变化')).toBeInTheDocument();
+    expect(screen.getByText('AI 声明：改写结局')).toBeInTheDocument();
+    expect(screen.getByText('未定义')).toBeInTheDocument();
+  });
+
   it('AI 修改派生缓存时显示只读越权并计入异常', () => {
     const comparison = createComparison({
       path: ['前端变量', '战力区'],

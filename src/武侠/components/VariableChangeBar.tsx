@@ -265,8 +265,7 @@ const hasComparisonFinalMismatch = (comparison: VariableAiComparison): boolean =
 const isAiException = (comparison: VariableAiComparison): boolean =>
   comparison.status === 'not-applied'
   || comparison.status === 'diverged'
-  || comparison.status === 'read-only'
-  || hasComparisonFinalMismatch(comparison);
+  || comparison.status === 'read-only';
 
 const createAiTimeItem = (comparisons: VariableAiComparison[]): AiLogicalItem | null => {
   if (comparisons.length === 0) {
@@ -432,7 +431,7 @@ const buildBackgroundLogicalItems = (changes: VariableActualChange[]): Backgroun
 const getAiItemExceptionCount = (items: AiLogicalItem[]): number =>
   items.filter(item =>
     item.kind === 'time'
-      ? item.status === 'not-applied' || item.status === 'diverged' || item.hasFinalMismatch
+      ? item.status === 'not-applied' || item.status === 'diverged'
       : isAiException(item.comparison),
   ).length;
 
@@ -654,6 +653,7 @@ const AiComparisonRow: React.FC<AiComparisonRowProps> = ({ comparison }) => {
   const beforePreview = observed?.beforePreview ?? comparison.baselinePreview;
   const finalMismatch = hasComparisonFinalMismatch(comparison);
   const exception = isAiException(comparison);
+  const showDeclaredNote = exception || finalMismatch;
   const statusLabel = finalMismatch ? '后续已变化' : COMPARE_STATUS_LABELS[comparison.status];
 
   return (
@@ -689,7 +689,7 @@ const AiComparisonRow: React.FC<AiComparisonRowProps> = ({ comparison }) => {
           </div>
         )}
 
-        {exception && (
+        {showDeclaredNote && (
           <div className="variable-change-note">
             AI 声明：{comparison.expectedPreview}
           </div>
@@ -706,8 +706,8 @@ interface AiTimeRowProps {
 const AiTimeRow: React.FC<AiTimeRowProps> = ({ item }) => {
   const exception =
     item.status === 'not-applied'
-    || item.status === 'diverged'
-    || item.hasFinalMismatch;
+    || item.status === 'diverged';
+  const showDeclaredNote = exception || item.hasFinalMismatch;
   const statusLabel = item.hasFinalMismatch ? '后续已变化' : COMPARE_STATUS_LABELS[item.status];
 
   return (
@@ -737,7 +737,7 @@ const AiTimeRow: React.FC<AiTimeRowProps> = ({ item }) => {
           </div>
         )}
 
-        {exception && (
+        {showDeclaredNote && (
           <div className="variable-change-note">
             AI 声明：{item.expectedPreview}
           </div>

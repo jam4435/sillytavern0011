@@ -912,21 +912,25 @@ export function buildAiComparisons({
   observedChanges,
   baselineStatData,
   currentStatData,
+  appliedStatData = null,
   backgroundObservedChanges = [],
 }: {
   declaredChanges: VariableDeclaredChange[];
   observedChanges: VariableActualChange[];
   baselineStatData: Record<string, unknown> | null;
   currentStatData: Record<string, unknown> | null;
+  /** AI 写入确认后的真实快照；用于区分“未落地”与“已落地后被事件/后台继续处理”。 */
+  appliedStatData?: Record<string, unknown> | null;
   backgroundObservedChanges?: VariableActualChange[];
 }): VariableAiComparisonResult {
   const comparisons: VariableAiComparison[] = [];
   const normalizedBaselineStatData = baselineStatData ? extractStatData(baselineStatData) : null;
   const normalizedCurrentStatData = currentStatData ? extractStatData(currentStatData) : null;
+  const normalizedAppliedStatData = appliedStatData ? extractStatData(appliedStatData) : null;
   const declaredByPath = new Map<string, VariableDeclaredChange>();
   const aggregatedObserved = aggregateObservedChanges(observedChanges);
-  // backgroundObservedChanges 仍保留在函数签名中，供调用方兼容；AI 是否落地不再依赖
-  // 中间写入归因，而只看回合基线、AI 声明和最终聊天级 stat_data。
+  // backgroundObservedChanges 仍保留在函数签名中，供调用方兼容；AI 是否落地优先看
+  // AI 写入确认检查点，不根据后续后台写入的来源反推。
   void backgroundObservedChanges;
 
   for (const declaredChange of declaredChanges) {
@@ -966,10 +970,15 @@ export function buildAiComparisons({
       const baselineMatchesExpected = areValuesEqual(baselineValue, expectedValue);
       const finalMatchesExpected = areValuesEqual(finalValue, expectedValue);
       const finalMatchesBaseline = areValuesEqual(finalValue, baselineValue);
+      const appliedValue = normalizedAppliedStatData
+        ? getValueAtPath(normalizedAppliedStatData, path)
+        : undefined;
+      const appliedMatchesExpected =
+        normalizedAppliedStatData !== null && areValuesEqual(appliedValue, expectedValue);
 
-      if (baselineMatchesExpected && finalMatchesExpected) {
+      if (baselineMatchesExpected) {
         status = 'no-op';
-      } else if (finalMatchesExpected) {
+      } else if (finalMatchesExpected || appliedMatchesExpected) {
         status = 'applied';
       } else if (finalMatchesBaseline) {
         status = 'not-applied';

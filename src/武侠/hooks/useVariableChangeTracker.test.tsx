@@ -353,7 +353,7 @@ describe('useVariableChangeTracker block/source model', () => {
     ]);
   });
 
-  it('同一路径在 AI 后又被后台修改：AI 看最终值判值不一致，后台保留精确 120→115', () => {
+  it('同一路径在 AI 后又被后台修改：AI 检查点判已落地，后台保留精确 120→115', () => {
     const { result } = renderHook(() => useVariableChangeTracker());
 
     act(() => {
@@ -386,7 +386,7 @@ describe('useVariableChangeTracker block/source model', () => {
 
     expect(result.current.variableChanges?.aiReply.comparisons).toEqual([
       expect.objectContaining({
-        status: 'diverged',
+        status: 'applied',
         baselineValue: 100,
         expectedValue: 120,
         finalValue: 115,

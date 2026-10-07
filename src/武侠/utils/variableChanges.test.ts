@@ -270,6 +270,39 @@ describe('buildAiComparisons', () => {
     expect(comparison.status).toBe('applied');
   });
 
+  it('AI 写入检查点已命中声明值时，后续事件覆盖或删除仍判定为已落地', () => {
+    const changedAfterApply = buildAiComparisons({
+      declaredChanges: declared,
+      observedChanges: [],
+      baselineStatData: { user数据: { 修为: 100 } },
+      appliedStatData: { user数据: { 修为: 120 } },
+      currentStatData: { user数据: { 修为: 115 } },
+    }).comparisons[0];
+
+    expect(changedAfterApply).toEqual(expect.objectContaining({
+      status: 'applied',
+      expectedValue: 120,
+      finalValue: 115,
+    }));
+
+    const participationDeclared = parseDeclaredVariableChanges(
+      '<VariableEdit>{"参与事件":{"测试事件":{"结局":"改写结局"}}}</VariableEdit>',
+    ).declaredChanges;
+    const consumedAfterApply = buildAiComparisons({
+      declaredChanges: participationDeclared,
+      observedChanges: [],
+      baselineStatData: { 参与事件: { 测试事件: { 结局: '原结局' } } },
+      appliedStatData: { 参与事件: { 测试事件: { 结局: '改写结局' } } },
+      currentStatData: { 参与事件: {} },
+    }).comparisons[0];
+
+    expect(consumedAfterApply).toEqual(expect.objectContaining({
+      status: 'applied',
+      expectedValue: '改写结局',
+      finalValue: undefined,
+    }));
+  });
+
   it('路径 ID 不会把带点号的键与嵌套路径混为一谈', () => {
     const collisionDeclarations = parseDeclaredVariableChanges(
       '<VariableEdit>{"a.b":{"c":1},"a":{"b.c":2}}</VariableEdit>',
