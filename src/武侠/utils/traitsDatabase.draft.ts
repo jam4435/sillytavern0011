@@ -37,7 +37,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: COMBAT_RULE_PROMPT,
   },
   {
-    name: '心灵手巧',
+    name: '玲珑巧手',
     rank: '上乘',
     category: '天资',
     cost: 14,
@@ -95,7 +95,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
 
   // 复合武道项
   {
-    name: '身手矫捷',
+    name: '身如鬼魅',
     rank: '镇派',
     category: '天资',
     cost: 18,
@@ -150,7 +150,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
   // ============================================
   // 基础体质项
   {
-    name: '体魄强健',
+    name: '筋骨精实',
     rank: '传家',
     category: '体质',
     cost: 8,
@@ -180,7 +180,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: COMBAT_RULE_PROMPT,
   },
   {
-    name: '铁拳天成',
+    name: '铁骨铜掌',
     rank: '上乘',
     category: '体质',
     cost: 14,
@@ -232,7 +232,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: COMBAT_RULE_PROMPT,
   },
   {
-    name: '万毒归宗',
+    name: '化毒入髓',
     rank: '镇派',
     category: '体质',
     cost: 18,
@@ -354,7 +354,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: '见强则喜，逢险愈勇，尤爱与成名高手拆招争锋；每逢酣战，常会反复咀嚼敌我招式得失，对同样好武成痴的江湖人也格外投契。',
   },
   {
-    name: '扫地僧',
+    name: '大隐抱拙',
     rank: '上乘',
     category: '性情',
     cost: 14,
@@ -435,7 +435,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     flavorPrompt: '相貌清秀端正，日常问路打听消息时NPC态度亲和耐烦。',
   },
   {
-    name: '纯路人',
+    name: '和光同尘',
     rank: '上乘',
     category: '气质',
     cost: 14,
@@ -496,7 +496,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
 
   // 复合性情项：强剧情特权
   {
-    name: '吃软饭',
+    name: '红鸾庇佑',
     rank: '镇派',
     category: '命格',
     cost: 18,
