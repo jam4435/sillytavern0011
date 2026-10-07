@@ -90,6 +90,17 @@ function setBallHolder(match: MatchState, side: Side, holder: string): MatchStat
   };
 }
 
+/** 把 CPU 已决定的发起人投影为真实持球状态，供模拟或交还玩家控制。 */
+export function prepareMatchForPlan(match: MatchState, plan: PossessionPlan): MatchState {
+  if (!match.阵容[plan.offense].场上.includes(plan.initiator)) return match;
+  return {
+    ...match,
+    球权: plan.offense,
+    站位: setBallHolder(match, plan.offense, plan.initiator),
+    回合情境: plan.reason,
+  };
+}
+
 function chooseInitiator(match: MatchState, offense: Side, resolvePlayer: PlayerResolver, rng: RandomSource): string {
   const onCourt = match.阵容[offense].场上;
   const holder = match.站位[offense].find(spot => spot.持球)?.球员;
@@ -457,7 +468,7 @@ export function simulatePossession(
     ...(initialPlan.partner ? [initialPlan.partner] : []),
     ...(initialPlan.primaryDefender ? [initialPlan.primaryDefender] : []),
   ]);
-  let current = match;
+  let current = prepareMatchForPlan(match, initialPlan);
   let actor = initialPlan.initiator;
   let action = initialPlan.action;
   let partner = initialPlan.partner;
