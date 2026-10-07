@@ -326,6 +326,13 @@ function chooseBranch(resolution: ActionResolution, actor: PlayerData, rng: Rand
   const branches = resolution.contract.branches;
   if (branches.length === 1) return branches[0];
 
+  const driveTurnover = branches.find(branch => branch.id === 'drive-turnover');
+  if (driveTurnover) {
+    const matchup = Math.max(0, resolution.defenseScore - resolution.attackScore) * .003;
+    const chance = clamp(.14 + (70 - actor.attrs.ballControl) * .003 + matchup, .07, .27);
+    if (rng() < chance) return driveTurnover;
+  }
+
   const foul = branches.find(branch => branch.id === 'shooting-foul');
   if (foul && rng() < actionFoulChance(resolution.action, actor)) return foul;
 
@@ -359,7 +366,7 @@ function chooseBranch(resolution: ActionResolution, actor: PlayerData, rng: Rand
     return reset;
   }
 
-  return branches.find(branch => !['shooting-foul', 'and-one', 'offensive-foul', 'blocked-out'].includes(branch.id)) ?? branches[0];
+  return branches.find(branch => !['drive-turnover', 'shooting-foul', 'and-one', 'offensive-foul', 'blocked-out'].includes(branch.id)) ?? branches[0];
 }
 
 function cpuSettlement(
