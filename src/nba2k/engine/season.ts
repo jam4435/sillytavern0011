@@ -2,6 +2,8 @@ import { TEAMS } from '../data/teams';
 import type { MatchState } from './types';
 
 export type LeaguePhase = '常规赛' | '季后赛' | '休赛期';
+export type PlayoffRound = '首轮' | '分区半决赛' | '分区决赛' | '总决赛';
+export type PlayoffConference = 'East' | 'West' | 'Finals';
 
 export interface StandingRecord {
   胜: number;
@@ -29,6 +31,24 @@ export interface StoryHook {
   consumed?: boolean;
 }
 
+export interface PlayoffSeries {
+  id: string;
+  round: PlayoffRound;
+  conference: PlayoffConference;
+  teamA: string;
+  teamB: string;
+  seedA: number;
+  seedB: number;
+  winsA: number;
+  winsB: number;
+}
+
+export interface PlayoffState {
+  round: PlayoffRound;
+  series: PlayoffSeries[];
+  champion: string | null;
+}
+
 export interface LeagueState {
   赛季: '2015-16';
   日期: string;
@@ -37,6 +57,7 @@ export interface LeagueState {
   战绩: Record<string, StandingRecord>;
   伤病: InjuryRecord[];
   故事钩子: StoryHook[];
+  季后赛: PlayoffState | null;
 }
 
 export interface ScheduledGame {
@@ -46,11 +67,14 @@ export interface ScheduledGame {
   away: string;
   opponent: string;
   isHome: boolean;
+  stage?: '常规赛' | PlayoffRound;
 }
 
 const REGULAR_SEASON_GAMES = 82;
 const START_DATE = '2015-10-27';
 const END_DATE = '2016-04-13';
+const PLAYOFF_START_DATE = '2016-04-16';
+const PLAYOFF_HOME_PATTERN = ['A', 'A', 'B', 'B', 'A', 'B', 'A'] as const;
 
 function dateToUtc(iso: string): Date {
   return new Date(`${iso}T12:00:00Z`);
@@ -95,11 +119,12 @@ export function getScheduledGame(teamId: string, index: number): ScheduledGame |
     away: isHome ? opponent.id : teamId,
     opponent: opponent.id,
     isHome,
+    stage: '常规赛',
   };
 }
 
 export function formatScheduledOpponent(game: ScheduledGame | null): string {
-  if (!game) return '常规赛已结束';
+  if (!game) return '赛季阶段已结束';
   return `${game.isHome ? 'vs' : '@'} ${game.opponent}`;
 }
 
@@ -116,15 +141,14 @@ export function createLeagueState(playerTeamId: string): LeagueState {
     赛程索引: 0,
     战绩: Object.fromEntries(TEAMS.map(team => [team.id, emptyStanding()])),
     伤病: [],
-    故事钩子: [
-      {
-        id: 'opening-night-2015',
-        type: '赛历',
-        title: '揭幕周',
-        detail: '2015-16 赛季开幕，媒体开始建立新赛季叙事。',
-        createdDate: START_DATE,
-      },
-    ],
+    故事钩子: [{
+      id: 'opening-night-2015',
+      type: '赛历',
+      title: '揭幕周',
+      detail: '2015-16 赛季开幕，媒体开始建立新赛季叙事。',
+      createdDate: START_DATE,
+    }],
+    季后赛: null,
   };
 }
 
@@ -203,55 +227,6 @@ function mergeHooks(existing: StoryHook[], incoming: StoryHook[]): StoryHook[] {
   return [...existing, ...incoming.filter(hook => !seen.has(hook.id))];
 }
 
-export interface AdvanceSeasonResult {
-  league: LeagueState;
-  nextGame: ScheduledGame | null;
-}
-
-/**
- * 玩家比赛结束后推进一轮联盟：
- * 1. 记录真实玩家比赛；
- * 2. 低精度模拟其他球队同轮比赛；
- * 3. 推进固定赛历；
- * 4. 只生成轻量 StoryHook，不创建“万能事件”。
- */
-export function advanceLeagueAfterGame(
-  league: LeagueState,
-  playerTeamId: string,
-  match: MatchState,
-  rng: () => number = Math.random,
-): AdvanceSeasonResult {
-  const home = match.对阵.主队;
-  const away = match.对阵.客队;
-  let standings = recordResult(league.战绩, home, away, match.比分.主, match.比分.客);
-  standings = simulateOtherLeagueGames(standings, league.赛程索引, new Set([home, away]), rng);
-
-  const nextIndex = league.赛程索引 + 1;
-  const nextGame = getScheduledGame(playerTeamId, nextIndex);
-  const nextDate = nextGame?.date ?? END_DATE;
-  const nextPhase: LeaguePhase = nextGame ? '常规赛' : '季后赛';
-  const hooks = mergeHooks(
-    league.故事钩子,
-    calendarHooksForDate(nextDate).concat(
-      nextGame
-        ? []
-        : [{ id: 'playoffs-2016', type: '赛历' as const, title: '季后赛', detail: '常规赛结束，按东西部战绩生成季后赛席位与系列赛。', createdDate: nextDate }],
-    ),
-  );
-
-  return {
-    league: {
-      ...league,
-      日期: nextDate,
-      阶段: nextPhase,
-      赛程索引: nextIndex,
-      战绩: standings,
-      故事钩子: hooks,
-    },
-    nextGame,
-  };
-}
-
 export function conferenceStandings(league: LeagueState, conference: 'East' | 'West') {
   return TEAMS
     .filter(team => team.conference === conference)
@@ -263,4 +238,308 @@ export function conferenceStandings(league: LeagueState, conference: 'East' | 'W
       const bPct = bGames ? b.record.胜 / bGames : 0;
       return bPct - aPct || b.record.胜 - a.record.胜 || (b.record.得分 - b.record.失分) - (a.record.得分 - a.record.失分);
     });
+}
+
+function firstRoundPairs(league: LeagueState, conference: 'East' | 'West'): PlayoffSeries[] {
+  const seeds = conferenceStandings(league, conference).slice(0, 8);
+  const pairings = [[0, 7], [3, 4], [1, 6], [2, 5]] as const;
+  return pairings.map(([a, b], index) => ({
+    id: `2016-${conference}-R1-${index + 1}`,
+    round: '首轮' as const,
+    conference,
+    teamA: seeds[a].team.id,
+    teamB: seeds[b].team.id,
+    seedA: a + 1,
+    seedB: b + 1,
+    winsA: 0,
+    winsB: 0,
+  }));
+}
+
+export function createPlayoffState(league: LeagueState): PlayoffState {
+  return {
+    round: '首轮',
+    series: [...firstRoundPairs(league, 'East'), ...firstRoundPairs(league, 'West')],
+    champion: null,
+  };
+}
+
+function seriesWinner(series: PlayoffSeries): string | null {
+  return series.winsA >= 4 ? series.teamA : series.winsB >= 4 ? series.teamB : null;
+}
+
+function seriesContains(series: PlayoffSeries, teamId: string): boolean {
+  return series.teamA === teamId || series.teamB === teamId;
+}
+
+function playoffGameForSeries(series: PlayoffSeries, playerTeamId: string, index: number, date: string): ScheduledGame {
+  const gameNo = Math.min(6, series.winsA + series.winsB);
+  const homeA = PLAYOFF_HOME_PATTERN[gameNo] === 'A';
+  const home = homeA ? series.teamA : series.teamB;
+  const away = homeA ? series.teamB : series.teamA;
+  return {
+    index,
+    date,
+    home,
+    away,
+    opponent: series.teamA === playerTeamId ? series.teamB : series.teamA,
+    isHome: home === playerTeamId,
+    stage: series.round,
+  };
+}
+
+export function getNextPlayoffGame(league: LeagueState, playerTeamId: string): ScheduledGame | null {
+  const state = league.季后赛;
+  if (!state || state.champion) return null;
+  const series = state.series.find(item => seriesContains(item, playerTeamId) && !seriesWinner(item));
+  return series ? playoffGameForSeries(series, playerTeamId, league.赛程索引, league.日期) : null;
+}
+
+function simulateSeriesGame(series: PlayoffSeries, rng: () => number): PlayoffSeries {
+  if (seriesWinner(series)) return series;
+  const gameNo = Math.min(6, series.winsA + series.winsB);
+  const homeA = PLAYOFF_HOME_PATTERN[gameNo] === 'A';
+  const home = homeA ? series.teamA : series.teamB;
+  const away = homeA ? series.teamB : series.teamA;
+  const [homeScore, awayScore] = simulateScore(home, away, rng);
+  const winner = homeScore > awayScore ? home : away;
+  return {
+    ...series,
+    winsA: series.winsA + (winner === series.teamA ? 1 : 0),
+    winsB: series.winsB + (winner === series.teamB ? 1 : 0),
+  };
+}
+
+function simulateOtherPlayoffSeries(state: PlayoffState, playerTeamId: string, rng: () => number): PlayoffState {
+  return {
+    ...state,
+    series: state.series.map(series => seriesContains(series, playerTeamId) ? series : simulateSeriesGame(series, rng)),
+  };
+}
+
+function completeOtherSeries(state: PlayoffState, playerTeamId: string, rng: () => number): PlayoffState {
+  let next = state;
+  for (let guard = 0; guard < 7; guard++) {
+    const incompleteOther = next.series.some(series => !seriesContains(series, playerTeamId) && !seriesWinner(series));
+    if (!incompleteOther) break;
+    next = simulateOtherPlayoffSeries(next, playerTeamId, rng);
+  }
+  return next;
+}
+
+function winnerSeed(series: PlayoffSeries): { team: string; seed: number } {
+  const winner = seriesWinner(series);
+  if (!winner) throw new Error(`系列赛尚未结束：${series.id}`);
+  return winner === series.teamA ? { team: winner, seed: series.seedA } : { team: winner, seed: series.seedB };
+}
+
+function nextRoundState(state: PlayoffState): PlayoffState {
+  if (state.series.some(series => !seriesWinner(series))) return state;
+
+  const build = (
+    round: PlayoffRound,
+    conference: PlayoffConference,
+    left: PlayoffSeries,
+    right: PlayoffSeries,
+    id: string,
+  ): PlayoffSeries => {
+    const a = winnerSeed(left);
+    const b = winnerSeed(right);
+    const higher = a.seed <= b.seed ? a : b;
+    const lower = higher === a ? b : a;
+    return {
+      id,
+      round,
+      conference,
+      teamA: higher.team,
+      teamB: lower.team,
+      seedA: higher.seed,
+      seedB: lower.seed,
+      winsA: 0,
+      winsB: 0,
+    };
+  };
+
+  if (state.round === '首轮') {
+    const east = state.series.filter(series => series.conference === 'East');
+    const west = state.series.filter(series => series.conference === 'West');
+    return {
+      round: '分区半决赛',
+      series: [
+        build('分区半决赛', 'East', east[0], east[1], '2016-East-R2-1'),
+        build('分区半决赛', 'East', east[2], east[3], '2016-East-R2-2'),
+        build('分区半决赛', 'West', west[0], west[1], '2016-West-R2-1'),
+        build('分区半决赛', 'West', west[2], west[3], '2016-West-R2-2'),
+      ],
+      champion: null,
+    };
+  }
+
+  if (state.round === '分区半决赛') {
+    const east = state.series.filter(series => series.conference === 'East');
+    const west = state.series.filter(series => series.conference === 'West');
+    return {
+      round: '分区决赛',
+      series: [
+        build('分区决赛', 'East', east[0], east[1], '2016-East-R3'),
+        build('分区决赛', 'West', west[0], west[1], '2016-West-R3'),
+      ],
+      champion: null,
+    };
+  }
+
+  if (state.round === '分区决赛') {
+    const east = state.series.find(series => series.conference === 'East');
+    const west = state.series.find(series => series.conference === 'West');
+    if (!east || !west) throw new Error('分区决赛结构不完整');
+    return {
+      round: '总决赛',
+      series: [build('总决赛', 'Finals', east, west, '2016-Finals')],
+      champion: null,
+    };
+  }
+
+  const final = state.series[0];
+  return { ...state, champion: final ? seriesWinner(final) : null };
+}
+
+function recordPlayerPlayoffGame(state: PlayoffState, match: MatchState, playerTeamId: string): PlayoffState {
+  const winner = match.比分.主 > match.比分.客 ? match.对阵.主队 : match.对阵.客队;
+  return {
+    ...state,
+    series: state.series.map(series => {
+      if (!seriesContains(series, playerTeamId) || seriesWinner(series)) return series;
+      return {
+        ...series,
+        winsA: series.winsA + (winner === series.teamA ? 1 : 0),
+        winsB: series.winsB + (winner === series.teamB ? 1 : 0),
+      };
+    }),
+  };
+}
+
+function playoffHook(id: string, title: string, detail: string, date: string): StoryHook {
+  return { id, type: '赛历', title, detail, createdDate: date };
+}
+
+export interface AdvanceSeasonResult {
+  league: LeagueState;
+  nextGame: ScheduledGame | null;
+}
+
+/**
+ * 玩家比赛结束后推进联盟。
+ * 常规赛：记录真实比赛 + 低精度模拟其他球队 + 固定赛历。
+ * 季后赛：玩家系列赛使用真实结果；其他系列赛低精度模拟；七场四胜纯代码晋级。
+ */
+export function advanceLeagueAfterGame(
+  league: LeagueState,
+  playerTeamId: string,
+  match: MatchState,
+  rng: () => number = Math.random,
+): AdvanceSeasonResult {
+  if (league.阶段 === '季后赛' && league.季后赛) {
+    let playoffs = recordPlayerPlayoffGame(league.季后赛, match, playerTeamId);
+    playoffs = simulateOtherPlayoffSeries(playoffs, playerTeamId, rng);
+    const playerSeries = playoffs.series.find(series => seriesContains(series, playerTeamId));
+    const playerWinner = playerSeries ? seriesWinner(playerSeries) : null;
+    const nextIndex = league.赛程索引 + 1;
+    const nextDate = addDays(league.日期, 2);
+
+    if (playerSeries && playerWinner && playerWinner !== playerTeamId) {
+      const nextLeague: LeagueState = {
+        ...league,
+        日期: nextDate,
+        阶段: '休赛期',
+        赛程索引: nextIndex,
+        季后赛: playoffs,
+        故事钩子: mergeHooks(league.故事钩子, [
+          playoffHook(`eliminated-${playoffs.round}`, '季后赛出局', `球队在${playoffs.round}被淘汰，进入赛季总结与休赛期。`, nextDate),
+        ]),
+      };
+      return { league: nextLeague, nextGame: null };
+    }
+
+    if (playerSeries && playerWinner === playerTeamId) {
+      playoffs = completeOtherSeries(playoffs, playerTeamId, rng);
+      playoffs = nextRoundState(playoffs);
+
+      if (playoffs.champion) {
+        const nextLeague: LeagueState = {
+          ...league,
+          日期: nextDate,
+          阶段: '休赛期',
+          赛程索引: nextIndex,
+          季后赛: playoffs,
+          故事钩子: mergeHooks(league.故事钩子, [
+            playoffHook('champion-2016', 'NBA总冠军', `${playoffs.champion} 赢得 2015-16 NBA 总冠军。`, nextDate),
+          ]),
+        };
+        return { league: nextLeague, nextGame: null };
+      }
+
+      const advancedLeague: LeagueState = {
+        ...league,
+        日期: nextDate,
+        赛程索引: nextIndex,
+        季后赛: playoffs,
+        故事钩子: mergeHooks(league.故事钩子, [
+          playoffHook(`advance-${playoffs.round}`, `晋级${playoffs.round}`, `球队进入${playoffs.round}，下一轮系列赛已经确定。`, nextDate),
+        ]),
+      };
+      return { league: advancedLeague, nextGame: getNextPlayoffGame(advancedLeague, playerTeamId) };
+    }
+
+    const continuingLeague: LeagueState = {
+      ...league,
+      日期: nextDate,
+      赛程索引: nextIndex,
+      季后赛: playoffs,
+    };
+    return { league: continuingLeague, nextGame: getNextPlayoffGame(continuingLeague, playerTeamId) };
+  }
+
+  if (league.阶段 !== '常规赛') return { league, nextGame: null };
+
+  const home = match.对阵.主队;
+  const away = match.对阵.客队;
+  let standings = recordResult(league.战绩, home, away, match.比分.主, match.比分.客);
+  standings = simulateOtherLeagueGames(standings, league.赛程索引, new Set([home, away]), rng);
+
+  const nextIndex = league.赛程索引 + 1;
+  const nextGame = getScheduledGame(playerTeamId, nextIndex);
+  if (nextGame) {
+    const nextDate = nextGame.date;
+    return {
+      league: {
+        ...league,
+        日期: nextDate,
+        赛程索引: nextIndex,
+        战绩: standings,
+        故事钩子: mergeHooks(league.故事钩子, calendarHooksForDate(nextDate)),
+      },
+      nextGame,
+    };
+  }
+
+  const seededBase: LeagueState = { ...league, 战绩: standings };
+  const playoffs = createPlayoffState(seededBase);
+  const qualified = playoffs.series.some(series => seriesContains(series, playerTeamId));
+  const nextDate = PLAYOFF_START_DATE;
+  const hooks = mergeHooks(league.故事钩子, [
+    playoffHook('playoffs-2016', '季后赛', qualified ? '常规赛结束，球队获得季后赛席位，首轮对阵已生成。' : '常规赛结束，球队未进入季后赛，进入赛季总结与休赛期。', nextDate),
+  ]);
+  const nextLeague: LeagueState = {
+    ...league,
+    日期: nextDate,
+    阶段: qualified ? '季后赛' : '休赛期',
+    赛程索引: nextIndex,
+    战绩: standings,
+    故事钩子: hooks,
+    季后赛: playoffs,
+  };
+  return {
+    league: nextLeague,
+    nextGame: qualified ? getNextPlayoffGame(nextLeague, playerTeamId) : null,
+  };
 }
