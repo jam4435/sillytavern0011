@@ -30,6 +30,7 @@ import { simulateUntilInterruption } from './engine/simulationMode';
 import { advanceLeagueAfterGame, createLeagueState, formatScheduledOpponent, getScheduledGame } from './engine/season';
 import { advanceInjuryRecovery, collectOffCourtHooks } from './engine/offCourtSystems';
 import { defaultTeamTactics } from './engine/tendencies';
+import { applyAutomaticRotation, createRotationState } from './engine/rotation';
 
 function freshStatus(): OnCourtStatus {
   return {
@@ -64,6 +65,14 @@ function readSimulationMode(): SimulationMode {
     if (value === '全回合' || value === '精简比赛' || value === '关键时刻') return value;
   } catch {}
   return '精简比赛';
+}
+
+function targetMinutesForRole(role: NonNullable<Nba2kStat['生涯']>['球队角色']): number {
+  if (role === '核心') return 36;
+  if (role === '首发') return 32;
+  if (role === '第六人') return 28;
+  if (role === '轮换') return 18;
+  return 8;
 }
 
 function generatedText(result: string | GenerateToolCallResult): string {
@@ -377,6 +386,9 @@ const App: React.FC = () => {
       球员状态,
       回合摘要: `${openingPossession}队赢得跳球`,
     };
+    match.轮换 = createRotationState(match, getPlayer, {
+      [mySide]: { [protagonistKey]: targetMinutesForRole(career.球队角色) },
+    });
     await insertOrAssignVariables({ stat_data: { 比赛: match } }, { type: 'chat' });
     setStat(s => ({ ...s, 比赛: match }));
     await sendTurn(
@@ -394,10 +406,11 @@ const App: React.FC = () => {
 
       if (choice.action === '观察' || choice.action === '模拟一个回合') {
         const cpu = simulatePossession(match, getPlayer);
-        const patch: Record<string, unknown> = { 比赛: cpu.match };
-        if (match.进行中 && !cpu.match.进行中) {
-          const nextCareer = finishCareerGame(career, cpu.match);
-          Object.assign(patch, buildPostGamePatch(stat, nextCareer, cpu.match));
+        const rotated = cpu.possessionsCompleted ? applyAutomaticRotation(cpu.match, getPlayer) : cpu.match;
+        const patch: Record<string, unknown> = { 比赛: rotated };
+        if (match.进行中 && !rotated.进行中) {
+          const nextCareer = finishCareerGame(career, rotated);
+          Object.assign(patch, buildPostGamePatch(stat, nextCareer, rotated));
         }
         await sendTurn(
           `【CPU回合模拟】主角当前不直接控制这一攻。前端已完整模拟一个 possession：${cpu.summary}。请用100-220字简要演出这次攻防，不得改判或修改数值。`,
@@ -527,6 +540,10 @@ const App: React.FC = () => {
                 };
               }
             }
+          }
+
+          if (finalMatch.进行中 && finalMatch.回合阶段 === '常规回合' && finalMatch.投篮时钟 >= 20) {
+            finalMatch = applyAutomaticRotation(finalMatch, getPlayer);
           }
 
           let nextCareer = updateCareerDynamics(career, resolution, settled.settlement);
