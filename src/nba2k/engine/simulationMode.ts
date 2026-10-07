@@ -101,7 +101,7 @@ export function simulateUntilInterruption(
     const decision = shouldInterruptForPlan(mode, current, protagonist, plan);
     if (decision.interrupt) {
       return {
-        match: plan.initiator === protagonist ? prepareMatchForPlan(current, plan, resolvePlayer) : current,
+        match: prepareMatchForPlan(current, plan, resolvePlayer),
         summaries,
         possessions,
         nextPlan: plan,
@@ -121,7 +121,7 @@ export function simulateUntilInterruption(
   const nextPlan = planPossession(current, resolvePlayer, rng);
   const decision = shouldInterruptForPlan(mode, current, protagonist, nextPlan);
   return {
-    match: decision.interrupt && nextPlan.initiator === protagonist ? prepareMatchForPlan(current, nextPlan, resolvePlayer) : current,
+    match: decision.interrupt ? prepareMatchForPlan(current, nextPlan, resolvePlayer) : current,
     summaries,
     possessions,
     nextPlan,
