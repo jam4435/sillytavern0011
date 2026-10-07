@@ -12,7 +12,7 @@ export type RotationPlayerResolver = (key: string) => PlayerData | undefined;
 export type RotationOverrides = Partial<Record<Side, Record<string, number>>>;
 
 const POSITIONS: Position[] = ['PG', 'SG', 'SF', 'PF', 'C'];
-const BASE_MINUTES = [36, 35, 34, 32, 29, 25, 20, 14, 9, 4, 1, 1] as const;
+const BASE_MINUTES = [35, 34, 33, 31, 29, 25, 21, 15, 10, 5, 1, 1] as const;
 const opposite = (side: Side): Side => side === '主' ? '客' : '主';
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
@@ -138,10 +138,10 @@ function playerRotationScore(
     match.节次 >= 4 &&
     match.剩余秒数 <= 360 &&
     Math.abs(match.比分.主 - match.比分.客) <= 12
-      ? Math.max(0, player.overall - 72) * .32 + target * .10
+      ? Math.max(0, player.overall - 72) * .20 + target * .06
       : 0;
 
-  return player.overall + deficit / 12 + stamina + currentBonus + closing + foulPenalty(match, status.犯规);
+  return player.overall + deficit / 10 + stamina + currentBonus + closing + foulPenalty(match, status.犯规);
 }
 
 function positionFit(player: PlayerData, position: Position): number {
