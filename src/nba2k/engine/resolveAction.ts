@@ -185,6 +185,15 @@ function branchesFor(input: ResolveInput, tier: ResultTier): SettlementBranch[] 
     ];
     if (tier === '部分成功') return [
       scoringBranch(input, '失败', points, 'contested-miss'),
+      ...((input.action === '突破终结' || input.action === '突破急停') ? [{
+        id: 'drive-turnover',
+        label: '突破中掉球',
+        scoreDelta: { 主: 0, 客: 0 },
+        possession: theirs,
+        nextPhase: '常规回合' as const,
+        statDeltas: [stat(input.actor.name, '失误', 1)],
+        pending: { type: 'none' as const },
+      }] : []),
       {
         ...scoringBranch(input, '失败', points, 'blocked-out'),
         label: '被封堵出界',
@@ -200,6 +209,15 @@ function branchesFor(input: ResolveInput, tier: ResultTier): SettlementBranch[] 
     ];
     if (tier === '失败') return [
       scoringBranch(input, tier, points, 'miss'),
+      ...((input.action === '突破终结' || input.action === '突破急停') ? [{
+        id: 'drive-turnover',
+        label: '突破被破坏并掉球',
+        scoreDelta: { 主: 0, 客: 0 },
+        possession: theirs,
+        nextPhase: '常规回合' as const,
+        statDeltas: [stat(input.actor.name, '失误', 1)],
+        pending: { type: 'none' as const },
+      }] : []),
       shootingFoulBranch(input, points),
     ];
     return [
@@ -281,17 +299,26 @@ export function resolveAction(input: ResolveInput): ActionResolution {
   const mods = situationalModifiers(input, help.players.length, help.weight);
   const body = bodyMatchup(input.actor, input.defender);
   if (Math.abs(body) >= .5) mods.push({ label: '体型对抗', value: Math.round(body * 10) / 10 });
-  const modifierTotal = mods.reduce((sum, item) => sum + item.value, 0);
   const baseShot = shotBase(input.action);
   const baseRate = baseShot === null ? clamp(50 + (attackScore - defenseScore) * 1.05, 10, 92) : shotProbability(input, defenseScore, help.weight) * 100;
-  const finalRate = Math.round(clamp(baseRate + modifierTotal, 3, 95));
 
   const stages: ActionResolution['stages'] = [];
+  let separationModifier = 0;
   if (spec.family === '突破' || spec.family === '挡拆') {
     const separationRate = Math.round(clamp(50 + (attackScore - primaryDefense) * 1.1 + body, 5, 95));
     const separationRoll = roll(input);
-    stages.push({ id: 'separation', label: '创造分离', attackScore: Math.round(attackScore), defenseScore: Math.round(primaryDefense), successRate: separationRate, roll: separationRoll, tier: tierOf(separationRoll, separationRate) });
+    const separationTier = tierOf(separationRoll, separationRate);
+    separationModifier =
+      separationTier === '大成功' ? 7 :
+      separationTier === '成功' ? 4 :
+      separationTier === '部分成功' ? 0 :
+      separationTier === '失败' ? -5 :
+      -9;
+    stages.push({ id: 'separation', label: '创造分离', attackScore: Math.round(attackScore), defenseScore: Math.round(primaryDefense), successRate: separationRate, roll: separationRoll, tier: separationTier });
   }
+  if (separationModifier) mods.push({ label: '分离质量', value: separationModifier });
+  const modifierTotal = mods.reduce((sum, item) => sum + item.value, 0);
+  const finalRate = Math.round(clamp(baseRate + modifierTotal, 3, 95));
   const finalRoll = roll(input);
   const tier = tierOf(finalRoll, finalRate);
   stages.push({ id: baseShot === null ? 'execution' : 'shot', label: baseShot === null ? '动作执行' : '出手结算', attackScore: Math.round(attackScore), defenseScore: Math.round(defenseScore), successRate: finalRate, roll: finalRoll, tier });
