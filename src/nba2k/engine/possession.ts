@@ -208,16 +208,6 @@ function actionWeights(player: PlayerData, match: MatchState, side: Side): { ite
     if (entry) entry.weight *= factor;
   };
 
-  boost('安全传球', 1.35);
-  boost('跨场转移', 1.28);
-  boost('突破分球', 1.18);
-  if (t.passing >= 85) {
-    boost('安全传球', 1.18);
-    boost('跨场转移', 1.15);
-    boost('顺下传球', 1.12);
-    boost('外弹传球', 1.12);
-  }
-
   if (scheme === '挡拆') {
     boost('挡拆突破', 2.0);
     boost('顺下传球', 1.7);
@@ -232,16 +222,14 @@ function actionWeights(player: PlayerData, match: MatchState, side: Side): { ite
     boost('突破分球', 1.35);
     boost('背身单打', .35);
   } else if (scheme === '四外一内') {
-    boost('突破分球', 1.32);
-    boost('安全传球', 1.18);
-    boost('跨场转移', 1.12);
+    boost('突破分球', 1.28);
     boost('背身单打', 1.25);
     boost('定点投篮', 1.18);
   } else if (scheme === '动态进攻') {
-    boost('安全传球', 1.55);
-    boost('跨场转移', 1.45);
-    boost('定点投篮', 1.18);
-    boost('突破分球', 1.35);
+    boost('安全传球', 1.25);
+    boost('跨场转移', 1.18);
+    boost('定点投篮', 1.22);
+    boost('突破分球', 1.18);
   }
 
   return weights;
@@ -447,6 +435,35 @@ function resolveOneAction(
     if (holder) next = { ...next, 站位: rebuildCourt(next, next.球权, holder, resolvePlayer) };
   }
   return { match: next, resolution, branch };
+}
+
+function implicitAssistChance(action: ActionType): number {
+  if (action === '定点投篮') return .82;
+  if (action === '急停投篮' || action === '突破急停') return .30;
+  if (action === '突破终结') return .20;
+  if (action === '背身单打') return .14;
+  if (action === '后撤步') return .08;
+  return .18;
+}
+
+function chooseImplicitPasser(
+  match: MatchState,
+  offense: Side,
+  scorer: string,
+  resolvePlayer: PlayerResolver,
+  rng: RandomSource,
+): string | null {
+  const candidates = match.阵容[offense].场上.filter(key => key !== scorer);
+  if (!candidates.length) return null;
+  return weightedPick(
+    candidates.map(key => {
+      const player = playerOrThrow(resolvePlayer, key);
+      const t = cpuTendencies(player);
+      const creation = t.passing * .72 + t.initiation * .28;
+      return { item: key, weight: Math.pow(Math.max(8, creation), 1.35) };
+    }),
+    rng,
+  );
 }
 
 function addAssist(match: MatchState, passer: string): MatchState {
@@ -710,7 +727,15 @@ export function simulatePossession(
     } else if (outcome.branch.id === 'reset') assistCandidate = null;
 
     const fieldGoalScored = outcome.branch.scoreDelta[initialOffense] > 0;
-    if (fieldGoalScored && assistCandidate && assistCandidate !== actor) current = addAssist(current, assistCandidate);
+    if (fieldGoalScored && assistCandidate && assistCandidate !== actor) {
+      current = addAssist(current, assistCandidate);
+    } else if (fieldGoalScored && rng() < implicitAssistChance(action)) {
+      const passer = chooseImplicitPasser(current, initialOffense, actor, resolvePlayer, rng);
+      if (passer) {
+        current = addAssist(current, passer);
+        involved.add(passer);
+      }
+    }
 
     if (current.回合阶段 === '罚球结算') current = settleFreeThrows(current, resolvePlayer, rng);
     if (current.回合阶段 === '篮板争抢') current = settleRebound(current, resolvePlayer, rng);
