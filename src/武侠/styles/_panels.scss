@@ -2850,6 +2850,7 @@
   gap: 0.75rem;
 
   strong {
+    color: var(--secret-art-color, #d97706);
     font-family: var(--font-serif);
     font-size: 0.95rem;
   }
@@ -2865,6 +2866,8 @@
 .workbench-secret-art-action {
   justify-self: end;
   min-width: 5.5rem;
+  color: var(--secret-art-color, #d97706);
+  border-color: color-mix(in srgb, var(--secret-art-color, #d97706) 38%, transparent);
 }
 
 .workbench-trait-list {
