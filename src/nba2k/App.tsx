@@ -19,7 +19,6 @@ import { advancePeriodIfNeeded, settleAssistantResponse } from './engine/settlem
 import { createDevelopment, defaultBadges, defaultHotZones, defaultTendencies, initialGroups } from './engine/development';
 import type { MatchState, OnCourtStatus, Side, SituationContext, StructuredTeamTactics, UpgradeGroupKey } from './engine/types';
 import { getPlayer, getRoster, getTeam, pickStarters, registerCustomPlayer, starterEntriesWith } from './utils/rosters';
-import { TEAMS } from './data/teams';
 import type { Nba2kStat } from './utils/statReader';
 import { getLastAssistantNarrative, isInMatch, parseOptions, readStat, stripNarrative } from './utils/statReader';
 import { runTurnTransaction } from './utils/turnTransaction';
