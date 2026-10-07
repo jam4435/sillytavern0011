@@ -215,9 +215,9 @@ const surrounding = rawSurrounding && typeof rawSurrounding === 'object' && !Arr
   ? rawSurrounding
   : {};
 const reachableLocations = uniqueFullLocationPaths([
-  ...(Array.isArray(surrounding.普通移动) ? surrounding.普通移动 : []),
-  ...(Array.isArray(surrounding.事件目标) ? surrounding.事件目标 : []),
-  ...(Array.isArray(surrounding.地图指定) ? surrounding.地图指定 : []),
+  ...(Array.isArray(surrounding.附近地点) ? surrounding.附近地点 : []),
+  ...(Array.isArray(surrounding.目标事件地点) ? surrounding.目标事件地点 : []),
+  ...(Array.isArray(surrounding.地图移动目的地) ? surrounding.地图移动目的地 : []),
 ]);
 const currentFullLocation = normalizeFullLocationPath(variables.stat_data.user数据?.所在位置);
 const currentScope = getLocationScopePath(surrounding.当前活动区) || getLocationScopePath(currentFullLocation);
