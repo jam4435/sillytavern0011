@@ -315,13 +315,17 @@ export const EVENT_AUDIT_REGEX_RULE: RegexRule = {
   originScope: 'manual',
 };
 
-/** 过滤事件进度短标签正则 - 移除 <射雕第一回04> 等回目因果阶段标签 */
+/** 旧版回目短标签的默认模式，用于识别尚未修改的已保存规则 */
+const LEGACY_EVENT_STAGE_TAG_PATTERN = '/<([^\\s>]+第[^\\s>]+回\\d+[^>]*)>[\\s\\S]*?<\\/\\1>/gi';
+
+/** 过滤当前 <事件记录> 与旧版回目阶段标签，只影响正文显示 */
 export const EVENT_STAGE_TAG_REGEX_RULE: RegexRule = {
   id: 'wuxia-filter-event-stage-tag',
-  pattern: '/<([^\\s>]+第[^\\s>]+回\\d+[^>]*)>[\\s\\S]*?<\\/\\1>/gi',
+  pattern:
+    '/<事件记录\\s*>[\\s\\S]*?<\\/事件记录\\s*>|<([^\\s>]+第[^\\s>]+回\\d+[^>]*)>[\\s\\S]*?<\\/\\1>/gi',
   replacement: '',
   enabled: true,
-  description: '过滤事件进度标签',
+  description: '过滤事件记录与旧进度标签',
   originScope: 'manual',
 };
 
@@ -679,11 +683,23 @@ function normalizeLocalRegexRules(rules: Partial<RegexRule>[] | undefined): Rege
   const existingIds = new Set<string>();
 
   normalizedRules.forEach(rule => {
-    if (existingIds.has(rule.id)) {
+    // 已保存的旧内置正则只在仍是原默认模式时同步升级；保留用户的开关和自定义规则。
+    const nextRule =
+      rule.id === EVENT_STAGE_TAG_REGEX_RULE.id &&
+      rule.pattern === LEGACY_EVENT_STAGE_TAG_PATTERN &&
+      rule.replacement === ''
+        ? {
+            ...rule,
+            pattern: EVENT_STAGE_TAG_REGEX_RULE.pattern,
+            description:
+              rule.description === '过滤事件进度标签' ? EVENT_STAGE_TAG_REGEX_RULE.description : rule.description,
+          }
+        : rule;
+    if (existingIds.has(nextRule.id)) {
       return;
     }
-    existingIds.add(rule.id);
-    nextRules.push(rule);
+    existingIds.add(nextRule.id);
+    nextRules.push(nextRule);
   });
 
   // 确保所有内置默认规则均存在（已有规则中缺失的内置规则按序补齐）
