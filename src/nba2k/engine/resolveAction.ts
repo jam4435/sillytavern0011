@@ -155,7 +155,7 @@ function branchesFor(input: ResolveInput, tier: ResultTier): SettlementBranch[] 
     if (tier === '失败') return [scoringBranch(input, tier, points, 'miss')];
     return [{ id: 'offensive-foul', label: '进攻犯规', scoreDelta: { 主: 0, 客: 0 }, possession: theirs, nextPhase: '死球', statDeltas: [stat(input.actor.name, '失误', 1), stat(input.actor.name, '犯规', 1)], pending: { type: 'deadBall', reason: '进攻犯规', inboundSide: theirs } }];
   }
-  if (family === '传球' || family === '挡拆' || family === '无球') {
+  if (family === '传球' || family === '挡拆' || family === '无球' || input.action === '突破分球') {
     if (tier === '大失败') return [{ id: 'turnover', label: '传球/配合失误', scoreDelta: { 主: 0, 客: 0 }, possession: theirs, nextPhase: '常规回合', statDeltas: [stat(input.actor.name, '失误', 1)], pending: { type: 'none' } }];
     return [{ id: tier === '失败' ? 'reset' : 'advantage', label: tier === '失败' ? '进攻重置' : '创造进攻优势', scoreDelta: { 主: 0, 客: 0 }, possession: mine, nextPhase: '常规回合', statDeltas: [], pending: { type: 'none' } }];
   }
