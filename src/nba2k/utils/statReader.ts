@@ -3,18 +3,21 @@ import type { MatchState } from '../engine/types';
 import {
   careerStateSchema,
   formatStatValidationIssues,
+  leagueStateSchema,
   nba2kStatSchema,
   offCourtStateSchema,
 } from '../schema';
 
 export type CareerState = z.infer<typeof careerStateSchema>;
 export type OffCourtState = z.infer<typeof offCourtStateSchema>;
+export type LeagueState = z.infer<typeof leagueStateSchema>;
 
 export interface Nba2kStat {
   版本: 3;
   比赛: MatchState | null;
   生涯: CareerState | null;
   场外: OffCourtState | null;
+  联盟: LeagueState | null;
   /** 非持久化字段；非空时 UI 必须进入错误恢复页。 */
   validationErrors: string[];
 }
@@ -24,6 +27,7 @@ const EMPTY_STAT: Nba2kStat = {
   比赛: null,
   生涯: null,
   场外: null,
+  联盟: null,
   validationErrors: [],
 };
 
@@ -44,6 +48,7 @@ export function parseStatData(raw: unknown): Nba2kStat {
   return {
     ...result.data,
     比赛: result.data.比赛 as MatchState | null,
+    联盟: result.data.联盟,
     validationErrors: [],
   };
 }
