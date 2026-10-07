@@ -109,13 +109,13 @@ export function applySettlement(match: MatchState, settlement: NormalizedSettlem
           ...current,
           上场秒数: current.上场秒数 + consumed,
           // 所有人都会因上场时间缓慢掉体力；持球/对抗者还会再吃动作额外消耗。
-          体力: clamp(current.体力 - consumed / 180, 0, 100),
+          体力: clamp(current.体力 - consumed / 130, 0, 100),
         };
       }
     }
     for (const player of match.阵容[side].替补) {
       const current = statuses[player];
-      if (current) statuses[player] = { ...current, 体力: Math.min(100, current.体力 + consumed / 60) };
+      if (current) statuses[player] = { ...current, 体力: Math.min(100, current.体力 + consumed / 180) };
     }
   }
   for (const delta of branch.statDeltas) {
