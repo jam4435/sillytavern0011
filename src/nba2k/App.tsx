@@ -333,8 +333,10 @@ const App: React.FC = () => {
     const mySide: Side = isHome ? '主' : '客';
 
     const protagonistKey = (career as any).附身球员 ?? '';
-    const homeEntries = homeId === myTeamId ? starterEntriesWith(homeId, protagonistKey) : starterEntriesWith(homeId, '');
-    const awayEntries = awayId === myTeamId ? starterEntriesWith(awayId, protagonistKey) : starterEntriesWith(awayId, '');
+    const protagonistStarts = career.球队角色 === '首发' || career.球队角色 === '核心';
+    const myTeamEntries = protagonistStarts ? starterEntriesWith(myTeamId, protagonistKey) : starterEntriesWith(myTeamId, '');
+    const homeEntries = homeId === myTeamId ? myTeamEntries : starterEntriesWith(homeId, '');
+    const awayEntries = awayId === myTeamId ? myTeamEntries : starterEntriesWith(awayId, '');
     const homeCenter = getPlayer(homeEntries.find(entry => entry.pos === 'C')?.key ?? homeEntries.at(-1)?.key ?? '');
     const awayCenter = getPlayer(awayEntries.find(entry => entry.pos === 'C')?.key ?? awayEntries.at(-1)?.key ?? '');
     const jumpScore = (player: typeof homeCenter) =>
