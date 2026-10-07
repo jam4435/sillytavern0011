@@ -462,9 +462,10 @@ export function continuePossessionAfterAdvantage(
   rng: RandomSource = Math.random,
 ): PossessionResult {
   const candidates = match.阵容[offense].场上;
+  const currentHolder = match.站位[offense].find(spot => spot.持球)?.球员 ?? candidates[0] ?? '';
   const actor = preferredActor && candidates.includes(preferredActor)
     ? preferredActor
-    : match.站位[offense].find(spot => spot.持球)?.球员 ?? candidates[0];
+    : bestFinisher(match, offense, currentHolder, resolvePlayer, rng);
   if (!actor) throw new Error('延续进攻时找不到合法终结者');
   const player = playerOrThrow(resolvePlayer, actor);
   const action = finishingAction(player, match, offense, rng);
