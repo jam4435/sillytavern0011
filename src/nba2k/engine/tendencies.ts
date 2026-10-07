@@ -26,7 +26,7 @@ export interface CpuTendencies {
  */
 export function deriveCpuTendencies(player: PlayerData): CpuTendencies {
   const a = player.attrs;
-  const guardBias = player.pos === 'PG' ? 10 : player.pos === 'SG' ? 4 : player.pos === 'SF' ? 1 : -6;
+  const guardBias = player.pos === 'PG' ? 10 : player.pos === 'SG' ? 4 : player.pos === 'SF' ? 1 : player.pos === 'PF' ? -5 : -12;
   const bigBias = player.pos === 'PF' || player.pos === 'C' ? 10 : 0;
   const usage = clamp(
     8 +
