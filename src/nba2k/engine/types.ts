@@ -278,7 +278,7 @@ export interface SettlementProposal {
 
 export interface NormalizedSettlement extends SettlementProposal {
   branch: SettlementBranch;
-  source: 'model' | 'repair' | 'fallback';
+  source: 'model' | 'repair' | 'fallback' | 'cpu';
 }
 
 export interface ActionResolution {
