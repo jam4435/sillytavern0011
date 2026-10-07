@@ -477,6 +477,14 @@ export function simulatePossession(
 
   for (let index = 0; index < maxSteps && current.进行中; index++) {
     if (current.球权 !== initialOffense) break;
+
+    // 最后一步必须是真正的终结动作，避免完整 possession 停在“传导成功/创造优势”。
+    if (index === maxSteps - 1 && ['传球', '挡拆', '无球'].includes(ACTION_SPECS[action].family)) {
+      const finisher = playerOrThrow(resolvePlayer, actor);
+      action = finishingAction(finisher, current, initialOffense, rng);
+      partner = null;
+    }
+
     const beforeScore = current.比分[initialOffense];
     const outcome = resolveOneAction(current, initialOffense, actor, action, partner, resolvePlayer, rng);
     current = outcome.match;
@@ -513,18 +521,6 @@ export function simulatePossession(
       partner = null;
       current = { ...current, 站位: setBallHolder(current, initialOffense, actor) };
     }
-  }
-
-  // 三阶段仍未终结时，最后强制以当前持球人的一次终结完成 possession，避免无限“传导成功”。
-  if (current.进行中 && current.球权 === initialOffense && steps.length >= maxSteps) {
-    const holder = current.站位[initialOffense].find(spot => spot.持球)?.球员 ?? actor;
-    const finisher = playerOrThrow(resolvePlayer, holder);
-    const final = resolveOneAction(current, initialOffense, holder, finishingAction(finisher, current, initialOffense, rng), null, resolvePlayer, rng);
-    current = final.match;
-    steps.push({ actor: holder, action: final.resolution.action, partner: null, tier: final.resolution.tier, branchId: final.branch.id, label: final.branch.label });
-    if (current.回合阶段 === '罚球结算') current = settleFreeThrows(current, resolvePlayer, rng);
-    if (current.回合阶段 === '篮板争抢') current = settleRebound(current, resolvePlayer, rng);
-    current = normalizeDeadBall(current);
   }
 
   const summary = steps
