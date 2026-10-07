@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createDevelopment, defaultBadges, defaultBody, defaultHotZones, defaultTendencies, initialGroups } from './engine/development';
 import type { MatchState, OnCourtStatus } from './engine/types';
 import { nba2kStatSchema } from './schema';
+import { createLeagueState } from './engine/season';
 import { buildCustomPlayer } from './utils/customPlayer';
 import { parseStatData } from './utils/statReader';
 
@@ -28,6 +29,7 @@ function validStat() {
     版本: 3 as const, 比赛: match,
     生涯: { 姓名: '主角', 球队: 'GSW', 位置: 'SG' as const, 附身球员: player.name, 自定义球员: player, 赛季: '2015-16', 赛程索引: 1, 能力: { overall: player.overall, ...player.attrs }, 发展: createDevelopment('2K16模式', '均衡', groups), 倾向: defaultTendencies(), 动态徽章: defaultBadges(), 热区: defaultHotZones(), 教练信任: 30, 球队角色: '轮换' as const, 赛季统计: { 出场数: 0 }, 成长点: 0 },
     场外: { 资金: 0, 声望: 0, 粉丝: 0, 经纪人: null, 代言: [], 合同: null, 关系: [], 队友好感: {}, 日程: { 日期: '2015-10-27', 下一场: 'vs CLE', 待办: [] } },
+    联盟: createLeagueState('GSW'),
   };
 }
 
@@ -37,7 +39,7 @@ describe('v3 schema', () => {
     expect(parseStatData(validStat()).validationErrors).toEqual([]);
     expect(parseStatData({ ...validStat(), 版本: 2 }).validationErrors.join('')).toContain('3');
   });
-  it('空 stat_data 是合法未建档', () => expect(parseStatData({})).toEqual({ 版本: 3, 比赛: null, 生涯: null, 场外: null, validationErrors: [] }));
+  it('空 stat_data 是合法未建档', () => expect(parseStatData({})).toEqual({ 版本: 3, 比赛: null, 生涯: null, 场外: null, 联盟: null, validationErrors: [] }));
   it('拦截越界和统计不变量', () => {
     const raw = validStat();
     raw.比赛.球员状态['MyPlayer_主角'].投篮命中 = 2;
