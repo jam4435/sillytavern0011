@@ -465,17 +465,11 @@ const App: React.FC = () => {
             async repairPrompt => generatedText(await generate({ should_stream: false, user_input: repairPrompt })),
             (normalized, nextMatch) => {
               let nextCareer = updateCareerDynamics(career, resolution, normalized);
-              const patch: Record<string, unknown> = {};
               if (match.进行中 && !nextMatch.进行中) {
                 nextCareer = finishCareerGame(nextCareer, nextMatch);
-                if (stat.场外) {
-                  const opponents = TEAMS.filter(team => team.id !== nextCareer.球队);
-                  const nextOpponent = opponents[nextCareer.赛程索引 % opponents.length];
-                  const date = new Date(`${stat.场外.日程.日期}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + 2);
-                  patch.场外 = { ...stat.场外, 日程: { 日期: date.toISOString().slice(0, 10), 下一场: `vs ${nextOpponent.id}`, 待办: ['恢复训练', '下一场比赛'] } };
-                }
+                return buildPostGamePatch(stat, nextCareer, nextMatch);
               }
-              return { 生涯: nextCareer, ...patch };
+              return { 生涯: nextCareer };
             },
           );
           if (settled.validationErrors.length) console.warn('[nba2k] settlement repaired/fallback', settled.validationErrors);
