@@ -1,4 +1,5 @@
 import { planPossession, prepareMatchForPlan, simulatePossession } from './possession';
+import { applyAutomaticRotation } from './rotation';
 import type { PlayerResolver, PossessionPlan, RandomSource } from './possession';
 import type { MatchState, Side } from './types';
 
@@ -109,7 +110,7 @@ export function simulateUntilInterruption(
       };
     }
     const result = simulatePossession(current, resolvePlayer, { rng, plan });
-    current = result.match;
+    current = result.possessionsCompleted ? applyAutomaticRotation(result.match, resolvePlayer) : result.match;
     possessions += result.possessionsCompleted;
     summaries.push(result.summary);
   }
