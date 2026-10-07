@@ -58,6 +58,11 @@ describe('v3 multi-stage resolution', () => {
     expect(shotProbability({ ...base, actor: strong }, 90, 2)).toBeLessThan(shotProbability({ ...base, actor: strong }, 55, 0));
     expect(shotProbability({ ...base, actor: weak }, 99, 20)).toBeGreaterThanOrEqual(.03);
   });
+  it('突破分球按传球型回合处理，不再掉入占位 simulated 分支', () => {
+    const result = resolve('突破分球', [20, 20]);
+    expect(result.contract.branches.some(branch => branch.id === 'advantage' || branch.id === 'reset' || branch.id === 'turnover')).toBe(true);
+    expect(result.contract.branches.every(branch => branch.id !== 'simulated')).toBe(true);
+  });
   it('大成功投篮提供命中/加罚合法分支，大失败不会产生模型自由得分', () => {
     const great = resolve('后撤步', [1]);
     expect(great.tier).toBe('大成功');
