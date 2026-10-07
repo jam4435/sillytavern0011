@@ -71,6 +71,7 @@ describe('PossessionEngine broad NBA-like calibration', () => {
       const plan = planPossession(freshMatch('GSW', 'CLE'), getPlayer, rng);
       counts[plan.initiator] = (counts[plan.initiator] ?? 0) + 1;
     }
+    console.info('[nba2k calibration] GSW initiators', counts);
     expect(counts['Stephen Curry']).toBeGreaterThan(counts['Andrew Bogut'] * 1.7);
     expect(counts['Stephen Curry']).toBeGreaterThan(counts['Klay Thompson']);
   });
@@ -99,6 +100,17 @@ describe('PossessionEngine broad NBA-like calibration', () => {
     const ftr = fta / Math.max(1, fga);
     const tovRate = tov / trials;
     const orebPerMiss = oreb / Math.max(1, misses);
+
+    console.info('[nba2k calibration] GSW vs CLE', {
+      ppp,
+      threeRate,
+      ftr,
+      tovRate,
+      orebPerMiss,
+      assists,
+      fga,
+      fta,
+    });
 
     expect(ppp).toBeGreaterThan(.85);
     expect(ppp).toBeLessThan(1.35);
