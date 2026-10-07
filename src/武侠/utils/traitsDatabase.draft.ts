@@ -318,9 +318,9 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
   },
   {
     name: '移花接木',
-    rank: '缺陷',
-    category: '缺陷',
-    cost: -6,
+    rank: '上乘',
+    category: '命格',
+    cost: 14,
     description: '命带绿云，极易遭遇枕边人背叛，却心甘情愿替他人养育子女，抚养后代毫无芥蒂。',
     flavorPrompt: '极易在剧情中遭遇伴侣背叛并替他人抚育螟蛉子，且对非亲生骨肉毫无芥蒂、视若己出；所养螟蛉子的功法与修为进境会与自身形成奇异牵连，彼此同步映照。',
   },
@@ -487,9 +487,9 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
   // 进阶体质项：初阶因果宿命
   {
     name: '苦主命格',
-    rank: '传家',
-    category: '命格',
-    cost: 8,
+    rank: '缺陷',
+    category: '缺陷',
+    cost: -3,
     description: '命中注定多遇绿帽情劫，伴侣极易红杏出墙或被他人所夺。',
     flavorPrompt: '命带苦主绿帽因果，伴侣极易背着主角私通或移情别恋。',
   },
