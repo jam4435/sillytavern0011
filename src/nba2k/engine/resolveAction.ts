@@ -46,38 +46,43 @@ function bodyMatchup(actor: PlayerData, defender: PlayerData | null): number {
 
 function situationalModifiers(input: ResolveInput, helpCount: number, helpWeight: number): { label: string; value: number }[] {
   const { actorStatus, situation } = input;
+  const family = ACTION_SPECS[input.action].family;
   const mods: { label: string; value: number }[] = [];
-  if (actorStatus.体力 < 20) mods.push({ label: '体力透支', value: -12 });
-  else if (actorStatus.体力 < 40) mods.push({ label: '体力下降', value: -6 });
-  if (actorStatus.手感 === '热') mods.push({ label: '手感火热', value: 4 });
-  if (actorStatus.手感 === '冷') mods.push({ label: '手感冰冷', value: -4 });
-  if (situation.isClutch) mods.push({ label: '关键时刻镇定', value: (input.actor.attrs.composure - 70) * .12 });
-  if (situation.mismatch) mods.push({ label: '错位', value: 6 });
-  if (situation.coverage === 'open') mods.push({ label: '空位', value: 8 });
-  if (situation.coverage === 'tight') mods.push({ label: '严防', value: -8 });
-  if (helpCount) mods.push({ label: `协防×${helpCount}`, value: -Math.min(10, Math.round(helpWeight * 4)) });
-  if (situation.offenseTactic?.offense === '五外') mods.push({ label: '五外空间', value: 4 });
-  if (situation.defenseTactic?.defense === '二三联防') mods.push({ label: '联防收缩', value: -3 });
+  if (actorStatus.体力 < 20) mods.push({ label: '体力透支', value: -10 });
+  else if (actorStatus.体力 < 40) mods.push({ label: '体力下降', value: -5 });
+  if (actorStatus.手感 === '热') mods.push({ label: '手感火热', value: 3 });
+  if (actorStatus.手感 === '冷') mods.push({ label: '手感冰冷', value: -3 });
+  if (situation.isClutch) mods.push({ label: '关键时刻镇定', value: (input.actor.attrs.composure - 70) * .08 });
+  if (situation.mismatch) mods.push({ label: '错位', value: 4 });
+  if (situation.coverage === 'open') mods.push({ label: '空位', value: 5 });
+  if (situation.coverage === 'tight') mods.push({ label: '严防', value: -5 });
+  if (helpCount) mods.push({ label: `协防×${helpCount}`, value: -Math.min(5, Math.round(helpWeight * 3)) });
+  if (situation.offenseTactic?.offense === '五外') mods.push({ label: '五外空间', value: 1.5 });
+  if (situation.defenseTactic?.defense === '二三联防') mods.push({ label: '联防收缩', value: -2 });
   if (situation.actorSpot && situation.teammateSpots) {
-    const crowding = situation.teammateSpots.filter(spot => spot.球员 !== input.actor.name && Math.hypot(spot.x - situation.actorSpot!.x, spot.y - situation.actorSpot!.y) < 10).length;
-    if (crowding) mods.push({ label: '进攻空间拥挤', value: -Math.min(6, crowding * 2) });
+    const crowding = situation.teammateSpots.filter(spot => spot.球员 !== input.actor.name && Math.hypot(spot.x - situation.actorSpot!.x, spot.y - situation.actorSpot!.y) < 9).length;
+    if (crowding) mods.push({ label: '进攻空间拥挤', value: -Math.min(4, crowding * 1.5) });
   }
-  if (ACTION_SPECS[input.action].family === '挡拆') {
+  if (family === '挡拆') {
     const scheme = situation.defenseTactic?.defense;
     if (scheme === '换防') mods.push({ label: '挡拆换防', value: -2 });
-    if (scheme === '沉退' && (input.action === '挡拆突破' || input.action === '顺下传球')) mods.push({ label: '沉退护框', value: -4 });
-    if (scheme === '延误') mods.push({ label: '夹击延误', value: -4 });
+    if (scheme === '沉退' && (input.action === '挡拆突破' || input.action === '顺下传球')) mods.push({ label: '沉退护框', value: -3 });
+    if (scheme === '延误') mods.push({ label: '夹击延误', value: -3 });
+  }
+  if (situation.advantageModifier) mods.push({ label: '前序创造优势', value: clamp(situation.advantageModifier, -6, 8) });
+  if (situation.turnoverPressure && (family === '传球' || family === '挡拆' || input.action === '突破分球')) {
+    mods.push({ label: '持球压力', value: -clamp(situation.turnoverPressure, 0, 8) });
   }
   if (situation.hotZoneModifier) mods.push({ label: '冷热区', value: situation.hotZoneModifier });
   if (situation.badgeModifier) mods.push({ label: '徽章', value: clamp(situation.badgeModifier, -8, 8) });
-  if (situation.defenderFouls >= 4) mods.push({ label: '防守犯规危机', value: 4 });
+  if (situation.defenderFouls >= 4) mods.push({ label: '防守犯规危机', value: 3 });
   return mods;
 }
 
 function shotBase(action: ActionType): number | null {
-  if (action === '定点投篮' || action === '后撤步') return .35;
-  if (action === '急停投篮' || action === '突破急停' || action === '背身单打') return .4;
-  if (action === '突破终结') return .62;
+  if (action === '定点投篮' || action === '后撤步') return .34;
+  if (action === '急停投篮' || action === '突破急停' || action === '背身单打') return .38;
+  if (action === '突破终结') return .58;
   return null;
 }
 
@@ -93,14 +98,20 @@ export function shotProbability(input: ResolveInput, contest: number, helpWeight
   const base = shotBase(input.action);
   if (base === null) return 0;
   const skill = shotSkill(input.action, input.actor);
-  const fatigue = (input.actorStatus.体力 - 70) * .004;
+  const fatigue = (input.actorStatus.体力 - 70) * .002;
   const difficulty = ACTION_SPECS[input.action].difficulty ?? 0;
-  const body = input.defender ? (input.actor.body.wingspanCm - input.defender.body.wingspanCm) * .002 : 0;
-  const spacing = input.situation.offenseTactic?.offense === '五外' ? .035 : 0;
-  const zone = (input.situation.hotZoneModifier ?? 0) / 100;
-  const badges = clamp(input.situation.badgeModifier ?? 0, -8, 8) / 100;
-  const logit = Math.log(base / (1 - base)) + (skill - 70) * .035 - (contest - 65) * .025 - helpWeight * .035 - difficulty * .035 + fatigue + body + spacing;
-  return clamp(1 / (1 + Math.exp(-logit)) + zone + badges, .03, .95);
+  const body = input.defender ? (input.actor.body.wingspanCm - input.defender.body.wingspanCm) * .0015 : 0;
+  const spacing = input.situation.offenseTactic?.offense === '五外' ? .015 : 0;
+  const logit =
+    Math.log(base / (1 - base)) +
+    (skill - 70) * .014 -
+    (contest - 65) * .012 -
+    helpWeight * .018 -
+    difficulty * .02 +
+    fatigue +
+    body +
+    spacing;
+  return clamp(1 / (1 + Math.exp(-logit)), .03, .82);
 }
 
 function nearbyHelp(input: ResolveInput): { players: PlayerData[]; weight: number } {
@@ -133,6 +144,7 @@ function scoringBranch(input: ResolveInput, tier: ResultTier, points: number, id
   if (made) {
     deltas.push(stat(input.actor.name, '投篮命中', 1), stat(input.actor.name, '得分', points), stat(input.actor.name, '连续命中', 1));
     if (points === 3) deltas.push(stat(input.actor.name, '三分命中', 1));
+    if (andOne && input.defender) deltas.push(stat(input.defender.name, '犯规', 1));
   } else deltas.push(stat(input.actor.name, '连续打铁', 1));
   return {
     id, label: andOne ? `${points}分命中并加罚` : made ? `${points}分命中` : '投篮不中', scoreDelta,
@@ -143,21 +155,55 @@ function scoringBranch(input: ResolveInput, tier: ResultTier, points: number, id
   };
 }
 
+function shootingFoulBranch(input: ResolveInput, points: number): SettlementBranch {
+  const mine = input.actionSide;
+  const deltas = input.defender ? [stat(input.defender.name, '犯规', 1)] : [];
+  return {
+    id: 'shooting-foul',
+    label: points === 3 ? '三分投篮犯规' : '投篮犯规',
+    scoreDelta: { 主: 0, 客: 0 },
+    possession: mine,
+    nextPhase: '罚球结算',
+    statDeltas: deltas,
+    pending: { type: 'freeThrow', shootingSide: mine, shooter: input.actor.name, remaining: points, total: points },
+  };
+}
+
 function branchesFor(input: ResolveInput, tier: ResultTier): SettlementBranch[] {
   const family = ACTION_SPECS[input.action].family;
   const mine = input.actionSide;
   const theirs = otherSide(mine);
   const points = input.action === '定点投篮' || input.action === '后撤步' ? 3 : 2;
   if (shotBase(input.action) !== null) {
-    if (tier === '大成功') return [scoringBranch(input, tier, points, 'clean-make'), scoringBranch(input, tier, points, 'and-one', true)];
-    if (tier === '成功') return [scoringBranch(input, tier, points, 'made')];
-    if (tier === '部分成功') return [{ ...scoringBranch(input, '失败', points, 'blocked-out'), label: '被封堵出界', possession: mine, nextPhase: '死球', pending: { type: 'deadBall', reason: '投篮被封堵出界', inboundSide: mine } }];
-    if (tier === '失败') return [scoringBranch(input, tier, points, 'miss')];
-    return [{ id: 'offensive-foul', label: '进攻犯规', scoreDelta: { 主: 0, 客: 0 }, possession: theirs, nextPhase: '死球', statDeltas: [stat(input.actor.name, '失误', 1), stat(input.actor.name, '犯规', 1)], pending: { type: 'deadBall', reason: '进攻犯规', inboundSide: theirs } }];
+    if (tier === '大成功') return [
+      scoringBranch(input, tier, points, 'clean-make'),
+      scoringBranch(input, tier, points, 'and-one', true),
+    ];
+    if (tier === '成功') return [
+      scoringBranch(input, tier, points, 'made'),
+      scoringBranch(input, '大成功', points, 'and-one', true),
+    ];
+    if (tier === '部分成功') return [
+      { ...scoringBranch(input, '失败', points, 'blocked-out'), label: '被封堵出界', possession: mine, nextPhase: '死球', pending: { type: 'deadBall', reason: '投篮被封堵出界', inboundSide: mine } },
+      shootingFoulBranch(input, points),
+    ];
+    if (tier === '失败') return [
+      scoringBranch(input, tier, points, 'miss'),
+      shootingFoulBranch(input, points),
+    ];
+    return [
+      { ...scoringBranch(input, '失败', points, 'bad-miss'), label: '严重失衡投篮不中' },
+      { id: 'offensive-foul', label: '进攻犯规', scoreDelta: { 主: 0, 客: 0 }, possession: theirs, nextPhase: '死球', statDeltas: [stat(input.actor.name, '失误', 1), stat(input.actor.name, '犯规', 1)], pending: { type: 'deadBall', reason: '进攻犯规', inboundSide: theirs } },
+    ];
   }
   if (family === '传球' || family === '挡拆' || family === '无球' || input.action === '突破分球') {
-    if (tier === '大失败') return [{ id: 'turnover', label: '传球/配合失误', scoreDelta: { 主: 0, 客: 0 }, possession: theirs, nextPhase: '常规回合', statDeltas: [stat(input.actor.name, '失误', 1)], pending: { type: 'none' } }];
-    return [{ id: tier === '失败' ? 'reset' : 'advantage', label: tier === '失败' ? '进攻重置' : '创造进攻优势', scoreDelta: { 主: 0, 客: 0 }, possession: mine, nextPhase: '常规回合', statDeltas: [], pending: { type: 'none' } }];
+    const turnover = { id: 'turnover', label: '传球/配合失误', scoreDelta: { 主: 0, 客: 0 }, possession: theirs, nextPhase: '常规回合' as const, statDeltas: [stat(input.actor.name, '失误', 1)], pending: { type: 'none' as const } };
+    if (tier === '大失败') return [turnover];
+    if (tier === '失败') return [
+      { id: 'reset', label: '进攻重置', scoreDelta: { 主: 0, 客: 0 }, possession: mine, nextPhase: '常规回合', statDeltas: [], pending: { type: 'none' } },
+      turnover,
+    ];
+    return [{ id: 'advantage', label: tier === '大成功' ? '制造明显进攻优势' : '创造进攻优势', scoreDelta: { 主: 0, 客: 0 }, possession: mine, nextPhase: '常规回合', statDeltas: [], pending: { type: 'none' } }];
   }
   if (family === '防守') {
     if (tier === '大成功' || (tier === '成功' && input.action === '赌博抢断')) return [{ id: 'forced-turnover', label: '制造球权转换', scoreDelta: { 主: 0, 客: 0 }, possession: mine, nextPhase: '常规回合', statDeltas: input.action === '赌博抢断' ? [stat(input.actor.name, '抢断', 1), ...(input.defender ? [stat(input.defender.name, '失误', 1)] : [])] : [], pending: { type: 'none' } }];
@@ -177,12 +223,16 @@ function branchesFor(input: ResolveInput, tier: ResultTier): SettlementBranch[] 
 function contractFor(input: ResolveInput, stages: ActionResolution['stages'], tier: ResultTier): SettlementContract {
   const branches = branchesFor(input, tier);
   const pace = input.situation.offenseTactic?.pace ?? '标准';
-  const clock = pace === '快' ? range(3, 10) : pace === '慢' ? range(8, 18) : range(5, 14);
+  const family = ACTION_SPECS[input.action].family;
+  const setupAction = family === '传球' || family === '挡拆' || family === '无球';
+  const clock = setupAction
+    ? range(2, 5)
+    : pace === '快' ? range(7, 13) : pace === '慢' ? range(11, 17) : range(9, 15);
   return {
     id: `nba-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     intent: { action: input.action, family: ACTION_SPECS[input.action].family, actor: input.actor.name, partner: input.partner?.name ?? null },
     stages, tier, branches, referenceBranchId: branches[0].id, clockSeconds: clock,
-    shotClockSeconds: range(0, 24), staminaDelta: { actor: range(-7, -2), ...(input.partner ? { partner: range(-4, -1) } : {}) },
+    shotClockSeconds: range(0, 24), staminaDelta: { actor: range(-1, 0), ...(input.partner ? { partner: range(-1, 0) } : {}) },
     allowedPlayers: [...new Set([...input.match.阵容.主.场上, ...input.match.阵容.客.场上])],
     allowedStatePaths: ['比赛.比分', '比赛.球权', '比赛.剩余秒数', '比赛.投篮时钟', '比赛.站位', '比赛.球员状态', '比赛.本节球队犯规', '比赛.回合阶段', '比赛.待处理情境', '比赛.回合情境', '比赛.回合摘要'],
   };
