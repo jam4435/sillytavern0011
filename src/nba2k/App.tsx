@@ -723,6 +723,22 @@ const App: React.FC = () => {
       </div>
       {inMatch && match ? (
         <>
+          <div className="simulation-mode-bar">
+            <span>比赛节奏</span>
+            {(['全回合', '精简比赛', '关键时刻'] as SimulationMode[]).map(mode => (
+              <button
+                key={mode}
+                className={simulationMode === mode ? 'active' : ''}
+                disabled={busy}
+                onClick={() => {
+                  setSimulationMode(mode);
+                  try { localStorage.setItem(SIMULATION_MODE_KEY, mode); } catch {}
+                }}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
           <ScoreBoard match={match} />
           <CourtView
             站位={match.站位}
@@ -752,6 +768,7 @@ const App: React.FC = () => {
         <CareerPanel
           career={stat.生涯}
           offCourt={stat.场外}
+          league={stat.联盟}
           disabled={busy}
           onAction={t => void sendTurn(t)}
           onStartMatch={() => void handleStartMatch()}
