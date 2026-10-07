@@ -487,21 +487,31 @@ const App: React.FC = () => {
           let finalMatch = settled.nextMatch;
           let continuationSummary = '';
           const family = resolution.intent.family;
-          const shouldContinue =
+          const branchScored = Boolean(settled.settlement.branch.scoreDelta.主 || settled.settlement.branch.scoreDelta.客);
+          const offenseStillOurs =
             finalMatch.进行中 &&
             finalMatch.球权 === mySide &&
             finalMatch.回合阶段 === '常规回合' &&
-            (family === '传球' || family === '挡拆' || choice.action === '突破分球') &&
-            !settled.settlement.branch.scoreDelta.主 &&
-            !settled.settlement.branch.scoreDelta.客;
+            !branchScored &&
+            (family === '传球' || family === '挡拆' || family === '无球' || choice.action === '突破分球');
+          const opponentStillAttacking =
+            finalMatch.进行中 &&
+            family === '防守' &&
+            finalMatch.球权 === oppSide &&
+            finalMatch.回合阶段 === '常规回合' &&
+            !branchScored;
 
-          if (shouldContinue) {
-            const passLike = family === '传球' || choice.action === '突破分球' || choice.action === '顺下传球' || choice.action === '外弹传球';
-            const preferredActor = choice.action === '挡拆突破'
-              ? actorKey
-              : choice.partnerKey;
-            const scoreBefore = finalMatch.比分[mySide];
-            const continuation = continuePossessionAfterAdvantage(finalMatch, mySide, preferredActor, getPlayer);
+          if (offenseStillOurs || opponentStillAttacking) {
+            const continuationSide = offenseStillOurs ? mySide : oppSide;
+            const passLike = offenseStillOurs &&
+              (family === '传球' || choice.action === '突破分球' || choice.action === '顺下传球' || choice.action === '外弹传球');
+            const preferredActor = opponentStillAttacking
+              ? defenderKey
+              : choice.action === '挡拆突破' || family === '无球'
+                ? actorKey
+                : choice.partnerKey;
+            const scoreBefore = finalMatch.比分[continuationSide];
+            const continuation = continuePossessionAfterAdvantage(finalMatch, continuationSide, preferredActor, getPlayer);
             finalMatch = continuation.match;
             continuationSummary = continuation.summary;
 
