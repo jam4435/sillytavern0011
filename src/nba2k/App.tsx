@@ -388,6 +388,21 @@ const App: React.FC = () => {
       const match = stat.比赛;
       const career = stat.生涯;
       if (!match || !career) return;
+
+      if (choice.action === '观察' || choice.action === '模拟一个回合') {
+        const cpu = simulatePossession(match, getPlayer);
+        const patch: Record<string, unknown> = { 比赛: cpu.match };
+        if (match.进行中 && !cpu.match.进行中) {
+          const nextCareer = finishCareerGame(career, cpu.match);
+          Object.assign(patch, buildPostGamePatch(stat, nextCareer, cpu.match));
+        }
+        await sendTurn(
+          `【CPU回合模拟】主角当前不直接控制这一攻。前端已完整模拟一个 possession：${cpu.summary}。请用100-220字简要演出这次攻防，不得改判或修改数值。`,
+          { transformAssistant: async raw => stripMatchVariableBlocks(raw, patch) },
+        );
+        return;
+      }
+
       const mySide: Side = match.对阵.主队 === career.球队 ? '主' : '客';
       const oppSide: Side = mySide === '主' ? '客' : '主';
       // v3 只允许控制主角；忽略任何伪造的 actorKey。
