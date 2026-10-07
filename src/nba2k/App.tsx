@@ -96,6 +96,33 @@ function stripMatchVariableBlocks(text: string, patch: Record<string, unknown>):
   return `${narrative}\n<VariableThink>确定性操作由前端完成。</VariableThink>\n<VariableEdit>${JSON.stringify(patch)}</VariableEdit>`;
 }
 
+function buildPostGamePatch(
+  stat: Nba2kStat,
+  nextCareer: NonNullable<Nba2kStat['生涯']>,
+  nextMatch: MatchState,
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = { 生涯: nextCareer };
+  if (!stat.场外) return patch;
+
+  const baseLeague = stat.联盟 ?? createLeagueState(nextCareer.球队);
+  const advanced = advanceLeagueAfterGame(baseLeague, nextCareer.球队, nextMatch);
+  let nextLeague = advanceInjuryRecovery(advanced.league);
+  const nextOffCourt = {
+    ...stat.场外,
+    日程: {
+      日期: nextLeague.日期,
+      下一场: formatScheduledOpponent(advanced.nextGame),
+      待办: advanced.nextGame ? ['恢复训练', '下一场比赛'] : ['常规赛总结', '季后赛准备'],
+    },
+  };
+  const hooks = collectOffCourtHooks(nextCareer, nextOffCourt, nextLeague);
+  if (hooks.length) nextLeague = { ...nextLeague, 故事钩子: [...nextLeague.故事钩子, ...hooks] };
+
+  patch.场外 = nextOffCourt;
+  patch.联盟 = nextLeague;
+  return patch;
+}
+
 const App: React.FC = () => {
   const [stat, setStat] = useState<Nba2kStat>(() => readStat());
   const [startScreen, setStartScreen] = useState<'splash' | StartMode>('splash');
