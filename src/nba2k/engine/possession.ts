@@ -293,13 +293,13 @@ function buildSituation(
 function actionFoulChance(action: ActionType, actor: PlayerData): number {
   const draw = (actor.attrs.drawFoul - 70) * .003;
   const base =
-    action === '突破终结' ? .44 :
-    action === '背身单打' ? .30 :
-    action === '急停投篮' || action === '突破急停' ? .15 :
-    action === '后撤步' ? .10 :
-    action === '定点投篮' ? .075 :
-    .10;
-  return clamp(base + draw * .85, .035, .60);
+    action === '突破终结' ? .40 :
+    action === '背身单打' ? .27 :
+    action === '急停投篮' || action === '突破急停' ? .13 :
+    action === '后撤步' ? .09 :
+    action === '定点投篮' ? .065 :
+    .09;
+  return clamp(base + draw * .75, .03, .56);
 }
 
 function andOneChance(action: ActionType, actor: PlayerData): number {
