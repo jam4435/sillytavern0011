@@ -251,8 +251,16 @@ function branchesFor(input: ResolveInput, tier: ResultTier): SettlementBranch[] 
       pending: { type: 'none' as const },
     };
     if (tier === '大失败') return input.defender ? [unforced, stolen] : [unforced];
-    if (tier === '失败') return [
-      { id: 'reset', label: '进攻重置', scoreDelta: { 主: 0, 客: 0 }, possession: mine, nextPhase: '常规回合', statDeltas: [], pending: { type: 'none' } },
+    if (tier === '失败' || tier === '部分成功') return [
+      {
+        id: 'reset',
+        label: tier === '部分成功' ? '受压传导，未形成明显优势' : '进攻重置',
+        scoreDelta: { 主: 0, 客: 0 },
+        possession: mine,
+        nextPhase: '常规回合',
+        statDeltas: [],
+        pending: { type: 'none' },
+      },
       unforced,
       ...(input.defender ? [stolen] : []),
     ];
