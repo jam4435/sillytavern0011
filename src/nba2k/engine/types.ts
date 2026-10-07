@@ -313,6 +313,10 @@ export interface SituationContext {
   defenseTactic?: StructuredTeamTactics;
   hotZoneModifier?: number;
   badgeModifier?: number;
+  /** 上一阶段真正创造出的进攻优势，直接影响下一动作质量。 */
+  advantageModifier?: number;
+  /** 传球/持球压力，正值提高失误风险。 */
+  turnoverPressure?: number;
 }
 
 export type ReboundSide = '进攻篮板' | '防守篮板';
