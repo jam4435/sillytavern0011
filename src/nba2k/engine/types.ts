@@ -178,6 +178,14 @@ export interface CourtSpot { 球员: string; x: number; y: number; 持球?: bool
 export type TurnPhase = '常规回合' | '篮板争抢' | '罚球结算' | '死球';
 export interface LineupState { 场上: string[]; 替补: string[] }
 
+export interface TeamRotationState {
+  /** 开场首发，用于稳定轮换角色，不随临场换人改变。 */
+  starters: string[];
+  /** 常规48分钟目标；加时由 RotationEngine 自动延长核心球员时间。 */
+  targetMinutes: Record<string, number>;
+}
+export interface RotationState { 主: TeamRotationState; 客: TeamRotationState }
+
 export type OffensiveScheme = '基础' | '五外' | '四外一内' | '挡拆' | '低位' | '动态进攻';
 export type DefensiveScheme = '人盯人' | '二三联防' | '换防' | '沉退' | '延误';
 export interface StructuredTeamTactics {
@@ -208,6 +216,8 @@ export interface MatchState {
   本节球队犯规: { 主: number; 客: number };
   暂停: { 主: number; 客: number };
   阵容: { 主: LineupState; 客: LineupState };
+  /** 可选以兼容旧测试/存档；正式开赛时由 RotationEngine 初始化。 */
+  轮换?: RotationState;
   回合阶段: TurnPhase;
   待处理情境: PendingMatchSituation;
   回合情境: string;
