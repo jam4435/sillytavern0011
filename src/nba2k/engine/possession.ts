@@ -149,7 +149,7 @@ function actionWeights(player: PlayerData, match: MatchState, side: Side): { ite
     { item: '顺下传球', weight: t.pickRollHandler * .5 + t.passing * .65 },
     { item: '外弹传球', weight: t.pickRollHandler * .45 + t.passing * .6 },
     { item: '安全传球', weight: t.passing * .75 },
-    { item: '跨场转移', weight: t.passing * .55 + t.composure * 0 },
+    { item: '跨场转移', weight: t.passing * .72 + t.handling * .18 },
   ];
 
   const boost = (action: ActionType, factor: number) => {
