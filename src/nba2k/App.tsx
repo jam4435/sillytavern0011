@@ -301,14 +301,18 @@ const App: React.FC = () => {
     const jumpScore = (player: typeof homeCenter) =>
       player ? player.height_cm * 0.6 + player.attrs.strength * 0.3 + player.overall * 0.1 : 0;
     const openingPossession: Side = jumpScore(homeCenter) >= jumpScore(awayCenter) ? '主' : '客';
+    const homeTactics = defaultTeamTactics(homeId);
+    const awayTactics = defaultTeamTactics(awayId);
     const offenseEntries = openingPossession === '主' ? homeEntries : awayEntries;
     const defenseEntries = openingPossession === '主' ? awayEntries : homeEntries;
+    const offenseTactics = openingPossession === '主' ? homeTactics : awayTactics;
+    const defenseTactics = openingPossession === '主' ? awayTactics : homeTactics;
     const 站位 = buildFormation({
       offense: offenseEntries,
       defense: defenseEntries,
       offenseSide: openingPossession,
-      tactic: '基础',
-      defenseScheme: '人盯人',
+      tactic: offenseTactics.offense,
+      defenseScheme: defenseTactics.defense,
       ballHolder: offenseEntries[0]?.key ?? '',
       attackRight: openingPossession === '主',
     });
@@ -329,7 +333,7 @@ const App: React.FC = () => {
       比分: { 主: 0, 客: 0 },
       球权: openingPossession,
       跳球胜方: openingPossession,
-      战术: { 主: { ...DEFAULT_TACTICS }, 客: { ...DEFAULT_TACTICS } },
+      战术: { 主: homeTactics, 客: awayTactics },
       站位,
       本节球队犯规: { 主: 0, 客: 0 },
       暂停: { 主: 7, 客: 7 },
