@@ -576,6 +576,66 @@ describe('settingsManager ui theme', () => {
       expect(result.trim()).toBe('风雪漫天，丘处机长剑出鞘。');
     });
 
+    it('filters current <事件记录> and legacy chapter tags without erasing other XML blocks', () => {
+      const input = [
+        '段誉拾起绸帛。',
+        '<事件记录>',
+        '天龙第二回07-段誉蒲团得绝学启程奔万劫谷',
+        '叩裂蒲团|得到帛卷|出洞启程',
+        '已完成|已完成|未进行',
+        '</事件记录>',
+        '接着夜色渐深。',
+        '<射雕第一回04>旧事件状态</射雕第一回04>',
+        '<事件记录说明>此处是剧情文字，不是事件进度。</事件记录说明>',
+      ].join('\n');
+
+      const result = applyRegexRules(input, [EVENT_STAGE_TAG_REGEX_RULE]);
+      expect(result).toContain('段誉拾起绸帛。');
+      expect(result).toContain('接着夜色渐深。');
+      expect(result).toContain('<事件记录说明>此处是剧情文字，不是事件进度。</事件记录说明>');
+      expect(result).not.toContain('<事件记录>');
+      expect(result).not.toContain('<射雕第一回04>');
+    });
+
+    it('upgrades the saved legacy built-in event regex without losing its disabled state', () => {
+      window.localStorage.setItem(
+        'wuxia_display_settings',
+        JSON.stringify({
+          localRegexRules: [
+            {
+              id: EVENT_STAGE_TAG_REGEX_RULE.id,
+              pattern: '/<([^\\s>]+第[^\\s>]+回\\d+[^>]*)>[\\s\\S]*?<\\/\\1>/gi',
+              replacement: '',
+              enabled: false,
+              description: '过滤事件进度标签',
+              originScope: 'manual',
+            },
+          ],
+        }),
+      );
+
+      const loadedRule = loadSettings().localRegexRules.find(rule => rule.id === EVENT_STAGE_TAG_REGEX_RULE.id);
+      expect(loadedRule?.pattern).toBe(EVENT_STAGE_TAG_REGEX_RULE.pattern);
+      expect(loadedRule?.description).toBe(EVENT_STAGE_TAG_REGEX_RULE.description);
+      expect(loadedRule?.enabled).toBe(false);
+    });
+
+    it('preserves manually edited event regex instead of replacing it with the built-in pattern', () => {
+      const customPattern = '/<自定义事件>[\\s\\S]*?<\\/自定义事件>/g';
+      window.localStorage.setItem(
+        'wuxia_display_settings',
+        JSON.stringify({
+          localRegexRules: [
+            { ...EVENT_STAGE_TAG_REGEX_RULE, pattern: customPattern, description: '自定义事件格式' },
+          ],
+        }),
+      );
+
+      const loadedRule = loadSettings().localRegexRules.find(rule => rule.id === EVENT_STAGE_TAG_REGEX_RULE.id);
+      expect(loadedRule?.pattern).toBe(customPattern);
+      expect(loadedRule?.description).toBe('自定义事件格式');
+    });
+
     it('beautifies <战斗判定> block into wuxia battle card HTML', () => {
       const input = `<战斗判定>
 先手: 角色A.水上漂=1234
