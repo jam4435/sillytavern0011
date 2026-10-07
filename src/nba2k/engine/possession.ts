@@ -549,7 +549,7 @@ function normalizeDeadBall(match: MatchState, resolvePlayer: PlayerResolver): Ma
   const holder = match.阵容[match.球权].场上[0];
   return {
     ...match,
-    投篮时钟: 24,
+    投篮时钟: match.投篮时钟,
     站位: holder ? rebuildCourt(match, match.球权, holder, resolvePlayer) : match.站位,
     回合阶段: '常规回合',
     待处理情境: { type: 'none' },
@@ -707,9 +707,14 @@ export function simulatePossession(
     }
 
     if (index < maxSteps - 1) {
-      const nextActor = partner && current.阵容[initialOffense].场上.includes(partner)
-        ? partner
-        : bestFinisher(current, initialOffense, actor, resolvePlayer, rng);
+      const liveHolder = current.站位[initialOffense].find(spot => spot.持球)?.球员;
+      const offensiveRebound = current.投篮时钟 === 14 && Boolean(liveHolder);
+      const nextActor = offensiveRebound
+        ? liveHolder!
+        : partner && current.阵容[initialOffense].场上.includes(partner)
+          ? partner
+          : bestFinisher(current, initialOffense, actor, resolvePlayer, rng);
+      if (offensiveRebound) flow = { advantageModifier: 2, turnoverPressure: 0 };
       actor = nextActor;
       const nextPlayer = playerOrThrow(resolvePlayer, actor);
       action = finishingAction(nextPlayer, current, initialOffense, rng);
