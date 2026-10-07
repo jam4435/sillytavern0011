@@ -345,10 +345,14 @@ function chooseBranch(resolution: ActionResolution, actor: PlayerData, rng: Rand
     if (rng() < chance) return offensiveFoul;
   }
 
-  const blocked = branches.find(branch => branch.id === 'blocked-out');
-  if (blocked) {
-    const blockChance = clamp(.045 + Math.max(0, resolution.defenseScore - 65) * .0025, .03, .14);
-    if (rng() < blockChance) return blocked;
+  const blockedOut = branches.find(branch => branch.id === 'blocked-out');
+  const blockedRecovered = branches.find(branch => branch.id === 'blocked-recovered');
+  if (blockedOut || blockedRecovered) {
+    const blockChance = clamp(.10 + Math.max(0, resolution.defenseScore - 65) * .004, .08, .28);
+    if (rng() < blockChance) {
+      if (blockedRecovered && rng() < .55) return blockedRecovered;
+      return blockedOut ?? blockedRecovered!;
+    }
   }
 
   const turnover = branches.find(branch => branch.id === 'turnover');
@@ -366,7 +370,7 @@ function chooseBranch(resolution: ActionResolution, actor: PlayerData, rng: Rand
     return reset;
   }
 
-  return branches.find(branch => !['drive-turnover', 'shooting-foul', 'and-one', 'offensive-foul', 'blocked-out'].includes(branch.id)) ?? branches[0];
+  return branches.find(branch => !['drive-turnover', 'shooting-foul', 'and-one', 'offensive-foul', 'blocked-out', 'blocked-recovered'].includes(branch.id)) ?? branches[0];
 }
 
 function cpuSettlement(
