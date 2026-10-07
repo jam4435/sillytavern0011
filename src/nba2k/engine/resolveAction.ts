@@ -184,7 +184,18 @@ function branchesFor(input: ResolveInput, tier: ResultTier): SettlementBranch[] 
       scoringBranch(input, '大成功', points, 'and-one', true),
     ];
     if (tier === '部分成功') return [
-      { ...scoringBranch(input, '失败', points, 'blocked-out'), label: '被封堵出界', possession: mine, nextPhase: '死球', pending: { type: 'deadBall', reason: '投篮被封堵出界', inboundSide: mine } },
+      scoringBranch(input, '失败', points, 'contested-miss'),
+      {
+        ...scoringBranch(input, '失败', points, 'blocked-out'),
+        label: '被封堵出界',
+        possession: mine,
+        nextPhase: '死球',
+        statDeltas: [
+          ...scoringBranch(input, '失败', points, 'blocked-out').statDeltas,
+          ...(input.defender ? [stat(input.defender.name, '盖帽', 1)] : []),
+        ],
+        pending: { type: 'deadBall', reason: '投篮被封堵出界', inboundSide: mine },
+      },
       shootingFoulBranch(input, points),
     ];
     if (tier === '失败') return [
@@ -197,11 +208,24 @@ function branchesFor(input: ResolveInput, tier: ResultTier): SettlementBranch[] 
     ];
   }
   if (family === '传球' || family === '挡拆' || family === '无球' || input.action === '突破分球') {
-    const turnover = { id: 'turnover', label: '传球/配合失误', scoreDelta: { 主: 0, 客: 0 }, possession: theirs, nextPhase: '常规回合' as const, statDeltas: [stat(input.actor.name, '失误', 1)], pending: { type: 'none' as const } };
-    if (tier === '大失败') return [turnover];
+    const unforced = { id: 'turnover', label: '传球/配合失误', scoreDelta: { 主: 0, 客: 0 }, possession: theirs, nextPhase: '常规回合' as const, statDeltas: [stat(input.actor.name, '失误', 1)], pending: { type: 'none' as const } };
+    const stolen = {
+      id: 'turnover-steal',
+      label: '传球被抢断',
+      scoreDelta: { 主: 0, 客: 0 },
+      possession: theirs,
+      nextPhase: '常规回合' as const,
+      statDeltas: [
+        stat(input.actor.name, '失误', 1),
+        ...(input.defender ? [stat(input.defender.name, '抢断', 1)] : []),
+      ],
+      pending: { type: 'none' as const },
+    };
+    if (tier === '大失败') return input.defender ? [unforced, stolen] : [unforced];
     if (tier === '失败') return [
       { id: 'reset', label: '进攻重置', scoreDelta: { 主: 0, 客: 0 }, possession: mine, nextPhase: '常规回合', statDeltas: [], pending: { type: 'none' } },
-      turnover,
+      unforced,
+      ...(input.defender ? [stolen] : []),
     ];
     return [{ id: 'advantage', label: tier === '大成功' ? '制造明显进攻优势' : '创造进攻优势', scoreDelta: { 主: 0, 客: 0 }, possession: mine, nextPhase: '常规回合', statDeltas: [], pending: { type: 'none' } }];
   }
