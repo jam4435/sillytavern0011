@@ -737,7 +737,6 @@ export interface CharacterTrait {
   attributeModifiers?: TraitAttributeModifiers;
   restrictions?: TraitRestrictions;
   discounts?: TraitDiscounts;
-  flavorPrompt?: string; // 专供大模型的日常风味与行为因果指引（战力完全折算面板，只在非战力处展现异象）
 }
 
 /**

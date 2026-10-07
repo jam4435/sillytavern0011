@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
+  CHARACTER_TRAITS,
   getTraitByName,
   getTraitModifierSources,
   getTraitRestrictions,
@@ -36,9 +37,19 @@ describe('traitsDatabase 结构化天赋机制', () => {
     expect(martialGenius?.discounts?.savvyRequirementOffset).toBe(-2);
   });
 
+  it('采用重构后的正式天赋池，并且不再保留废弃的 flavorPrompt 字段', () => {
+    expect(CHARACTER_TRAITS).toHaveLength(94);
+    expect(getTraitByName('绿帽神功')).toMatchObject({ rank: '传说', cost: 30 });
+    expect(getTraitByName('身如鬼魅')).toMatchObject({
+      rank: '镇派',
+      discounts: { martialTypeDiscount: { 剑法: 0.15, 暗器: 0.15, 轻功: 0.15 } },
+    });
+    expect(CHARACTER_TRAITS.every(trait => !('flavorPrompt' in trait))).toBe(true);
+  });
+
   it('提取属性修正源：正确包含天赋修正并支持正负百分比', () => {
     const sources = getTraitModifierSources({
-      体魄强健: '生来体格健壮',
+      筋骨精实: '生来体格健壮',
       断臂: '失去了一条手臂',
     });
 
@@ -80,11 +91,10 @@ describe('traitsDatabase 结构化天赋机制', () => {
     // 无天赋时
     const normal = calculateAllAttributes(baseAttrs, realm, martialArts);
 
-    // 装备天赋：体魄强健（根骨+10%，气血+10%）
-    const positiveSources = getTraitModifierSources(['体魄强健']);
+    // 装备天赋：筋骨精实（根骨+10%）
+    const positiveSources = getTraitModifierSources(['筋骨精实']);
     const boosted = calculateAllAttributes(baseAttrs, realm, martialArts, positiveSources);
     expect(boosted.combat.根骨).toBeGreaterThan(normal.combat.根骨);
-    expect(boosted.resources.气血上限).toBeGreaterThan(normal.resources.气血上限);
 
     // 装备负面天赋：断臂（臂力-20%，机敏-20%）
     const negativeSources = getTraitModifierSources(['断臂']);
