@@ -301,9 +301,13 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
                       {selectedSecretEntries.map(({ art, eligibility }) => {
                         const artRank = getRankVisual(art.rank, 'secret');
                         return (
-                          <div key={art.name} className="workbench-secret-art">
+                          <div
+                            key={art.name}
+                            className="workbench-secret-art"
+                            style={{ '--secret-art-color': artRank.color } as CSSProperties}
+                          >
                             <div className="workbench-secret-art-head">
-                              <strong style={{ color: artRank.color }}>{art.name}</strong>
+                              <strong>{art.name}</strong>
                               <span className="workbench-chip">{art.rank}</span>
                             </div>
                             {art.description && <p className="workbench-secret-art-desc">{art.description}</p>}
@@ -330,7 +334,6 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
                               disabled={isActing || !onItemAction || !eligibility.canStudy}
                               onClick={() => handleSecretArtAction(art.name, eligibility.canStudy)}
                               title={eligibility.alreadyLearned ? `已习得《${art.name}》，无需重复参悟` : eligibility.canStudy ? `参悟《${art.name}》` : eligibility.reasons.join('；')}
-                              style={{ color: artRank.color, borderColor: `${artRank.color}60` }}
                             >
                               {isActing ? '处理中' : eligibility.alreadyLearned ? '已习得' : eligibility.canStudy ? '参悟' : '条件未满足'}
                             </button>
