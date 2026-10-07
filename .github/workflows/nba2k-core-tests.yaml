@@ -33,7 +33,10 @@ jobs:
       - run: pnpm install
       - name: Run NBA2K core tests
         run: >
-          pnpm test:safe --
+          pnpm exec vitest run
+          --configLoader native
+          --pool threads
+          --reporter verbose
           src/nba2k/engine/positioning.test.ts
           src/nba2k/engine/resolveAction.test.ts
           src/nba2k/engine/possession.test.ts
