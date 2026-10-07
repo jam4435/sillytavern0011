@@ -1,0 +1,40 @@
+name: nba2k-core-tests
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    paths:
+      - 'src/nba2k/**'
+      - '.github/workflows/nba2k-core-tests.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nba2k-core-tests
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - run: pnpm install
+      - name: Run NBA2K core tests
+        run: >
+          pnpm test:safe --
+          src/nba2k/engine/positioning.test.ts
+          src/nba2k/engine/resolveAction.test.ts
+          src/nba2k/engine/possession.test.ts
+          src/nba2k/engine/possessionCalibration.test.ts
