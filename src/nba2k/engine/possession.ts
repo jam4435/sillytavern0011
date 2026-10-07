@@ -208,6 +208,16 @@ function actionWeights(player: PlayerData, match: MatchState, side: Side): { ite
     if (entry) entry.weight *= factor;
   };
 
+  boost('安全传球', 1.35);
+  boost('跨场转移', 1.28);
+  boost('突破分球', 1.18);
+  if (t.passing >= 85) {
+    boost('安全传球', 1.18);
+    boost('跨场转移', 1.15);
+    boost('顺下传球', 1.12);
+    boost('外弹传球', 1.12);
+  }
+
   if (scheme === '挡拆') {
     boost('挡拆突破', 2.0);
     boost('顺下传球', 1.7);
@@ -222,14 +232,16 @@ function actionWeights(player: PlayerData, match: MatchState, side: Side): { ite
     boost('突破分球', 1.35);
     boost('背身单打', .35);
   } else if (scheme === '四外一内') {
-    boost('突破分球', 1.28);
+    boost('突破分球', 1.32);
+    boost('安全传球', 1.18);
+    boost('跨场转移', 1.12);
     boost('背身单打', 1.25);
     boost('定点投篮', 1.18);
   } else if (scheme === '动态进攻') {
-    boost('安全传球', 1.25);
-    boost('跨场转移', 1.18);
-    boost('定点投篮', 1.22);
-    boost('突破分球', 1.18);
+    boost('安全传球', 1.55);
+    boost('跨场转移', 1.45);
+    boost('定点投篮', 1.18);
+    boost('突破分球', 1.35);
   }
 
   return weights;
@@ -364,7 +376,7 @@ function chooseBranch(resolution: ActionResolution, actor: PlayerData, rng: Rand
   }
   if ((turnover || stolen) && reset) {
     if (rng() < passingTurnoverChance(resolution, actor)) {
-      if (stolen && rng() < clamp(.5 + (resolution.defenseScore - resolution.attackScore) * .006, .30, .72)) return stolen;
+      if (stolen && rng() < clamp(.64 + (resolution.defenseScore - resolution.attackScore) * .006, .46, .82)) return stolen;
       return turnover ?? stolen!;
     }
     return reset;
@@ -693,7 +705,9 @@ export function simulatePossession(
 
     const passLike = ['突破分球', '顺下传球', '外弹传球', '安全传球', '跨场转移'].includes(action);
     if (passLike && outcome.branch.id === 'advantage') assistCandidate = actor;
-    else if (outcome.branch.id === 'reset') assistCandidate = null;
+    else if (passLike && outcome.branch.id === 'reset' && outcome.resolution.tier === '部分成功') {
+      assistCandidate = rng() < .55 ? actor : null;
+    } else if (outcome.branch.id === 'reset') assistCandidate = null;
 
     const fieldGoalScored = outcome.branch.scoreDelta[initialOffense] > 0;
     if (fieldGoalScored && assistCandidate && assistCandidate !== actor) current = addAssist(current, assistCandidate);
