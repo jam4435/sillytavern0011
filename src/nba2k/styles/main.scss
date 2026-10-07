@@ -1445,3 +1445,65 @@ body {
     }
   }
 }
+
+
+/* --- Match simulation pace ------------------------------------------------ */
+.simulation-mode-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 12px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 10px;
+  background: rgba(10, 13, 18, .72);
+  font-size: 12px;
+
+  > span {
+    margin-right: auto;
+    color: rgba(255, 255, 255, .62);
+    font-weight: 700;
+    letter-spacing: .08em;
+  }
+
+  button {
+    padding: 6px 10px;
+    border: 1px solid rgba(255, 255, 255, .14);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, .04);
+    color: rgba(255, 255, 255, .72);
+    cursor: pointer;
+
+    &.active {
+      border-color: rgba(255, 255, 255, .42);
+      background: rgba(255, 255, 255, .12);
+      color: #fff;
+      font-weight: 700;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: .45;
+    }
+  }
+}
+
+.league-pulse .cp-row {
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .simulation-mode-bar {
+    flex-wrap: wrap;
+
+    > span {
+      flex-basis: 100%;
+      margin-right: 0;
+    }
+
+    button {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+  }
+}
