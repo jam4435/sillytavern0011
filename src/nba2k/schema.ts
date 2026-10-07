@@ -51,6 +51,12 @@ const lineupSchema = z.object({ 场上: z.array(nonEmptyText).max(5), 替补: z.
   if (new Set(all).size !== all.length) ctx.addIssue({ code: 'custom', message: '场上与替补阵容中不能出现重复球员' });
 });
 
+const teamRotationSchema = z.object({
+  starters: z.array(nonEmptyText).max(5),
+  targetMinutes: z.record(nonEmptyText, z.number().min(0).max(60)),
+}).strict();
+const rotationSchema = z.object({ 主: teamRotationSchema, 客: teamRotationSchema }).strict();
+
 export const structuredTacticsSchema = z.object({
   offense: z.enum(['基础', '五外', '四外一内', '挡拆', '低位', '动态进攻']),
   defense: z.enum(['人盯人', '二三联防', '换防', '沉退', '延误']),
@@ -74,7 +80,9 @@ export const matchStateSchema = z.object({
   站位: z.object({ 主: z.array(courtSpotSchema).max(5), 客: z.array(courtSpotSchema).max(5) }).strict(),
   本节球队犯规: z.object({ 主: z.number().int().min(0).max(99), 客: z.number().int().min(0).max(99) }).strict(),
   暂停: z.object({ 主: z.number().int().min(0).max(7), 客: z.number().int().min(0).max(7) }).strict(),
-  阵容: z.object({ 主: lineupSchema, 客: lineupSchema }).strict(), 回合阶段: turnPhaseSchema,
+  阵容: z.object({ 主: lineupSchema, 客: lineupSchema }).strict(),
+  轮换: rotationSchema.optional(),
+  回合阶段: turnPhaseSchema,
   待处理情境: pendingSituationSchema, 回合情境: z.string(), 球员状态: z.record(nonEmptyText, onCourtStatusSchema), 回合摘要: z.string(),
 }).strict().superRefine((match, ctx) => {
   for (const side of ['主', '客'] as const) {
