@@ -25,6 +25,12 @@ import { getLastAssistantNarrative, isInMatch, parseOptions, readStat, stripNarr
 import { runTurnTransaction } from './utils/turnTransaction';
 import type { TurnTransactionOptions } from './utils/turnTransaction';
 import { finishCareerGame, trainCareer, updateCareerDynamics, upgradeCareer } from './utils/careerProgress';
+import { simulatePossession } from './engine/possession';
+import type { SimulationMode } from './engine/simulationMode';
+import { simulateUntilInterruption } from './engine/simulationMode';
+import { advanceLeagueAfterGame, createLeagueState, formatScheduledOpponent, getScheduledGame } from './engine/season';
+import { advanceInjuryRecovery, collectOffCourtHooks } from './engine/offCourtSystems';
+import { defaultTeamTactics } from './engine/tendencies';
 
 function freshStatus(): OnCourtStatus {
   return {
@@ -51,7 +57,15 @@ function freshStatus(): OnCourtStatus {
   };
 }
 
-const DEFAULT_TACTICS: StructuredTeamTactics = { offense: '基础', defense: '人盯人', pace: '标准', helpIntensity: 50, rebound: '均衡' };
+const SIMULATION_MODE_KEY = 'nba2k_simulation_mode_v1';
+
+function readSimulationMode(): SimulationMode {
+  try {
+    const value = localStorage.getItem(SIMULATION_MODE_KEY);
+    if (value === '全回合' || value === '精简比赛' || value === '关键时刻') return value;
+  } catch {}
+  return '精简比赛';
+}
 
 function generatedText(result: string | GenerateToolCallResult): string {
   return (typeof result === 'string' ? result : result.content).trim();
@@ -88,6 +102,7 @@ const App: React.FC = () => {
   const [narrative, setNarrative] = useState('');
   const [options, setOptions] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [simulationMode, setSimulationMode] = useState<SimulationMode>(() => readSimulationMode());
   const [freeText, setFreeText] = useState('');
   const [showBoxScore, setShowBoxScore] = useState(false);
   const busyRef = useRef(false);
