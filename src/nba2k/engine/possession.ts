@@ -454,6 +454,32 @@ function finishingAction(player: PlayerData, match: MatchState, side: Side, rng:
  * 模拟一个真正的进攻回合。
  * 允许 1~3 个动作阶段；传导/挡拆创造优势后会自动找到终结者，投丢后自动结算篮板。
  */
+export function continuePossessionAfterAdvantage(
+  match: MatchState,
+  offense: Side,
+  preferredActor: string | null,
+  resolvePlayer: PlayerResolver,
+  rng: RandomSource = Math.random,
+): PossessionResult {
+  const candidates = match.阵容[offense].场上;
+  const actor = preferredActor && candidates.includes(preferredActor)
+    ? preferredActor
+    : match.站位[offense].find(spot => spot.持球)?.球员 ?? candidates[0];
+  if (!actor) throw new Error('延续进攻时找不到合法终结者');
+  const player = playerOrThrow(resolvePlayer, actor);
+  const action = finishingAction(player, match, offense, rng);
+  const plan: PossessionPlan = {
+    offense,
+    defense: opposite(offense),
+    initiator: actor,
+    action,
+    partner: null,
+    primaryDefender: nearestDefender(match, offense, actor),
+    reason: `延续已创造的进攻优势 · ${player.cn}${action}`,
+  };
+  return simulatePossession(match, resolvePlayer, { rng, plan, maxSteps: 1 });
+}
+
 export function simulatePossession(
   match: MatchState,
   resolvePlayer: PlayerResolver,
