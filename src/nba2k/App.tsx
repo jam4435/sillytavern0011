@@ -495,6 +495,37 @@ const App: React.FC = () => {
     [stat, sendTurn],
   );
 
+  const handleAutoSimulation = useCallback(async () => {
+    const match = stat.比赛;
+    const career = stat.生涯;
+    if (!match || !career || !match.进行中 || simulationMode === '全回合' || busyRef.current) return;
+    if (match.回合阶段 !== '常规回合') return;
+
+    const segment = simulateUntilInterruption(match, simulationMode, career.附身球员, getPlayer);
+    if (segment.possessions <= 0) return;
+
+    const patch: Record<string, unknown> = { 比赛: segment.match };
+    if (match.进行中 && !segment.match.进行中) {
+      const nextCareer = finishCareerGame(career, segment.match);
+      Object.assign(patch, buildPostGamePatch(stat, nextCareer, segment.match));
+    }
+
+    const digest = segment.summaries.slice(-8).join('\n');
+    await sendTurn(
+      `【CPU连续模拟】当前比赛节奏：${simulationMode}。前端使用同一 PossessionEngine 连续模拟了 ${segment.possessions} 个真实回合，不得重算。\n` +
+        `回合摘要：\n${digest}\n` +
+        `${segment.interruptionReason ? `暂停原因：${segment.interruptionReason}。` : ''}请用150-320字把这段比赛压缩成连贯现场叙事；比分、技术统计、球权、时间与体力全部以变量结果为准。`,
+      { transformAssistant: async raw => stripMatchVariableBlocks(raw, patch) },
+    );
+  }, [stat, simulationMode, sendTurn]);
+
+  useEffect(() => {
+    const match = stat.比赛;
+    if (simulationMode === '全回合' || busy || !match?.进行中 || match.回合阶段 !== '常规回合') return;
+    const timer = window.setTimeout(() => void handleAutoSimulation(), 120);
+    return () => window.clearTimeout(timer);
+  }, [simulationMode, busy, stat.比赛, handleAutoSimulation]);
+
   /** 暂停与换人是确定性管理操作：先写状态，再让 AI 只演出既定结果。 */
   const handleTimeout = useCallback(
     async (side: Side) => {
