@@ -143,6 +143,28 @@ const storyHookSchema = z.object({
   title: nonEmptyText, detail: nonEmptyText, createdDate: nonEmptyText, consumed: z.boolean().optional(),
 }).strict();
 
+const playoffRoundSchema = z.enum(['首轮', '分区半决赛', '分区决赛', '总决赛']);
+const playoffSeriesSchema = z.object({
+  id: nonEmptyText,
+  round: playoffRoundSchema,
+  conference: z.enum(['East', 'West', 'Finals']),
+  teamA: nonEmptyText,
+  teamB: nonEmptyText,
+  seedA: z.number().int().min(1).max(8),
+  seedB: z.number().int().min(1).max(8),
+  winsA: z.number().int().min(0).max(4),
+  winsB: z.number().int().min(0).max(4),
+}).strict().superRefine((series, ctx) => {
+  if (series.teamA === series.teamB) ctx.addIssue({ code: 'custom', message: '季后赛系列赛双方不能相同' });
+  if (series.winsA === 4 && series.winsB === 4) ctx.addIssue({ code: 'custom', message: '系列赛不能双方同时四胜' });
+});
+
+const playoffStateSchema = z.object({
+  round: playoffRoundSchema,
+  series: z.array(playoffSeriesSchema),
+  champion: nonEmptyText.nullable(),
+}).strict();
+
 export const leagueStateSchema = z.object({
   赛季: z.literal('2015-16'),
   日期: nonEmptyText,
@@ -151,6 +173,7 @@ export const leagueStateSchema = z.object({
   战绩: z.record(nonEmptyText, standingRecordSchema),
   伤病: z.array(injuryRecordSchema),
   故事钩子: z.array(storyHookSchema),
+  季后赛: playoffStateSchema.nullable().default(null),
 }).strict();
 
 export const nba2kStatSchema = z.object({
