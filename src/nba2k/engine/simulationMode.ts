@@ -81,8 +81,10 @@ export function simulateUntilInterruption(
   let current = match;
   const summaries: string[] = [];
   let possessions = 0;
+  let iterations = 0;
 
-  while (current.进行中 && possessions < maxPossessions) {
+  while (current.进行中 && possessions < maxPossessions && iterations < maxPossessions * 3) {
+    iterations += 1;
     if (current.回合阶段 !== '常规回合') break;
     const heroSide = protagonistSide(current, protagonist);
     const actualHolder = heroSide ? current.站位[heroSide].find(spot => spot.持球)?.球员 : undefined;
@@ -99,7 +101,7 @@ export function simulateUntilInterruption(
     const decision = shouldInterruptForPlan(mode, current, protagonist, plan);
     if (decision.interrupt) {
       return {
-        match: plan.initiator === protagonist ? prepareMatchForPlan(current, plan) : current,
+        match: plan.initiator === protagonist ? prepareMatchForPlan(current, plan, resolvePlayer) : current,
         summaries,
         possessions,
         nextPlan: plan,
@@ -108,7 +110,7 @@ export function simulateUntilInterruption(
     }
     const result = simulatePossession(current, resolvePlayer, { rng, plan });
     current = result.match;
-    possessions += Math.max(1, result.possessionsCompleted);
+    possessions += result.possessionsCompleted;
     summaries.push(result.summary);
   }
 
@@ -119,7 +121,7 @@ export function simulateUntilInterruption(
   const nextPlan = planPossession(current, resolvePlayer, rng);
   const decision = shouldInterruptForPlan(mode, current, protagonist, nextPlan);
   return {
-    match: decision.interrupt && nextPlan.initiator === protagonist ? prepareMatchForPlan(current, nextPlan) : current,
+    match: decision.interrupt && nextPlan.initiator === protagonist ? prepareMatchForPlan(current, nextPlan, resolvePlayer) : current,
     summaries,
     possessions,
     nextPlan,
