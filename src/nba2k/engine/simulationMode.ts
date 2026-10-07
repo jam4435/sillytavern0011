@@ -1,4 +1,4 @@
-import { planPossession, simulatePossession } from './possession';
+import { planPossession, prepareMatchForPlan, simulatePossession } from './possession';
 import type { PlayerResolver, PossessionPlan, RandomSource } from './possession';
 import type { MatchState, Side } from './types';
 
@@ -84,11 +84,22 @@ export function simulateUntilInterruption(
 
   while (current.进行中 && possessions < maxPossessions) {
     if (current.回合阶段 !== '常规回合') break;
+    const heroSide = protagonistSide(current, protagonist);
+    const actualHolder = heroSide ? current.站位[heroSide].find(spot => spot.持球)?.球员 : undefined;
+    if (mode === '精简比赛' && heroSide === current.球权 && actualHolder === protagonist) {
+      return {
+        match: current,
+        summaries,
+        possessions,
+        nextPlan: null,
+        interruptionReason: '主角当前持球',
+      };
+    }
     const plan = planPossession(current, resolvePlayer, rng);
     const decision = shouldInterruptForPlan(mode, current, protagonist, plan);
     if (decision.interrupt) {
       return {
-        match: current,
+        match: plan.initiator === protagonist ? prepareMatchForPlan(current, plan) : current,
         summaries,
         possessions,
         nextPlan: plan,
@@ -108,7 +119,7 @@ export function simulateUntilInterruption(
   const nextPlan = planPossession(current, resolvePlayer, rng);
   const decision = shouldInterruptForPlan(mode, current, protagonist, nextPlan);
   return {
-    match: current,
+    match: decision.interrupt && nextPlan.initiator === protagonist ? prepareMatchForPlan(current, nextPlan) : current,
     summaries,
     possessions,
     nextPlan,
