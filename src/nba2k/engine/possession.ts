@@ -438,11 +438,11 @@ function resolveOneAction(
 }
 
 function implicitAssistChance(action: ActionType): number {
-  if (action === '定点投篮') return .82;
-  if (action === '急停投篮' || action === '突破急停') return .30;
-  if (action === '突破终结') return .20;
-  if (action === '背身单打') return .14;
-  if (action === '后撤步') return .08;
+  if (action === '定点投篮') return .88;
+  if (action === '急停投篮' || action === '突破急停') return .34;
+  if (action === '突破终结') return .24;
+  if (action === '背身单打') return .18;
+  if (action === '后撤步') return .10;
   return .18;
 }
 
@@ -459,8 +459,8 @@ function chooseImplicitPasser(
     candidates.map(key => {
       const player = playerOrThrow(resolvePlayer, key);
       const t = cpuTendencies(player);
-      const creation = t.passing * .72 + t.initiation * .28;
-      return { item: key, weight: Math.pow(Math.max(8, creation), 1.35) };
+      const creation = t.passing * .40 + t.initiation * .60;
+      return { item: key, weight: Math.pow(Math.max(8, creation), 1.60) };
     }),
     rng,
   );
