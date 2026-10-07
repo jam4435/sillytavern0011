@@ -245,9 +245,9 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     rank: '传说',
     category: '体质',
     cost: 30,
-    description: '异种玄异体质。心念与道侣紧密相连，当心爱之人与其他男性亲密或在一起时，体内真气逆流激荡，修炼速度翻十倍！',
+    description: '异种玄异体质。心念与道侣紧密相连，当心爱之人与其他男子亲密或私通时，体内真气逆流激荡，修炼速度获得十倍暴增！',
     attributeModifiers: { 内力: 20, 气血: 15 },
-    flavorPrompt: '心念感知到爱人与其他男性苟合或在一起时，不仅心境毫无崩溃，周身真气反倒如江河奔涌，修炼进境一日千里（提升十倍）。',
+    flavorPrompt: '心念感知到伴侣与其他男子私通或举止亲密时，心境不怒不崩，体内真气反倒如狂潮奔涌逆流，武功与内息修炼速度十倍暴增。',
   },
 
   // 极高阶体质项
@@ -322,7 +322,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     category: '命格',
     cost: 14,
     description: '命带绿云，极易遭遇枕边人背叛，却心甘情愿替他人养育子女，抚养后代毫无芥蒂。',
-    flavorPrompt: '极易在剧情中遭遇伴侣背叛并替他人抚育螟蛉子，且对非亲生骨肉毫无芥蒂、视若己出；所养螟蛉子的功法与修为进境会与自身形成奇异牵连，彼此同步映照。',
+    flavorPrompt: '极易遭遇伴侣背叛并替他人抚育螟蛉子，且对非亲生骨肉毫无芥蒂、视若己出；所养育螟蛉子的功法领悟与修为进境，会与自身形成玄妙牵连，彼此同步映照提升。',
   },
   {
     name: '枯木蛰伏',
@@ -360,7 +360,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     cost: 14,
     description: '大隐隐于市，身着朴素衣着时气质极不起眼，极擅低调自悟武学。',
     discounts: { savvyRequirementOffset: -1 },
-    flavorPrompt: '平平无奇深藏不露，日常粗布麻衣扫阶除尘，无人能看穿其深浅。',
+    flavorPrompt: '不着华服时神态气息平实朴素，混迹市井如普通布衣，旁人极难察觉其武功深浅；研习武学时擅长静心默悟、不显山露水。',
   },
   {
     name: '红颜知己',
@@ -368,7 +368,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     category: '性情',
     cost: 14,
     description: '极擅倾听异性在伴侣面前无法启齿的委屈，善于在他人情感裂隙中获得深厚信任与依赖。',
-    flavorPrompt: '异性极易视其为知心良友，倾诉夫妻隔阂，剧情中极擅充当感情倾诉与情感慰藉对象。',
+    flavorPrompt: '异性极易视其为知心挚友并倾诉隐秘心事与夫妻隔阂，极擅在他人情感嫌隙间获得深度信赖与情感依附。',
   },
   {
     name: '放下屠刀',
@@ -376,7 +376,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     category: '性情',
     cost: 14,
     description: '曾造杀戮而心生忏悔皈依正道，眉宇自带度人之意，深谙苦海无边回头是岸。',
-    flavorPrompt: '曾造杀业后大彻大悟，眉宇间常带自省与度人之意，面对仇家怨怼时坦然受之，反常能以德报怨感化顽敌。',
+    flavorPrompt: '曾染血海杀业后大彻大悟，行事慈和隐忍，面对仇家寻仇怨怼常坦然受责，往往能以至诚悔意动摇顽敌杀心。',
   },
   {
     name: '夺妻之恨',
@@ -432,7 +432,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     category: '气质',
     cost: 8,
     description: '长相干净讨喜，初见之时容易获得江湖长辈与市井豪客的好感照拂。',
-    flavorPrompt: '相貌清秀端正，日常问路打听消息时NPC态度亲和耐烦。',
+    flavorPrompt: '相貌清秀端正，向路人或客栈掌柜打听消息、问询江湖传闻时，旁人态度格外亲和耐烦。',
   },
   {
     name: '和光同尘',
@@ -440,7 +440,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     category: '气质',
     cost: 14,
     description: '气韵平淡如微尘，走入人群或脱战数日后，寻常江湖人极易将其容貌忘得精光。',
-    flavorPrompt: '五官平淡如水，走入人群瞬息无踪，NPC转头便记不清其具体样貌。',
+    flavorPrompt: '面容气韵平淡无奇，走入市井人群便极难辨认，旁人与交手过的江湖客转头便极易淡忘其容貌细节。',
   },
 
   // 进阶体质项：显著外在魅力
@@ -450,7 +450,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     category: '气质',
     cost: 18,
     description: '风姿绰约冠绝同侪，举手投足极具异性吸引力，容易引得高手侧目。',
-    flavorPrompt: '容貌气质出众，异性NPC与之对视常有恍惚，非深仇大恨极难痛下杀手。',
+    flavorPrompt: '容貌身段极具风韵，异性高手与之近距离交涉或对视时心神常有动摇，若非血海深仇往往难下死手。',
   },
   {
     name: '菩萨低眉',
@@ -467,8 +467,8 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     rank: '绝世',
     category: '气质',
     cost: 24,
-    description: '祸水级绝世容姿，一举一动足以牵动数大宗门恩怨，群雄争相折腰。',
-    flavorPrompt: '风华绝代倾国倾城，江湖豪杰、正邪掌门常为其一颦一笑而大动干戈。',
+    description: '生具倾国倾城之绝色，一颦一笑足以牵动数大门派恩怨，引得江湖名宿与少侠英杰争相折腰。',
+    flavorPrompt: '容姿冠绝天下，涉足江湖纷争时，常有豪雄掌门或正邪英杰甘为其驱使折腰，甚至为博其青睐而大动干戈。',
   },
 
   // ============================================
@@ -481,7 +481,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     category: '缺陷',
     cost: -3,
     description: '言语仿佛受无形天道反向牵引，好的不灵坏的灵，一旦把话说得太满，后续往往离奇遭重逆转。',
-    flavorPrompt: '日常聊天立下定论或笃定预测时往往离奇逆转生祸，同伴对其开口提心吊胆，堪称因果律反转。',
+    flavorPrompt: '言语极易一语成谶。做出笃定断言或夸下海口时，事态往往离奇恶化或向反方向发展，使同伴对其开口断事心怀忌惮。',
   },
 
   // 进阶体质项：初阶因果宿命
@@ -491,7 +491,7 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     category: '缺陷',
     cost: -3,
     description: '命中注定多遇绿帽情劫，伴侣极易红杏出墙或被他人所夺。',
-    flavorPrompt: '命带苦主绿帽因果，伴侣极易背着主角私通或移情别恋。',
+    flavorPrompt: '命中注定遭遇伴侣背叛的情劫，伴侣极易被其他江湖人物诱惑私通、横刀夺爱或主动移情别恋。',
   },
 
   // 复合性情项：强剧情特权
@@ -500,8 +500,8 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     rank: '镇派',
     category: '命格',
     cost: 18,
-    description: '命中多逢女贵人庇护，极易引动高境界异性强者的照拂宠溺，危难关头往往有绝顶高手挺身相助。',
-    flavorPrompt: '命格自带软饭气运，极受高阶异性NPC青睐照顾，遇险时常有强者出面护短替其摆平。',
+    description: '命中多逢异性贵人庇护，极易引动高境界异性强者的照拂宠溺，危难关头往往有绝顶高手挺身相助。',
+    flavorPrompt: '极受高境界、高地位的异性侠客与名宿青睐照料；遭遇危险或困局时，容易有强大的异性高手主动出面护短、替其化解危机。',
   },
 
   // 高阶性情项：神级特权因果律
@@ -518,8 +518,8 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     rank: '镇派',
     category: '命格',
     cost: 18,
-    description: '命中自带曹贼机缘，对已有家室之异性吸引力奇高，且言谈举止反常地常被其夫婿伴侣视为生死兄弟与莫逆之交。',
-    flavorPrompt: '在人妇或名花有主者面前魅力非凡，且其原配伴侣往往对其信任有加、引为知己通家之好。',
+    description: '生来多招人妇情缘，对已有婚配之女子吸引力极高，且言谈举止反常地极易被其夫婿引为莫逆之交或生死至交。',
+    flavorPrompt: '对名花有主或已为人妇者极具吸引力；更奇特的是，其夫婿原配往往不仅不生戒心，反倒对其格外赏识信任、引为通家之好。',
   },
 
   // ============================================
@@ -937,6 +937,6 @@ export const CHARACTER_TRAITS_DRAFT: CharacterTrait[] = [
     category: '命格',
     description: '气运盛极，更容易被卷入天下大势、绝世机缘与时代风云之中。',
     attributeThreshold: { attribute: '福缘', minValue: 17 },
-    flavorPrompt: '可让角色更容易接触重大人物、机缘与时代事件，但不得赋予“主角必胜”或凭空逆转死局的权限。',
+    flavorPrompt: '行事更容易遭遇江湖重大风云、机缘造化与成名人物；但仍须遵循生死因果，不得强行免死或凭空逆转死局。',
   },
 ];
