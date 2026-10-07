@@ -33,4 +33,17 @@ describe('SeasonEngine', () => {
     expect(result.league.赛程索引).toBe(1);
     expect(result.nextGame?.index).toBe(1);
   });
+
+  it('第82场结束后按排名生成七场四胜季后赛首轮', () => {
+    const league = createLeagueState('GSW');
+    league.赛程索引 = 81;
+    league.日期 = '2016-04-13';
+    league.战绩.GSW = { 胜: 70, 负: 11, 得分: 9000, 失分: 8200, 连胜: 4 };
+    const result = advanceLeagueAfterGame(league, 'GSW', finishedMatch(), () => .5);
+    expect(result.league.阶段).toBe('季后赛');
+    expect(result.league.季后赛?.round).toBe('首轮');
+    expect(result.league.季后赛?.series).toHaveLength(8);
+    expect(result.nextGame?.stage).toBe('首轮');
+    expect(result.nextGame?.opponent).toBeTruthy();
+  });
 });
