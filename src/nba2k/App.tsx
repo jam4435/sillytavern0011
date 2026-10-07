@@ -164,8 +164,9 @@ const App: React.FC = () => {
     async (r: SetupResult) => {
       const p = getPlayer(r.protagonistKey);
       const team = getTeam(r.teamId);
-      const opponents = TEAMS.filter(t => t.id !== r.teamId);
-      const firstOpponent = opponents[Math.floor(Math.random() * opponents.length)];
+      const league = createLeagueState(r.teamId);
+      const firstGame = getScheduledGame(r.teamId, 0);
+      const firstOpponent = firstGame ? getTeam(firstGame.opponent) : undefined;
       await insertOrAssignVariables(
         {
           stat_data: {
@@ -200,8 +201,9 @@ const App: React.FC = () => {
                   .filter(sp => sp.name !== r.protagonistKey)
                   .map(sp => [sp.name, 50]),
               ),
-              日程: { 日期: '2015-10-27', 下一场: `vs ${firstOpponent.id}`, 待办: ['赛季首战'] },
+              日程: { 日期: league.日期, 下一场: formatScheduledOpponent(firstGame), 待办: ['赛季首战'] },
             },
+            联盟: league,
             比赛: null,
           },
         },
@@ -210,7 +212,7 @@ const App: React.FC = () => {
       setStat(readStat());
       await sendTurn(
         `【开局】我是${r.playerName}，以${p?.cn ?? r.protagonistKey}的身份效力于${team?.cn}（${p?.pos}，总评${p?.overall}）。` +
-          `2015-16 赛季即将开始，首战 ${firstOpponent.cn}。请以生涯纪录片的口吻开场，介绍我的处境（更衣室、教练、媒体期待），最后给出行动选项。`,
+          `2015-16 赛季即将开始，首战 ${firstOpponent?.cn ?? firstGame?.opponent ?? '待定'}。请以生涯纪录片的口吻开场，介绍我的处境（更衣室、教练、媒体期待），最后给出行动选项。`,
       );
     },
     [sendTurn],
@@ -222,8 +224,9 @@ const App: React.FC = () => {
       const player = buildCustomPlayer(form);
       registerCustomPlayer(player);
       const team = getTeam(form.teamId);
-      const opponents = TEAMS.filter(t => t.id !== form.teamId);
-      const firstOpponent = opponents[Math.floor(Math.random() * opponents.length)];
+      const league = createLeagueState(form.teamId);
+      const firstGame = getScheduledGame(form.teamId, 0);
+      const firstOpponent = firstGame ? getTeam(firstGame.opponent) : undefined;
       await insertOrAssignVariables(
         {
           stat_data: {
@@ -259,8 +262,9 @@ const App: React.FC = () => {
                   .slice(0, 5)
                   .map(sp => [sp.name, 45]),
               ),
-              日程: { 日期: '2015-10-27', 下一场: `vs ${firstOpponent.id}`, 待办: ['新秀首秀'] },
+              日程: { 日期: league.日期, 下一场: formatScheduledOpponent(firstGame), 待办: ['新秀首秀'] },
             },
+            联盟: league,
             比赛: null,
           },
         },
@@ -269,7 +273,7 @@ const App: React.FC = () => {
       setStat(readStat());
       await sendTurn(
         `【开局】我是${form.name}，一名${form.height_cm}cm、${form.weight_kg}kg、臂展${form.wingspan_cm}cm 的${form.pos}新秀（${form.mode}，总评${player.overall}，潜力${player.attrs.potential}），` +
-          `刚与${team?.cn}签下新秀合同，球衣号码 ${form.number} 号。2015-16 赛季即将开始，首战 ${firstOpponent.cn}。` +
+          `刚与${team?.cn}签下新秀合同，球衣号码 ${form.number} 号。2015-16 赛季即将开始，首战 ${firstOpponent?.cn ?? firstGame?.opponent ?? '待定'}。` +
           `请以生涯纪录片口吻开场：选秀夜的回忆、初进更衣室面对老大哥们的场面、教练对我的期待与质疑，最后给出行动选项。`,
       );
     },
