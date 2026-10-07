@@ -205,6 +205,17 @@ function branchesFor(input: ResolveInput, tier: ResultTier): SettlementBranch[] 
         ],
         pending: { type: 'deadBall', reason: '投篮被封堵出界', inboundSide: mine },
       },
+      {
+        ...scoringBranch(input, '失败', points, 'blocked-recovered'),
+        label: '投篮被封盖并由防守方控制',
+        possession: theirs,
+        nextPhase: '常规回合',
+        statDeltas: [
+          ...scoringBranch(input, '失败', points, 'blocked-recovered').statDeltas,
+          ...(input.defender ? [stat(input.defender.name, '盖帽', 1)] : []),
+        ],
+        pending: { type: 'none' },
+      },
       shootingFoulBranch(input, points),
     ];
     if (tier === '失败') return [
@@ -267,9 +278,14 @@ function contractFor(input: ResolveInput, stages: ActionResolution['stages'], ti
   const pace = input.situation.offenseTactic?.pace ?? '标准';
   const family = ACTION_SPECS[input.action].family;
   const setupAction = family === '传球' || family === '挡拆' || family === '无球';
-  const clock = setupAction
+  const rawClock = setupAction
     ? range(2, 5)
     : pace === '快' ? range(7, 13) : pace === '慢' ? range(11, 17) : range(9, 15);
+  const remainingShotClock = Math.max(1, input.match.投篮时钟);
+  const clock = range(
+    Math.min(rawClock.min, remainingShotClock),
+    Math.min(rawClock.max, remainingShotClock),
+  );
   return {
     id: `nba-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     intent: { action: input.action, family: ACTION_SPECS[input.action].family, actor: input.actor.name, partner: input.partner?.name ?? null },
