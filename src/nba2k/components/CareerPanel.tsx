@@ -1,20 +1,22 @@
 import { useState } from 'react';
 import { BADGE_REGISTRY, GROUP_KEYS, GROUP_LABELS, HOT_ZONE_IDS, potentialLevelCap, upgradeCost } from '../engine/development';
 import type { UpgradeGroupKey } from '../engine/types';
-import type { CareerState, OffCourtState } from '../utils/statReader';
+import type { CareerState, LeagueState, OffCourtState } from '../utils/statReader';
 import { getTeam } from '../utils/rosters';
 
 export function CareerPanel(props: {
-  career: CareerState | null; offCourt: OffCourtState | null; disabled: boolean;
+  career: CareerState | null; offCourt: OffCourtState | null; league: LeagueState | null; disabled: boolean;
   onAction: (text: string) => void; onStartMatch: () => void;
   onTrain: () => void; onUpgrade: (group: UpgradeGroupKey) => void;
 }) {
-  const { career, offCourt } = props;
+  const { career, offCourt, league } = props;
   const [showDevelopment, setShowDevelopment] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const team = career ? getTeam(career.球队) : undefined;
   const points = career?.发展.growthPoints ?? career?.成长点 ?? 0;
   const cap = potentialLevelCap(career?.能力.potential ?? 75);
+  const record = career ? league?.战绩?.[career.球队] : undefined;
+  const activeHooks = (league?.故事钩子 ?? []).filter(hook => !hook.consumed).slice(-3).reverse();
   const quickActions = [
     { label: '会见经纪人', text: '我约经纪人见面，聊聊最近的代言机会和职业规划。' },
     { label: '代言谈判', text: '我想推进当前的代言谈判或寻找新的代言机会。' },
@@ -23,9 +25,10 @@ export function CareerPanel(props: {
   ];
 
   return <div className="career-panel career-v3">
-    <div className="cp-header"><div className="cp-identity"><span className="cp-eyebrow">2015–16 / MYCAREER</span><span className="cp-name">{career?.姓名 ?? '未建档'}</span><span className="cp-team" style={{ color: team?.colors.primary }}>{team?.cn ?? career?.球队} · {career?.位置} · {career?.球队角色}</span><span className="cp-season">第 {career?.赛程索引 ?? 0} 场 · 教练信任 {career?.教练信任 ?? 0}</span></div><div className="career-ovr"><span>OVR</span><b>{career?.能力.overall ?? 0}</b><small>POT {career?.能力.potential ?? 0}</small></div></div>
+    <div className="cp-header"><div className="cp-identity"><span className="cp-eyebrow">2015–16 / MYCAREER</span><span className="cp-name">{career?.姓名 ?? '未建档'}</span><span className="cp-team" style={{ color: team?.colors.primary }}>{team?.cn ?? career?.球队} · {career?.位置} · {career?.球队角色}</span><span className="cp-season">第 {career?.赛程索引 ?? 0} 场 · {record ? `${record.胜}胜${record.负}负 · ` : ''}教练信任 {career?.教练信任 ?? 0}</span></div><div className="career-ovr"><span>OVR</span><b>{career?.能力.overall ?? 0}</b><small>POT {career?.能力.potential ?? 0}</small></div></div>
     <div className="career-resource-strip"><span>资金 <b>{((offCourt?.资金 ?? 0) / 10000).toFixed(1)}万</b></span><span>声望 <b>{offCourt?.声望 ?? 0}</b></span><span>粉丝 <b>{((offCourt?.粉丝 ?? 0) / 10000).toFixed(1)}万</b></span><span>成长点 <b>{points}</b></span></div>
     <div className="cp-schedule"><span>{offCourt?.日程?.日期 ?? '—'}</span><span>下一场：{offCourt?.日程?.下一场 ?? '—'}</span>{(offCourt?.日程?.待办 ?? []).map(item => <span key={item} className="cp-todo">{item}</span>)}</div>
+    {activeHooks.length > 0 && <div className="cp-section league-pulse"><div className="cp-section-title">联盟动态</div>{activeHooks.map(hook => <div key={hook.id} className="cp-row"><b>{hook.title}</b> · {hook.detail}</div>)}</div>}
 
     <div className="career-toolbar"><button className={showDevelopment ? 'active' : ''} onClick={() => setShowDevelopment(value => !value)}>能力升级</button><button className={showProfile ? 'active' : ''} onClick={() => setShowProfile(value => !value)}>徽章 / 热区</button><button disabled={props.disabled} onClick={props.onTrain}>今日训练 +1</button></div>
     {showDevelopment && career && <section className="development-panel"><header><div><span>NONLINEAR DEVELOPMENT</span><b>潜力等级上限 {cap}</b></div><strong>{points} GP</strong></header><div className="development-grid">{GROUP_KEYS.map(key => { const level = career.发展.groups[key]; const cost = upgradeCost(level); return <div className="development-row" key={key}><div><span>{GROUP_LABELS[key]}</span><small>LV {level}/{cap} · 下级 {cost}点</small></div><div className="development-track"><i style={{ width: `${level / 20 * 100}%` }} /></div><button disabled={props.disabled || level >= cap || points < cost} onClick={() => props.onUpgrade(key)}>升级</button></div>; })}</div></section>}
