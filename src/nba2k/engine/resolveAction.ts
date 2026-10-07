@@ -287,8 +287,8 @@ function contractFor(input: ResolveInput, stages: ActionResolution['stages'], ti
   const family = ACTION_SPECS[input.action].family;
   const setupAction = family === '传球' || family === '挡拆' || family === '无球';
   const rawClock = setupAction
-    ? range(2, 5)
-    : pace === '快' ? range(7, 13) : pace === '慢' ? range(11, 17) : range(9, 15);
+    ? range(2, 6)
+    : pace === '快' ? range(8, 14) : pace === '慢' ? range(12, 18) : range(10, 16);
   const remainingShotClock = Math.max(1, input.match.投篮时钟);
   const clock = range(
     Math.min(rawClock.min, remainingShotClock),
