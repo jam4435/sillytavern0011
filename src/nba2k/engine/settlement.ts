@@ -104,11 +104,18 @@ export function applySettlement(match: MatchState, settlement: NormalizedSettlem
   for (const side of ['主', '客'] as const) {
     for (const player of match.阵容[side].场上) {
       const current = statuses[player];
-      if (current) statuses[player] = { ...current, 上场秒数: current.上场秒数 + consumed };
+      if (current) {
+        statuses[player] = {
+          ...current,
+          上场秒数: current.上场秒数 + consumed,
+          // 所有人都会因上场时间缓慢掉体力；持球/对抗者还会再吃动作额外消耗。
+          体力: clamp(current.体力 - consumed / 180, 0, 100),
+        };
+      }
     }
     for (const player of match.阵容[side].替补) {
       const current = statuses[player];
-      if (current) statuses[player] = { ...current, 体力: Math.min(100, current.体力 + Math.max(1, Math.round(consumed / 8))) };
+      if (current) statuses[player] = { ...current, 体力: Math.min(100, current.体力 + consumed / 60) };
     }
   }
   for (const delta of branch.statDeltas) {
