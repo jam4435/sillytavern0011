@@ -312,9 +312,13 @@ const App: React.FC = () => {
     const offCourt = stat.场外;
     if (!career) return;
     const myTeamId = career.球队;
-    const next = offCourt?.日程?.下一场 ?? 'vs LAL';
+    const next = offCourt?.日程?.下一场 ?? '';
+    if (!/^(vs|@)\s+/i.test(next)) {
+      toastr.warning('当前没有可进入的正式比赛。');
+      return;
+    }
     const isHome = !next.startsWith('@');
-    const oppId = next.replace(/^(vs|@)\s*/i, '').trim() || 'LAL';
+    const oppId = next.replace(/^(vs|@)\s*/i, '').trim();
     const homeId = isHome ? myTeamId : oppId;
     const awayId = isHome ? oppId : myTeamId;
     const mySide: Side = isHome ? '主' : '客';
