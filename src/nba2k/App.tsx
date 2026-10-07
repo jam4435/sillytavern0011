@@ -15,7 +15,7 @@ import { buildCustomPlayer } from './utils/customPlayer';
 import { buildTurnPrompt } from './engine/promptBuilder';
 import { buildFormation } from './engine/positioning';
 import { resolveAction } from './engine/resolveAction';
-import { advancePeriodIfNeeded, settleAssistantResponse } from './engine/settlement';
+import { advancePeriodIfNeeded, buildCanonicalAssistant, settleAssistantResponse } from './engine/settlement';
 import { createDevelopment, defaultBadges, defaultHotZones, defaultTendencies, initialGroups } from './engine/development';
 import type { MatchState, OnCourtStatus, Side, SituationContext, StructuredTeamTactics, UpgradeGroupKey } from './engine/types';
 import { getPlayer, getRoster, getTeam, pickStarters, registerCustomPlayer, starterEntriesWith } from './utils/rosters';
@@ -24,7 +24,7 @@ import { getLastAssistantNarrative, isInMatch, parseOptions, readStat, stripNarr
 import { runTurnTransaction } from './utils/turnTransaction';
 import type { TurnTransactionOptions } from './utils/turnTransaction';
 import { finishCareerGame, trainCareer, updateCareerDynamics, upgradeCareer } from './utils/careerProgress';
-import { simulatePossession } from './engine/possession';
+import { continuePossessionAfterAdvantage, simulatePossession } from './engine/possession';
 import type { SimulationMode } from './engine/simulationMode';
 import { simulateUntilInterruption } from './engine/simulationMode';
 import { advanceLeagueAfterGame, createLeagueState, formatScheduledOpponent, getScheduledGame } from './engine/season';
@@ -481,17 +481,38 @@ const App: React.FC = () => {
             resolution.contract,
             match,
             async repairPrompt => generatedText(await generate({ should_stream: false, user_input: repairPrompt })),
-            (normalized, nextMatch) => {
-              let nextCareer = updateCareerDynamics(career, resolution, normalized);
-              if (match.进行中 && !nextMatch.进行中) {
-                nextCareer = finishCareerGame(nextCareer, nextMatch);
-                return buildPostGamePatch(stat, nextCareer, nextMatch);
-              }
-              return { 生涯: nextCareer };
-            },
           );
           if (settled.validationErrors.length) console.warn('[nba2k] settlement repaired/fallback', settled.validationErrors);
-          return settled.assistantText;
+
+          let finalMatch = settled.nextMatch;
+          let continuationSummary = '';
+          const family = resolution.intent.family;
+          const shouldContinue =
+            finalMatch.进行中 &&
+            finalMatch.球权 === mySide &&
+            finalMatch.回合阶段 === '常规回合' &&
+            (family === '传球' || family === '挡拆' || choice.action === '突破分球') &&
+            !settled.settlement.branch.scoreDelta.主 &&
+            !settled.settlement.branch.scoreDelta.客;
+
+          if (shouldContinue) {
+            const preferredActor = choice.partnerKey ?? finalMatch.站位[mySide].find(spot => spot.持球)?.球员 ?? null;
+            const continuation = continuePossessionAfterAdvantage(finalMatch, mySide, preferredActor, getPlayer);
+            finalMatch = continuation.match;
+            continuationSummary = continuation.summary;
+          }
+
+          let nextCareer = updateCareerDynamics(career, resolution, settled.settlement);
+          let extras: Record<string, unknown> = { 生涯: nextCareer };
+          if (match.进行中 && !finalMatch.进行中) {
+            nextCareer = finishCareerGame(nextCareer, finalMatch);
+            extras = buildPostGamePatch(stat, nextCareer, finalMatch);
+          }
+
+          const narrativeSource = continuationSummary
+            ? `${raw}\n\n随后这一攻继续完成：${continuationSummary}。`
+            : raw;
+          return buildCanonicalAssistant(narrativeSource, settled.settlement, finalMatch, extras);
         },
       });
     },
