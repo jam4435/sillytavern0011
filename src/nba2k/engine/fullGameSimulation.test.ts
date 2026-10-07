@@ -70,6 +70,53 @@ describe('48-minute full-game audit', () => {
     expect(result.possessions.客).toBeGreaterThan(70);
   });
 
+
+  it('48场勇士vs骑士审计核心球员分钟与数据层级', () => {
+    const tracked = ['Stephen Curry', 'Klay Thompson', 'Draymond Green', 'Andrew Bogut', 'LeBron James', 'Kyrie Irving', 'Kevin Love'];
+    const totals = Object.fromEntries(tracked.map(key => [key, { games: 0, minutes: 0, points: 0, rebounds: 0, assists: 0, fga: 0, threeA: 0, turnovers: 0 }]));
+    const games = 48;
+
+    for (let index = 0; index < games; index++) {
+      const homeId = index % 2 === 0 ? 'GSW' : 'CLE';
+      const awayId = homeId === 'GSW' ? 'CLE' : 'GSW';
+      const result = simulateFullGame(freshMatch(homeId, awayId), getPlayer, { rng: seeded(5000 + index * 31) });
+      for (const key of tracked) {
+        const row = result.match.球员状态[key];
+        if (!row) continue;
+        const total = totals[key];
+        total.games += 1;
+        total.minutes += row.上场秒数 / 60;
+        total.points += row.得分;
+        total.rebounds += row.篮板;
+        total.assists += row.助攻;
+        total.fga += row.投篮出手;
+        total.threeA += row.三分出手;
+        total.turnovers += row.失误;
+      }
+    }
+
+    const averages = Object.fromEntries(Object.entries(totals).map(([key, row]) => [key, {
+      min: row.minutes / row.games,
+      pts: row.points / row.games,
+      reb: row.rebounds / row.games,
+      ast: row.assists / row.games,
+      fga: row.fga / row.games,
+      threeA: row.threeA / row.games,
+      tov: row.turnovers / row.games,
+    }]));
+    console.info('[nba2k star audit]', averages);
+
+    expect(averages['Stephen Curry'].min).toBeGreaterThan(31);
+    expect(averages['Stephen Curry'].min).toBeLessThan(40);
+    expect(averages['LeBron James'].min).toBeGreaterThan(31);
+    expect(averages['LeBron James'].min).toBeLessThan(40);
+    expect(averages['Stephen Curry'].pts).toBeGreaterThan(18);
+    expect(averages['LeBron James'].pts).toBeGreaterThan(18);
+    expect(averages['Stephen Curry'].pts).toBeGreaterThan(averages['Andrew Bogut'].pts);
+    expect(averages['LeBron James'].pts).toBeGreaterThan(averages['Kevin Love'].pts);
+    expect(averages['Draymond Green'].ast).toBeGreaterThan(averages['Andrew Bogut'].ast);
+  }, 30_000);
+
   it('96场多体系完整比赛统计保持在宽松真实NBA区间', () => {
     const matchups: [string, string][] = [
       ['GSW', 'CLE'], ['SAS', 'OKC'], ['HOU', 'LAC'], ['MEM', 'GSW'],
