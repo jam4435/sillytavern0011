@@ -2974,6 +2974,41 @@
     background: rgba(255, 250, 244, 0.36);
   }
 
+  // 秘籍所载武学：内部卡片与操作按钮跟随宣纸主题，品阶色仅用于细窄饰边。
+  .inventory-workbench {
+    .workbench-secret-art {
+      border-color: var(--wuxia-ink-border-soft);
+      background: linear-gradient(135deg, rgba(255, 252, 247, 0.7), rgba(232, 222, 206, 0.52));
+      box-shadow: inset 2px 0 0 color-mix(in srgb, var(--secret-art-color, #8b1a1a) 42%, rgba(61, 48, 40, 0.25));
+    }
+
+    .workbench-secret-art-head strong {
+      color: var(--wuxia-ink-text-strong);
+    }
+
+    .workbench-secret-art-desc {
+      color: var(--wuxia-ink-text);
+    }
+
+    .workbench-secret-art-action {
+      color: #7f2119;
+      border-color: var(--wuxia-ink-border);
+      background: rgba(139, 26, 26, 0.06);
+
+      &:hover:not(:disabled) {
+        border-color: rgba(139, 26, 26, 0.48);
+        background: rgba(139, 26, 26, 0.12);
+      }
+
+      &:disabled {
+        opacity: 0.72;
+        color: var(--wuxia-ink-text-muted);
+        border-color: var(--wuxia-ink-border-soft);
+        background: rgba(61, 48, 40, 0.035);
+      }
+    }
+  }
+
   .workbench-mobile-back {
     background: rgba(250, 246, 238, 0.86);
     border-bottom-color: rgba(61, 48, 40, 0.16);
