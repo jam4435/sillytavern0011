@@ -293,13 +293,13 @@ function buildSituation(
 function actionFoulChance(action: ActionType, actor: PlayerData): number {
   const draw = (actor.attrs.drawFoul - 70) * .003;
   const base =
-    action === '突破终结' ? .50 :
-    action === '背身单打' ? .34 :
-    action === '急停投篮' || action === '突破急停' ? .18 :
-    action === '后撤步' ? .13 :
-    action === '定点投篮' ? .10 :
-    .12;
-  return clamp(base + draw, .04, .68);
+    action === '突破终结' ? .44 :
+    action === '背身单打' ? .30 :
+    action === '急停投篮' || action === '突破急停' ? .15 :
+    action === '后撤步' ? .10 :
+    action === '定点投篮' ? .075 :
+    .10;
+  return clamp(base + draw * .85, .035, .60);
 }
 
 function andOneChance(action: ActionType, actor: PlayerData): number {
@@ -311,15 +311,15 @@ function andOneChance(action: ActionType, actor: PlayerData): number {
 function passingTurnoverChance(resolution: ActionResolution, actor: PlayerData): number {
   const action = resolution.action;
   const risk =
-    action === '安全传球' ? .18 :
-    action === '跨场转移' ? .42 :
-    action === '突破分球' ? .34 :
-    action === '挡拆突破' ? .25 :
-    action === '顺下传球' || action === '外弹传球' ? .30 :
-    .24;
+    action === '安全传球' ? .26 :
+    action === '跨场转移' ? .52 :
+    action === '突破分球' ? .43 :
+    action === '挡拆突破' ? .32 :
+    action === '顺下传球' || action === '外弹传球' ? .37 :
+    .32;
   const skill = (actor.attrs.passAccuracy + actor.attrs.passIQ + actor.attrs.ballControl) / 3;
-  const matchup = (resolution.defenseScore - resolution.attackScore) * .004;
-  return clamp(risk + (70 - skill) * .004 + matchup, .10, .64);
+  const matchup = (resolution.defenseScore - resolution.attackScore) * .0045;
+  return clamp(risk + (70 - skill) * .0045 + matchup, .14, .72);
 }
 
 function chooseBranch(resolution: ActionResolution, actor: PlayerData, rng: RandomSource): SettlementBranch {
@@ -329,7 +329,7 @@ function chooseBranch(resolution: ActionResolution, actor: PlayerData, rng: Rand
   const driveTurnover = branches.find(branch => branch.id === 'drive-turnover');
   if (driveTurnover) {
     const matchup = Math.max(0, resolution.defenseScore - resolution.attackScore) * .003;
-    const chance = clamp(.14 + (70 - actor.attrs.ballControl) * .003 + matchup, .07, .27);
+    const chance = clamp(.17 + (70 - actor.attrs.ballControl) * .003 + matchup, .09, .30);
     if (rng() < chance) return driveTurnover;
   }
 
@@ -472,9 +472,9 @@ function settleRebound(match: MatchState, resolvePlayer: PlayerResolver, rng: Ra
   const defenseTactic = match.战术[defenseSide].rebound;
   const offStrength = teamReboundStrength(offensePlayers, true);
   const defStrength = teamReboundStrength(defensePlayers, false);
-  const tacticDelta = offenseTactic === '冲抢' ? .055 : offenseTactic === '优先退防' ? -.045 : 0;
-  const defenseDelta = defenseTactic === '冲抢' ? -.015 : 0;
-  const offensiveChance = clamp(.235 + tacticDelta + defenseDelta + (offStrength - defStrength) * .00135, .16, .36);
+  const tacticDelta = offenseTactic === '冲抢' ? .05 : offenseTactic === '优先退防' ? -.03 : 0;
+  const defenseDelta = defenseTactic === '冲抢' ? -.012 : 0;
+  const offensiveChance = clamp(.248 + tacticDelta + defenseDelta + (offStrength - defStrength) * .00135, .17, .36);
   const offensive = rng() < offensiveChance;
   const pool = offensive ? offensePlayers : defensePlayers;
   const winner = weightedPick(
@@ -636,7 +636,7 @@ export function continuePossessionAfterAdvantage(
     primaryDefender: nearestDefender(match, offense, actor),
     reason: `延续已创造的进攻优势 · ${player.cn}${action}`,
   };
-  return simulatePossession(match, resolvePlayer, { rng, plan, maxSteps: 1, initialAdvantageModifier: 5 });
+  return simulatePossession(match, resolvePlayer, { rng, plan, maxSteps: 1, initialAdvantageModifier: 4 });
 }
 
 export function simulatePossession(
@@ -705,7 +705,7 @@ export function simulatePossession(
     if (current.球权 !== initialOffense) break;
 
     if (outcome.branch.id === 'advantage') {
-      const tierBonus = outcome.resolution.tier === '大成功' ? 7 : outcome.resolution.tier === '成功' ? 5 : 3;
+      const tierBonus = outcome.resolution.tier === '大成功' ? 6 : outcome.resolution.tier === '成功' ? 4 : 2;
       const creationBonus = action === '突破分球' || action === '顺下传球' || action === '外弹传球' ? 1 : 0;
       flow = {
         advantageModifier: clamp(tierBonus + creationBonus, 0, 8),
