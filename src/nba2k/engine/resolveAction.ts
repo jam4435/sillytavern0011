@@ -169,6 +169,25 @@ function shootingFoulBranch(input: ResolveInput, points: number): SettlementBran
   };
 }
 
+function blockedShotBranch(input: ResolveInput, points: number, recovered: boolean): SettlementBranch {
+  const mine = input.actionSide;
+  const theirs = otherSide(mine);
+  const base = scoringBranch(input, '失败', points, recovered ? 'blocked-recovered' : 'blocked-out');
+  return {
+    ...base,
+    label: recovered ? '投篮被封盖并由防守方控制' : '投篮被封堵出界',
+    possession: recovered ? theirs : mine,
+    nextPhase: recovered ? '常规回合' : '死球',
+    statDeltas: [
+      ...base.statDeltas,
+      ...(input.defender ? [stat(input.defender.name, '盖帽', 1)] : []),
+    ],
+    pending: recovered
+      ? { type: 'none' }
+      : { type: 'deadBall', reason: '投篮被封堵出界', inboundSide: mine },
+  };
+}
+
 function branchesFor(input: ResolveInput, tier: ResultTier): SettlementBranch[] {
   const family = ACTION_SPECS[input.action].family;
   const mine = input.actionSide;
@@ -194,28 +213,8 @@ function branchesFor(input: ResolveInput, tier: ResultTier): SettlementBranch[] 
         statDeltas: [stat(input.actor.name, '失误', 1)],
         pending: { type: 'none' as const },
       }] : []),
-      {
-        ...scoringBranch(input, '失败', points, 'blocked-out'),
-        label: '被封堵出界',
-        possession: mine,
-        nextPhase: '死球',
-        statDeltas: [
-          ...scoringBranch(input, '失败', points, 'blocked-out').statDeltas,
-          ...(input.defender ? [stat(input.defender.name, '盖帽', 1)] : []),
-        ],
-        pending: { type: 'deadBall', reason: '投篮被封堵出界', inboundSide: mine },
-      },
-      {
-        ...scoringBranch(input, '失败', points, 'blocked-recovered'),
-        label: '投篮被封盖并由防守方控制',
-        possession: theirs,
-        nextPhase: '常规回合',
-        statDeltas: [
-          ...scoringBranch(input, '失败', points, 'blocked-recovered').statDeltas,
-          ...(input.defender ? [stat(input.defender.name, '盖帽', 1)] : []),
-        ],
-        pending: { type: 'none' },
-      },
+      blockedShotBranch(input, points, false),
+      blockedShotBranch(input, points, true),
       shootingFoulBranch(input, points),
     ];
     if (tier === '失败') return [
@@ -229,6 +228,8 @@ function branchesFor(input: ResolveInput, tier: ResultTier): SettlementBranch[] 
         statDeltas: [stat(input.actor.name, '失误', 1)],
         pending: { type: 'none' as const },
       }] : []),
+      blockedShotBranch(input, points, false),
+      blockedShotBranch(input, points, true),
       shootingFoulBranch(input, points),
     ];
     return [
@@ -287,7 +288,7 @@ function contractFor(input: ResolveInput, stages: ActionResolution['stages'], ti
   const family = ACTION_SPECS[input.action].family;
   const setupAction = family === '传球' || family === '挡拆' || family === '无球';
   const rawClock = setupAction
-    ? range(2, 6)
+    ? range(1, 4)
     : pace === '快' ? range(8, 14) : pace === '慢' ? range(12, 18) : range(10, 16);
   const remainingShotClock = Math.max(1, input.match.投篮时钟);
   const clock = range(
