@@ -505,7 +505,10 @@ const App: React.FC = () => {
     if (match.回合阶段 !== '常规回合') return;
 
     const segment = simulateUntilInterruption(match, simulationMode, career.附身球员, getPlayer);
-    if (segment.possessions <= 0) return;
+    if (segment.possessions <= 0) {
+      if (segment.match !== match) setStat(current => ({ ...current, 比赛: segment.match }));
+      return;
+    }
 
     const patch: Record<string, unknown> = { 比赛: segment.match };
     if (match.进行中 && !segment.match.进行中) {
