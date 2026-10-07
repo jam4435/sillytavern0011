@@ -496,10 +496,27 @@ const App: React.FC = () => {
             !settled.settlement.branch.scoreDelta.客;
 
           if (shouldContinue) {
-            const preferredActor = choice.partnerKey ?? finalMatch.站位[mySide].find(spot => spot.持球)?.球员 ?? null;
+            const passLike = family === '传球' || choice.action === '突破分球' || choice.action === '顺下传球' || choice.action === '外弹传球';
+            const preferredActor = choice.action === '挡拆突破'
+              ? actorKey
+              : choice.partnerKey;
+            const scoreBefore = finalMatch.比分[mySide];
             const continuation = continuePossessionAfterAdvantage(finalMatch, mySide, preferredActor, getPlayer);
             finalMatch = continuation.match;
             continuationSummary = continuation.summary;
+
+            if (passLike && finalMatch.比分[mySide] > scoreBefore) {
+              const passerStatus = finalMatch.球员状态[actorKey];
+              if (passerStatus) {
+                finalMatch = {
+                  ...finalMatch,
+                  球员状态: {
+                    ...finalMatch.球员状态,
+                    [actorKey]: { ...passerStatus, 助攻: passerStatus.助攻 + 1 },
+                  },
+                };
+              }
+            }
           }
 
           let nextCareer = updateCareerDynamics(career, resolution, settled.settlement);
