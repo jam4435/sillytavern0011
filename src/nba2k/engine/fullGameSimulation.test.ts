@@ -130,6 +130,10 @@ describe('48-minute full-game audit', () => {
     let totalFta = 0;
     let totalTov = 0;
     let totalOreb = 0;
+    let totalAssists = 0;
+    let totalFgm = 0;
+    let totalSteals = 0;
+    let totalBlocks = 0;
     let totalBenchMinutes = 0;
     let totalTopMinutes = 0;
     let totalFinalStamina = 0;
@@ -156,6 +160,10 @@ describe('48-minute full-game audit', () => {
           totalFta += teamStat(m, side, '罚球出手');
           totalTov += teamStat(m, side, '失误');
           totalOreb += teamStat(m, side, '进攻篮板');
+          totalAssists += teamStat(m, side, '助攻');
+          totalFgm += teamStat(m, side, '投篮命中');
+          totalSteals += teamStat(m, side, '抢断');
+          totalBlocks += teamStat(m, side, '盖帽');
           const roster = [...m.阵容[side].场上, ...m.阵容[side].替补];
           const minutes = roster.map(key => ({ key, value: (m.球员状态[key]?.上场秒数 ?? 0) / 60 }));
           totalTopMinutes += Math.max(...minutes.map(item => item.value));
@@ -180,6 +188,10 @@ describe('48-minute full-game audit', () => {
       ftr: totalFta / Math.max(1, totalFga),
       tovPerTeam: totalTov / teamGames,
       orebPerTeam: totalOreb / teamGames,
+      assistsPerTeam: totalAssists / teamGames,
+      assistedFgRate: totalAssists / Math.max(1, totalFgm),
+      stealsPerTeam: totalSteals / teamGames,
+      blocksPerTeam: totalBlocks / teamGames,
       benchMinutes: totalBenchMinutes / teamGames,
       topPlayerMinutes: totalTopMinutes / teamGames,
       finalStamina: totalFinalStamina / Math.max(1, staminaSamples),
