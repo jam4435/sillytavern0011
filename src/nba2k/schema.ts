@@ -127,7 +127,39 @@ export const offCourtStateSchema = z.object({
   日程: z.object({ 日期: nonEmptyText, 下一场: nonEmptyText, 待办: z.array(z.string()) }).strict(),
 }).strict();
 
-export const nba2kStatSchema = z.object({ 版本: z.literal(3), 比赛: matchStateSchema.nullable(), 生涯: careerStateSchema.nullable(), 场外: offCourtStateSchema.nullable() }).strict();
+const standingRecordSchema = z.object({
+  胜: nonNegativeInt, 负: nonNegativeInt, 得分: nonNegativeInt, 失分: nonNegativeInt,
+  连胜: z.number().int(),
+}).strict();
+
+const injuryRecordSchema = z.object({
+  球员: nonEmptyText, 类型: nonEmptyText, 严重度: z.enum(['轻微', '中等', '严重']),
+  受伤日期: nonEmptyText, 预计复出: nonEmptyText, 状态: z.enum(['休战', '恢复中', '可复出']),
+}).strict();
+
+const storyHookSchema = z.object({
+  id: nonEmptyText,
+  type: z.enum(['赛历', '交易', '合同', '代言', '伤病', '球队关系', '奖项']),
+  title: nonEmptyText, detail: nonEmptyText, createdDate: nonEmptyText, consumed: z.boolean().optional(),
+}).strict();
+
+export const leagueStateSchema = z.object({
+  赛季: z.literal('2015-16'),
+  日期: nonEmptyText,
+  阶段: z.enum(['常规赛', '季后赛', '休赛期']),
+  赛程索引: nonNegativeInt,
+  战绩: z.record(nonEmptyText, standingRecordSchema),
+  伤病: z.array(injuryRecordSchema),
+  故事钩子: z.array(storyHookSchema),
+}).strict();
+
+export const nba2kStatSchema = z.object({
+  版本: z.literal(3),
+  比赛: matchStateSchema.nullable(),
+  生涯: careerStateSchema.nullable(),
+  场外: offCourtStateSchema.nullable(),
+  联盟: leagueStateSchema.nullable().default(null),
+}).strict();
 export type ValidatedNba2kStat = z.infer<typeof nba2kStatSchema>;
 
 export function formatStatValidationIssues(error: z.ZodError): string[] {
