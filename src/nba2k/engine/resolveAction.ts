@@ -256,7 +256,11 @@ function contractFor(input: ResolveInput, stages: ActionResolution['stages'], ti
     id: `nba-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     intent: { action: input.action, family: ACTION_SPECS[input.action].family, actor: input.actor.name, partner: input.partner?.name ?? null },
     stages, tier, branches, referenceBranchId: branches[0].id, clockSeconds: clock,
-    shotClockSeconds: range(0, 24), staminaDelta: { actor: range(-1, 0), ...(input.partner ? { partner: range(-1, 0) } : {}) },
+    shotClockSeconds: range(
+      Math.max(0, input.match.投篮时钟 - clock.max - 1),
+      Math.max(0, input.match.投篮时钟 - clock.min + 1),
+    ),
+    staminaDelta: { actor: range(-1, 0), ...(input.partner ? { partner: range(-1, 0) } : {}) },
     allowedPlayers: [...new Set([...input.match.阵容.主.场上, ...input.match.阵容.客.场上])],
     allowedStatePaths: ['比赛.比分', '比赛.球权', '比赛.剩余秒数', '比赛.投篮时钟', '比赛.站位', '比赛.球员状态', '比赛.本节球队犯规', '比赛.回合阶段', '比赛.待处理情境', '比赛.回合情境', '比赛.回合摘要'],
   };
