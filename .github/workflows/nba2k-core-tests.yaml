@@ -42,4 +42,5 @@ jobs:
           src/nba2k/engine/possession.test.ts
           src/nba2k/engine/possessionCalibration.test.ts
           src/nba2k/engine/rotation.test.ts
+          src/nba2k/engine/rotationPlan.test.ts
           src/nba2k/engine/fullGameSimulation.test.ts
