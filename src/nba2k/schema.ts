@@ -54,7 +54,10 @@ const lineupSchema = z.object({ 场上: z.array(nonEmptyText).max(5), 替补: z.
 const teamRotationSchema = z.object({
   starters: z.array(nonEmptyText).max(5),
   targetMinutes: z.record(nonEmptyText, z.number().min(0).max(60)),
-  profileId: z.string().optional(),
+  planSource: z.literal('dynamic').optional(),
+  benchTrust: z.number().min(0).max(100).optional(),
+  starLoad: z.number().min(0).max(100).optional(),
+  loadManagement: z.number().min(0).max(100).optional(),
   closingPriority: z.record(nonEmptyText, z.number().min(0).max(100)).optional(),
   garbagePriority: z.record(nonEmptyText, z.number().min(0).max(100)).optional(),
   rotationDepth: z.number().int().min(5).max(15).optional(),
