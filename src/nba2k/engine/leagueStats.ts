@@ -44,7 +44,6 @@ export function emptyPlayerSeasonTotals(teamId: string): PlayerSeasonTotals {
     fgm: 0, fga: 0, threePm: 0, threePa: 0, ftm: 0, fta: 0 };
 }
 
-type StatValues = Omit<PlayerSeasonTotals, 'teamId'>;
 const TOTAL_KEYS = ['gp', 'min', 'pts', 'reb', 'ast', 'stl', 'blk', 'tov', 'fgm', 'fga',
   'threePm', 'threePa', 'ftm', 'fta'] as const;
 
