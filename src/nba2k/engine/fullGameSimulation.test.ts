@@ -3,6 +3,7 @@ import { buildFormation } from './positioning';
 import { simulateFullGame } from './fullGameSimulation';
 import { createRotationPlan } from './rotationPlan';
 import { deriveTeamTactics } from './teamStyle';
+import { createLeagueState } from './season';
 import type { MatchState, OnCourtStatus, Side } from './types';
 import { getPlayer, getRoster } from '../utils/rosters';
 import { buildDynamicDepthChart } from './depthChart';
@@ -24,10 +25,13 @@ function seeded(seed: number) {
 function freshMatch(homeId: string, awayId: string): MatchState {
   const homeRoster = getRoster(homeId);
   const awayRoster = getRoster(awayId);
-  const homeTactics = deriveTeamTactics(homeRoster);
-  const awayTactics = deriveTeamTactics(awayRoster);
-  const homeEntries = buildDynamicDepthChart(homeRoster, { tactics: homeTactics }).starters;
-  const awayEntries = buildDynamicDepthChart(awayRoster, { tactics: awayTactics }).starters;
+  const league = createLeagueState(homeId);
+  const homeCoach = league.教练[homeId] ?? null;
+  const awayCoach = league.教练[awayId] ?? null;
+  const homeTactics = deriveTeamTactics(homeRoster, homeCoach);
+  const awayTactics = deriveTeamTactics(awayRoster, awayCoach);
+  const homeEntries = buildDynamicDepthChart(homeRoster, { tactics: homeTactics, coachProfile: homeCoach }).starters;
+  const awayEntries = buildDynamicDepthChart(awayRoster, { tactics: awayTactics, coachProfile: awayCoach }).starters;
   const homeOn = homeEntries.map(e => e.key);
   const awayOn = awayEntries.map(e => e.key);
   const homeAll = homeRoster.map(p => p.name);
@@ -49,7 +53,7 @@ function freshMatch(homeId: string, awayId: string): MatchState {
     回合阶段: '常规回合', 待处理情境: { type: 'none' }, 回合情境: '',
     球员状态: Object.fromEntries([...homeAll, ...awayAll].map(k => [k, status()])), 回合摘要: '',
   };
-  match.轮换 = createRotationPlan(match, getPlayer);
+  match.轮换 = createRotationPlan(match, getPlayer, { league });
   return match;
 }
 
