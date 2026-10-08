@@ -243,6 +243,7 @@ function buildPostGamePatch(
     Math.random,
     simulationProfiles,
     leagueSnapshot.byTeam,
+    { key: nextCareer.附身球员, age: nextCareer.年龄 },
   );
   let nextLeague = advanceInjuryRecovery(advanced.league);
 
