@@ -1312,6 +1312,40 @@ describe('history checkout', () => {
     expect(readHistoryCheckoutJournal()?.failure?.stage).toBe('verify');
   });
 
+  it('旧节点也能识别是事件脚本预检查改写了参与事件，展示具体变更路径', async () => {
+    currentChat().messages = [
+      { message_id: 0, role: 'assistant', swipe_id: 0, swipes: ['路线甲', '路线乙'], message: '路线甲' },
+    ];
+    const scanned = await scanCurrentChat();
+    const target = findNodeByPreview(scanned.tree, '路线乙')!;
+    const emptyEventState = {
+      事件系统: null,
+      参与事件: null,
+      世界事件: null,
+      事件分支结果: null,
+      后续事件线索: null,
+      后续事件线索计数: null,
+    };
+    const tree = deepClone(scanned.tree);
+    tree.nodes[target.id].verification = {
+      selectedMksHash: stableHistoryHash([]),
+      eventStateHash: stableHistoryHash(emptyEventState),
+      // 模拟旧封存，没有 eventPartHashes。
+    };
+    persistTreeDirect(tree);
+    eventOn('wuxia:history-checkout-prepare-verification', async () => {
+      (currentChat().variables.stat_data as Record<string, unknown>).参与事件 = { 测试事件: { 结局: '重建' } };
+    });
+
+    const result = await checkoutNode(target.id);
+    expect(result.status).toBe('recovery_failed');
+    const journal = readHistoryCheckoutJournal();
+    expect(journal?.verificationTrace?.eraEventStateHash).toBe(tree.nodes[target.id].verification?.eventStateHash);
+    expect(journal?.verificationTrace?.preparedEventStateHash).not.toBe(tree.nodes[target.id].verification?.eventStateHash);
+    expect(journal?.verificationTrace?.changedPaths).toContain('参与事件（空 → 对象(1项)）');
+    expect(journal?.failure?.details).toContain('ERA 完全同步后与封存一致，但运行事件脚本预检查后发生漂移');
+  });
+
   it('retryCheckoutRecovery 会续期过期 journal 并继续原 stage', async () => {
     currentChat().messages = [{ message_id: 0, role: 'assistant', message: '可重试节点' }];
     const scanned = await scanCurrentChat();
