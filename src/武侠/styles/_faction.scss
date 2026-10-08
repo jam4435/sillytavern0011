@@ -1544,7 +1544,12 @@
   }
 }
 
-.public-faction-structure-list,
+.public-faction-structure-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
 .public-faction-people-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1581,6 +1586,18 @@
     color: #c99a8e;
     font-size: 0.68rem;
   }
+}
+
+.people-more {
+  align-self: center;
+  color: #8f8377;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.public-faction-overview {
+  margin: 0.55rem 0 0;
+  line-height: 1.7;
 }
 
 .public-faction-person-item {
@@ -1879,7 +1896,7 @@
 
     .category-filter-bar {
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 0.25rem;
       margin-bottom: 0.5rem;
 
