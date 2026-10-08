@@ -8,6 +8,7 @@ import {
 } from './coachProfile';
 import { seasonLabelFromOffset } from './lifecycle';
 import type { LeagueContract, MarketOffer, TransactionRecord } from './transactionTypes';
+import type { DraftPickRecord, GeneratedPlayerSeed } from './draft';
 
 export type LeaguePhase = '常规赛' | '季后赛' | '休赛期';
 export type PlayoffRound = '首轮' | '分区半决赛' | '分区决赛' | '总决赛';
@@ -74,6 +75,10 @@ export interface LeagueState {
   市场报价: MarketOffer[];
   /** 联盟正式交易/签约流水。 */
   交易记录: TransactionRecord[];
+  /** 程序化新秀种子；43项能力由 draft.ts 确定性重建。 */
+  生成球员: Record<string, GeneratedPlayerSeed>;
+  /** 最近最多10届（600签）的选秀历史。 */
+  选秀历史: DraftPickRecord[];
   伤病: InjuryRecord[];
   故事钩子: StoryHook[];
   季后赛: PlayoffState | null;
@@ -168,6 +173,8 @@ export function createLeagueState(playerTeamId: string): LeagueState {
     合同册: {},
     市场报价: [],
     交易记录: [],
+    生成球员: {},
+    选秀历史: [],
     伤病: [],
     故事钩子: [{
       id: 'opening-night-2015',
