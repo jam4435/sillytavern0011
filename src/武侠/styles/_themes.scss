@@ -6370,6 +6370,49 @@
             color: var(--wuxia-ink-text);
           }
         }
+
+        .public-faction-overview {
+          color: var(--wuxia-ink-text);
+        }
+
+        .public-faction-structure-list {
+          gap: 0;
+          border-top: 1px solid var(--wuxia-ink-border-soft);
+        }
+
+        .public-faction-structure-item {
+          padding: 0.68rem 0.08rem 0.72rem;
+          background: transparent;
+          border: 0;
+          border-bottom: 1px solid var(--wuxia-ink-border-soft);
+          border-radius: 0;
+
+          .card-top {
+            margin-bottom: 0.38rem;
+          }
+
+          .sect-title {
+            color: var(--wuxia-ink-text-strong);
+            font-weight: 600;
+          }
+
+          .member-mark {
+            padding: 0.04rem 0.38rem;
+            background: rgba(139, 26, 26, 0.045);
+            border-color: rgba(139, 26, 26, 0.18);
+            color: #7f2119;
+          }
+
+          .leader-pill {
+            background: transparent;
+            border-color: rgba(61, 48, 40, 0.16);
+            color: var(--wuxia-ink-text);
+          }
+
+          .people-more {
+            color: var(--wuxia-ink-text-muted);
+          }
+        }
       }
     }
   }
