@@ -84,7 +84,7 @@ function allocate(total: number, weights: number[]): number[] {
  */
 function allocateTeamMinutes(weights: number[], caps: number[]): number[] {
   const boundedCaps = caps.map(cap => Math.floor(clamp(cap, 0, 48)));
-  if (boundedCaps.reduce((sum, value) => sum + value, 0) < 240) return allocate(240, weights);
+  if (boundedCaps.reduce((sum, value, index) => sum + (weights[index] > 0 ? value : 0), 0) < 240) return allocate(240, weights);
   const result = weights.map(() => 0);
   const active = new Set(weights.map((value, index) => value > 0 ? index : -1).filter(index => index >= 0));
   let remaining = 240;
