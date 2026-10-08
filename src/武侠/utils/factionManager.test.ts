@@ -14,9 +14,9 @@ import {
 import type { InitialAttributes, SectMartialNode } from '../types';
 
 describe('factionManager', () => {
-  it('应当正确加载全部 17 个门派势力', () => {
+  it('应当正确加载全部 23 个正式可玩势力', () => {
     const sects = getAllSects();
-    expect(sects).toHaveLength(17);
+    expect(sects).toHaveLength(23);
     expect(sects.map(s => s.门派名称)).toContain('全真教');
     expect(sects.map(s => s.门派名称)).toContain('少林派');
     expect(sects.map(s => s.门派名称)).toContain('丐帮');
@@ -24,6 +24,9 @@ describe('factionManager', () => {
     expect(sects.map(s => s.门派名称)).toContain('白驼山庄');
     expect(sects.map(s => s.门派名称)).toContain('星宿派');
     expect(sects.map(s => s.门派名称)).toContain('蒙古军旅武学');
+    for (const name of ['灵鹫宫', '大理天龙寺', '青城派', '蓬莱派', '神农帮', '西夏一品堂']) {
+      expect(sects.map(s => s.门派名称)).toContain(name);
+    }
   });
 
   it('应当支持按名称或别名查找势力', () => {
@@ -34,6 +37,10 @@ describe('factionManager', () => {
 
     const quanzhenAlias = getSectByName('全真派');
     expect(quanzhenAlias?.门派ID).toBe('全真教');
+
+    const dali = getSectByName('大理段氏与一灯门下');
+    expect(dali?.门派ID).toBe('大理段氏');
+    expect(getSectByName('天龙寺')?.门派ID).toBe('大理天龙寺');
   });
 
   it('应当准确计算请教消耗与前置条件判定', () => {
