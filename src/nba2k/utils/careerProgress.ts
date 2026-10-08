@@ -1,6 +1,7 @@
 import { GROUP_KEYS, badgeLevel, bodyCaps, hotZoneState, overallOf, ratingsFromGroups, upgradeCost } from '../engine/development';
 import type { ActionResolution, MatchState, NormalizedSettlement, UpgradeGroupKey } from '../engine/types';
 import type { CareerState, OffCourtState } from './statReader';
+import { applyCoachReview } from '../engine/coachRole';
 
 export function upgradeCareer(career: CareerState, group: UpgradeGroupKey): CareerState {
   const level = career.发展.groups[group];
@@ -86,26 +87,34 @@ export function postGameGrowthPoints(performance: number): number {
 
 export function finishCareerGame(career: CareerState, match: MatchState): CareerState {
   const status = match.球员状态[career.附身球员];
-  if (!status) return career;
+  // 伤病休战 / 教练DNP：球队赛程照常前进，但不记个人出场、成长奖励或负面教练评价。
+  if (!status || status.上场秒数 <= 0) {
+    return { ...career, 赛程索引: career.赛程索引 + 1 };
+  }
+
   const performance = Math.round(Math.max(0, Math.min(100,
     50 + status.得分 * .7 + status.篮板 * 1.2 + status.助攻 * 1.5 + status.抢断 * 2.5 + status.盖帽 * 2.2 - status.失误 * 2 - status.犯规 * .5,
   )));
   const reward = postGameGrowthPoints(performance);
   const previousGames = Number(career.赛季统计.出场数 ?? 0);
-  const average = (key: string, value: number) => ((Number(career.赛季统计[key] ?? 0) * previousGames) + value) / (previousGames + 1);
+  const nextGames = previousGames + 1;
+  const average = (key: string, value: number) => ((Number(career.赛季统计[key] ?? 0) * previousGames) + value) / nextGames;
   const points = career.发展.growthPoints + reward;
-  return {
+  const next: CareerState = {
     ...career,
     赛程索引: career.赛程索引 + 1,
-    发展: { ...career.发展, growthPoints: points }, 成长点: points,
+    发展: { ...career.发展, growthPoints: points },
+    成长点: points,
     赛季统计: {
-      ...career.赛季统计, 出场数: previousGames + 1,
+      ...career.赛季统计,
+      出场数: nextGames,
       场均得分: Math.round(average('场均得分', status.得分) * 10) / 10,
       场均篮板: Math.round(average('场均篮板', status.篮板) * 10) / 10,
       场均助攻: Math.round(average('场均助攻', status.助攻) * 10) / 10,
       上场表现: performance,
     },
   };
+  return applyCoachReview(next, match, performance, nextGames).career;
 }
 
 export function assertDevelopmentGroups(groups: CareerState['发展']['groups']): boolean {
