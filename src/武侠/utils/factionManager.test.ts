@@ -43,6 +43,28 @@ describe('factionManager', () => {
     expect(getSectByName('天龙寺')?.门派ID).toBe('大理天龙寺');
   });
 
+  it('逍遥/灵鹫与大理段氏/天龙寺应保持拆分后的传承边界', () => {
+    const xiaoyao = getSectByName('逍遥派')!;
+    const lingjiu = getSectByName('灵鹫宫')!;
+    const dali = getSectByName('大理段氏')!;
+    const tianlong = getSectByName('大理天龙寺')!;
+
+    expect(xiaoyao.武学传承树.map(n => n.功法)).toContain('北冥神功');
+    expect(xiaoyao.武学传承树.map(n => n.功法)).not.toContain('天山六阳掌');
+    expect(xiaoyao.武学传承树.map(n => n.功法)).not.toContain('周公剑法');
+    expect(lingjiu.武学传承树.map(n => n.功法)).toEqual(
+      expect.arrayContaining(['天山六阳掌', '生死符', '天山折梅手', '八荒六合唯我独尊功']),
+    );
+
+    expect(dali.武学传承树.map(n => n.功法)).toContain('一阳指');
+    expect(dali.武学传承树.map(n => n.功法)).not.toContain('枯荣禅功');
+    expect(dali.武学传承树.map(n => n.功法)).not.toContain('六脉神剑');
+    expect(tianlong.武学传承树.map(n => n.功法)).toEqual(
+      expect.arrayContaining(['一阳指', '枯荣禅功', '六脉神剑']),
+    );
+    expect(tianlong.武学传承树.filter(n => n.功法.startsWith('六脉神剑-'))).toHaveLength(6);
+  });
+
   it('应当准确计算请教消耗与前置条件判定', () => {
     const quanzhen = getSectByName('全真教');
     expect(quanzhen).toBeDefined();
