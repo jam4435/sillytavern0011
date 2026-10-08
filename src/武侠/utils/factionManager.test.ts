@@ -63,6 +63,10 @@ describe('factionManager', () => {
       expect.arrayContaining(['一阳指', '枯荣禅功', '六脉神剑']),
     );
     expect(tianlong.武学传承树.filter(n => n.功法.startsWith('六脉神剑-'))).toHaveLength(6);
+    expect(tianlong.武学传承树.map(n => n.功法)).toContain('六脉剑阵');
+    const formation = tianlong.武学传承树.find(n => n.功法 === '六脉剑阵');
+    expect(formation?.分支).toBe('六脉合阵');
+    expect(formation?.学习限制.特别条件?.join(' ')).toContain('六位成员');
   });
 
   it('应当准确计算请教消耗与前置条件判定', () => {
