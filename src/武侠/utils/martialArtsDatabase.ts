@@ -49,6 +49,8 @@ export interface TrainingRequirement {
 }
 
 /** 功法数据库中的完整功法结构 */
+export type MartialArtSourceType = '原著明确' | '合理补全';
+
 export interface MartialArtData {
   功法名称: string;
   类型: string;
@@ -57,6 +59,9 @@ export interface MartialArtData {
   修炼限制?: TrainingRequirement;
   战斗系数?: CombatCoefficient;
   特性?: Record<string, string>;
+  /** 开发期来源标记：区分原著明确武学与为完整玩法链合理补全的低中层功法。 */
+  来源类型?: MartialArtSourceType;
+  来源说明?: string;
 }
 
 /** 功法数据库JSON结构 */
