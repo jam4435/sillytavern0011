@@ -27,7 +27,7 @@ function validStat() {
   };
   return {
     版本: 3 as const, 比赛: match,
-    生涯: { 姓名: '主角', 球队: 'GSW', 位置: 'SG' as const, 附身球员: player.name, 自定义球员: player, 赛季: '2015-16', 赛程索引: 1, 能力: { overall: player.overall, ...player.attrs }, 发展: createDevelopment('2K16模式', '均衡', groups), 倾向: defaultTendencies(), 动态徽章: defaultBadges(), 热区: defaultHotZones(), 教练信任: 30, 球队角色: '轮换' as const, 赛季统计: { 出场数: 0 }, 成长点: 0 },
+    生涯: { 姓名: '主角', 球队: 'GSW', 位置: 'SG' as const, 附身球员: player.name, 自定义球员: player, 赛季: '2015-16', 赛程索引: 1, 年龄: 19, 巅峰年龄: 28, 生涯赛季数: 0, 退役状态: '现役' as const, 能力: { overall: player.overall, ...player.attrs }, 发展: createDevelopment('2K16模式', '均衡', groups), 倾向: defaultTendencies(), 动态徽章: defaultBadges(), 热区: defaultHotZones(), 教练信任: 30, 球队角色: '轮换' as const, 赛季统计: { 出场数: 0 }, 成长点: 0 },
     场外: { 资金: 0, 声望: 0, 粉丝: 0, 经纪人: null, 代言: [], 合同: null, 关系: [], 队友好感: {}, 日程: { 日期: '2015-10-27', 下一场: 'vs CLE', 待办: [] } },
     联盟: createLeagueState('GSW'),
   };

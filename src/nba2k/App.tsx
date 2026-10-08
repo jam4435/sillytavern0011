@@ -17,8 +17,15 @@ import { buildFormation } from './engine/positioning';
 import { resolveAction } from './engine/resolveAction';
 import { advancePeriodIfNeeded, buildCanonicalAssistant, settleAssistantResponse } from './engine/settlement';
 import { createDevelopment, defaultBadges, defaultHotZones, defaultTendencies, initialGroups } from './engine/development';
-import type { MatchState, OnCourtStatus, Side, SituationContext, StructuredTeamTactics, UpgradeGroupKey } from './engine/types';
-import { getPlayer, getRoster, getTeam, registerCustomPlayer } from './utils/rosters';
+import type { MatchState, OnCourtStatus, PlayerData, Side, SituationContext, StructuredTeamTactics, UpgradeGroupKey } from './engine/types';
+import {
+  createLeaguePlayerResolver,
+  getBasePlayer,
+  getPlayer,
+  getRosterForLeague,
+  getTeam,
+  registerCustomPlayer,
+} from './utils/rosters';
 import type { Nba2kStat } from './utils/statReader';
 import { getLastAssistantNarrative, isInMatch, parseOptions, readStat, stripNarrative } from './utils/statReader';
 import { runTurnTransaction } from './utils/turnTransaction';
@@ -27,13 +34,24 @@ import { finishCareerGame, trainCareer, updateCareerDynamics, upgradeCareer } fr
 import { continuePossessionAfterAdvantage, simulatePossession } from './engine/possession';
 import type { SimulationMode } from './engine/simulationMode';
 import { simulateUntilInterruption } from './engine/simulationMode';
-import { advanceLeagueAfterGame, createLeagueState, formatScheduledOpponent, getScheduledGame } from './engine/season';
+import {
+  advanceLeagueAfterGame,
+  beginNextSeason,
+  createLeagueState,
+  formatScheduledOpponent,
+  getScheduledGame,
+} from './engine/season';
 import { advanceInjuryRecovery, collectOffCourtHooks } from './engine/offCourtSystems';
 import { deriveTeamTactics } from './engine/teamStyle';
 import { applyAutomaticRotation } from './engine/rotation';
 import { createRotationPlan } from './engine/rotationPlan';
 import { getPlayerAvailability } from './engine/availability';
 import { buildDynamicDepthChart } from './engine/depthChart';
+import {
+  advanceCareerLifecycleOneSeason,
+  estimateInitialAge,
+  estimatePeakAge,
+} from './engine/lifecycle';
 
 function freshStatus(): OnCourtStatus {
   return {
@@ -69,6 +87,26 @@ function readSimulationMode(): SimulationMode {
     if (value === '全回合' || value === '精简比赛' || value === '关键时刻') return value;
   } catch {}
   return '精简比赛';
+}
+
+function careerPlayerProjection(career: NonNullable<Nba2kStat['生涯']>): PlayerData | undefined {
+  const base = career.自定义球员 ?? getBasePlayer(career.附身球员);
+  if (!base) return undefined;
+  const { overall, ...attrs } = career.能力;
+  return {
+    ...base,
+    team: career.球队,
+    pos: career.位置,
+    overall,
+    attrs,
+  };
+}
+
+function playerResolverForStat(stat: Nba2kStat): (key: string) => PlayerData | undefined {
+  const leagueResolver = createLeaguePlayerResolver(stat.联盟);
+  const career = stat.生涯;
+  const protagonist = career ? careerPlayerProjection(career) : undefined;
+  return key => career && key === career.附身球员 ? protagonist : leagueResolver(key);
 }
 
 function generatedText(result: string | GenerateToolCallResult): string {
@@ -156,9 +194,11 @@ const App: React.FC = () => {
 
   const refresh = useCallback(async () => {
     const next = readStat();
-    // 自定义球员随存档恢复时重新注册进球员库
-    const custom = (next.生涯 as any)?.自定义球员;
-    if (custom?.name) registerCustomPlayer(custom);
+    // 主角始终以生涯中的“当季能力”覆盖静态球员种子；训练/衰退才能真实进入比赛。
+    if (next.生涯) {
+      const projection = careerPlayerProjection(next.生涯);
+      if (projection) registerCustomPlayer(projection);
+    }
     setStat(next);
     const last = await getLastAssistantNarrative();
     setNarrative(stripNarrative(last));
@@ -212,7 +252,7 @@ const App: React.FC = () => {
       const p = getPlayer(r.protagonistKey);
       const team = getTeam(r.teamId);
       const league = createLeagueState(r.teamId);
-      const firstGame = getScheduledGame(r.teamId, 0);
+      const firstGame = getScheduledGame(r.teamId, 0, league.赛季序号);
       const firstOpponent = firstGame ? getTeam(firstGame.opponent) : undefined;
       await insertOrAssignVariables(
         {
@@ -223,8 +263,12 @@ const App: React.FC = () => {
               球队: r.teamId,
               位置: p?.pos ?? 'SG',
               附身球员: r.protagonistKey,
-              赛季: '2015-16',
+              赛季: league.赛季,
               赛程索引: 1,
+              年龄: p ? estimateInitialAge(p) : 24,
+              巅峰年龄: p ? estimatePeakAge(p) : 28,
+              生涯赛季数: 0,
+              退役状态: '现役',
               能力: { overall: p?.overall ?? 75, ...p?.attrs },
               发展: createDevelopment('2K16模式', '均衡', initialGroups('2K16模式', '均衡')),
               倾向: defaultTendencies(),
@@ -245,7 +289,8 @@ const App: React.FC = () => {
               合同: { 球队: r.teamId, 年限: 2, 年薪: 2000000, 到期赛季: '2017-18' },
               关系: [],
               队友好感: Object.fromEntries(
-                pickStarters(r.teamId)
+                getRosterForLeague(r.teamId, league)
+                  .slice(0, 5)
                   .filter(sp => sp.name !== r.protagonistKey)
                   .map(sp => [sp.name, 50]),
               ),
@@ -273,7 +318,7 @@ const App: React.FC = () => {
       registerCustomPlayer(player);
       const team = getTeam(form.teamId);
       const league = createLeagueState(form.teamId);
-      const firstGame = getScheduledGame(form.teamId, 0);
+      const firstGame = getScheduledGame(form.teamId, 0, league.赛季序号);
       const firstOpponent = firstGame ? getTeam(firstGame.opponent) : undefined;
       await insertOrAssignVariables(
         {
@@ -285,8 +330,12 @@ const App: React.FC = () => {
               位置: form.pos,
               附身球员: player.name,
               自定义球员: player,
-              赛季: '2015-16',
+              赛季: league.赛季,
               赛程索引: 1,
+              年龄: 19,
+              巅峰年龄: estimatePeakAge(player),
+              生涯赛季数: 0,
+              退役状态: '现役',
               能力: { overall: player.overall, ...player.attrs },
               发展: createDevelopment(form.mode, form.style, form.groups),
               倾向: defaultTendencies(),
@@ -307,7 +356,7 @@ const App: React.FC = () => {
               合同: { 球队: form.teamId, 年限: 2, 年薪: 1100000, 到期赛季: '2017-18' },
               关系: [],
               队友好感: Object.fromEntries(
-                pickStarters(form.teamId)
+                getRosterForLeague(form.teamId, league)
                   .slice(0, 5)
                   .map(sp => [sp.name, 45]),
               ),
@@ -348,8 +397,11 @@ const App: React.FC = () => {
 
     const protagonistKey = (career as any).附身球员 ?? '';
     const league = stat.联盟;
-    const homeFullRoster = getRoster(homeId);
-    const awayFullRoster = getRoster(awayId);
+    const projection = careerPlayerProjection(career);
+    if (projection) registerCustomPlayer(projection);
+    const resolvePlayer = playerResolverForStat(stat);
+    const homeFullRoster = getRosterForLeague(homeId, league);
+    const awayFullRoster = getRosterForLeague(awayId, league);
     const homeAvailable = homeFullRoster.filter(player => getPlayerAvailability(player.name, league).available);
     const awayAvailable = awayFullRoster.filter(player => getPlayerAvailability(player.name, league).available);
     if (homeAvailable.length < 5 || awayAvailable.length < 5) {
@@ -376,8 +428,8 @@ const App: React.FC = () => {
       }).starters;
     const homeEntries = entriesFor(homeId, homeAvailable, homeTactics, homeCoach);
     const awayEntries = entriesFor(awayId, awayAvailable, awayTactics, awayCoach);
-    const homeCenter = getPlayer(homeEntries.find(entry => entry.pos === 'C')?.key ?? homeEntries.at(-1)?.key ?? '');
-    const awayCenter = getPlayer(awayEntries.find(entry => entry.pos === 'C')?.key ?? awayEntries.at(-1)?.key ?? '');
+    const homeCenter = resolvePlayer(homeEntries.find(entry => entry.pos === 'C')?.key ?? homeEntries.at(-1)?.key ?? '');
+    const awayCenter = resolvePlayer(awayEntries.find(entry => entry.pos === 'C')?.key ?? awayEntries.at(-1)?.key ?? '');
     const jumpScore = (player: typeof homeCenter) =>
       player ? player.height_cm * 0.6 + player.attrs.strength * 0.3 + player.overall * 0.1 : 0;
     const openingPossession: Side = jumpScore(homeCenter) >= jumpScore(awayCenter) ? '主' : '客';
@@ -425,7 +477,7 @@ const App: React.FC = () => {
       球员状态,
       回合摘要: `${openingPossession}队赢得跳球`,
     };
-    match.轮换 = createRotationPlan(match, getPlayer, {
+    match.轮换 = createRotationPlan(match, resolvePlayer, {
       league,
       phase: league?.阶段,
       protagonist: { teamId: myTeamId, key: protagonistKey, role: career.球队角色 },
@@ -445,10 +497,11 @@ const App: React.FC = () => {
       const match = stat.比赛;
       const career = stat.生涯;
       if (!match || !career) return;
+      const resolvePlayer = playerResolverForStat(stat);
 
       if (choice.action === '观察' || choice.action === '模拟一个回合') {
-        const cpu = simulatePossession(match, getPlayer);
-        const rotated = cpu.possessionsCompleted ? applyAutomaticRotation(cpu.match, getPlayer) : cpu.match;
+        const cpu = simulatePossession(match, resolvePlayer);
+        const rotated = cpu.possessionsCompleted ? applyAutomaticRotation(cpu.match, resolvePlayer) : cpu.match;
         const patch: Record<string, unknown> = { 比赛: rotated };
         if (match.进行中 && !rotated.进行中) {
           const nextCareer = finishCareerGame(career, rotated);
@@ -465,9 +518,9 @@ const App: React.FC = () => {
       const oppSide: Side = mySide === '主' ? '客' : '主';
       // v3 只允许控制主角；忽略任何伪造的 actorKey。
       const actorKey = career.附身球员;
-      const actor = getPlayer(actorKey);
+      const actor = resolvePlayer(actorKey);
       if (!actor) return;
-      const partner = choice.partnerKey ? (getPlayer(choice.partnerKey) ?? null) : null;
+      const partner = choice.partnerKey ? (resolvePlayer(choice.partnerKey) ?? null) : null;
 
       // 对位者：距行动人最近的对方球员
       const actorSpot = match.站位[mySide]?.find(s => s.球员 === actorKey);
@@ -483,9 +536,9 @@ const App: React.FC = () => {
           }
         }
       }
-      const defender = defenderKey ? (getPlayer(defenderKey) ?? null) : null;
+      const defender = defenderKey ? (resolvePlayer(defenderKey) ?? null) : null;
       const defenderStatus = defenderKey ? match.球员状态[defenderKey] : undefined;
-      const defenders = oppSpots.map(spot => getPlayer(spot.球员)).filter((player): player is NonNullable<typeof player> => Boolean(player));
+      const defenders = oppSpots.map(spot => resolvePlayer(spot.球员)).filter((player): player is NonNullable<typeof player> => Boolean(player));
 
       let partnerDefender = null;
       if (['挡拆突破', '顺下传球', '外弹传球'].includes(choice.action) && choice.partnerKey) {
@@ -497,7 +550,7 @@ const App: React.FC = () => {
               Math.hypot(a.x - partnerSpot.x, a.y - partnerSpot.y) -
               Math.hypot(b.x - partnerSpot.x, b.y - partnerSpot.y),
           )[0];
-          partnerDefender = nearest ? (getPlayer(nearest.球员) ?? null) : null;
+          partnerDefender = nearest ? (resolvePlayer(nearest.球员) ?? null) : null;
         }
       }
 
@@ -566,7 +619,7 @@ const App: React.FC = () => {
                 ? actorKey
                 : choice.partnerKey;
             const scoreBefore = finalMatch.比分[continuationSide];
-            const continuation = continuePossessionAfterAdvantage(finalMatch, continuationSide, preferredActor, getPlayer);
+            const continuation = continuePossessionAfterAdvantage(finalMatch, continuationSide, preferredActor, resolvePlayer);
             finalMatch = continuation.match;
             continuationSummary = continuation.summary;
 
@@ -585,7 +638,7 @@ const App: React.FC = () => {
           }
 
           if (finalMatch.进行中 && finalMatch.回合阶段 === '常规回合' && finalMatch.投篮时钟 >= 20) {
-            finalMatch = applyAutomaticRotation(finalMatch, getPlayer);
+            finalMatch = applyAutomaticRotation(finalMatch, resolvePlayer);
           }
 
           let nextCareer = updateCareerDynamics(career, resolution, settled.settlement);
@@ -611,7 +664,8 @@ const App: React.FC = () => {
     if (!match || !career || !match.进行中 || simulationMode === '全回合' || busyRef.current) return;
     if (match.回合阶段 !== '常规回合') return;
 
-    const segment = simulateUntilInterruption(match, simulationMode, career.附身球员, getPlayer);
+    const resolvePlayer = playerResolverForStat(stat);
+    const segment = simulateUntilInterruption(match, simulationMode, career.附身球员, resolvePlayer);
     if (segment.possessions <= 0) {
       if (segment.match !== match) setStat(current => ({ ...current, 比赛: segment.match }));
       return;
@@ -668,6 +722,7 @@ const App: React.FC = () => {
     async ({ side, outKey, inKey }: SubstitutionChoice) => {
       const match = stat.比赛;
       if (!match || match.回合阶段 !== '死球' || busyRef.current) return;
+      const resolvePlayer = playerResolverForStat(stat);
       const rotation = match.阵容[side];
       if (!rotation.场上.includes(outKey) || !rotation.替补.includes(inKey)) return;
 
@@ -685,14 +740,14 @@ const App: React.FC = () => {
           [inKey]: match.球员状态[inKey] ?? freshStatus(),
         },
         回合情境: `${side}队死球换人：${outKey}下，${inKey}上`,
-        回合摘要: `${getPlayer(outKey)?.cn ?? outKey}被${getPlayer(inKey)?.cn ?? inKey}换下`,
+        回合摘要: `${resolvePlayer(outKey)?.cn ?? outKey}被${resolvePlayer(inKey)?.cn ?? inKey}换下`,
         回合阶段: '常规回合',
         待处理情境: { type: 'none' },
       };
       await insertOrAssignVariables({ stat_data: { 比赛: nextMatch } }, { type: 'chat' });
       setStat(current => ({ ...current, 比赛: nextMatch }));
       await sendTurn(
-        `【比赛管理】前端已完成${side}队换人：${getPlayer(outKey)?.cn ?? outKey}下，${getPlayer(inKey)?.cn ?? inKey}上。` +
+        `【比赛管理】前端已完成${side}队换人：${resolvePlayer(outKey)?.cn ?? outKey}下，${resolvePlayer(inKey)?.cn ?? inKey}上。` +
           `请简短演出换人，不得修改比赛数值。`,
         { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 比赛: nextMatch }) },
       );
@@ -704,7 +759,8 @@ const App: React.FC = () => {
     const match = stat.比赛;
     if (!match || match.待处理情境.type !== 'freeThrow' || busyRef.current) return;
     const pending = match.待处理情境;
-    const shooter = getPlayer(pending.shooter);
+    const resolvePlayer = playerResolverForStat(stat);
+    const shooter = resolvePlayer(pending.shooter);
     const made = Math.floor(Math.random() * 100) + 1 <= (shooter?.attrs.freeThrow ?? 70);
     const shooterStatus = match.球员状态[pending.shooter] ?? freshStatus();
     const remaining = pending.remaining - 1;
@@ -772,6 +828,67 @@ const App: React.FC = () => {
     await insertOrAssignVariables({ stat_data: { 生涯: result.career, 场外: result.offCourt } }, { type: 'chat' });
     setStat(current => ({ ...current, 生涯: result.career, 场外: result.offCourt }));
     await sendTurn('【训练】我完成了今天的专项训练，前端已确定性增加1成长点并推进日期。请简短描写训练内容与教练反馈，不再修改数值。', { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 生涯: result.career, 场外: result.offCourt }) });
+  }, [stat, sendTurn]);
+
+  const handleNextSeason = useCallback(async () => {
+    const career = stat.生涯;
+    const offCourt = stat.场外;
+    const league = stat.联盟;
+    if (!career || !offCourt || !league || league.阶段 !== '休赛期' || busyRef.current) return;
+
+    const severeInjuries = league.伤病.filter(
+      item => item.球员 === career.附身球员 && item.严重度 === '严重',
+    ).length;
+    const agedCareer = advanceCareerLifecycleOneSeason(career, severeInjuries);
+    const advanced = beginNextSeason(league, career.球队);
+    let nextLeague = advanced.league;
+    const nextCareer = {
+      ...agedCareer,
+      赛季: nextLeague.赛季,
+      赛程索引: 1,
+      教练评估: { 最近评分: [], 上次角色调整场次: 0 },
+      赛季统计: { 场均得分: 0, 场均篮板: 0, 场均助攻: 0, 出场数: 0 },
+    };
+    if (agedCareer.退役状态 !== career.退役状态) {
+      nextLeague = {
+        ...nextLeague,
+        故事钩子: [
+          ...nextLeague.故事钩子,
+          {
+            id: `career-retirement-${nextLeague.赛季序号}-${agedCareer.退役状态}`,
+            type: '球队关系' as const,
+            title: agedCareer.退役状态 === '退役' ? '生涯走到终点' : '退役话题升温',
+            detail: agedCareer.退役状态 === '退役'
+              ? `${career.姓名}在${agedCareer.年龄}岁正式结束球员生涯。`
+              : `${career.姓名}进入生涯暮年，年龄、能力、耐久与球队角色让退役成为现实议题。`,
+            createdDate: nextLeague.日期,
+          },
+        ],
+      };
+    }
+
+    const nextOffCourt = {
+      ...offCourt,
+      日程: {
+        日期: nextLeague.日期,
+        下一场: agedCareer.退役状态 === '退役'
+          ? '生涯已退役'
+          : formatScheduledOpponent(advanced.nextGame),
+        待办: agedCareer.退役状态 === '退役' ? ['生涯总结'] : ['新赛季报到'],
+      },
+    };
+
+    const projection = careerPlayerProjection(nextCareer);
+    if (projection) registerCustomPlayer(projection);
+    const patch = { 生涯: nextCareer, 场外: nextOffCourt, 联盟: nextLeague, 比赛: null };
+    await insertOrAssignVariables({ stat_data: patch }, { type: 'chat' });
+    setStat(current => ({ ...current, ...patch }));
+    await sendTurn(
+      agedCareer.退役状态 === '退役'
+        ? `【休赛期结算】前端生命周期系统已判定我在${agedCareer.年龄}岁正式退役。请以生涯纪录片口吻总结，不得改变退役结论或能力数值。`
+        : `【新赛季】前端已进入${nextLeague.赛季}赛季。我现在${agedCareer.年龄}岁，总评${agedCareer.能力.overall}，退役状态为“${agedCareer.退役状态}”。年龄成长/衰退已经由代码结算；请演出训练营报到和新赛季期待，不得重新计算能力。`,
+      { transformAssistant: async raw => stripMatchVariableBlocks(raw, patch) },
+    );
   }, [stat, sendTurn]);
 
   const handleReset = useCallback(() => {
@@ -885,6 +1002,7 @@ const App: React.FC = () => {
           disabled={busy}
           onAction={t => void sendTurn(t)}
           onStartMatch={() => void handleStartMatch()}
+          onNextSeason={() => void handleNextSeason()}
           onTrain={() => void handleTrain()}
           onUpgrade={group => void handleUpgrade(group)}
         />

@@ -13,3 +13,7 @@ NBA 2K16（2015-16赛季揭幕阵容，即2K16首发名单）。overall：各队
 
 ## calibration/teamStyleBenchmarks2015_16.ts
 2015-16 GSW/HOU/SAS/MEM 等球队的粗粒度进攻体系、节奏、防守和篮板风格只作为**校准参照**。生产运行时不会读取这些标签；`TeamStyleEngine` 先根据当前 roster 纯模拟本场战术，再由测试比较“精确命中”和“是否落在第一梯队”。历史标签本身较粗，因此不以逐队100%复刻为目标。
+
+
+## calibration/ageBenchmarks2015_16.ts
+2015-16 开季附近的真实年龄只作为**年龄估算器校准答案**。生产运行时不会读取这张表；`lifecycle.ts` 仅根据球员当前 overall、potential、speed、stamina 等种子信息估算初始年龄，再按赛季序号确定性推进成长、衰退与退役。当前代表球员年龄估算 MAE 约 0.67 岁。

@@ -125,6 +125,10 @@ const hotZoneSchema = z.object({ makes: nonNegativeInt, attempts: nonNegativeInt
 export const careerStateSchema = z.object({
   姓名: nonEmptyText, 球队: nonEmptyText, 位置: positionSchema, 附身球员: nonEmptyText,
   自定义球员: playerDataSchema.optional(), 赛季: nonEmptyText, 赛程索引: nonNegativeInt,
+  年龄: z.number().int().min(18).max(50),
+  巅峰年龄: z.number().int().min(24).max(34),
+  生涯赛季数: nonNegativeInt,
+  退役状态: z.enum(['现役', '考虑退役', '退役']),
   能力: abilitySchema, 发展: developmentSchema, 倾向: z.object({ families: z.record(nonEmptyText, tendencySchema) }).strict(),
   动态徽章: z.object({ badges: z.record(nonEmptyText, badgeSchema).superRefine((badges, ctx) => {
     for (const name of BADGE_REGISTRY) if (!badges[name]) ctx.addIssue({ code: 'custom', path: [name], message: '缺少核心徽章' });
@@ -207,7 +211,8 @@ const playoffStateSchema = z.object({
 }).strict();
 
 export const leagueStateSchema = z.object({
-  赛季: z.literal('2015-16'),
+  赛季: z.string().regex(/^\d{4}-\d{2}$/),
+  赛季序号: nonNegativeInt,
   日期: nonEmptyText,
   阶段: z.enum(['常规赛', '季后赛', '休赛期']),
   赛程索引: nonNegativeInt,
