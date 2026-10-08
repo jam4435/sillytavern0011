@@ -152,6 +152,30 @@ function playerRotationScore(
     contextBonus += (closingPriority - 60) * .36;
     // 终结阶段减少“欠分钟补课”，优先真正适合收比赛的人。
     contextBonus -= Math.max(0, deficit) / 28;
+    const a = player.attrs;
+    if (context.leading) {
+      const protectLead = (
+        a.freeThrow * .18 +
+        a.ballControl * .16 +
+        a.passIQ * .12 +
+        a.onBallDefenseIQ * .14 +
+        a.defensiveConsistency * .12 +
+        a.defRebound * .10 +
+        a.composure * .18
+      );
+      contextBonus += (protectLead - 72) * .10;
+    } else if (context.trailing) {
+      const chaseScore = (
+        a.standingThree * .20 +
+        a.movingThree * .14 +
+        a.ballControl * .14 +
+        a.passVision * .10 +
+        a.offensiveConsistency * .16 +
+        a.shotIQ * .12 +
+        a.composure * .14
+      );
+      contextBonus += (chaseScore - 72) * .11;
+    }
   } else if (context.mode === '软垃圾时间') {
     contextBonus += (garbagePriority - 55) * .28;
     if (target >= 30) contextBonus -= 8;
