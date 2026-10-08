@@ -159,6 +159,30 @@ function draftSummary(
   return [...top, ...mine].join('\n');
 }
 
+function ensureOffseasonDraft(
+  league: NonNullable<Nba2kStat['联盟']>,
+  playerTeamId: string,
+): { league: NonNullable<Nba2kStat['联盟']>; picks: ReturnType<typeof runAnnualDraft>['picks']; newlyCompleted: boolean } {
+  const entrySeason = league.赛季序号 + 1;
+  const alreadyCompleted = league.选秀历史.some(pick => pick.entrySeason === entrySeason);
+  const result = runAnnualDraft(league, getRosterForLeague);
+  let nextLeague = result.league;
+  const hookId = `draft-${entrySeason}`;
+  if (!alreadyCompleted && result.picks.length && !nextLeague.故事钩子.some(hook => hook.id === hookId)) {
+    nextLeague = {
+      ...nextLeague,
+      故事钩子: [...nextLeague.故事钩子, {
+        id: hookId,
+        type: '选秀' as const,
+        title: `${seasonLabelFromOffset(entrySeason)} 新秀选秀完成`,
+        detail: draftSummary(nextLeague, result.picks, playerTeamId),
+        createdDate: nextLeague.日期,
+      }],
+    };
+  }
+  return { league: nextLeague, picks: result.picks, newlyCompleted: !alreadyCompleted };
+}
+
 function offerSummary(offer: MarketOffer): string {
   const team = getTeam(offer.teamId)?.cn ?? offer.teamId;
   if (offer.type === '交易') {
