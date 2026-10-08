@@ -31,6 +31,12 @@ export function CareerPanel(props: {
   const pendingOffers = career
     ? (league?.市场报价 ?? []).filter(offer => offer.playerKey === career.附身球员 && offer.status === '待定')
     : [];
+  const latestDraftEntry = Math.max(-1, ...(league?.选秀历史 ?? []).map(pick => pick.entrySeason));
+  const latestDraft = latestDraftEntry >= 0
+    ? (league?.选秀历史 ?? []).filter(pick => pick.entrySeason === latestDraftEntry)
+    : [];
+  const draftPreview = [...latestDraft.slice(0, 5), ...latestDraft.filter(pick => pick.teamId === career?.球队)]
+    .filter((pick, index, list) => list.findIndex(item => item.playerKey === pick.playerKey) === index);
   const quickActions = [
     { label: '会见经纪人', text: '我约经纪人见面，聊聊最近的代言机会和职业规划。' },
     { label: '代言谈判', text: '我想推进当前的代言谈判或寻找新的代言机会。' },
@@ -43,6 +49,11 @@ export function CareerPanel(props: {
     <div className="career-resource-strip"><span>资金 <b>{((offCourt?.资金 ?? 0) / 10000).toFixed(1)}万</b></span><span>声望 <b>{offCourt?.声望 ?? 0}</b></span><span>粉丝 <b>{((offCourt?.粉丝 ?? 0) / 10000).toFixed(1)}万</b></span><span>成长点 <b>{points}</b></span></div>
     <div className="cp-schedule"><span>{offCourt?.日程?.日期 ?? '—'}</span><span>下一场：{offCourt?.日程?.下一场 ?? '—'}</span>{(offCourt?.日程?.待办 ?? []).map(item => <span key={item} className="cp-todo">{item}</span>)}</div>
     {activeHooks.length > 0 && <div className="cp-section league-pulse"><div className="cp-section-title">联盟动态</div>{activeHooks.map(hook => <div key={hook.id} className="cp-row"><b>{hook.title}</b> · {hook.detail}</div>)}</div>}
+    {draftPreview.length > 0 && <div className="cp-section draft-board"><div className="cp-section-title">最近选秀</div>
+      {draftPreview.map(pick => <div key={pick.playerKey} className="cp-row">
+        <b>#{pick.overallPick} {getTeam(pick.teamId)?.cn ?? pick.teamId}</b> · {pick.playerName} · {pick.pos} · {pick.template} · OVR {pick.overallAtDraft} / POT {pick.potential}
+      </div>)}
+    </div>}
     {coach && <div className="cp-section coach-profile"><div className="cp-section-title">教练理念</div>
       <div className="cp-row"><b>体系</b> · 进攻偏好 {coach.offensePreference ?? '随阵容'} · 防守偏好 {coach.defensePreference ?? '随阵容'} · 节奏 {coach.pacePreference}</div>
       <div className="cp-row"><b>用人</b> · {rotationLabel} · {starLoadLabel} · 小阵容 {coach.smallBallBias > 4 ? '偏爱' : coach.smallBallBias < -4 ? '保守' : '中性'}</div>
