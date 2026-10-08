@@ -390,15 +390,13 @@ export function applyMarketOffer(
   });
 }
 
-export function setPlayerFreeAgent(
+function setResolvedPlayerFreeAgent(
   league: LeagueState,
-  playerKey: string,
-  getPlayer: PlayerGetter,
+  player: PlayerData,
 ): LeagueState {
-  const player = getPlayer(playerKey, league);
-  if (!player) return league;
+  const playerKey = player.name;
   const fromTeam = currentTeamOf(player, league);
-  const previous = contractForPlayer(playerKey, league, getPlayer);
+  const previous = league.合同册[playerKey] ?? derivedInitialContract(player, league);
   let next: LeagueState = {
     ...league,
     球员归属: { ...league.球员归属, [playerKey]: null },
@@ -407,10 +405,10 @@ export function setPlayerFreeAgent(
       [playerKey]: {
         playerKey,
         teamId: null,
-        signedSeason: previous?.signedSeason ?? 0,
-        expiresAfterSeason: previous?.expiresAfterSeason ?? league.赛季序号,
-        annualSalary: previous?.annualSalary ?? 0,
-        years: previous?.years ?? 0,
+        signedSeason: previous.signedSeason,
+        expiresAfterSeason: previous.expiresAfterSeason,
+        annualSalary: previous.annualSalary,
+        years: previous.years,
         status: '自由球员',
       },
     },
@@ -425,6 +423,15 @@ export function setPlayerFreeAgent(
     date: league.日期,
   });
   return next;
+}
+
+export function setPlayerFreeAgent(
+  league: LeagueState,
+  playerKey: string,
+  getPlayer: PlayerGetter,
+): LeagueState {
+  const player = getPlayer(playerKey, league);
+  return player ? setResolvedPlayerFreeAgent(league, player) : league;
 }
 
 export function preparePlayerTradeMarket(
@@ -502,47 +509,59 @@ export function prepareOffseasonMarket(
   };
   let npcMoves = 0;
 
-  // 先一次性找出到期者并释放，再建立30队需求快照；避免每名FA重复重算整个联盟。
-  const expiringKeys = getAllPlayers(next)
+  // 休赛期只投影一次全联盟；后续裁员/需求全部使用内存快照。
+  const allPlayers = getAllPlayers(next);
+  const playerByKey = new Map(allPlayers.map(player => [player.name, player]));
+  const expiringPlayers = allPlayers
     .filter(player => player.name !== protagonistKey)
     .filter(player => {
-      const contract = contractForPlayer(player.name, next, getPlayer);
-      return Boolean(contract && contractExpiresThisOffseason(contract, next));
+      const contract = next.合同册[player.name] ?? derivedInitialContract(player, next);
+      return contractExpiresThisOffseason(contract, next);
     })
-    .map(player => player.name)
-    .sort((a, b) => a.localeCompare(b));
+    .sort((a, b) => a.name.localeCompare(b.name));
 
-  const marketKeys = [...expiringKeys];
-  for (const playerKey of expiringKeys) next = setPlayerFreeAgent(next, playerKey, getPlayer);
+  const marketKeys = expiringPlayers.map(player => player.name);
+  const freeAgentKeys = new Set(marketKeys);
+  for (const player of expiringPlayers) next = setResolvedPlayerFreeAgent(next, player);
 
-  // 选秀后每队最多15人。优先保留主角与本届首轮秀，超额的最低价值球员进入自由市场。
+  const rosterSnapshot = Object.fromEntries(TEAMS.map(team => [team.id, [] as PlayerData[]])) as Record<string, PlayerData[]>;
+  for (const player of allPlayers) {
+    if (freeAgentKeys.has(player.name)) continue;
+    const teamId = currentTeamOf(player, next);
+    if (teamId && rosterSnapshot[teamId]) rosterSnapshot[teamId].push(player);
+  }
+  for (const roster of Object.values(rosterSnapshot)) roster.sort((a, b) => b.overall - a.overall);
+
+  // 选秀后每队最多15人。优先保留主角与本届首轮秀，超额边缘球员进入自由市场。
   const protectedFirstRound = new Set(
     next.选秀历史
       .filter(pick => pick.entrySeason === next.赛季序号 + 1 && pick.round === 1)
       .map(pick => pick.playerKey),
   );
   for (const team of TEAMS) {
-    let roster = getRoster(team.id, next);
+    const roster = rosterSnapshot[team.id];
     while (roster.length > 15) {
       const candidate = roster
         .filter(player => player.name !== protagonistKey && !protectedFirstRound.has(player.name))
         .sort((a, b) => playerMarketValue(a) - playerMarketValue(b) || a.name.localeCompare(b.name))[0];
       if (!candidate) break;
-      next = setPlayerFreeAgent(next, candidate.name, getPlayer);
+      next = setResolvedPlayerFreeAgent(next, candidate);
+      freeAgentKeys.add(candidate.name);
       if (!marketKeys.includes(candidate.name)) marketKeys.push(candidate.name);
-      roster = getRoster(team.id, next);
+      roster.splice(roster.findIndex(player => player.name === candidate.name), 1);
     }
   }
 
+  const snapshotRosterGetter: RosterGetter = teamId => rosterSnapshot[teamId] ?? [];
   const needsByTeam = Object.fromEntries(
-    TEAMS.map(team => [team.id, evaluateTeamNeeds(team.id, next, getRoster)]),
+    TEAMS.map(team => [team.id, evaluateTeamNeeds(team.id, next, snapshotRosterGetter)]),
   ) as Record<string, TeamNeeds>;
   const rosterCounts = Object.fromEntries(
-    TEAMS.map(team => [team.id, getRoster(team.id, next).length]),
+    TEAMS.map(team => [team.id, rosterSnapshot[team.id].length]),
   ) as Record<string, number>;
 
   for (const playerKey of marketKeys.sort((a, b) => a.localeCompare(b))) {
-    const player = getPlayer(playerKey, next);
+    const player = playerByKey.get(playerKey) ?? getPlayer(playerKey, next);
     if (!player) continue;
     const offers = offerFromNeedSnapshot(next, player, '自由市场', needsByTeam, rosterCounts, 4);
     const best = offers[0];
