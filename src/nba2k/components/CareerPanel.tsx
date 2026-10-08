@@ -4,9 +4,11 @@ import type { UpgradeGroupKey } from '../engine/types';
 import type { CareerState, LeagueState, OffCourtState } from '../utils/statReader';
 import { getTeam } from '../utils/rosters';
 import { careerPhase } from '../engine/lifecycle';
+import type { TeamSimulationProfile } from '../engine/teamPower';
 
 export function CareerPanel(props: {
-  career: CareerState | null; offCourt: OffCourtState | null; league: LeagueState | null; disabled: boolean;
+  career: CareerState | null; offCourt: OffCourtState | null; league: LeagueState | null;
+  teamPower: { profile: TeamSimulationProfile; rank: number; total: number } | null; disabled: boolean;
   onAction: (text: string) => void; onStartMatch: () => void; onNextSeason: () => void;
   onPrepareMarket: () => void; onAcceptOffer: (offerId: string) => void;
   onTrain: () => void; onUpgrade: (group: UpgradeGroupKey) => void;
@@ -48,7 +50,12 @@ export function CareerPanel(props: {
     <div className="cp-header"><div className="cp-identity"><span className="cp-eyebrow">{career?.赛季 ?? '—'} / MYCAREER</span><span className="cp-name">{career?.姓名 ?? '未建档'}</span><span className="cp-team" style={{ color: team?.colors.primary }}>{team?.cn ?? career?.球队} · {career?.位置} · {career?.球队角色} · {career?.年龄 ?? '—'}岁 · {phase}</span><span className="cp-season">第 {career?.赛程索引 ?? 0} 场 · {record ? `${record.胜}胜${record.负}负 · ` : ''}教练信任 {career?.教练信任 ?? 0}</span></div><div className="career-ovr"><span>OVR</span><b>{career?.能力.overall ?? 0}</b><small>POT {career?.能力.potential ?? 0}</small></div></div>
     <div className="career-resource-strip"><span>资金 <b>{((offCourt?.资金 ?? 0) / 10000).toFixed(1)}万</b></span><span>声望 <b>{offCourt?.声望 ?? 0}</b></span><span>粉丝 <b>{((offCourt?.粉丝 ?? 0) / 10000).toFixed(1)}万</b></span><span>成长点 <b>{points}</b></span></div>
     <div className="cp-schedule"><span>{offCourt?.日程?.日期 ?? '—'}</span><span>下一场：{offCourt?.日程?.下一场 ?? '—'}</span>{(offCourt?.日程?.待办 ?? []).map(item => <span key={item} className="cp-todo">{item}</span>)}</div>
-    {activeHooks.length > 0 && <div className="cp-section league-pulse"><div className="cp-section-title">联盟动态</div>{activeHooks.map(hook => <div key={hook.id} className="cp-row"><b>{hook.title}</b> · {hook.detail}</div>)}</div>}
+    {props.teamPower && <div className="cp-section team-power"><div className="cp-section-title">当前球队实力</div>
+      <div className="cp-row"><b>联盟 #{props.teamPower.rank}/{props.teamPower.total}</b> · 动态实力 {props.teamPower.profile.power.toFixed(1)} · 净效率 {props.teamPower.profile.netRating >= 0 ? '+' : ''}{props.teamPower.profile.netRating.toFixed(1)}</div>
+      <div className="cp-row"><b>画像</b> · ORtg {props.teamPower.profile.offenseRating.toFixed(1)} · DRtg {props.teamPower.profile.defenseRating.toFixed(1)} · Pace {props.teamPower.profile.pace.toFixed(1)}</div>
+      <div className="cp-row"><b>体系</b> · {props.teamPower.profile.tactics.offense} / {props.teamPower.profile.tactics.defense} · {props.teamPower.profile.tactics.pace}节奏 · 可用 {props.teamPower.profile.healthyPlayers} 人</div>
+    </div>}
+        {activeHooks.length > 0 && <div className="cp-section league-pulse"><div className="cp-section-title">联盟动态</div>{activeHooks.map(hook => <div key={hook.id} className="cp-row"><b>{hook.title}</b> · {hook.detail}</div>)}</div>}
     {draftPreview.length > 0 && <div className="cp-section draft-board"><div className="cp-section-title">最近选秀</div>
       {draftPreview.map(pick => <div key={pick.playerKey} className="cp-row">
         <b>#{pick.overallPick} {getTeam(pick.teamId)?.cn ?? pick.teamId}</b> · {pick.playerName} · {pick.pos} · {pick.template} · OVR {pick.overallAtDraft} / POT {pick.potential}
