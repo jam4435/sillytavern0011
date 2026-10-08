@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import _ from 'lodash';
 
 const state = vi.hoisted(() => ({
@@ -51,6 +51,8 @@ describe('ERA 同一楼层变量块的原始次序', () => {
     state.message = '';
     vi.clearAllMocks();
   });
+
+  afterEach(() => vi.unstubAllGlobals());
 
   it('复现天龙 06→07 事件接驳：先 Delete 再 Insert 必须留下第07占用，且日志可逆', async () => {
     state.message = `正文结算\n${deleteOld}\n${insertNew}`;
