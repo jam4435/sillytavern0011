@@ -294,6 +294,36 @@ const seasonAwardsSchema = z.object({
   allNBA: z.array(z.array(nonEmptyText).max(5)).max(3),
   allDefense: z.array(z.array(nonEmptyText).max(5)).max(2),
 }).strict();
+// Lifetime entries are compact totals; they intentionally remain queryable after retirement.
+const historicalPlayerTotalsSchema = z.object({
+  teamId: nonEmptyText, gp: nonNegativeInt, min: finite.nonnegative(),
+  pts: nonNegativeInt, reb: nonNegativeInt, ast: nonNegativeInt, stl: nonNegativeInt,
+  blk: nonNegativeInt, tov: nonNegativeInt, fgm: nonNegativeInt, fga: nonNegativeInt,
+  threePm: nonNegativeInt, threePa: nonNegativeInt, ftm: nonNegativeInt, fta: nonNegativeInt,
+  seasons: nonNegativeInt, firstSeason: nonEmptyText, lastSeason: nonEmptyText,
+}).strict();
+const historicalRecordSchema = z.object({
+  season: nonEmptyText, playerKey: nonEmptyText, teamId: nonEmptyText,
+  gp: nonNegativeInt, total: nonNegativeInt,
+}).strict();
+const milestoneSchema = z.object({
+  id: nonEmptyText, season: nonEmptyText, playerKey: nonEmptyText,
+  category: z.enum(['gp', 'pts', 'reb', 'ast', 'stl', 'blk']),
+  threshold: nonNegativeInt,
+}).strict();
+const leagueHistorySchema = z.object({
+  lastCountedSeason: nonEmptyText.nullable(),
+  career: z.record(nonEmptyText, historicalPlayerTotalsSchema),
+  records: z.object({
+    pts: historicalRecordSchema.optional(), reb: historicalRecordSchema.optional(),
+    ast: historicalRecordSchema.optional(), stl: historicalRecordSchema.optional(),
+    blk: historicalRecordSchema.optional(),
+  }).strict(),
+  milestones: z.array(milestoneSchema).max(240),
+  championships: z.array(z.object({
+    season: nonEmptyText, champion: nonEmptyText, runnerUp: nonEmptyText,
+  }).strict()).max(120),
+}).strict();
 export const leagueStateSchema = z.object({
   赛季: z.string().regex(/^\d{4}-\d{2}$/),
   赛季序号: nonNegativeInt,
@@ -309,7 +339,8 @@ export const leagueStateSchema = z.object({
   生成球员: z.record(nonEmptyText, generatedPlayerSeedSchema),
   选秀历史: z.array(draftPickRecordSchema).max(600),
   球员赛季统计: z.record(nonEmptyText, playerSeasonTotalsSchema).default({}),
-  奖项记录: z.array(seasonAwardsSchema).max(20).default([]),
+  奖项记录: z.array(seasonAwardsSchema).max(120).default([]),
+  历史档案: leagueHistorySchema.default({ lastCountedSeason: null, career: {}, records: {}, milestones: [], championships: [] }),
   伤病: z.array(injuryRecordSchema),
   故事钩子: z.array(storyHookSchema),
   季后赛: playoffStateSchema.nullable().default(null),
