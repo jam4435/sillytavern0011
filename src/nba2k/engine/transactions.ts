@@ -104,6 +104,32 @@ function yearsFor(player: PlayerData, fitScore: number): number {
  * 初始历史名单没有真实合同数据，运行时按球员种子确定性生成合同期限。
  * 真实历史合同不会作为未来模拟依赖。
  */
+export function registerExistingContract(
+  league: LeagueState,
+  playerKey: string,
+  teamId: string,
+  years: number,
+  annualSalary: number,
+): LeagueState {
+  const safeYears = Math.max(1, Math.min(5, Math.round(years)));
+  return {
+    ...league,
+    球员归属: { ...league.球员归属, [playerKey]: teamId },
+    合同册: {
+      ...league.合同册,
+      [playerKey]: {
+        playerKey,
+        teamId,
+        signedSeason: league.赛季序号,
+        expiresAfterSeason: league.赛季序号 + safeYears - 1,
+        annualSalary,
+        years: safeYears,
+        status: '有效',
+      },
+    },
+  };
+}
+
 export function derivedInitialContract(player: PlayerData, league: LeagueState): LeagueContract {
   const termIndex = hash(`${player.name}:initial-contract`) % 3;
   const teamId = currentTeamOf(player, league);
