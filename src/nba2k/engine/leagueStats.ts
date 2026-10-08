@@ -79,6 +79,34 @@ function allocate(total: number, weights: number[]): number[] {
 }
 
 /**
+ * 正常情况下严格执行每人分钟限制，并将剩余分钟给可用轮换。
+ * 当全队可承担的上限不足240时回退到比例分配，保证赛果不产生无主分钟。
+ */
+function allocateTeamMinutes(weights: number[], caps: number[]): number[] {
+  const boundedCaps = caps.map(cap => Math.floor(clamp(cap, 0, 48)));
+  if (boundedCaps.reduce((sum, value) => sum + value, 0) < 240) return allocate(240, weights);
+  const result = weights.map(() => 0);
+  const active = new Set(weights.map((value, index) => value > 0 ? index : -1).filter(index => index >= 0));
+  let remaining = 240;
+  for (let pass = 0; pass < weights.length && active.size; pass++) {
+    const sum = [...active].reduce((total, index) => total + weights[index], 0);
+    const over = [...active].filter(index => remaining * weights[index] / sum > boundedCaps[index]);
+    if (!over.length) {
+      const indices = [...active];
+      const shares = allocate(remaining, indices.map(index => weights[index]));
+      indices.forEach((index, i) => { result[index] = shares[i]; });
+      return result;
+    }
+    for (const index of over) {
+      result[index] = boundedCaps[index];
+      remaining -= result[index];
+      active.delete(index);
+    }
+  }
+  return result;
+}
+
+/**
  * 后台单场：球队比分由 TeamPower GameSim 决定，再拆给当前真实轮换。
  * 不产生可被 AI 修改的每场球员日志；只有累计数字进入 stat_data。
  */
@@ -101,8 +129,9 @@ export function simulateTeamSeasonLines(
     const limit = available.minuteLimit ?? 48;
     return Math.max(0, Math.min(minutes, limit));
   });
-  // 原比赛结果已经确定，分钟统一到240。伤后限时作为权重约束，而不是硬性承诺。
-  const minutes = allocate(240, minuteWeights);
+  // 原比赛结果已确定，总分钟统一到240；可行时复出限制作为硬上限。
+  const minutes = allocateTeamMinutes(minuteWeights, players.map(player =>
+    getPlayerAvailability(player.name, league).minuteLimit ?? 48));
   const tendencies = players.map(deriveCpuTendencies);
   const pointsWeights = players.map((player, i) => minutes[i] * (0.25 + tendencies[i].usage / 22)
     * (0.8 + player.overall / 400) * (0.89 + rng() * .22));
