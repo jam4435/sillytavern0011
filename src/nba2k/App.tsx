@@ -1050,11 +1050,59 @@ const App: React.FC = () => {
     const league = stat.联盟;
     if (!career || !offCourt || !league || league.阶段 !== '休赛期' || busyRef.current) return;
 
-    const severeInjuries = league.伤病.filter(
+    const currentProjection = careerPlayerProjection(career);
+    if (currentProjection) registerCustomPlayer(currentProjection);
+
+    const market = prepareOffseasonMarket(
+      league,
+      career.附身球员,
+      getPlayerForLeague,
+      getRosterForLeague,
+      getAllPlayersForLeague,
+    );
+    let marketLeague = market.league;
+    if (market.npcMoves > 0 && !marketLeague.故事钩子.some(hook => hook.id === `offseason-market-${league.赛季}`)) {
+      marketLeague = {
+        ...marketLeague,
+        故事钩子: [...marketLeague.故事钩子, {
+          id: `offseason-market-${league.赛季}`,
+          type: '合同',
+          title: '联盟自由市场开始重组阵容',
+          detail: `本轮共有${market.npcMoves}名到期球员完成确定性签约/续约；球队依据位置需求、阵容深度、竞争力和市场价值做选择。`,
+          createdDate: marketLeague.日期,
+        }],
+      };
+    }
+
+    if (market.protagonistMustSign) {
+      const patch = { 联盟: marketLeague };
+      await insertOrAssignVariables({ stat_data: patch }, { type: 'chat' });
+      setStat(current => ({ ...current, ...patch }));
+      const offers = market.protagonistOffers;
+      await sendTurn(
+        '【自由市场必须决策】我的上一份合同已经到期，前端已完成其他球队的休赛期市场，并生成了固定的正式报价：\n' +
+          offers.map(offer => `- ${offerSummary(offer)}`).join('\n') +
+          '\n在接受其中一份合同前不能进入下一赛季。报价已写入存档，叙事模型不得重新报价。',
+        { transformAssistant: async raw => stripMatchVariableBlocks(raw, patch) },
+      );
+      return;
+    }
+
+    // 未接受的提前续约报价视为暂不续约，但原合同继续有效。
+    marketLeague = {
+      ...marketLeague,
+      市场报价: marketLeague.市场报价.map(offer =>
+        offer.playerKey === career.附身球员 && offer.status === '待定'
+          ? { ...offer, status: '拒绝' as const }
+          : offer,
+      ),
+    };
+
+    const severeInjuries = marketLeague.伤病.filter(
       item => item.球员 === career.附身球员 && item.严重度 === '严重',
     ).length;
     const agedCareer = advanceCareerLifecycleOneSeason(career, severeInjuries);
-    const advanced = beginNextSeason(league, career.球队);
+    const advanced = beginNextSeason(marketLeague, career.球队);
     let nextLeague = advanced.league;
     const nextCareer = {
       ...agedCareer,
@@ -1081,8 +1129,15 @@ const App: React.FC = () => {
       };
     }
 
+    const nextContract = contractForPlayer(career.附身球员, nextLeague, getPlayerForLeague);
     const nextOffCourt = {
       ...offCourt,
+      合同: nextContract ? {
+        球队: career.球队,
+        年限: Math.max(0, nextContract.expiresAfterSeason - nextLeague.赛季序号 + 1),
+        年薪: nextContract.annualSalary,
+        到期赛季: contractExpirySeason(nextContract.expiresAfterSeason),
+      } : offCourt.合同,
       日程: {
         日期: nextLeague.日期,
         下一场: agedCareer.退役状态 === '退役'
@@ -1100,7 +1155,7 @@ const App: React.FC = () => {
     await sendTurn(
       agedCareer.退役状态 === '退役'
         ? `【休赛期结算】前端生命周期系统已判定我在${agedCareer.年龄}岁正式退役。请以生涯纪录片口吻总结，不得改变退役结论或能力数值。`
-        : `【新赛季】前端已进入${nextLeague.赛季}赛季。我现在${agedCareer.年龄}岁，总评${agedCareer.能力.overall}，退役状态为“${agedCareer.退役状态}”。年龄成长/衰退已经由代码结算；请演出训练营报到和新赛季期待，不得重新计算能力。`,
+        : `【新赛季】休赛期阵容市场与生命周期结算已经完成，进入${nextLeague.赛季}赛季。我现在${agedCareer.年龄}岁，总评${agedCareer.能力.overall}，效力${getTeam(nextCareer.球队)?.cn ?? nextCareer.球队}。请演出训练营报到和新赛季期待，不得重新计算合同、Roster或能力。`,
       { transformAssistant: async raw => stripMatchVariableBlocks(raw, patch) },
     );
   }, [stat, sendTurn]);
