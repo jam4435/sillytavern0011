@@ -220,7 +220,11 @@ const reachableLocations = uniqueFullLocationPaths([
   ...(Array.isArray(surrounding.地图移动目的地) ? surrounding.地图移动目的地 : []),
 ]);
 const activeFollowupLocations =
-  Object.entries(participation).some(([name, event]) => !name.startsWith('
+  Object.entries(participation).some(([name, event]) => name.charCodeAt(0) !== 36 && event && typeof event === 'object' && !Array.isArray(event))
+  && surrounding.后续事件 && typeof surrounding.后续事件 === 'object' && !Array.isArray(surrounding.后续事件)
+    ? surrounding.后续事件
+    : {};
+const currentFullLocation = normalizeFullLocationPath(variables.stat_data.user数据?.所在位置);
 const currentScope = getLocationScopePath(surrounding.当前活动区) || getLocationScopePath(currentFullLocation);
 -%>
 <可用地点>
