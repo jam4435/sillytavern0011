@@ -9,6 +9,7 @@ import {
 import { seasonLabelFromOffset } from './lifecycle';
 import type { LeagueContract, MarketOffer, TransactionRecord } from './transactionTypes';
 import type { DraftPickRecord, GeneratedPlayerSeed } from './draft';
+import { simulateLowFidelityGame, type LeagueSimulationProfiles } from './teamPower';
 
 export type LeaguePhase = '常规赛' | '季后赛' | '休赛期';
 export type PlayoffRound = '首轮' | '分区半决赛' | '分区决赛' | '总决赛';
@@ -215,23 +216,12 @@ function recordResult(
   return next;
 }
 
-function simulateScore(homeId: string, awayId: string, rng: () => number): [number, number] {
-  const home = TEAMS.find(team => team.id === homeId);
-  const away = TEAMS.find(team => team.id === awayId);
-  const homeStrength = home?.overall ?? 80;
-  const awayStrength = away?.overall ?? 80;
-  const paceNoise = () => Math.round((rng() - .5) * 18);
-  let homeScore = 99 + Math.round((homeStrength - 80) * .7) + 3 + paceNoise();
-  let awayScore = 99 + Math.round((awayStrength - 80) * .7) + paceNoise();
-  if (homeScore === awayScore) homeScore += rng() < .55 ? 1 : -1;
-  return [Math.max(72, homeScore), Math.max(72, awayScore)];
-}
-
 function simulateOtherLeagueGames(
   standings: Record<string, StandingRecord>,
   roundIndex: number,
   excluded: Set<string>,
   rng: () => number,
+  profiles?: LeagueSimulationProfiles | null,
 ): Record<string, StandingRecord> {
   const teams = TEAMS.filter(team => !excluded.has(team.id)).map(team => team.id).sort();
   if (teams.length < 2) return standings;
@@ -241,7 +231,7 @@ function simulateOtherLeagueGames(
   for (let i = 0; i + 1 < rotated.length; i += 2) {
     const home = rotated[i];
     const away = rotated[i + 1];
-    const [homeScore, awayScore] = simulateScore(home, away, rng);
+    const [homeScore, awayScore] = simulateLowFidelityGame(home, away, profiles, rng);
     next = recordResult(next, home, away, homeScore, awayScore);
   }
   return next;
@@ -338,13 +328,17 @@ export function getNextPlayoffGame(league: LeagueState, playerTeamId: string): S
   return series ? playoffGameForSeries(series, playerTeamId, league.赛程索引, league.日期) : null;
 }
 
-function simulateSeriesGame(series: PlayoffSeries, rng: () => number): PlayoffSeries {
+function simulateSeriesGame(
+  series: PlayoffSeries,
+  rng: () => number,
+  profiles?: LeagueSimulationProfiles | null,
+): PlayoffSeries {
   if (seriesWinner(series)) return series;
   const gameNo = Math.min(6, series.winsA + series.winsB);
   const homeA = PLAYOFF_HOME_PATTERN[gameNo] === 'A';
   const home = homeA ? series.teamA : series.teamB;
   const away = homeA ? series.teamB : series.teamA;
-  const [homeScore, awayScore] = simulateScore(home, away, rng);
+  const [homeScore, awayScore] = simulateLowFidelityGame(home, away, profiles, rng, true);
   const winner = homeScore > awayScore ? home : away;
   return {
     ...series,
@@ -353,19 +347,31 @@ function simulateSeriesGame(series: PlayoffSeries, rng: () => number): PlayoffSe
   };
 }
 
-function simulateOtherPlayoffSeries(state: PlayoffState, playerTeamId: string, rng: () => number): PlayoffState {
+function simulateOtherPlayoffSeries(
+  state: PlayoffState,
+  playerTeamId: string,
+  rng: () => number,
+  profiles?: LeagueSimulationProfiles | null,
+): PlayoffState {
   return {
     ...state,
-    series: state.series.map(series => seriesContains(series, playerTeamId) ? series : simulateSeriesGame(series, rng)),
+    series: state.series.map(series =>
+      seriesContains(series, playerTeamId) ? series : simulateSeriesGame(series, rng, profiles),
+    ),
   };
 }
 
-function completeOtherSeries(state: PlayoffState, playerTeamId: string, rng: () => number): PlayoffState {
+function completeOtherSeries(
+  state: PlayoffState,
+  playerTeamId: string,
+  rng: () => number,
+  profiles?: LeagueSimulationProfiles | null,
+): PlayoffState {
   let next = state;
   for (let guard = 0; guard < 7; guard++) {
     const incompleteOther = next.series.some(series => !seriesContains(series, playerTeamId) && !seriesWinner(series));
     if (!incompleteOther) break;
-    next = simulateOtherPlayoffSeries(next, playerTeamId, rng);
+    next = simulateOtherPlayoffSeries(next, playerTeamId, rng, profiles);
   }
   return next;
 }
@@ -536,12 +542,13 @@ export function advanceLeagueAfterGame(
   playerTeamId: string,
   match: MatchState,
   rng: () => number = Math.random,
+  profiles?: LeagueSimulationProfiles | null,
 ): AdvanceSeasonResult {
   // 每个玩家比赛轮次同时代表联盟推进一轮；所有现任教练增加1场磨合。
   league = { ...league, 教练: advanceCoachTenure(league.教练) };
   if (league.阶段 === '季后赛' && league.季后赛) {
     let playoffs = recordPlayerPlayoffGame(league.季后赛, match, playerTeamId);
-    playoffs = simulateOtherPlayoffSeries(playoffs, playerTeamId, rng);
+    playoffs = simulateOtherPlayoffSeries(playoffs, playerTeamId, rng, profiles);
     const playerSeries = playoffs.series.find(series => seriesContains(series, playerTeamId));
     const playerWinner = playerSeries ? seriesWinner(playerSeries) : null;
     const nextIndex = league.赛程索引 + 1;
@@ -562,7 +569,7 @@ export function advanceLeagueAfterGame(
     }
 
     if (playerSeries && playerWinner === playerTeamId) {
-      playoffs = completeOtherSeries(playoffs, playerTeamId, rng);
+      playoffs = completeOtherSeries(playoffs, playerTeamId, rng, profiles);
       playoffs = nextRoundState(playoffs);
 
       if (playoffs.champion) {
@@ -605,7 +612,7 @@ export function advanceLeagueAfterGame(
   const home = match.对阵.主队;
   const away = match.对阵.客队;
   let standings = recordResult(league.战绩, home, away, match.比分.主, match.比分.客);
-  standings = simulateOtherLeagueGames(standings, league.赛程索引, new Set([home, away]), rng);
+  standings = simulateOtherLeagueGames(standings, league.赛程索引, new Set([home, away]), rng, profiles);
 
   const nextIndex = league.赛程索引 + 1;
   const nextGame = getScheduledGame(playerTeamId, nextIndex, league.赛季序号);
