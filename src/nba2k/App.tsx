@@ -29,7 +29,7 @@ import type { SimulationMode } from './engine/simulationMode';
 import { simulateUntilInterruption } from './engine/simulationMode';
 import { advanceLeagueAfterGame, createLeagueState, formatScheduledOpponent, getScheduledGame } from './engine/season';
 import { advanceInjuryRecovery, collectOffCourtHooks } from './engine/offCourtSystems';
-import { defaultTeamTactics } from './engine/tendencies';
+import { deriveTeamTactics } from './engine/teamStyle';
 import { applyAutomaticRotation } from './engine/rotation';
 import { createRotationPlan } from './engine/rotationPlan';
 import { getPlayerAvailability } from './engine/availability';
@@ -359,8 +359,8 @@ const App: React.FC = () => {
 
     const protagonistStarts = career.球队角色 === '首发' || career.球队角色 === '核心';
     const protagonistAvailable = getPlayerAvailability(protagonistKey, league).available;
-    const homeTactics = defaultTeamTactics(homeId);
-    const awayTactics = defaultTeamTactics(awayId);
+    const homeTactics = deriveTeamTactics(homeAvailable);
+    const awayTactics = deriveTeamTactics(awayAvailable);
     const entriesFor = (teamId: string, roster: typeof homeAvailable, tactics: StructuredTeamTactics) =>
       buildDynamicDepthChart(roster, {
         tactics,
