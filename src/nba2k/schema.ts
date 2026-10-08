@@ -60,6 +60,7 @@ const teamRotationSchema = z.object({
   rotationDepth: z.number().int().min(5).max(15).optional(),
   smallBallAffinity: z.number().min(0).max(100).optional(),
   playoffShortening: z.number().min(0).max(1).optional(),
+  staggerGroups: z.array(z.array(nonEmptyText).min(2)).optional(),
   contextMode: z.enum(['正常', '终结阵容', '软垃圾时间', '硬垃圾时间']).optional(),
 }).strict();
 const rotationSchema = z.object({ 主: teamRotationSchema, 客: teamRotationSchema }).strict();
