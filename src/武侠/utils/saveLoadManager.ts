@@ -157,6 +157,47 @@ const HISTORY_EVENT_STATE_KEYS = [
   '事件系统', '参与事件', '世界事件', '事件分支结果', '后续事件线索', '后续事件线索计数',
 ] as const;
 
+/** 对比 ERA 完整回滚完成时和事件脚本预检查完成时的真实事件根，避免旧哈希无法定位原因。 */
+function readCheckoutEventRoots(): Record<string, unknown> {
+  const variables = getVariables({ type: 'chat' });
+  const statData = isRecord(variables?.stat_data) ? variables.stat_data : {};
+  const roots = Object.fromEntries(HISTORY_EVENT_STATE_KEYS.map(key => [key, statData[key] ?? null]));
+  return structuredClone(roots);
+}
+
+function describeChangedEventPaths(before: Record<string, unknown>, after: Record<string, unknown>): string[] {
+  const changes: string[] = [];
+  const limit = 32;
+  const walk = (oldValue: unknown, nextValue: unknown, path: string, depth: number) => {
+    if (changes.length >= limit) return;
+    if (stableHistoryHash(oldValue) === stableHistoryHash(nextValue)) return;
+    if (depth < 6 && isRecord(oldValue) && isRecord(nextValue)) {
+      for (const key of [...new Set([...Object.keys(oldValue), ...Object.keys(nextValue)])].sort()) {
+        walk(oldValue[key], nextValue[key], `${path}.${key}`, depth + 1);
+        if (changes.length >= limit) break;
+      }
+      return;
+    }
+    const typeOf = (value: unknown) =>
+      value === null || value === undefined
+        ? '空'
+        : Array.isArray(value)
+          ? `数组(${value.length})`
+          : isRecord(value)
+            ? `对象(${Object.keys(value).length}项)`
+            : typeof value;
+    changes.push(`${path}（${typeOf(oldValue)} → ${typeOf(nextValue)}）`);
+  };
+  for (const key of HISTORY_EVENT_STATE_KEYS) {
+    walk(before[key], after[key], key, 0);
+    if (changes.length >= limit) {
+      changes.push('其余变化省略（最多列出 32 条路径）');
+      break;
+    }
+  }
+  return changes;
+}
+
 const ERA_MESSAGE_KEY_REGEX =
   /<era_data>[\s\S]*?["']?era-message-key["']?\s*[=:]\s*["']([^"']+)["'][\s\S]*?<\/era_data>/i;
 const ERA_DATA_BLOCK_REGEX = /\s*<era_data>[\s\S]*?<\/era_data>\s*/gi;
@@ -1094,8 +1135,22 @@ async function runFullHistorySync(prepareVerification = false): Promise<void> {
   await waitForEraFullResync();
   if (prepareVerification) {
     const journal = readHistoryCheckoutJournal();
+    const afterEra = readCurrentVerification();
+    const rootsAfterEra = readCheckoutEventRoots();
     await eventEmit(WUXIA_HISTORY_PREPARE_VERIFICATION_EVENT, {
       transactionId: journal?.transactionId ?? '',
+    });
+    const afterPrepare = readCurrentVerification();
+    const rootsAfterPrepare = readCheckoutEventRoots();
+    // 只持久化诊断哈希与变更路径，不额外保存游戏变量或污染分支状态。
+    updateHistoryCheckoutJournal({
+      verificationTrace: {
+        eraSelectedMksHash: afterEra.selectedMksHash,
+        eraEventStateHash: afterEra.eventStateHash,
+        preparedSelectedMksHash: afterPrepare.selectedMksHash,
+        preparedEventStateHash: afterPrepare.eventStateHash,
+        changedPaths: describeChangedEventPaths(rootsAfterEra, rootsAfterPrepare),
+      },
     });
   }
 }
@@ -1454,6 +1509,18 @@ async function executeCheckout(
     const broken = Boolean(unavailableChat);
     const journal = readHistoryCheckoutJournal();
     if (journal) {
+      const trace = journal.verificationTrace;
+      const baselineHash = loadHistoryTree().nodes[nodeId]?.verification?.eventStateHash;
+      const finalHash = readCurrentVerification().eventStateHash;
+      const causeHint = !trace || !baselineHash
+        ? '缺少分阶段诊断：请重试恢复，以记录 ERA 同步与事件脚本检查各自的结果。'
+        : trace.eraEventStateHash !== baselineHash
+          ? 'ERA 完全同步结束时就已经与历史封存不一致：优先排查未受 ERA 回滚管理的事件直接写入或原有快照缺失。'
+          : trace.preparedEventStateHash !== baselineHash
+            ? 'ERA 完全同步后与封存一致，但运行事件脚本预检查后发生漂移：请排查该检查期间的事件写入。'
+            : finalHash !== trace.preparedEventStateHash
+              ? '事件预检查完成后又发生事件变量变化：可能存在迟到的异步写入。'
+              : '分阶段校验结果一致，请检查更具体的事件差异。';
       const diagnostics = [
         `恢复事务：${journal.transactionId}`,
         `恢复动作：${actionKind}`,
@@ -1465,6 +1532,16 @@ async function executeCheckout(
         `异常信息：${message}`,
         ...(error instanceof HistoryVerificationError && error.diagnostics
           ? ['校验指纹详情：', error.diagnostics]
+          : []),
+        `阶段归因：${causeHint}`,
+        ...(trace
+          ? [
+              `ERA 完全同步后：主干 ${trace.eraSelectedMksHash}；事件 ${trace.eraEventStateHash}`,
+              `事件预检查完成后：主干 ${trace.preparedSelectedMksHash}；事件 ${trace.preparedEventStateHash}`,
+              `最终事件指纹：${finalHash}`,
+              '事件预检查产生的路径变化：',
+              ...(trace.changedPaths.length ? trace.changedPaths : ['无（这不排除 ERA 同步前已出现事件状态漂移）']),
+            ]
           : []),
       ].join('\n');
       updateHistoryCheckoutJournal({
