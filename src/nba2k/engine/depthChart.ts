@@ -1,4 +1,5 @@
 import { cpuTendencies } from './tendencies';
+import { coachInfluence, type CoachProfile } from './coachProfile';
 import type { PlayerData, Position, StructuredTeamTactics } from './types';
 
 const POSITIONS: Position[] = ['PG', 'SG', 'SF', 'PF', 'C'];
@@ -125,7 +126,7 @@ function makeEntry(player: PlayerData, tactics?: StructuredTeamTactics): DepthCh
   };
 }
 
-function deriveCoach(entries: DepthChartEntry[]): CoachRotationProfile {
+function deriveCoach(entries: DepthChartEntry[], profile?: CoachProfile | null): CoachRotationProfile {
   const ranked = [...entries].sort((a, b) => b.rotationScore - a.rotationScore);
   const topFive = ranked.slice(0, 5);
   const bench = ranked.slice(5, 10);
@@ -156,12 +157,24 @@ function deriveCoach(entries: DepthChartEntry[]): CoachRotationProfile {
   const loadManagement = clamp(50 + (76 - topDurability) * 1.5 + (benchTrust - 60) * .25, 15, 85);
 
   const creators = ranked.filter(entry => entry.creationScore >= 72);
+  const influence = coachInfluence(profile);
+  const adjustedBenchTrust = clamp(benchTrust + (profile?.benchTrustBias ?? 0) * influence, 30, 95);
+  const adjustedStarLoad = clamp(starLoad + (profile?.starLoadBias ?? 0) * influence, 45, 98);
+  const adjustedSmallBall = clamp(smallBallAffinity + (profile?.smallBallBias ?? 0) * influence, 10, 98);
+  const adjustedPlayoffShortening = Math.max(.05, Math.min(.38,
+    playoffShortening + (profile?.playoffShorteningBias ?? 0) * influence,
+  ));
+  const adjustedRotationDepth = Math.max(8, Math.min(
+    Math.min(entries.length, 11),
+    rotationDepth + Math.round((profile?.rotationDepthBias ?? 0) * influence),
+  ));
+
   return {
-    rotationDepth,
-    benchTrust,
-    starLoad,
-    smallBallAffinity,
-    playoffShortening,
+    rotationDepth: adjustedRotationDepth,
+    benchTrust: adjustedBenchTrust,
+    starLoad: adjustedStarLoad,
+    smallBallAffinity: adjustedSmallBall,
+    playoffShortening: adjustedPlayoffShortening,
     loadManagement,
     staggerStars: creators.length >= 2,
   };
@@ -209,12 +222,12 @@ function buildStaggerGroups(
 
 export function buildDynamicDepthChart(
   roster: PlayerData[],
-  options: { tactics?: StructuredTeamTactics; forcedStarter?: string | null } = {},
+  options: { tactics?: StructuredTeamTactics; forcedStarter?: string | null; coachProfile?: CoachProfile | null } = {},
 ): DynamicDepthChart {
   const entries = roster
     .map(player => makeEntry(player, options.tactics))
     .sort((a, b) => b.rotationScore - a.rotationScore);
-  const coach = deriveCoach(entries);
+  const coach = deriveCoach(entries, options.coachProfile);
   const starters = pickStarters(entries, options.tactics, options.forcedStarter);
   const starterKeys = new Set(starters.map(entry => entry.key));
 
