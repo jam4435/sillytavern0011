@@ -1,4 +1,5 @@
 import type { MatchState, NormalizedSettlement, OnCourtStatus, SettlementContract, SettlementProposal, Side } from './types';
+import { deriveRotationGameContext } from './gameContext';
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const inRange = (value: number, range: { min: number; max: number }) => Number.isFinite(value) && value >= range.min && value <= range.max;
@@ -70,7 +71,7 @@ function sideOfPlayer(match: MatchState, player: string): Side | null {
 
 function applyStat(status: OnCourtStatus, key: keyof OnCourtStatus, amount: number): OnCourtStatus {
   if (key === '手感') return status;
-  const next = { ...status, [key]: Math.max(0, Number(status[key]) + amount) } as OnCourtStatus;
+  const next = { ...status, [key]: Math.max(0, Number(status[key] ?? 0) + amount) } as OnCourtStatus;
   if (key === '投篮命中' && amount > 0) { next.连续打铁 = 0; next.手感 = next.连续命中 + amount >= 3 ? '热' : '平'; }
   if (key === '投篮出手' && amount > 0) next.手感 = next.连续打铁 >= 3 ? '冷' : next.手感;
   return next;
@@ -102,12 +103,15 @@ export function applySettlement(match: MatchState, settlement: NormalizedSettlem
   const statuses = { ...match.球员状态 };
   const consumed = Math.min(match.剩余秒数, settlement.clockSeconds);
   for (const side of ['主', '客'] as const) {
+    const rotationContext = deriveRotationGameContext(match, side, match.轮换?.[side]);
+    const garbage = rotationContext.mode === '软垃圾时间' || rotationContext.mode === '硬垃圾时间';
     for (const player of match.阵容[side].场上) {
       const current = statuses[player];
       if (current) {
         statuses[player] = {
           ...current,
           上场秒数: current.上场秒数 + consumed,
+          垃圾时间秒数: (current.垃圾时间秒数 ?? 0) + (garbage ? consumed : 0),
           // 所有人都会因上场时间缓慢掉体力；持球/对抗者还会再吃动作额外消耗。
           体力: clamp(current.体力 - consumed / 130, 0, 100),
         };
