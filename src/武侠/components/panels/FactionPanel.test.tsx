@@ -227,8 +227,10 @@ describe('FactionPanel Component', () => {
 
     // 默认展示天下势力鉴赏
     expect(screen.getByText('天下势力鉴赏')).toBeInTheDocument();
-    expect(screen.getByText('当前掌舵与公开规模')).toBeInTheDocument();
+    expect(screen.getByText('势力概况')).toBeInTheDocument();
     expect(screen.getByText('公开组织结构')).toBeInTheDocument();
+    expect(screen.queryByText('来源资料记载：')).not.toBeInTheDocument();
+    expect(screen.queryByText('公开重要人物')).not.toBeInTheDocument();
     expect(screen.queryByText(/传承武学谱系图鉴/)).not.toBeInTheDocument();
   });
 });
