@@ -442,6 +442,52 @@ export function preparePlayerTradeMarket(
   };
 }
 
+function offerFromNeedSnapshot(
+  league: LeagueState,
+  player: PlayerData,
+  type: '续约' | '自由市场',
+  needsByTeam: Record<string, TeamNeeds>,
+  rosterCounts: Record<string, number>,
+  maxOffers: number,
+): MarketOffer[] {
+  const current = currentTeamOf(player, league);
+  const candidateTeams = type === '续约'
+    ? TEAMS.filter(team => team.id === current)
+    : TEAMS;
+
+  return candidateTeams
+    .map(team => {
+      if (team.id !== current && (rosterCounts[team.id] ?? 0) >= 15) return null;
+      const needs = needsByTeam[team.id];
+      if (!needs) return null;
+      const { fitScore, needScore } = teamOfferScore(player, team.id, league, needs);
+      const years = yearsFor(player, fitScore);
+      return {
+        id: `${type}-${league.赛季序号}-${player.name}-${team.id}`,
+        playerKey: player.name,
+        type,
+        teamId: team.id,
+        annualSalary: salaryFor(player, league, needScore, team.id),
+        years,
+        fitScore,
+        needScore,
+        createdDate: league.日期,
+        status: '待定' as const,
+      };
+    })
+    .filter((offer): offer is MarketOffer => Boolean(offer))
+    .sort((a, b) => b.fitScore - a.fitScore || b.annualSalary - a.annualSalary)
+    .slice(0, maxOffers);
+}
+
+function reduceNeedAfterSigning(needs: TeamNeeds, player: PlayerData): TeamNeeds {
+  const byPosition = { ...needs.byPosition };
+  byPosition[player.pos] = Math.max(8, byPosition[player.pos] - 13);
+  if (player.secondaryPos) byPosition[player.secondaryPos] = Math.max(8, byPosition[player.secondaryPos] - 7);
+  const strongestNeed = [...POSITIONS].sort((a, b) => byPosition[b] - byPosition[a])[0];
+  return { byPosition, strongestNeed, strongestNeedScore: byPosition[strongestNeed] };
+}
+
 export function prepareOffseasonMarket(
   league: LeagueState,
   protagonistKey: string,
@@ -455,21 +501,35 @@ export function prepareOffseasonMarket(
   };
   let npcMoves = 0;
 
-  const allPlayers = getAllPlayers(next)
+  // 先一次性找出到期者并释放，再建立30队需求快照；避免每名FA重复重算整个联盟。
+  const expiringKeys = getAllPlayers(next)
     .filter(player => player.name !== protagonistKey)
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .filter(player => {
+      const contract = contractForPlayer(player.name, next, getPlayer);
+      return Boolean(contract && contractExpiresThisOffseason(contract, next));
+    })
+    .map(player => player.name)
+    .sort((a, b) => a.localeCompare(b));
 
-  for (const player of allPlayers) {
-    const contract = contractForPlayer(player.name, next, getPlayer);
-    if (!contract || !contractExpiresThisOffseason(contract, next)) continue;
+  for (const playerKey of expiringKeys) next = setPlayerFreeAgent(next, playerKey, getPlayer);
 
-    next = setPlayerFreeAgent(next, player.name, getPlayer);
-    const offers = generateContractOffers(next, player.name, '自由市场', getPlayer, getRoster, 4);
+  const needsByTeam = Object.fromEntries(
+    TEAMS.map(team => [team.id, evaluateTeamNeeds(team.id, next, getRoster)]),
+  ) as Record<string, TeamNeeds>;
+  const rosterCounts = Object.fromEntries(
+    TEAMS.map(team => [team.id, getRoster(team.id, next).length]),
+  ) as Record<string, number>;
+
+  for (const playerKey of expiringKeys) {
+    const player = getPlayer(playerKey, next);
+    if (!player) continue;
+    const offers = offerFromNeedSnapshot(next, player, '自由市场', needsByTeam, rosterCounts, 4);
     const best = offers[0];
-    if (best) {
-      next = applyMarketOffer(next, best, getPlayer);
-      npcMoves += 1;
-    }
+    if (!best) continue;
+    next = applyMarketOffer(next, best, getPlayer);
+    rosterCounts[best.teamId] = (rosterCounts[best.teamId] ?? 0) + 1;
+    needsByTeam[best.teamId] = reduceNeedAfterSigning(needsByTeam[best.teamId], player);
+    npcMoves += 1;
   }
 
   const protagonist = getPlayer(protagonistKey, next);
@@ -481,9 +541,9 @@ export function prepareOffseasonMarket(
   let protagonistMustSign = false;
   if (contractExpiresThisOffseason(contract, next)) {
     protagonistMustSign = true;
-    offers = generateContractOffers(next, protagonistKey, '自由市场', getPlayer, getRoster, 3);
+    offers = offerFromNeedSnapshot(next, protagonist, '自由市场', needsByTeam, rosterCounts, 3);
   } else if (contractHasOneSeasonLeft(contract, next)) {
-    offers = generateContractOffers(next, protagonistKey, '续约', getPlayer, getRoster, 1);
+    offers = offerFromNeedSnapshot(next, protagonist, '续约', needsByTeam, rosterCounts, 1);
   }
 
   next = {
