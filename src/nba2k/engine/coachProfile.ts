@@ -6,6 +6,8 @@ export type ReboundPreference = '优先退防' | '均衡' | '冲抢';
 export interface CoachProfile {
   id: string;
   generation: number;
+  /** 在当前球队已执教的比赛数；新帅需要约15场把理念完全落地。 */
+  tenureGames: number;
   offensePreference: OffensiveScheme | null;
   defensePreference: DefensiveScheme | null;
   pacePreference: PacePreference;
@@ -58,6 +60,7 @@ export function createCoachProfile(teamId: string, generation = 0): CoachProfile
   return {
     id: `coach-${teamId}-${generation}`,
     generation,
+    tenureGames: generation === 0 ? 24 : 0,
     offensePreference: rng() < preferenceChance ? OFFENSES[Math.floor(rng() * OFFENSES.length)] : null,
     defensePreference: rng() < preferenceChance ? DEFENSES[Math.floor(rng() * DEFENSES.length)] : null,
     pacePreference: PACES[Math.floor(rng() * PACES.length)],
@@ -83,5 +86,16 @@ export function replacementCoach(teamId: string, current?: CoachProfile | null):
 /** 教练哲学影响强度：即使最固执也只是偏置，不替代 roster 客观适配。 */
 export function coachInfluence(profile?: CoachProfile | null): number {
   if (!profile) return 0;
-  return .35 + profile.stubbornness / 100 * .45;
+  const philosophy = .35 + profile.stubbornness / 100 * .45;
+  const assimilation = .45 + Math.min(1, profile.tenureGames / 15) * .55;
+  return philosophy * assimilation;
+}
+
+export function advanceCoachTenure(
+  profiles: Record<string, CoachProfile>,
+): Record<string, CoachProfile> {
+  return Object.fromEntries(Object.entries(profiles).map(([teamId, profile]) => [
+    teamId,
+    { ...profile, tenureGames: profile.tenureGames + 1 },
+  ]));
 }
