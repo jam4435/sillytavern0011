@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { buildFormation } from './positioning';
 import { planPossession, simulatePossession } from './possession';
-import { defaultTeamTactics } from './tendencies';
+import { deriveTeamTactics } from './teamStyle';
+import { buildDynamicDepthChart } from './depthChart';
 import type { MatchState, OnCourtStatus, Side } from './types';
-import { getPlayer, getRoster, starterEntries } from '../utils/rosters';
+import { getPlayer, getRoster } from '../utils/rosters';
 
 function seeded(seed: number) {
   let state = seed >>> 0;
@@ -20,15 +21,19 @@ const status = (): OnCourtStatus => ({
 });
 
 function freshMatch(homeId: string, awayId: string, possession: Side = '主'): MatchState {
-  const homeEntries = starterEntries(homeId);
-  const awayEntries = starterEntries(awayId);
+  const homeRoster = getRoster(homeId);
+  const awayRoster = getRoster(awayId);
+  const homeTactics = deriveTeamTactics(homeRoster);
+  const awayTactics = deriveTeamTactics(awayRoster);
+  const homeEntries = buildDynamicDepthChart(homeRoster, { tactics: homeTactics }).starters;
+  const awayEntries = buildDynamicDepthChart(awayRoster, { tactics: awayTactics }).starters;
   const offenseEntries = possession === '主' ? homeEntries : awayEntries;
   const defenseEntries = possession === '主' ? awayEntries : homeEntries;
-  const offenseTactics = defaultTeamTactics(possession === '主' ? homeId : awayId);
-  const defenseTactics = defaultTeamTactics(possession === '主' ? awayId : homeId);
+  const offenseTactics = possession === '主' ? homeTactics : awayTactics;
+  const defenseTactics = possession === '主' ? awayTactics : homeTactics;
   const homeOn = homeEntries.map(entry => entry.key);
   const awayOn = awayEntries.map(entry => entry.key);
-  const all = [...getRoster(homeId), ...getRoster(awayId)].map(player => player.name);
+  const all = [...homeRoster, ...awayRoster].map(player => player.name);
   return {
     进行中: true,
     对阵: { 主队: homeId, 客队: awayId },
@@ -38,7 +43,7 @@ function freshMatch(homeId: string, awayId: string, possession: Side = '主'): M
     比分: { 主: 0, 客: 0 },
     球权: possession,
     跳球胜方: possession,
-    战术: { 主: defaultTeamTactics(homeId), 客: defaultTeamTactics(awayId) },
+    战术: { 主: homeTactics, 客: awayTactics },
     站位: buildFormation({
       offense: offenseEntries,
       defense: defenseEntries,
