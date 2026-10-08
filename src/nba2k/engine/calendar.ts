@@ -156,7 +156,12 @@ function placeOnCalendar(rounds: PairGame[][], offset: number): LeagueCalendar {
   rounds.forEach((round, r) => {
     const base = Math.round(span * r / Math.max(1, rounds.length - 1));
     const latest = Math.min(span, base + (r === rounds.length - 1 ? 0 : 1));
-    for (const game of shuffle(round, rand)) {
+    for (const [gameIndex, game] of shuffle(round, rand).entries()) {
+      // 同轮比赛分散在相邻日：揭幕夜仅3场，其他对阵错峰进行，
+      // 而不是每个球队都在完全相同的82个日期出场。
+      const preferred = r === 0
+        ? (gameIndex < 3 ? 0 : 1)
+        : Math.min(span, base + (rand() < .55 ? 0 : 1));
       const candidates: { day: number; score: number }[] = [];
       for (let day = Math.max(0, base - 2); day <= Math.min(span, base + 3); day++) {
         if (day > latest) continue;
@@ -170,7 +175,7 @@ function placeOnCalendar(rounds: PairGame[][], offset: number): LeagueCalendar {
           if (gap > 5) return (gap - 5) * .4;
           return 0;
         };
-        candidates.push({ day, score: Math.abs(day - base) * 1.3 + penalty(h) + penalty(a) + rand() * .9 });
+        candidates.push({ day, score: Math.abs(day - preferred) * 2.6 + penalty(h) + penalty(a) + rand() * .35 });
       }
       if (!candidates.length) {
         for (let day = Math.max(0, base - 4); day <= span; day++) {
