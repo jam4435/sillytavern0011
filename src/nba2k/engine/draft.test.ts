@@ -15,6 +15,7 @@ import {
 } from '../utils/rosters';
 import { prepareOffseasonMarket } from './transactions';
 import { TEAMS } from '../data/teams';
+import { deriveCpuTendencies } from './tendencies';
 
 function draftWithSnapshot(league: ReturnType<typeof createLeagueState>) {
   const snapshot = buildLeagueRosterSnapshot(league);
@@ -37,6 +38,31 @@ describe('procedural rookie draft', () => {
     expect(Math.min(...first.map(seed => seed.potential))).toBeGreaterThanOrEqual(72);
     expect(Math.max(...first.map(seed => seed.potential))).toBeLessThanOrEqual(97);
     expect(first.every(seed => !('attrs' in (seed as unknown as Record<string, unknown>)))).toBe(true);
+  });
+
+  it('新秀倾向由43项能力和模板自然派生，不额外保存一套行为答案', () => {
+    const seeds = [...generateDraftClass(0), ...generateDraftClass(1), ...generateDraftClass(2)];
+    const rows = seeds.map(seed => ({
+      seed,
+      tendency: deriveCpuTendencies(playerFromGeneratedSeed(seed)),
+    }));
+    expect(rows.every(({ tendency }) =>
+      Object.values(tendency).every(value => Number.isFinite(value) && value >= 0 && value <= 100),
+    )).toBe(true);
+
+    const average = (template: typeof seeds[number]['template'], key: keyof ReturnType<typeof deriveCpuTendencies>) => {
+      const values = rows.filter(row => row.seed.template === template).map(row => row.tendency[key]);
+      expect(values.length).toBeGreaterThan(0);
+      return values.reduce((sum, value) => sum + value, 0) / values.length;
+    };
+
+    expect(average('神射手', 'three')).toBeGreaterThan(average('神射手', 'post'));
+    expect(average('组织核心', 'passing')).toBeGreaterThan(average('组织核心', 'post'));
+    expect(average('突破手', 'rim')).toBeGreaterThan(average('突破手', 'three'));
+    expect(average('护框中锋', 'pickRollScreener')).toBeGreaterThan(average('护框中锋', 'three'));
+
+    // 存档种子保留模板而不重复存13项CPU倾向；未来能力成长后倾向也会跟着能力重新派生。
+    expect(seeds.every(seed => !('tendencies' in (seed as unknown as Record<string, unknown>)))).toBe(true);
   });
 
   it('选秀顺位按战绩倒序，弱队先于强队', () => {
