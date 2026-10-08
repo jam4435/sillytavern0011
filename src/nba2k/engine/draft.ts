@@ -3,7 +3,7 @@ import { BODY_BOUNDS_2K16, RATING_KEYS, bodyCaps, initialGroups, overallOf, rati
 import { evolveRatingsOneSeason, retirementStatusFor } from './lifecycle';
 import type { LeagueState, StandingRecord } from './season';
 import type { LeagueContract } from './transactionTypes';
-import { evaluateTeamNeeds } from './transactions';
+import { evaluateTeamNeeds, type TeamNeeds } from './transactions';
 import { TEAMS } from '../data/teams';
 
 export type RookieTemplate =
@@ -301,11 +301,19 @@ function prospectBoardValue(seed: GeneratedPlayerSeed): number {
   return seed.targetOverall * .55 + seed.potential * .45;
 }
 
-function fitForTeam(seed: GeneratedPlayerSeed, teamId: string, league: LeagueState, getRoster: RosterGetter): number {
-  const needs = evaluateTeamNeeds(teamId, league, getRoster);
+function fitForNeeds(seed: GeneratedPlayerSeed, needs: TeamNeeds): number {
   const primary = needs.byPosition[seed.pos];
   const secondary = seed.secondaryPos ? needs.byPosition[seed.secondaryPos] : primary;
   return Math.max(primary, secondary * .9);
+}
+
+function reduceNeedAfterDraft(needs: TeamNeeds, seed: GeneratedPlayerSeed): TeamNeeds {
+  const byPosition = { ...needs.byPosition };
+  const impact = clamp(6 + (seed.targetOverall - 64) * .72 + (seed.potential - 78) * .18, 6, 20);
+  byPosition[seed.pos] = Math.max(8, byPosition[seed.pos] - impact);
+  if (seed.secondaryPos) byPosition[seed.secondaryPos] = Math.max(8, byPosition[seed.secondaryPos] - impact * .55);
+  const strongestNeed = [...POSITIONS].sort((a, b) => byPosition[b] - byPosition[a])[0];
+  return { byPosition, strongestNeed, strongestNeedScore: byPosition[strongestNeed] };
 }
 
 function rookieSalary(overallPick: number, entrySeason: number): number {
@@ -342,6 +350,11 @@ export function runAnnualDraft(
   const available = new Map(seeds.map(seed => [seed.key, seed]));
   const order = draftOrder(league);
   const picks: DraftPickRecord[] = [];
+  // 一届选秀只扫描一次30队Roster；每签后局部降低该队对应位置需求。
+  // 避免随着程序化球员累积，对每个候选人反复重建整个联盟Roster。
+  const needsByTeam = Object.fromEntries(
+    TEAMS.map(team => [team.id, evaluateTeamNeeds(team.id, league, getRoster)]),
+  ) as Record<string, TeamNeeds>;
   let next = {
     ...league,
     生成球员: { ...league.生成球员, ...Object.fromEntries(seeds.map(seed => [seed.key, seed])) },
@@ -358,7 +371,7 @@ export function runAnnualDraft(
         seed,
         score:
           prospectBoardValue(seed) * .78 +
-          fitForTeam(seed, teamId, next, getRoster) * .22 +
+          fitForNeeds(seed, needsByTeam[teamId]) * .22 +
           jitter(`${seed.key}:${teamId}:draft-fit`, 2.5),
       }))
       .sort((a, b) => b.score - a.score)[0]?.seed;
@@ -388,6 +401,7 @@ export function runAnnualDraft(
       球员归属: { ...next.球员归属, [chosen.key]: teamId },
       合同册: { ...next.合同册, [chosen.key]: rookieContract(chosen, teamId, overallPick) },
     };
+    needsByTeam[teamId] = reduceNeedAfterDraft(needsByTeam[teamId], chosen);
   }
 
   next = {
