@@ -27,12 +27,35 @@ import { processInsertBlocks } from './insert/insert';
 import { readMessageKey } from '../../core/key/mk';
 import { findLastAiMessage, getMessageContent, isUserMessage } from '../../utils/message';
 import { processEditBlocks } from './update';
-import { updateEraMetaData } from '../../utils/era_data';
-import { extractBlocks } from '../../utils/string';
+import { getEraData, updateEraMetaData } from '../../utils/era_data';
+import { extractOrderedVariableActionBlocks } from '../../utils/string';
 import { escapeEraData, parseEditLog, parseJsonl } from '../../utils/data';
 import { Logger } from '../../utils/log';
+import { recordEraDiagnostic } from '../../utils/diagnostics';
 
 const logger = new Logger('core-crud-patcher');
+
+const TRACKED_EVENT_ROOTS = [
+  '事件系统', '参与事件', '世界事件', '事件分支结果', '后续事件线索', '后续事件线索计数',
+] as const;
+
+function fingerprintEventRoots(): Record<string, string> {
+  const stat = getEraData().stat || {};
+  return Object.fromEntries(TRACKED_EVENT_ROOTS.map(key => {
+    let serialized: string;
+    try {
+      serialized = JSON.stringify(stat[key] ?? null) ?? 'null';
+    } catch {
+      serialized = '[unserializable]';
+    }
+    let hash = 2166136261;
+    for (let index = 0; index < serialized.length; index += 1) {
+      hash ^= serialized.charCodeAt(index);
+      hash = Math.imul(hash, 16777619) >>> 0;
+    }
+    return [key, hash.toString(16).padStart(8, '0')];
+  }));
+}
 
 /**
  * **【核心实现】** 对指定的消息应用变量修改。
@@ -66,42 +89,57 @@ export const ApplyVarChangeForMessage = async (msg: any): Promise<string | null>
     }
 
     const rawContent = getMessageContent(msg) || '';
+  const operationBlocks = extractOrderedVariableActionBlocks(rawContent);
+  const oldEditLog = parseEditLog(getEraData().meta?.[LOGS_PATH]?.[MK]);
+  const beforeEventRoots = fingerprintEventRoots();
+  const editLog: any[] = [];
 
-    // 1. 从消息内容中解析出所有指令块。
-    const insertBlocks = extractBlocks(rawContent, 'VariableInsert');
-    const editBlocks = extractBlocks(rawContent, 'VariableEdit');
-    const deleteBlocks = extractBlocks(rawContent, 'VariableDelete');
+  if (operationBlocks.length === 0) {
+    logger.debug('ApplyVarChangeForMessage', `消息 (ID: ${messageId}) 未检测到变量修改标签。`);
+  }
 
-    if (!insertBlocks.length && !editBlocks.length && !deleteBlocks.length) {
-      logger.debug('ApplyVarChangeForMessage', `消息 (ID: ${messageId}) 未检测到变量修改标签。`);
+  // 同一消息中的变量动作严格按文本顺序执行。按 Insert/Edit/Delete 分桶会
+  // 将“Delete 旧事件占用 → Insert 新事件占用”错误变成“Insert → Delete”。
+  for (const block of operationBlocks) {
+    const records = escapeEraData(parseJsonl(block.body));
+    if (block.tag === 'VariableInsert') {
+      await processInsertBlocks(records, editLog);
+    } else if (block.tag === 'VariableEdit') {
+      await processEditBlocks(records, editLog, messageId);
+    } else {
+      await processDeleteBlocks(records, editLog);
     }
+  }
 
-    const rawInserts = insertBlocks.flatMap(s => parseJsonl(s));
-    const rawEdits = editBlocks.flatMap(s => parseJsonl(s));
-    const rawDeletes = deleteBlocks.flatMap(s => parseJsonl(s));
+  const afterEventRoots = fingerprintEventRoots();
+  const changedEventRoots = TRACKED_EVENT_ROOTS.filter(
+    key => beforeEventRoots[key] !== afterEventRoots[key],
+  );
+  const logSummary = {
+    messageId,
+    mk: MK,
+    blockOrder: operationBlocks.map(block => block.tag.replace('Variable', '')),
+    oldLogCount: oldEditLog.length,
+    newLogCount: editLog.length,
+    changedEventRoots,
+    beforeEventRoots,
+    afterEventRoots,
+  };
+  if (operationBlocks.length > 0 || changedEventRoots.length > 0 || oldEditLog.length > 0) {
+    recordEraDiagnostic('core-crud-patcher', 'message-apply-log-audit', logSummary);
+  }
+  if (changedEventRoots.length > 0 && editLog.length === 0) {
+    recordEraDiagnostic('core-crud-patcher', 'event-state-changed-without-editlog', logSummary);
+    logger.warn('ApplyVarChangeForMessage', '事件根状态发生变化，但本楼没有生成 ERA EditLog', logSummary);
+  } else if (operationBlocks.length > 0 && editLog.length === 0) {
+    recordEraDiagnostic('core-crud-patcher', 'action-blocks-produced-empty-editlog', logSummary);
+  }
+  if (oldEditLog.length > 0 && editLog.length === 0) {
+    // 只记录事实；合法的 Swipe/回滚重算同样可能产生空日志，不能直接保留旧日志。
+    recordEraDiagnostic('core-crud-patcher', 'nonempty-editlog-overwritten-by-empty', logSummary);
+  }
 
-    // 在这里对从消息中解析出的原始数据进行转义，确保所有后续处理都使用转义后的数据。
-    const allInserts = escapeEraData(rawInserts);
-    const allEdits = escapeEraData(rawEdits);
-    const allDeletes = escapeEraData(rawDeletes);
-
-    logger.debug('ApplyVarChangeForMessage', '数据转义完成', {
-      before: { inserts: rawInserts, edits: rawEdits, deletes: rawDeletes },
-      after: { inserts: allInserts, edits: allEdits, deletes: allDeletes },
-    });
-
-    const editLog: any[] = []; // 用于收集本轮操作产生的所有变更记录。
-
-    // 2. --- 处理所有插入操作 (`<VariableInsert>`) ---
-    await processInsertBlocks(allInserts, editLog);
-
-    // 3. --- 处理所有编辑操作 (`<VariableEdit>`) ---
-    await processEditBlocks(allEdits, editLog, messageId);
-
-    // 4. --- 处理所有删除操作 (`<VariableDelete>`) ---
-    await processDeleteBlocks(allDeletes, editLog);
-
-    // 5. --- 覆盖式写入 EditLog ---
+  // 5. --- 覆盖式写入 EditLog ---
     /*
      * 核心逻辑：无论本轮是否产生了有效的变量修改，都必须用当前的 editLog (哪怕是空数组) 覆盖旧的 EditLog。
      *
