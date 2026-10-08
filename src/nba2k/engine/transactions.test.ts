@@ -3,10 +3,12 @@ import { deriveTeamTactics } from './teamStyle';
 import { createLeagueState } from './season';
 import {
   applyMarketOffer,
+  contractForPlayer,
   evaluateTeamNeeds,
   generateContractOffers,
   prepareOffseasonMarket,
   registerExistingContract,
+  runCpuTradeDeadline,
 } from './transactions';
 import type { MarketOffer } from './transactionTypes';
 import {
@@ -32,6 +34,7 @@ describe('roster transaction chain', () => {
       status: '待定',
       outgoingPlayerKey: 'Kevin Love',
     };
+    const originalSalary = contractForPlayer('Klay Thompson', league, getPlayerForLeague)?.annualSalary;
     const offered = { ...league, 市场报价: [offer] };
     const next = applyMarketOffer(offered, offer, getPlayerForLeague);
     const gsw = getRosterForLeague('GSW', next).map(player => player.name);
@@ -41,6 +44,7 @@ describe('roster transaction chain', () => {
     expect(cle).toContain('Klay Thompson');
     expect(cle).not.toContain('Kevin Love');
     expect(next.交易记录.at(-1)?.type).toBe('交易');
+    expect(contractForPlayer('Klay Thompson', next, getPlayerForLeague)?.annualSalary).toBe(originalSalary);
 
     const after = deriveTeamTactics(getRosterForLeague('GSW', next), next.教练.GSW);
     expect(after).not.toEqual(before);
@@ -80,6 +84,27 @@ describe('roster transaction chain', () => {
     expect(next.合同册['Stephen Curry']?.teamId).toBe(offer!.teamId);
     expect(getRosterForLeague(offer!.teamId, next).some(player => player.name === 'Stephen Curry')).toBe(true);
     expect(getRosterForLeague('GSW', next).some(player => player.name === 'Stephen Curry')).toBe(false);
+  });
+
+  it('CPU截止日最多执行少量需求驱动交易，且不会交易主角', () => {
+    const league = createLeagueState('GSW');
+    for (const teamId of Object.keys(league.战绩)) {
+      league.战绩[teamId] = { 胜: 40, 负: 40, 得分: 8000, 失分: 8000, 连胜: 0 };
+    }
+    league.战绩.GSW = { 胜: 60, 负: 20, 得分: 8500, 失分: 7900, 连胜: 2 };
+    league.战绩.CLE = { 胜: 58, 负: 22, 得分: 8400, 失分: 7950, 连胜: 1 };
+    league.战绩.PHI = { 胜: 15, 负: 65, 得分: 7600, 失分: 8500, 连胜: -4 };
+    league.战绩.LAL = { 胜: 20, 负: 60, 得分: 7700, 失分: 8350, 连胜: -2 };
+
+    const result = runCpuTradeDeadline(
+      league,
+      'Stephen Curry',
+      getPlayerForLeague,
+      getRosterForLeague,
+    );
+    expect(result.trades.length).toBeGreaterThan(0);
+    expect(result.trades.length).toBeLessThanOrEqual(2);
+    expect(result.trades.some(record => record.playerKey === 'Stephen Curry' || record.outgoingPlayerKey === 'Stephen Curry')).toBe(false);
   });
 
   it('主角合同到期时必须先从多报价中签约，NPC自由市场同时完成', () => {
