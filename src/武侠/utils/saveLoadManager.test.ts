@@ -1252,7 +1252,7 @@ describe('history checkout', () => {
     expect(localStorage.getItem(HISTORY_CHECKOUT_RETURN_INTENT_KEY)).toBeNull();
   });
 
-  it('verification 不一致会把当前分支标为 broken，并保留 journal', async () => {
+  it('verification 不一致会阻止提交、标为可恢复失败，并保留完整 journal', async () => {
     currentChat().messages = [
       { message_id: 0, role: 'assistant', swipe_id: 0, swipes: ['路线甲', '路线乙'], message: '路线甲' },
     ];
@@ -1267,9 +1267,49 @@ describe('history checkout', () => {
 
     const result = await checkoutNode(target.id);
 
-    expect(result.status).toBe('broken');
-    expect(loadHistoryTree().branches[scanned.currentBranchId].status).toBe('broken');
-    expect(readHistoryCheckoutJournal()).not.toBeNull();
+    expect(result.status).toBe('recovery_failed');
+    expect(loadHistoryTree().branches[scanned.currentBranchId].status).toBe('recovery_failed');
+    const failure = readHistoryCheckoutJournal()?.failure;
+    expect(failure?.stage).toBe('verify');
+    expect(failure?.details).toContain('旧封存记录没有逐组事件指纹');
+    expect(failure?.details).toContain('目标楼层：User 无 / Assistant 0 / swipe 1');
+  });
+
+  it('事件状态指纹不同但 ERA 主干一致时报告具体事件组，重试重新执行全量同步', async () => {
+    currentChat().messages = [
+      { message_id: 0, role: 'assistant', swipe_id: 0, swipes: ['路线甲', '路线乙'], message: '路线甲' },
+    ];
+    const scanned = await scanCurrentChat();
+    const target = findNodeByPreview(scanned.tree, '路线乙')!;
+    const eventState = {
+      事件系统: { 进行中事件: { foo: 1 } },
+      参与事件: null,
+      世界事件: null,
+      事件分支结果: null,
+      后续事件线索: null,
+      后续事件线索计数: null,
+    };
+    const tree = deepClone(scanned.tree);
+    tree.nodes[target.id].verification = {
+      selectedMksHash: stableHistoryHash([]),
+      eventStateHash: stableHistoryHash(eventState),
+      eventPartHashes: Object.fromEntries(Object.entries(eventState).map(([key, value]) => [key, stableHistoryHash(value)])),
+    };
+    persistTreeDirect(tree);
+    (currentChat().variables.stat_data as Record<string, unknown>).事件系统 = { 进行中事件: { foo: 2 } };
+
+    const failed = await checkoutNode(target.id);
+    expect(failed.status).toBe('recovery_failed');
+    const detail = readHistoryCheckoutJournal()?.failure?.details ?? '';
+    expect(detail).toContain('事件系统：不一致');
+    expect(detail).toContain('参与事件：一致');
+    expect(detail).toContain('目标楼层：User 无 / Assistant 0 / swipe 1');
+    const beforeRetry = eventEmitMock.mock.calls.filter(call => call[0] === 'manual_full_sync').length;
+
+    const retried = await retryCheckoutRecovery();
+    expect(retried?.status).toBe('recovery_failed');
+    expect(eventEmitMock.mock.calls.filter(call => call[0] === 'manual_full_sync')).toHaveLength(beforeRetry + 1);
+    expect(readHistoryCheckoutJournal()?.failure?.stage).toBe('verify');
   });
 
   it('retryCheckoutRecovery 会续期过期 journal 并继续原 stage', async () => {
