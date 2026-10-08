@@ -586,6 +586,10 @@ export function advanceLeagueAfterGame(
     league = applyGameInjuries(league, rosters, [{
       gameId: `player-${league.赛季序号}-${league.赛程索引}-${match.对阵.主队}-${match.对阵.客队}`,
       date: league.日期, lines: realGame, remainingStamina: fatigue,
+      restDaysByTeam: league.阶段 === '常规赛' ? {
+        [match.对阵.主队]: getTeamRestDays(match.对阵.主队, league.日期, league.赛季序号),
+        [match.对阵.客队]: getTeamRestDays(match.对阵.客队, league.日期, league.赛季序号),
+      } : undefined,
     }], protagonist);
   }
   if (league.阶段 === '季后赛' && league.季后赛) {
