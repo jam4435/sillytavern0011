@@ -1502,6 +1502,24 @@ async function executeCheckout(
   }
 }
 
+// 同一 iframe 可能同时由 App 自动续接和存档页挂载发起 resumeCheckout。
+ // 复用正在执行的事务，避免两个执行器交错推进同一个 journal / ERA 校验。
+let activeCheckout: Promise<HistoryCheckoutResult> | null = null;
+
+function executeCheckoutSingleFlight(
+  nodeId: string,
+  options: CheckoutHistoryOptions,
+  journal: HistoryCheckoutJournal | null,
+): Promise<HistoryCheckoutResult> {
+  if (activeCheckout) return activeCheckout;
+  const flight = executeCheckout(nodeId, options, journal);
+  activeCheckout = flight;
+  void flight.finally(() => {
+    if (activeCheckout === flight) activeCheckout = null;
+  }).catch(() => {});
+  return flight;
+}
+
 export async function checkoutNode(
   nodeId: string,
   options: CheckoutHistoryOptions = {},
@@ -1530,7 +1548,7 @@ export async function checkoutNode(
     // 过期 journal 只代表旧事务已经失去恢复锁资格，不应继续阻止用户重新“从此处继续”。
     clearHistoryCheckoutJournal();
   }
-  return executeCheckout(nodeId, options, null);
+  return executeCheckoutSingleFlight(nodeId, options, null);
 }
 
 export interface CheckoutRecoveryState {
@@ -1577,7 +1595,7 @@ export async function resumeCheckout(): Promise<HistoryCheckoutResult | null> {
       message,
     );
   }
-  return executeCheckout(journal.targetNodeId, {}, journal);
+  return executeCheckoutSingleFlight(journal.targetNodeId, {}, journal);
 }
 
 /** 放弃尚未完成的历史检出；保留已创建的聊天/分支，只解除恢复锁。 */
@@ -1606,13 +1624,14 @@ export function abandonCheckoutRecovery(): HistoryCheckoutResult | null {
 export async function retryCheckoutRecovery(): Promise<HistoryCheckoutResult | null> {
   const journal = readHistoryCheckoutJournal();
   if (!journal) return null;
+  if (activeCheckout) return activeCheckout;
   clearHistoryCheckoutReturnIntent();
   const renewed = renewHistoryCheckoutJournal(journal);
   // verify 失败后的重试必须重新执行 ERA 完全重算；只重比哈希不会改变事件状态。
   const retryJournal = journal.failure?.stage === 'verify'
     ? (updateHistoryCheckoutJournal({ stage: 'sync_era' }) ?? renewed)
     : renewed;
-  return executeCheckout(retryJournal.targetNodeId, {}, retryJournal);
+  return executeCheckoutSingleFlight(retryJournal.targetNodeId, {}, retryJournal);
 }
 
 export async function returnToCheckoutSource(): Promise<HistoryCheckoutResult | null> {
