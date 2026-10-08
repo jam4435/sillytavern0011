@@ -147,7 +147,9 @@ export function deriveTeamStyle(roster: PlayerData[]): DerivedTeamStyle {
   const tactics: StructuredTeamTactics = {
     offense: offenseScheme(offenseScores),
     defense: defenseScheme(defenseScores),
-    pace: paceScore >= 72 ? '快' : paceScore <= 62 ? '慢' : '标准',
+    // 43项适配后的NBA球员整体运动能力偏高，节奏必须用相对高阈值拉开，
+    // 否则几乎所有球队都会被误判为快节奏。
+    pace: paceScore >= 76.5 ? '快' : paceScore <= 72 ? '慢' : '标准',
     helpIntensity: Math.round(clamp(helpScore, 35, 82)),
     rebound: reboundScore >= 70 ? '冲抢' : reboundScore <= 58 || paceScore >= 76 ? '优先退防' : '均衡',
   };
