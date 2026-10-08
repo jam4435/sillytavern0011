@@ -18,7 +18,10 @@ import { resolveAction } from './engine/resolveAction';
 import { advancePeriodIfNeeded, buildCanonicalAssistant, settleAssistantResponse } from './engine/settlement';
 import { createDevelopment, defaultBadges, defaultHotZones, defaultTendencies, initialGroups } from './engine/development';
 import type { MatchState, OnCourtStatus, Side, SituationContext, StructuredTeamTactics, UpgradeGroupKey } from './engine/types';
-import { getPlayer, getRoster, getTeam, pickStarters, registerCustomPlayer, starterEntriesWith } from './utils/rosters';
+import {
+  getPlayer, getRoster, getTeam, pickStarters, registerCustomPlayer,
+  starterEntriesFromPlayers, starterEntriesFromPlayersWith,
+} from './utils/rosters';
 import type { Nba2kStat } from './utils/statReader';
 import { getLastAssistantNarrative, isInMatch, parseOptions, readStat, stripNarrative } from './utils/statReader';
 import { runTurnTransaction } from './utils/turnTransaction';
@@ -30,7 +33,9 @@ import { simulateUntilInterruption } from './engine/simulationMode';
 import { advanceLeagueAfterGame, createLeagueState, formatScheduledOpponent, getScheduledGame } from './engine/season';
 import { advanceInjuryRecovery, collectOffCourtHooks } from './engine/offCourtSystems';
 import { defaultTeamTactics } from './engine/tendencies';
-import { applyAutomaticRotation, createRotationState } from './engine/rotation';
+import { applyAutomaticRotation } from './engine/rotation';
+import { createRotationPlan } from './engine/rotationPlan';
+import { getPlayerAvailability } from './engine/availability';
 
 function freshStatus(): OnCourtStatus {
   return {
@@ -65,14 +70,6 @@ function readSimulationMode(): SimulationMode {
     if (value === '全回合' || value === '精简比赛' || value === '关键时刻') return value;
   } catch {}
   return '精简比赛';
-}
-
-function targetMinutesForRole(role: NonNullable<Nba2kStat['生涯']>['球队角色']): number {
-  if (role === '核心') return 36;
-  if (role === '首发') return 32;
-  if (role === '第六人') return 28;
-  if (role === '轮换') return 18;
-  return 8;
 }
 
 function generatedText(result: string | GenerateToolCallResult): string {
@@ -220,6 +217,7 @@ const App: React.FC = () => {
               热区: defaultHotZones(),
               教练信任: 45,
               球队角色: '首发',
+              教练评估: { 最近评分: [], 上次角色调整场次: 0 },
               赛季统计: { 场均得分: 0, 场均篮板: 0, 场均助攻: 0, 出场数: 0 },
               成长点: 0,
             },
@@ -281,6 +279,7 @@ const App: React.FC = () => {
               热区: defaultHotZones(),
               教练信任: 30,
               球队角色: '轮换',
+              教练评估: { 最近评分: [], 上次角色调整场次: 0 },
               赛季统计: { 场均得分: 0, 场均篮板: 0, 场均助攻: 0, 出场数: 0 },
               成长点: 0,
             },
@@ -333,10 +332,24 @@ const App: React.FC = () => {
     const mySide: Side = isHome ? '主' : '客';
 
     const protagonistKey = (career as any).附身球员 ?? '';
+    const league = stat.联盟;
+    const homeFullRoster = getRoster(homeId);
+    const awayFullRoster = getRoster(awayId);
+    const homeAvailable = homeFullRoster.filter(player => getPlayerAvailability(player.name, league).available);
+    const awayAvailable = awayFullRoster.filter(player => getPlayerAvailability(player.name, league).available);
+    if (homeAvailable.length < 5 || awayAvailable.length < 5) {
+      toastr.error('可出战球员不足5人，无法开始比赛。');
+      return;
+    }
+
     const protagonistStarts = career.球队角色 === '首发' || career.球队角色 === '核心';
-    const myTeamEntries = protagonistStarts ? starterEntriesWith(myTeamId, protagonistKey) : starterEntriesWith(myTeamId, '');
-    const homeEntries = homeId === myTeamId ? myTeamEntries : starterEntriesWith(homeId, '');
-    const awayEntries = awayId === myTeamId ? myTeamEntries : starterEntriesWith(awayId, '');
+    const protagonistAvailable = getPlayerAvailability(protagonistKey, league).available;
+    const entriesFor = (teamId: string, roster: typeof homeAvailable) =>
+      teamId === myTeamId && protagonistStarts && protagonistAvailable
+        ? starterEntriesFromPlayersWith(roster, protagonistKey)
+        : starterEntriesFromPlayers(roster);
+    const homeEntries = entriesFor(homeId, homeAvailable);
+    const awayEntries = entriesFor(awayId, awayAvailable);
     const homeCenter = getPlayer(homeEntries.find(entry => entry.pos === 'C')?.key ?? homeEntries.at(-1)?.key ?? '');
     const awayCenter = getPlayer(awayEntries.find(entry => entry.pos === 'C')?.key ?? awayEntries.at(-1)?.key ?? '');
     const jumpScore = (player: typeof homeCenter) =>
@@ -359,11 +372,11 @@ const App: React.FC = () => {
     });
     const homeOnCourt = homeEntries.map(entry => entry.key);
     const awayOnCourt = awayEntries.map(entry => entry.key);
-    const homeBench = getRoster(homeId).map(player => player.name).filter(key => !homeOnCourt.includes(key));
-    const awayBench = getRoster(awayId).map(player => player.name).filter(key => !awayOnCourt.includes(key));
+    const homeBench = homeAvailable.map(player => player.name).filter(key => !homeOnCourt.includes(key));
+    const awayBench = awayAvailable.map(player => player.name).filter(key => !awayOnCourt.includes(key));
     const 球员状态: Record<string, OnCourtStatus> = {};
-    [...homeOnCourt, ...homeBench, ...awayOnCourt, ...awayBench].forEach(key => {
-      球员状态[key] = freshStatus();
+    [...homeFullRoster, ...awayFullRoster].forEach(player => {
+      球员状态[player.name] = freshStatus();
     });
     const match: MatchState = {
       进行中: true,
@@ -388,13 +401,16 @@ const App: React.FC = () => {
       球员状态,
       回合摘要: `${openingPossession}队赢得跳球`,
     };
-    match.轮换 = createRotationState(match, getPlayer, {
-      [mySide]: { [protagonistKey]: targetMinutesForRole(career.球队角色) },
+    match.轮换 = createRotationPlan(match, getPlayer, {
+      league,
+      phase: league?.阶段,
+      protagonist: { teamId: myTeamId, key: protagonistKey, role: career.球队角色 },
     });
     await insertOrAssignVariables({ stat_data: { 比赛: match } }, { type: 'chat' });
     setStat(s => ({ ...s, 比赛: match }));
     await sendTurn(
       `【开赛】${getTeam(homeId)?.cn} vs ${getTeam(awayId)?.cn}，我效力于${mySide}队。` +
+        (protagonistAvailable ? '' : `我因${getPlayerAvailability(protagonistKey, league).reason ?? '伤病'}本场休战，只能在场边观察；不得安排我登场。`) +
         `前端已按双方中锋身高、力量与总评判定由${openingPossession}队赢得跳球。请演出赛前入场、首发介绍与这个既定跳球结果；不得修改球权、比分、时间或其他比赛变量，然后把镜头交给我。`,
     );
   }, [stat, sendTurn]);
