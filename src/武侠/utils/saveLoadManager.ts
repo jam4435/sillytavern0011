@@ -67,6 +67,8 @@ export const HistoryNodeSchema = z
       .object({
         selectedMksHash: z.string(),
         eventStateHash: z.string(),
+        /** 新封存节点可用：用于定位具体哪组事件状态变化；老节点仍能读取。 */
+        eventPartHashes: z.record(z.string(), z.string()).optional(),
       })
       .strict()
       .nullable(),
@@ -151,6 +153,9 @@ export interface CurrentHistoryContext extends HistoryTreeViewState {
 }
 
 type HistoryVerification = NonNullable<HistoryNode['verification']>;
+const HISTORY_EVENT_STATE_KEYS = [
+  '事件系统', '参与事件', '世界事件', '事件分支结果', '后续事件线索', '后续事件线索计数',
+] as const;
 
 const ERA_MESSAGE_KEY_REGEX =
   /<era_data>[\s\S]*?["']?era-message-key["']?\s*[=:]\s*["']([^"']+)["'][\s\S]*?<\/era_data>/i;
@@ -614,16 +619,20 @@ function readCurrentVerification(): HistoryVerification {
   const statData = isRecord(variables?.stat_data) ? variables.stat_data : {};
   const metaData = isRecord(variables?.ERAMetaData) ? variables.ERAMetaData : {};
   const selectedMks = Array.isArray(metaData.SelectedMks) ? metaData.SelectedMks : [];
+  const eventState = {
+    事件系统: statData.事件系统 ?? null,
+    参与事件: statData.参与事件 ?? null,
+    世界事件: statData.世界事件 ?? null,
+    事件分支结果: statData.事件分支结果 ?? null,
+    后续事件线索: statData.后续事件线索 ?? null,
+    后续事件线索计数: statData.后续事件线索计数 ?? null,
+  };
   return {
     selectedMksHash: stableHistoryHash(selectedMks),
-    eventStateHash: stableHistoryHash({
-      事件系统: statData.事件系统 ?? null,
-      参与事件: statData.参与事件 ?? null,
-      世界事件: statData.世界事件 ?? null,
-      事件分支结果: statData.事件分支结果 ?? null,
-      后续事件线索: statData.后续事件线索 ?? null,
-      后续事件线索计数: statData.后续事件线索计数 ?? null,
-    }),
+    eventStateHash: stableHistoryHash(eventState),
+    eventPartHashes: Object.fromEntries(
+      HISTORY_EVENT_STATE_KEYS.map(key => [key, stableHistoryHash(eventState[key])]),
+    ),
   };
 }
 
@@ -1167,7 +1176,12 @@ function markBranchStatus(
   return persistHistoryTree(tree);
 }
 
-class HistoryVerificationError extends Error {}
+class HistoryVerificationError extends Error {
+  constructor(message: string, readonly diagnostics?: string) {
+    super(message);
+    this.name = 'HistoryVerificationError';
+  }
+}
 
 function commitVerification(
   state: HistoryTreeViewState,
@@ -1180,11 +1194,22 @@ function commitVerification(
     (baseline.selectedMksHash !== verification.selectedMksHash ||
       baseline.eventStateHash !== verification.eventStateHash)
   ) {
-    markBranchStatus(state.currentBranchId, 'broken');
     const mksSame = baseline.selectedMksHash === verification.selectedMksHash;
     const eventSame = baseline.eventStateHash === verification.eventStateHash;
+    const eventDetails = baseline.eventPartHashes
+      ? HISTORY_EVENT_STATE_KEYS.map(key => {
+          const expected = baseline.eventPartHashes?.[key] ?? '未记录';
+          const actual = verification.eventPartHashes?.[key] ?? '未记录';
+          return `${key}：${expected === actual ? '一致' : '不一致'}（封存 ${expected}；恢复 ${actual}）`;
+        })
+      : ['旧封存记录没有逐组事件指纹，无法准确归因到某一组事件字段。'];
     throw new HistoryVerificationError(
       `历史节点校验失败：ERA 主干或事件状态与封存记录不一致（主干${mksSame ? '一致' : '不一致'}，事件状态${eventSame ? '一致' : '不一致'}）。`,
+      [
+        `ERA SelectedMks：封存 ${baseline.selectedMksHash}；恢复 ${verification.selectedMksHash}`,
+        `事件整体：封存 ${baseline.eventStateHash}；恢复 ${verification.eventStateHash}`,
+        ...eventDetails,
+      ].join('\n'),
     );
   }
 
@@ -1425,12 +1450,26 @@ async function executeCheckout(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const unavailableChat = error instanceof HistoryChatUnavailableError ? error : null;
-    const broken = error instanceof HistoryVerificationError || Boolean(unavailableChat);
+    // 状态指纹不一致仍可再次完成全量同步；只有聊天本身不可访问才是不可恢复的断链。
+    const broken = Boolean(unavailableChat);
     const journal = readHistoryCheckoutJournal();
     if (journal) {
+      const diagnostics = [
+        `恢复事务：${journal.transactionId}`,
+        `恢复动作：${actionKind}`,
+        `失败阶段：${journal.stage}`,
+        `目标节点：${nodeId}`,
+        `来源聊天：${journal.sourceChatName}（${journal.sourceChatId}）`,
+        `目标聊天：${journal.targetLocator.chatName}（${journal.targetLocator.chatId}）`,
+        `目标楼层：User ${journal.targetLocator.userMessageId ?? '无'} / Assistant ${journal.targetLocator.assistantMessageId} / swipe ${journal.targetLocator.swipeId}`,
+        `异常信息：${message}`,
+        ...(error instanceof HistoryVerificationError && error.diagnostics
+          ? ['校验指纹详情：', error.diagnostics]
+          : []),
+      ].join('\n');
       updateHistoryCheckoutJournal({
-        failure: { stage: journal.stage, message, occurredAt: Date.now() },
-      });
+        failure: { stage: journal.stage, message, occurredAt: Date.now(), details: diagnostics },
+      }, { touch: false });
     }
     const currentChat = unavailableChat ? null : await readCurrentChatIdentity().catch(() => null);
     const branchId = unavailableChat
@@ -1569,7 +1608,11 @@ export async function retryCheckoutRecovery(): Promise<HistoryCheckoutResult | n
   if (!journal) return null;
   clearHistoryCheckoutReturnIntent();
   const renewed = renewHistoryCheckoutJournal(journal);
-  return executeCheckout(renewed.targetNodeId, {}, renewed);
+  // verify 失败后的重试必须重新执行 ERA 完全重算；只重比哈希不会改变事件状态。
+  const retryJournal = journal.failure?.stage === 'verify'
+    ? (updateHistoryCheckoutJournal({ stage: 'sync_era' }) ?? renewed)
+    : renewed;
+  return executeCheckout(retryJournal.targetNodeId, {}, retryJournal);
 }
 
 export async function returnToCheckoutSource(): Promise<HistoryCheckoutResult | null> {
@@ -1608,6 +1651,14 @@ export async function returnToCheckoutSource(): Promise<HistoryCheckoutResult | 
       chatName: failedChat.chatName,
       originNodeId: journal.sourceHeadNodeId || null,
     });
+    updateHistoryCheckoutJournal({
+      failure: {
+        stage: journal.stage,
+        message,
+        occurredAt: Date.now(),
+        details: `返回来源聊天失败\n事务：${journal.transactionId}\n来源：${journal.sourceChatName}（${journal.sourceChatId}）\n目标：${journal.targetLocator.chatName}（${journal.targetLocator.chatId}）\n异常：${message}`,
+      },
+    }, { touch: false });
     notifyHistoryCheckoutFailure();
     return makeCheckoutResult(
       unavailableChat ? 'broken' : 'recovery_failed',
