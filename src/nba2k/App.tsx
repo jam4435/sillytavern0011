@@ -69,6 +69,7 @@ import {
   runCpuTradeDeadline,
 } from './engine/transactions';
 import type { MarketOffer } from './engine/transactionTypes';
+import { runAnnualDraft } from './engine/draft';
 
 function freshStatus(): OnCourtStatus {
   return {
@@ -142,6 +143,20 @@ function roleAfterRosterChange(
   if (rank === 5) return '第六人';
   if (rank <= 9 && rank >= 0) return '轮换';
   return '边缘轮换';
+}
+
+function draftSummary(
+  league: NonNullable<Nba2kStat['联盟']>,
+  picks: ReturnType<typeof runAnnualDraft>['picks'],
+  playerTeamId: string,
+): string {
+  const top = picks.slice(0, 5).map(pick =>
+    `#${pick.overallPick} ${getTeam(pick.teamId)?.cn ?? pick.teamId}：${pick.playerName}（${pick.pos}，${pick.template}，OVR ${pick.overallAtDraft}/POT ${pick.potential}）`
+  );
+  const mine = picks
+    .filter(pick => pick.teamId === playerTeamId)
+    .map(pick => `本队#${pick.overallPick}：${pick.playerName}（${pick.pos}，${pick.template}）`);
+  return [...top, ...mine].join('\n');
 }
 
 function offerSummary(offer: MarketOffer): string {
