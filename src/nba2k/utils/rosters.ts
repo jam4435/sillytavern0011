@@ -2,6 +2,8 @@ import { PLAYERS } from '../data/players';
 import { TEAMS } from '../data/teams';
 import type { PlayerData, Position, TeamData } from '../engine/types';
 import { adaptLegacyPlayer } from '../engine/playerAdapter';
+import { projectLeaguePlayer } from '../engine/lifecycle';
+import type { LeagueState } from '../engine/season';
 
 const POSITIONS: Position[] = ['PG', 'SG', 'SF', 'PF', 'C'];
 
@@ -23,8 +25,55 @@ export function getRoster(teamId: string): PlayerData[] {
   );
 }
 
+export function getBasePlayer(key: string): PlayerData | undefined {
+  return players.find(p => p.name === key);
+}
+
 export function getPlayer(key: string): PlayerData | undefined {
-  return customPlayers.get(key) ?? players.find(p => p.name === key);
+  return customPlayers.get(key) ?? getBasePlayer(key);
+}
+
+function severeInjuryCount(league: LeagueState | null | undefined, playerKey: string): number {
+  return league?.伤病.filter(item => item.球员 === playerKey && item.严重度 === '严重').length ?? 0;
+}
+
+export function getPlayerForLeague(
+  key: string,
+  league: LeagueState | null | undefined,
+): PlayerData | undefined {
+  const custom = customPlayers.get(key);
+  if (custom) return custom;
+  const base = getBasePlayer(key);
+  if (!base || !league) return base;
+  const projected = projectLeaguePlayer(base, league.赛季序号 ?? 0, severeInjuryCount(league, key));
+  return projected.retirementStatus === '退役' ? undefined : projected.player;
+}
+
+export function getRosterForLeague(
+  teamId: string,
+  league: LeagueState | null | undefined,
+): PlayerData[] {
+  const base = players
+    .filter(player => player.team === teamId)
+    .map(player => {
+      if (!league) return player;
+      const projected = projectLeaguePlayer(
+        player,
+        league.赛季序号 ?? 0,
+        severeInjuryCount(league, player.name),
+      );
+      return projected.retirementStatus === '退役' ? null : projected.player;
+    })
+    .filter((player): player is PlayerData => Boolean(player));
+
+  const custom = [...customPlayers.values()].filter(player => player.team === teamId);
+  return [...base, ...custom].sort((a, b) => b.overall - a.overall);
+}
+
+export function createLeaguePlayerResolver(
+  league: LeagueState | null | undefined,
+): (key: string) => PlayerData | undefined {
+  return key => getPlayerForLeague(key, league);
 }
 
 /** 从已筛选可用名单中按位置挑选首发。 */
