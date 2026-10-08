@@ -125,7 +125,7 @@ describe('InjuryManager', () => {
       受伤日期: '2016-04-20', 预计复出: '2016-05-20', 状态: '休战',
     }];
     const next = beginNextSeason(league, 'GSW').league;
-    expect(next.日期).toBe('2016-10-27');
+    expect(next.日期).toBe(getScheduledGame('GSW', 0, 1)!.date);
     expect(getPlayerAvailability('Stephen Curry', next).available).toBe(true);
     expect(getPlayerAvailability('Stephen Curry', next).minuteLimit).toBeNull();
   });
