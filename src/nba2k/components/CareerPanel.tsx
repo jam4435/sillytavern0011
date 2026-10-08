@@ -8,6 +8,7 @@ import { careerPhase } from '../engine/lifecycle';
 export function CareerPanel(props: {
   career: CareerState | null; offCourt: OffCourtState | null; league: LeagueState | null; disabled: boolean;
   onAction: (text: string) => void; onStartMatch: () => void; onNextSeason: () => void;
+  onPrepareMarket: () => void; onAcceptOffer: (offerId: string) => void;
   onTrain: () => void; onUpgrade: (group: UpgradeGroupKey) => void;
 }) {
   const { career, offCourt, league } = props;
@@ -27,6 +28,9 @@ export function CareerPanel(props: {
     : '—';
   const phase = career ? careerPhase(career.年龄, career.巅峰年龄, career.退役状态) : '—';
   const activeHooks = (league?.故事钩子 ?? []).filter(hook => !hook.consumed).slice(-3).reverse();
+  const pendingOffers = career
+    ? (league?.市场报价 ?? []).filter(offer => offer.playerKey === career.附身球员 && offer.status === '待定')
+    : [];
   const quickActions = [
     { label: '会见经纪人', text: '我约经纪人见面，聊聊最近的代言机会和职业规划。' },
     { label: '代言谈判', text: '我想推进当前的代言谈判或寻找新的代言机会。' },
@@ -44,6 +48,20 @@ export function CareerPanel(props: {
       <div className="cp-row"><b>用人</b> · {rotationLabel} · {starLoadLabel} · 小阵容 {coach.smallBallBias > 4 ? '偏爱' : coach.smallBallBias < -4 ? '保守' : '中性'}</div>
       <div className="cp-row"><b>磨合</b> · {coach.tenureGames >= 15 ? '理念已稳定落地' : `${coachAssimilation}/15 场`} · 固执度 {Math.round(coach.stubbornness)}</div>
     </div>}
+    {offCourt?.合同 && <div className="cp-section contract-profile"><div className="cp-section-title">当前合同</div>
+      <div className="cp-row"><b>{getTeam(offCourt.合同.球队)?.cn ?? offCourt.合同.球队}</b> · 年薪 {(offCourt.合同.年薪 / 10000).toFixed(0)} 万美元 · 剩余 {offCourt.合同.年限} 年 · 到期 {offCourt.合同.到期赛季}</div>
+    </div>}
+    {pendingOffers.length > 0 && <div className="cp-section market-offers"><div className="cp-section-title">正式报价</div>
+      {pendingOffers.map(offer => <div className="cp-row market-offer" key={offer.id}>
+        <div><b>{getTeam(offer.teamId)?.cn ?? offer.teamId}</b> · {offer.type}
+          {offer.type === '交易'
+            ? <> · 回报 {offer.outgoingPlayerKey ?? '筹码'}</>
+            : <> · {offer.years}年 / 年薪 {(offer.annualSalary / 10000).toFixed(0)} 万美元</>}
+          <small> · 需求 {Math.round(offer.needScore)} · 适配 {Math.round(offer.fitScore)}</small>
+        </div>
+        <button disabled={props.disabled} onClick={() => props.onAcceptOffer(offer.id)}>接受</button>
+      </div>)}
+    </div>}
 
     <div className="career-toolbar"><button className={showDevelopment ? 'active' : ''} onClick={() => setShowDevelopment(value => !value)}>能力升级</button><button className={showProfile ? 'active' : ''} onClick={() => setShowProfile(value => !value)}>徽章 / 热区</button><button disabled={props.disabled} onClick={props.onTrain}>今日训练 +1</button></div>
     {showDevelopment && career && <section className="development-panel"><header><div><span>NONLINEAR DEVELOPMENT</span><b>潜力等级上限 {cap}</b></div><strong>{points} GP</strong></header><div className="development-grid">{GROUP_KEYS.map(key => { const level = career.发展.groups[key]; const cost = upgradeCost(level); return <div className="development-row" key={key}><div><span>{GROUP_LABELS[key]}</span><small>LV {level}/{cap} · 下级 {cost}点</small></div><div className="development-track"><i style={{ width: `${level / 20 * 100}%` }} /></div><button disabled={props.disabled || level >= cap || points < cost} onClick={() => props.onUpgrade(key)}>升级</button></div>; })}</div></section>}
@@ -52,6 +70,9 @@ export function CareerPanel(props: {
     {(offCourt?.代言?.length ?? 0) > 0 && <div className="cp-section"><div className="cp-section-title">代言</div>{offCourt!.代言.map(item => <div key={item.品牌} className="cp-row">{item.品牌} · {(item.年薪 / 10000).toFixed(0)}万/年 · {item.状态}</div>)}</div>}
     <div className="cp-actions">
       {quickActions.map(action => <button key={action.label} disabled={props.disabled || career?.退役状态 === '退役'} onClick={() => props.onAction(action.text)}>{action.label}</button>)}
+      <button disabled={props.disabled || career?.退役状态 === '退役'} onClick={props.onPrepareMarket}>
+        {league?.阶段 === '休赛期' ? '查看合同市场' : '查看交易报价'}
+      </button>
       {league?.阶段 === '休赛期'
         ? <button className="cp-start-match" disabled={props.disabled || career?.退役状态 === '退役'} onClick={props.onNextSeason}>进入下一赛季</button>
         : <button className="cp-start-match" disabled={props.disabled || career?.退役状态 === '退役'} onClick={props.onStartMatch}>{career?.退役状态 === '退役' ? '生涯已退役' : '进入下一场比赛'}</button>}
