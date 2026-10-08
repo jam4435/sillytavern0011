@@ -726,6 +726,17 @@
   }
 }
 
+:root[data-ui-theme='ink-wash'] .history-restore-notice {
+  color: var(--wuxia-ink-text-strong);
+  background: var(--wuxia-ink-paper-strong);
+  border-color: var(--wuxia-ink-border);
+
+  &.failed {
+    color: #8b1a1a;
+    border-color: rgba(139, 26, 26, 0.45);
+  }
+}
+
 .variable-change-dock {
   flex-shrink: 0;
   padding: 0 1.25rem 0.5rem;
