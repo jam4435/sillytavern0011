@@ -498,10 +498,11 @@ const App: React.FC = () => {
       const match = stat.比赛;
       const career = stat.生涯;
       if (!match || !career) return;
+      const resolvePlayer = playerResolverForStat(stat);
 
       if (choice.action === '观察' || choice.action === '模拟一个回合') {
-        const cpu = simulatePossession(match, getPlayer);
-        const rotated = cpu.possessionsCompleted ? applyAutomaticRotation(cpu.match, getPlayer) : cpu.match;
+        const cpu = simulatePossession(match, resolvePlayer);
+        const rotated = cpu.possessionsCompleted ? applyAutomaticRotation(cpu.match, resolvePlayer) : cpu.match;
         const patch: Record<string, unknown> = { 比赛: rotated };
         if (match.进行中 && !rotated.进行中) {
           const nextCareer = finishCareerGame(career, rotated);
@@ -518,9 +519,9 @@ const App: React.FC = () => {
       const oppSide: Side = mySide === '主' ? '客' : '主';
       // v3 只允许控制主角；忽略任何伪造的 actorKey。
       const actorKey = career.附身球员;
-      const actor = getPlayer(actorKey);
+      const actor = resolvePlayer(actorKey);
       if (!actor) return;
-      const partner = choice.partnerKey ? (getPlayer(choice.partnerKey) ?? null) : null;
+      const partner = choice.partnerKey ? (resolvePlayer(choice.partnerKey) ?? null) : null;
 
       // 对位者：距行动人最近的对方球员
       const actorSpot = match.站位[mySide]?.find(s => s.球员 === actorKey);
@@ -536,9 +537,9 @@ const App: React.FC = () => {
           }
         }
       }
-      const defender = defenderKey ? (getPlayer(defenderKey) ?? null) : null;
+      const defender = defenderKey ? (resolvePlayer(defenderKey) ?? null) : null;
       const defenderStatus = defenderKey ? match.球员状态[defenderKey] : undefined;
-      const defenders = oppSpots.map(spot => getPlayer(spot.球员)).filter((player): player is NonNullable<typeof player> => Boolean(player));
+      const defenders = oppSpots.map(spot => resolvePlayer(spot.球员)).filter((player): player is NonNullable<typeof player> => Boolean(player));
 
       let partnerDefender = null;
       if (['挡拆突破', '顺下传球', '外弹传球'].includes(choice.action) && choice.partnerKey) {
@@ -550,7 +551,7 @@ const App: React.FC = () => {
               Math.hypot(a.x - partnerSpot.x, a.y - partnerSpot.y) -
               Math.hypot(b.x - partnerSpot.x, b.y - partnerSpot.y),
           )[0];
-          partnerDefender = nearest ? (getPlayer(nearest.球员) ?? null) : null;
+          partnerDefender = nearest ? (resolvePlayer(nearest.球员) ?? null) : null;
         }
       }
 
@@ -619,7 +620,7 @@ const App: React.FC = () => {
                 ? actorKey
                 : choice.partnerKey;
             const scoreBefore = finalMatch.比分[continuationSide];
-            const continuation = continuePossessionAfterAdvantage(finalMatch, continuationSide, preferredActor, getPlayer);
+            const continuation = continuePossessionAfterAdvantage(finalMatch, continuationSide, preferredActor, resolvePlayer);
             finalMatch = continuation.match;
             continuationSummary = continuation.summary;
 
@@ -638,7 +639,7 @@ const App: React.FC = () => {
           }
 
           if (finalMatch.进行中 && finalMatch.回合阶段 === '常规回合' && finalMatch.投篮时钟 >= 20) {
-            finalMatch = applyAutomaticRotation(finalMatch, getPlayer);
+            finalMatch = applyAutomaticRotation(finalMatch, resolvePlayer);
           }
 
           let nextCareer = updateCareerDynamics(career, resolution, settled.settlement);
@@ -664,7 +665,8 @@ const App: React.FC = () => {
     if (!match || !career || !match.进行中 || simulationMode === '全回合' || busyRef.current) return;
     if (match.回合阶段 !== '常规回合') return;
 
-    const segment = simulateUntilInterruption(match, simulationMode, career.附身球员, getPlayer);
+    const resolvePlayer = playerResolverForStat(stat);
+    const segment = simulateUntilInterruption(match, simulationMode, career.附身球员, resolvePlayer);
     if (segment.possessions <= 0) {
       if (segment.match !== match) setStat(current => ({ ...current, 比赛: segment.match }));
       return;
@@ -721,6 +723,7 @@ const App: React.FC = () => {
     async ({ side, outKey, inKey }: SubstitutionChoice) => {
       const match = stat.比赛;
       if (!match || match.回合阶段 !== '死球' || busyRef.current) return;
+      const resolvePlayer = playerResolverForStat(stat);
       const rotation = match.阵容[side];
       if (!rotation.场上.includes(outKey) || !rotation.替补.includes(inKey)) return;
 
@@ -738,14 +741,14 @@ const App: React.FC = () => {
           [inKey]: match.球员状态[inKey] ?? freshStatus(),
         },
         回合情境: `${side}队死球换人：${outKey}下，${inKey}上`,
-        回合摘要: `${getPlayer(outKey)?.cn ?? outKey}被${getPlayer(inKey)?.cn ?? inKey}换下`,
+        回合摘要: `${resolvePlayer(outKey)?.cn ?? outKey}被${resolvePlayer(inKey)?.cn ?? inKey}换下`,
         回合阶段: '常规回合',
         待处理情境: { type: 'none' },
       };
       await insertOrAssignVariables({ stat_data: { 比赛: nextMatch } }, { type: 'chat' });
       setStat(current => ({ ...current, 比赛: nextMatch }));
       await sendTurn(
-        `【比赛管理】前端已完成${side}队换人：${getPlayer(outKey)?.cn ?? outKey}下，${getPlayer(inKey)?.cn ?? inKey}上。` +
+        `【比赛管理】前端已完成${side}队换人：${resolvePlayer(outKey)?.cn ?? outKey}下，${resolvePlayer(inKey)?.cn ?? inKey}上。` +
           `请简短演出换人，不得修改比赛数值。`,
         { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 比赛: nextMatch }) },
       );
@@ -757,7 +760,8 @@ const App: React.FC = () => {
     const match = stat.比赛;
     if (!match || match.待处理情境.type !== 'freeThrow' || busyRef.current) return;
     const pending = match.待处理情境;
-    const shooter = getPlayer(pending.shooter);
+    const resolvePlayer = playerResolverForStat(stat);
+    const shooter = resolvePlayer(pending.shooter);
     const made = Math.floor(Math.random() * 100) + 1 <= (shooter?.attrs.freeThrow ?? 70);
     const shooterStatus = match.球员状态[pending.shooter] ?? freshStatus();
     const remaining = pending.remaining - 1;
