@@ -197,6 +197,8 @@ export interface TeamRotationState {
   smallBallAffinity?: number;
   /** 0-1，季后赛压缩替补、增加核心分钟的强度。 */
   playoffShortening?: number;
+  /** 正常轮换尽量保证每组至少一名组织核心在场。 */
+  staggerGroups?: string[][];
   /** 当前由 GameContextManager 推导出的轮换语义，仅用于解释/执行。 */
   contextMode?: RotationContextMode;
 }
