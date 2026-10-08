@@ -978,6 +978,15 @@
 
       let performedLegacyRuntimeMigration = false;
       if (needsEventRuntimeStateReset(preCheckVars.stat_data)) {
+        if (options.allowPendingHistoryCheckout === true) {
+          // 恢复旧楼层期间的 stat_data 可能来自旧事件版本。直接重置会清空事件系统、
+          // 参与记录与人物经历，并且这些直接写入不会进入 ERA 历史回滚日志。
+          // 保留原始历史数据和 journal，必须先显式解决版本不一致才能重试。
+          throw new Error(
+            `历史恢复中止：事件运行时版本不匹配（当前 ${preCheckVars.stat_data.前端变量?.事件运行时键版本 ?? '未记录'}）；` +
+              '禁止在历史检出期间直接清空事件状态。请查看存档恢复诊断并返回来源聊天处理版本差异。',
+          );
+        }
         const resetSucceeded = await resetLegacyEventRuntimeState(preCheckVars.stat_data);
         if (!resetSucceeded) {
           return false;
@@ -1050,6 +1059,7 @@
     } catch (error) {
       isInitialized = false;
       logError('❌ ERA 事件系统初始化失败（变量尚未就绪或初始化步骤抛错）:', error);
+      if (options.allowPendingHistoryCheckout === true) throw error;
       return false;
     } finally {
       isInitializing = false;
