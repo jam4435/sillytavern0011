@@ -20,6 +20,7 @@ export interface InjuryRecord {
   受伤日期: string;
   预计复出: string;
   状态: '休战' | '恢复中' | '可复出';
+  分钟限制?: number | null;
 }
 
 export interface StoryHook {
