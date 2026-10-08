@@ -3,11 +3,14 @@ import { advanceLeagueAfterGame, beginNextSeason, createLeagueState, getSchedule
 import type { MatchState } from './types';
 import { buildLeagueRosterSnapshot } from '../utils/rosters';
 import { buildLeagueSimulationProfiles } from './teamPower';
+import { getLeagueCalendar } from './calendar';
+import { TEAMS } from '../data/teams';
 
 function finishedMatch(): MatchState {
+  const scheduled = getScheduledGame('GSW', 0)!;
   return {
-    进行中: false, 对阵: { 主队: 'GSW', 客队: 'CLE' }, 节次: 4, 剩余秒数: 0, 投篮时钟: 0,
-    比分: { 主: 112, 客: 104 }, 球权: '客', 跳球胜方: '主',
+    进行中: false, 对阵: { 主队: scheduled.home, 客队: scheduled.away }, 节次: 4, 剩余秒数: 0, 投篮时钟: 0,
+    比分: scheduled.home === 'GSW' ? { 主: 112, 客: 104 } : { 主: 104, 客: 112 }, 球权: '客', 跳球胜方: '主',
     战术: {
       主: { offense: '动态进攻', defense: '换防', pace: '快', helpIntensity: 60, rebound: '均衡' },
       客: { offense: '四外一内', defense: '人盯人', pace: '标准', helpIntensity: 55, rebound: '均衡' },
@@ -22,10 +25,10 @@ function finishedMatch(): MatchState {
 describe('SeasonEngine', () => {
   it('同一球队的简化赛历固定可重算并覆盖常规赛时间范围', () => {
     expect(getScheduledGame('GSW', 0)).toEqual(getScheduledGame('GSW', 0));
-    expect(scheduleDate(0)).toBe('2015-10-27');
-    expect(scheduleDate(81)).toBe('2016-04-13');
-    expect(scheduleDate(0, 1)).toBe('2016-10-27');
-    expect(scheduleDate(81, 1)).toBe('2017-04-13');
+    expect(scheduleDate(0)).toBe(getScheduledGame('GSW', 0)?.date);
+    expect(scheduleDate(81)).toBe(getScheduledGame('GSW', 81)?.date);
+    expect(scheduleDate(0, 1)).toBe(getScheduledGame('GSW', 0, 1)?.date);
+    expect(scheduleDate(81, 1)).toBe(getScheduledGame('GSW', 81, 1)?.date);
     expect(getScheduledGame('GSW', 82)).toBeNull();
   });
 
@@ -35,35 +38,36 @@ describe('SeasonEngine', () => {
     const result = advanceLeagueAfterGame(league, 'GSW', finishedMatch(), () => .5);
     expect(result.league.战绩.GSW.胜).toBe(1);
     expect(result.league.教练.GSW.tenureGames).toBe(tenureBefore + 1);
-    expect(result.league.战绩.CLE.负).toBe(1);
+    expect(result.league.战绩[finishedMatch().对阵.主队 === 'GSW'
+      ? finishedMatch().对阵.客队 : finishedMatch().对阵.主队].负).toBe(1);
     expect(result.league.赛程索引).toBe(1);
     expect(result.nextGame?.index).toBe(1);
   });
 
-  it('SeasonEngine后台比赛真实读取动态球队画像，而不是静态球队overall', () => {
+  it('SeasonEngine根据统一日历结算后台队伍，仍然读取动态球队画像', () => {
     const league = createLeagueState('GSW');
     const snapshot = buildLeagueRosterSnapshot(league);
     const base = buildLeagueSimulationProfiles(league, snapshot.byTeam);
-
-    const atlStrong = {
+    const nextGame = getScheduledGame('GSW', 1)!;
+    const candidate = getLeagueCalendar(0).games.find(game =>
+      game.home !== 'GSW' && game.away !== 'GSW' &&
+      game.date < nextGame.date)!;
+    expect(candidate).toBeDefined();
+    const { home, away } = candidate;
+    const firstPower = {
       ...base,
-      ATL: { ...base.ATL, offenseRating: 116, defenseRating: 100, netRating: 16, power: 93 },
-      BOS: { ...base.BOS, offenseRating: 99, defenseRating: 113, netRating: -14, power: 68 },
+      [home]: { ...base[home], offenseRating: 116, defenseRating: 100, netRating: 16, power: 93 },
+      [away]: { ...base[away], offenseRating: 99, defenseRating: 113, netRating: -14, power: 68 },
     };
-    const bosStrong = {
+    const reversePower = {
       ...base,
-      ATL: { ...base.ATL, offenseRating: 99, defenseRating: 113, netRating: -14, power: 68 },
-      BOS: { ...base.BOS, offenseRating: 116, defenseRating: 100, netRating: 16, power: 93 },
+      [home]: { ...base[home], offenseRating: 99, defenseRating: 113, netRating: -14, power: 68 },
+      [away]: { ...base[away], offenseRating: 116, defenseRating: 100, netRating: 16, power: 93 },
     };
-
-    // Round 0 排除玩家场 GSW/CLE 后，排序中的第一组后台对阵就是 ATL vs BOS。
-    const first = advanceLeagueAfterGame(league, 'GSW', finishedMatch(), () => .5, atlStrong);
-    const second = advanceLeagueAfterGame(league, 'GSW', finishedMatch(), () => .5, bosStrong);
-
-    expect(first.league.战绩.ATL.胜).toBe(1);
-    expect(first.league.战绩.BOS.负).toBe(1);
-    expect(second.league.战绩.ATL.负).toBe(1);
-    expect(second.league.战绩.BOS.胜).toBe(1);
+    const first = advanceLeagueAfterGame(league, 'GSW', finishedMatch(), () => .5, firstPower);
+    const second = advanceLeagueAfterGame(league, 'GSW', finishedMatch(), () => .5, reversePower);
+    expect(first.league.战绩[home].胜).toBeGreaterThan(second.league.战绩[home].胜);
+    expect(first.league.战绩[away].胜).toBeLessThan(second.league.战绩[away].胜);
   });
 
   it('休赛期进入下一赛季会重置战绩并使用下一年度赛历', () => {
@@ -72,9 +76,37 @@ describe('SeasonEngine', () => {
     const next = beginNextSeason(league, 'GSW');
     expect(next.league.赛季).toBe('2016-17');
     expect(next.league.赛季序号).toBe(1);
-    expect(next.league.日期).toBe('2016-10-27');
+    expect(next.league.日期).toBe(getScheduledGame('GSW', 0, 1)!.date);
     expect(next.nextGame?.index).toBe(0);
     expect(next.league.战绩.GSW.胜).toBe(0);
+  });
+
+  it('统一赛历推进完整82场后每队正好82场，胜负合计始终1230场且无漏赛', () => {
+    let league = createLeagueState('GSW');
+    let prior = 0;
+    for (let index = 0; index < 82; index++) {
+      const scheduled = getScheduledGame('GSW', index)!;
+      expect(league.日期).toBe(scheduled.date);
+      const homeGSW = scheduled.home === 'GSW';
+      const match = { ...finishedMatch(),
+        对阵: { 主队: scheduled.home, 客队: scheduled.away },
+        比分: homeGSW ? { 主: 108, 客: 99 } : { 主: 99, 客: 108 },
+      };
+      league = advanceLeagueAfterGame(league, 'GSW', match, () => .5).league;
+      const games = Object.values(league.战绩).reduce((sum, team) => sum + team.胜 + team.负, 0) / 2;
+      expect(games).toBeGreaterThan(prior);
+      prior = games;
+    }
+    for (const team of TEAMS) {
+      const row = league.战绩[team.id];
+      expect(row.胜 + row.负).toBe(82);
+    }
+    expect(prior).toBe(1230);
+    const wins = Object.values(league.战绩).reduce((total, standing) => total + standing.胜, 0);
+    const losses = Object.values(league.战绩).reduce((total, standing) => total + standing.负, 0);
+    expect(wins).toBe(1230);
+    expect(losses).toBe(1230);
+    expect(league.赛程索引).toBe(82);
   });
 
   it('第82场结束后按排名生成七场四胜季后赛首轮', () => {
@@ -82,7 +114,10 @@ describe('SeasonEngine', () => {
     league.赛程索引 = 81;
     league.日期 = '2016-04-13';
     league.战绩.GSW = { 胜: 70, 负: 11, 得分: 9000, 失分: 8200, 连胜: 4 };
-    const result = advanceLeagueAfterGame(league, 'GSW', finishedMatch(), () => .5);
+    const last = getScheduledGame('GSW', 81)!;
+    const result = advanceLeagueAfterGame(league, 'GSW', {
+      ...finishedMatch(), 对阵: { 主队: last.home, 客队: last.away },
+    }, () => .5);
     expect(result.league.阶段).toBe('季后赛');
     expect(result.league.季后赛?.round).toBe('首轮');
     expect(result.league.季后赛?.series).toHaveLength(8);

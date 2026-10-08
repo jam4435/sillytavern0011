@@ -3,6 +3,8 @@ import { leagueStateSchema } from '../schema';
 import { buildLeagueRosterSnapshot } from '../utils/rosters';
 import { advanceLeagueAfterGame, beginNextSeason, createLeagueState } from './season';
 import { buildLeagueSimulationProfiles } from './teamPower';
+import { getScheduledGame } from './season';
+import { getLeagueCalendar } from './calendar';
 import { generateDraftClass, playerFromGeneratedSeed } from './draft';
 import {
   addSeasonLines, decideSeasonAwards, emptyPlayerSeasonTotals, leaderboard,
@@ -18,7 +20,8 @@ function seededRng(seed = 17): () => number {
   };
 }
 
-function completedMatch(): MatchState {
+function completedMatch(index = 0): MatchState {
+  const scheduled = getScheduledGame('GSW', index)!;
   const status: OnCourtStatus = {
     体力: 78, 得分: 29, 篮板: 6, 助攻: 9, 抢断: 2, 盖帽: 0, 失误: 3,
     犯规: 2, 投篮命中: 10, 投篮出手: 19, 三分命中: 5, 三分出手: 10,
@@ -26,8 +29,8 @@ function completedMatch(): MatchState {
     手感: '平', 连续命中: 0, 连续打铁: 0,
   };
   return {
-    进行中: false, 对阵: { 主队: 'GSW', 客队: 'CLE' }, 节次: 4,
-    剩余秒数: 0, 投篮时钟: 0, 比分: { 主: 115, 客: 100 },
+    进行中: false, 对阵: { 主队: scheduled.home, 客队: scheduled.away }, 节次: 4,
+    剩余秒数: 0, 投篮时钟: 0, 比分: scheduled.home === 'GSW' ? { 主: 115, 客: 100 } : { 主: 100, 客: 115 },
     球权: '主', 跳球胜方: '主',
     战术: {
       主: { offense: '五外', defense: '换防', pace: '快', helpIntensity: 50, rebound: '均衡' },
@@ -35,7 +38,9 @@ function completedMatch(): MatchState {
     },
     站位: { 主: [], 客: [] }, 本节球队犯规: { 主: 0, 客: 0 },
     暂停: { 主: 0, 客: 0 },
-    阵容: { 主: { 场上: ['Stephen Curry'], 替补: [] }, 客: { 场上: [], 替补: [] } },
+    阵容: scheduled.home === 'GSW'
+      ? { 主: { 场上: ['Stephen Curry'], 替补: [] }, 客: { 场上: [], 替补: [] } }
+      : { 主: { 场上: [], 替补: [] }, 客: { 场上: ['Stephen Curry'], 替补: [] } },
     回合阶段: '死球', 待处理情境: { type: 'deadBall', reason: '结束', inboundSide: '主' },
     回合情境: '结束', 球员状态: { 'Stephen Curry': status }, 回合摘要: '比赛结束',
   };
@@ -106,8 +111,12 @@ describe('league-wide season statistics and awards', () => {
     expect(curry.pts).toBe(29);
     expect(curry.ast).toBe(9);
     expect(curry.fgm).toBe(10);
-    expect(next.球员赛季统计['LeBron James']).toBeUndefined();
-    expect(next.球员赛季统计[snapshot.byTeam.ATL[0].name]?.gp).toBe(1);
+    const rival = match.对阵.主队 === 'GSW' ? match.对阵.客队 : match.对阵.主队;
+    expect(next.球员赛季统计[snapshot.byTeam[rival][0].name]).toBeUndefined();
+    const nextPlayerDate = getScheduledGame('GSW', 1)!.date;
+    const other = getLeagueCalendar(0).games.find(game =>
+      game.home !== 'GSW' && game.away !== 'GSW' && game.date < nextPlayerDate)!;
+    expect(next.球员赛季统计[snapshot.byTeam[other.home][0].name]?.gp).toBeGreaterThanOrEqual(1);
     expect(leagueStateSchema.safeParse(next).success).toBe(true);
     const added = addSeasonLines(next.球员赛季统计, matchSeasonLines(match));
     expect(added['Stephen Curry'].gp).toBe(2);
@@ -155,7 +164,7 @@ describe('league-wide season statistics and awards', () => {
   it('第82轮正式结算奖项并保存在联盟，进入季后赛不二次改写赛季累计', () => {
     const league = createLeagueState('GSW');
     league.赛程索引 = 81;
-    league.日期 = '2016-04-13';
+    league.日期 = getScheduledGame('GSW', 81)!.date;
     const snapshot = buildLeagueRosterSnapshot(league);
     for (const roster of Object.values(snapshot.byTeam)) {
       for (const player of roster) {
@@ -166,7 +175,7 @@ describe('league-wide season statistics and awards', () => {
       }
     }
     const profiles = buildLeagueSimulationProfiles(league, snapshot.byTeam);
-    const closed = advanceLeagueAfterGame(league, 'GSW', completedMatch(), seededRng(84), profiles, snapshot.byTeam).league;
+    const closed = advanceLeagueAfterGame(league, 'GSW', completedMatch(81), seededRng(84), profiles, snapshot.byTeam).league;
     expect(closed.赛程索引).toBe(82);
     expect(closed.奖项记录).toHaveLength(1);
     expect(closed.奖项记录[0].season).toBe('2015-16');
