@@ -33,7 +33,7 @@ export const onCourtStatusSchema = z.object({
   抢断: nonNegativeInt, 盖帽: nonNegativeInt, 失误: nonNegativeInt, 犯规: z.number().int().min(0).max(6),
   投篮命中: nonNegativeInt, 投篮出手: nonNegativeInt, 三分命中: nonNegativeInt, 三分出手: nonNegativeInt,
   罚球命中: nonNegativeInt, 罚球出手: nonNegativeInt, 进攻篮板: nonNegativeInt, 防守篮板: nonNegativeInt,
-  上场秒数: nonNegativeInt, 手感: z.enum(['热', '平', '冷']), 连续命中: nonNegativeInt, 连续打铁: nonNegativeInt,
+  上场秒数: nonNegativeInt, 垃圾时间秒数: nonNegativeInt.optional(), 手感: z.enum(['热', '平', '冷']), 连续命中: nonNegativeInt, 连续打铁: nonNegativeInt,
 }).strict().superRefine((status, ctx) => {
   if (status.投篮命中 > status.投篮出手) ctx.addIssue({ code: 'custom', path: ['投篮命中'], message: '投篮命中不能大于出手' });
   if (status.三分命中 > status.三分出手) ctx.addIssue({ code: 'custom', path: ['三分命中'], message: '三分命中不能大于出手' });
