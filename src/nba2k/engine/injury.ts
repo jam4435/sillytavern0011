@@ -184,6 +184,7 @@ export function advanceInjuryRecovery(league: LeagueState): LeagueState {
       分钟限制: minutes >= 36 ? null : Math.min(36, minutes),
     };
   });
+  // 长期存档不保留无影响的数年前轻/中伤；严重伤史仍保留供生命周期衰退与退役评估。
   const hooks: StoryHook[] = [];
   injuries.forEach((injury, index) => {
     if (injury.状态 !== '可复出' || league.伤病[index].状态 === '可复出') return;
@@ -195,5 +196,9 @@ export function advanceInjuryRecovery(league: LeagueState): LeagueState {
       createdDate: league.日期,
     });
   });
-  return { ...league, 伤病: injuries, 故事钩子: [...league.故事钩子, ...hooks] };
+  const compact = injuries.filter(injury =>
+    injury.严重度 === '严重' ||
+    injury.状态 !== '可复出' ||
+    daysBetween(injury.预计复出, league.日期) <= 120);
+  return { ...league, 伤病: compact, 故事钩子: [...league.故事钩子, ...hooks] };
 }
