@@ -76,9 +76,14 @@ function collectLeaderCandidates(
   }
 }
 
-/** 天下势力鉴赏的完整公开目录；与 17 门派玩法静态库分离。 */
+/** 原著资料层的完整 canonical 组织目录；不直接等于玩家可加入势力列表。 */
 export function getAllPublicFactions(): PublicFactionCatalogEntry[] {
   return ALL_PUBLIC_FACTIONS;
+}
+
+/** 天下势力鉴赏只展示正式可玩势力；世界组织资料仍保留在完整目录中供归一/考据使用。 */
+export function getPlayablePublicFactions(): PublicFactionCatalogEntry[] {
+  return ALL_PUBLIC_FACTIONS.filter(faction => faction.可加入 && Boolean(faction.sectId));
 }
 
 /** 通过 canonical id、公开名称或别名查找公开势力。 */
