@@ -3,7 +3,7 @@ import sectsJson from '../data/sects.json';
 import martialArtsJson from '../data/_合并后功法.json';
 import publicCatalogJson from '../data/factionPublicCatalog.json';
 import { getAllSects, getFactionCandidateLocations, getSectByName } from './factionManager';
-import { getPlayablePublicFactions } from './publicFactionManager';
+import { getPlayablePublicFactions, getPublicFactionByName } from './publicFactionManager';
 import { loadMapData } from './mapLoader';
 
 const NEW_FACTIONS = ['灵鹫宫', '大理天龙寺', '青城派', '蓬莱派', '神农帮', '西夏一品堂'] as const;
@@ -24,6 +24,13 @@ describe('23 个正式可玩势力数据完整性', () => {
     expect(new Set(ids).size).toBe(23);
     expect(new Set(playable.map(faction => faction.sectId)).size).toBe(23);
     expect(new Set(playable.map(faction => faction.sectId))).toEqual(new Set(ids));
+    for (const faction of playable) {
+      const sect = getSectByName(faction.sectId!);
+      expect(sect, `公开势力没有正式门派: ${faction.势力名称}`).toBeDefined();
+      expect(faction.驻地, `公开驻地与正式门派不一致: ${faction.势力名称}`).toBe(sect!.主峰驻地);
+    }
+    expect(getPublicFactionByName('天山灵鹫宫')?.sectId).toBe('灵鹫宫');
+    expect(getPublicFactionByName('大理段氏')?.sectId).toBe('大理段氏');
     for (const sect of sects) {
       expect(getSectByName(sect.门派ID)?.门派ID).toBe(sect.门派ID);
       expect(getSectByName(sect.门派名称)?.门派ID).toBe(sect.门派ID);
