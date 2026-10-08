@@ -59,6 +59,14 @@ export const HistoryCheckoutJournalSchema = z
      */
     postCommitChatName: z.string().min(1).optional(),
     failure: CheckoutJournalFailureSchema.optional(),
+    /** ERA 全同步前后与事件预校验前后的哈希和差异路径，用于区分两类漂移原因。 */
+    verificationTrace: z.object({
+      eraSelectedMksHash: z.string(),
+      eraEventStateHash: z.string(),
+      preparedSelectedMksHash: z.string(),
+      preparedEventStateHash: z.string(),
+      changedPaths: z.array(z.string()),
+    }).strict().optional(),
     sourceHeadNodeId: z.string(),
     sourceChatId: z.string(),
     sourceChatName: z.string(),
@@ -151,6 +159,7 @@ export function updateHistoryCheckoutJournal(
       | 'draftMessage'
       | 'postCommitChatName'
       | 'failure'
+      | 'verificationTrace'
     >
   >,
   options: { touch?: boolean; now?: number } = {},
@@ -278,6 +287,7 @@ export function renewHistoryCheckoutJournal(journal: HistoryCheckoutJournal, now
     startedAt: now,
     lastTouchedAt: now,
     failure: undefined,
+    verificationTrace: undefined,
   });
 }
 
