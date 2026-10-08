@@ -287,8 +287,9 @@ function neutralProfile(teamId: string): TeamSimulationProfile {
 }
 
 function scoreNoise(rng: () => number): number {
-  // 三个均匀随机数叠加，避免原先单次±9分的“平顶噪声”。
-  return ((rng() + rng() + rng()) - 1.5) * 10.5;
+  // 三个均匀随机数叠加形成近钟形单场波动。
+  // 球队真实长期强弱应反映在赛季胜率，而不是让强弱悬殊的单场失去爆冷可能。
+  return ((rng() + rng() + rng()) - 1.5) * 18;
 }
 
 /**
@@ -311,15 +312,16 @@ export function simulateLowFidelityGame(
   );
 
   // 对手防守画像以“对联盟平均的DRtg偏差”进入本队进攻效率。
+  const MATCHUP_REALIZATION = .72;
   const homeMatchupOrtg =
     LEAGUE_BASE_ORTG +
-    (home.offenseRating - LEAGUE_BASE_ORTG) +
-    (away.defenseRating - LEAGUE_BASE_ORTG) +
+    (home.offenseRating - LEAGUE_BASE_ORTG) * MATCHUP_REALIZATION +
+    (away.defenseRating - LEAGUE_BASE_ORTG) * MATCHUP_REALIZATION +
     2.25;
   const awayMatchupOrtg =
     LEAGUE_BASE_ORTG +
-    (away.offenseRating - LEAGUE_BASE_ORTG) +
-    (home.defenseRating - LEAGUE_BASE_ORTG);
+    (away.offenseRating - LEAGUE_BASE_ORTG) * MATCHUP_REALIZATION +
+    (home.defenseRating - LEAGUE_BASE_ORTG) * MATCHUP_REALIZATION;
 
   let homeScore = Math.round(possessions * homeMatchupOrtg / 100 + scoreNoise(rng));
   let awayScore = Math.round(possessions * awayMatchupOrtg / 100 + scoreNoise(rng));
