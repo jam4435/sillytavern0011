@@ -340,6 +340,7 @@ function rookieContract(seed: GeneratedPlayerSeed, teamId: string, overallPick: 
 export function runAnnualDraft(
   league: LeagueState,
   getRoster: RosterGetter,
+  rosterSnapshot?: Record<string, PlayerData[]>,
 ): DraftResult {
   const entrySeason = league.赛季序号 + 1;
   if (league.选秀历史.some(pick => pick.entrySeason === entrySeason)) {
@@ -352,8 +353,11 @@ export function runAnnualDraft(
   const picks: DraftPickRecord[] = [];
   // 一届选秀只扫描一次30队Roster；每签后局部降低该队对应位置需求。
   // 避免随着程序化球员累积，对每个候选人反复重建整个联盟Roster。
+  const rosterForNeeds: RosterGetter = rosterSnapshot
+    ? teamId => rosterSnapshot[teamId] ?? []
+    : getRoster;
   const needsByTeam = Object.fromEntries(
-    TEAMS.map(team => [team.id, evaluateTeamNeeds(team.id, league, getRoster)]),
+    TEAMS.map(team => [team.id, evaluateTeamNeeds(team.id, league, rosterForNeeds)]),
   ) as Record<string, TeamNeeds>;
   let next = {
     ...league,
