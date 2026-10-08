@@ -512,7 +512,27 @@ export function prepareOffseasonMarket(
     .map(player => player.name)
     .sort((a, b) => a.localeCompare(b));
 
+  const marketKeys = [...expiringKeys];
   for (const playerKey of expiringKeys) next = setPlayerFreeAgent(next, playerKey, getPlayer);
+
+  // 选秀后每队最多15人。优先保留主角与本届首轮秀，超额的最低价值球员进入自由市场。
+  const protectedFirstRound = new Set(
+    next.选秀历史
+      .filter(pick => pick.entrySeason === next.赛季序号 + 1 && pick.round === 1)
+      .map(pick => pick.playerKey),
+  );
+  for (const team of TEAMS) {
+    let roster = getRoster(team.id, next);
+    while (roster.length > 15) {
+      const candidate = roster
+        .filter(player => player.name !== protagonistKey && !protectedFirstRound.has(player.name))
+        .sort((a, b) => playerMarketValue(a) - playerMarketValue(b) || a.name.localeCompare(b.name))[0];
+      if (!candidate) break;
+      next = setPlayerFreeAgent(next, candidate.name, getPlayer);
+      if (!marketKeys.includes(candidate.name)) marketKeys.push(candidate.name);
+      roster = getRoster(team.id, next);
+    }
+  }
 
   const needsByTeam = Object.fromEntries(
     TEAMS.map(team => [team.id, evaluateTeamNeeds(team.id, next, getRoster)]),
@@ -521,7 +541,7 @@ export function prepareOffseasonMarket(
     TEAMS.map(team => [team.id, getRoster(team.id, next).length]),
   ) as Record<string, number>;
 
-  for (const playerKey of expiringKeys) {
+  for (const playerKey of marketKeys.sort((a, b) => a.localeCompare(b))) {
     const player = getPlayer(playerKey, next);
     if (!player) continue;
     const offers = offerFromNeedSnapshot(next, player, '自由市场', needsByTeam, rosterCounts, 4);
