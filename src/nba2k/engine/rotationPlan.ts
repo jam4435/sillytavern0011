@@ -50,6 +50,24 @@ function playoffAdjusted(
   return next;
 }
 
+function capDynamicRegularSeasonTargets(
+  targets: Record<string, number>,
+  fixed: Record<string, number>,
+  cap: number,
+): Record<string, number> {
+  let current = { ...targets };
+  for (let pass = 0; pass < 8; pass++) {
+    const over = Object.entries(current)
+      .filter(([key, value]) => fixed[key] === undefined && value > cap + .05)
+      .map(([key]) => key);
+    if (!over.length) break;
+    const capped = { ...fixed };
+    for (const key of over) capped[key] = cap;
+    current = normalizeRotationTargets(current, capped);
+  }
+  return current;
+}
+
 function buildTeamPlan(
   match: MatchState,
   side: Side,
@@ -89,7 +107,12 @@ function buildTeamPlan(
       : 0;
   }
 
-  const targetMinutes = normalizeRotationTargets(base, fixed);
+  const normalized = normalizeRotationTargets(base, fixed);
+  const isPlayoffs = (options.phase ?? options.league?.阶段) === '季后赛';
+  const regularSeasonCap = Math.max(35.5, Math.min(37.5, 35.5 + (chart.coach.starLoad - 60) * .04));
+  const targetMinutes = isPlayoffs
+    ? normalized
+    : capDynamicRegularSeasonTargets(normalized, fixed, regularSeasonCap);
   const closingPriority: Record<string, number> = {};
   const garbagePriority: Record<string, number> = {};
   const entryMap = new Map(chart.entries.map(entry => [entry.key, entry]));
