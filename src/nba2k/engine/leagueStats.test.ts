@@ -80,6 +80,20 @@ describe('league-wide season statistics and awards', () => {
     }
   });
 
+  it('伤愈球星的可复出分钟限制在球队有足够健康轮换时应是硬上限', () => {
+    const league = createLeagueState('GSW');
+    league.伤病.push({
+      球员: 'Stephen Curry', 类型: '膝伤', 严重度: '严重',
+      受伤日期: league.日期, 预计复出: league.日期,
+      状态: '可复出', 分钟限制: 20,
+    });
+    const snapshot = buildLeagueRosterSnapshot(league);
+    const profile = buildLeagueSimulationProfiles(league, snapshot.byTeam).GSW;
+    const lines = simulateTeamSeasonLines('GSW', snapshot.byTeam.GSW, league, profile, 109, seededRng(8));
+    expect(lines['Stephen Curry']?.min).toBeLessThanOrEqual(20);
+    expect(Object.values(lines).reduce((sum, line) => sum + line.min, 0)).toBe(240);
+  });
+
   it('玩家比赛真实Box Score写入一次，同时后台其他28队有个人数据，不重复结算主角', () => {
     const league = createLeagueState('GSW');
     const snapshot = buildLeagueRosterSnapshot(league);
