@@ -5,6 +5,8 @@ import { emptyPlayerSeasonTotals } from './leagueStats';
 import { applyGameInjuries, advanceInjuryRecovery, gameInjuryRisk, type InjuryGameExposure } from './injury';
 import { advanceLeagueAfterGame, beginNextSeason, createLeagueState } from './season';
 import { buildLeagueSimulationProfiles } from './teamPower';
+import { getLeagueCalendar } from './calendar';
+import { getScheduledGame } from './season';
 import type { MatchState } from './types';
 
 function seedRng(seed = 1): () => number {
@@ -19,10 +21,11 @@ function dayAfter(date: string, days: number): string {
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
-function finishedMatch(): MatchState {
+function finishedMatch(index = 0): MatchState {
+  const scheduled = getScheduledGame('GSW', index)!;
   return {
-    进行中: false, 对阵: { 主队: 'GSW', 客队: 'CLE' },
-    节次: 4, 剩余秒数: 0, 投篮时钟: 0, 比分: { 主: 108, 客: 102 },
+    进行中: false, 对阵: { 主队: scheduled.home, 客队: scheduled.away },
+    节次: 4, 剩余秒数: 0, 投篮时钟: 0, 比分: scheduled.home === 'GSW' ? { 主: 108, 客: 102 } : { 主: 102, 客: 108 },
     球权: '主', 跳球胜方: '主',
     战术: {
       主: { offense: '五外', defense: '换防', pace: '快', helpIntensity: 50, rebound: '均衡' },
@@ -49,6 +52,8 @@ describe('InjuryManager', () => {
     expect(gameInjuryRisk({ ...baseline, recentAverageMinutes: 38 })).toBeGreaterThan(good);
     expect(gameInjuryRisk({ ...baseline, severeHistory: 2 })).toBeGreaterThan(good);
     expect(gameInjuryRisk({ ...baseline, recovering: true })).toBeGreaterThan(good);
+    expect(gameInjuryRisk({ ...baseline, restDays: 0 })).toBeGreaterThan(
+      gameInjuryRisk({ ...baseline, restDays: 2 }));
   });
 
   it('同一场比赛的确定性判定一致且幂等；伤停立即影响Availability与TeamPower', () => {
@@ -132,7 +137,7 @@ describe('InjuryManager', () => {
       const snapshot = buildLeagueRosterSnapshot(league);
       const profiles = buildLeagueSimulationProfiles(league, snapshot.byTeam);
       const next = advanceLeagueAfterGame(
-        league, 'GSW', finishedMatch(), seedRng(2300 + round), profiles, snapshot.byTeam,
+        league, 'GSW', finishedMatch(round), seedRng(2300 + round), profiles, snapshot.byTeam,
       ).league;
       expect(next.赛程索引).toBe(round + 1);
       for (const injury of next.伤病) injured.add(injury.球员);
@@ -146,6 +151,8 @@ describe('InjuryManager', () => {
     expect(injured.size).toBeLessThan(50);
     expect(Object.values(league.球员赛季统计).some(line => line.gp < 24)).toBe(true);
     // 回合产生的新伤病只影响未来轮次，赛果和赛季统计仍正常推进。
-    expect(league.战绩.ATL.胜 + league.战绩.ATL.负).toBe(24);
+    const atlGamesSoFar = getLeagueCalendar(0).byTeam.ATL
+      .filter(game => game.date < league.日期).length;
+    expect(league.战绩.ATL.胜 + league.战绩.ATL.负).toBe(atlGamesSoFar);
   });
 });
