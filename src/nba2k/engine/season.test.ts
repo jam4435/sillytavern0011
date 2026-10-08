@@ -4,6 +4,7 @@ import type { MatchState } from './types';
 import { buildLeagueRosterSnapshot } from '../utils/rosters';
 import { buildLeagueSimulationProfiles } from './teamPower';
 import { getLeagueCalendar } from './calendar';
+import { TEAMS } from '../data/teams';
 
 function finishedMatch(): MatchState {
   const scheduled = getScheduledGame('GSW', 0)!;
@@ -78,6 +79,34 @@ describe('SeasonEngine', () => {
     expect(next.league.日期).toBe(getScheduledGame('GSW', 0, 1)!.date);
     expect(next.nextGame?.index).toBe(0);
     expect(next.league.战绩.GSW.胜).toBe(0);
+  });
+
+  it('统一赛历推进完整82场后每队正好82场，胜负合计始终1230场且无漏赛', () => {
+    let league = createLeagueState('GSW');
+    let prior = 0;
+    for (let index = 0; index < 82; index++) {
+      const scheduled = getScheduledGame('GSW', index)!;
+      expect(league.日期).toBe(scheduled.date);
+      const homeGSW = scheduled.home === 'GSW';
+      const match = { ...finishedMatch(),
+        对阵: { 主队: scheduled.home, 客队: scheduled.away },
+        比分: homeGSW ? { 主: 108, 客: 99 } : { 主: 99, 客: 108 },
+      };
+      league = advanceLeagueAfterGame(league, 'GSW', match, () => .5).league;
+      const games = Object.values(league.战绩).reduce((sum, team) => sum + team.胜 + team.负, 0) / 2;
+      expect(games).toBeGreaterThan(prior);
+      prior = games;
+    }
+    for (const team of TEAMS) {
+      const row = league.战绩[team.id];
+      expect(row.胜 + row.负).toBe(82);
+    }
+    expect(prior).toBe(1230);
+    const wins = Object.values(league.战绩).reduce((total, standing) => total + standing.胜, 0);
+    const losses = Object.values(league.战绩).reduce((total, standing) => total + standing.负, 0);
+    expect(wins).toBe(1230);
+    expect(losses).toBe(1230);
+    expect(league.赛程索引).toBe(82);
   });
 
   it('第82场结束后按排名生成七场四胜季后赛首轮', () => {
