@@ -20,7 +20,9 @@ export function getTeam(id: string): TeamData | undefined {
 }
 
 export function getRoster(teamId: string): PlayerData[] {
-  return [...players.filter(p => p.team === teamId), ...[...customPlayers.values()].filter(p => p.team === teamId)].sort(
+  const custom = [...customPlayers.values()].filter(p => p.team === teamId);
+  const customKeys = new Set(custom.map(player => player.name));
+  return [...players.filter(p => p.team === teamId && !customKeys.has(p.name)), ...custom].sort(
     (a, b) => b.overall - a.overall,
   );
 }
@@ -53,8 +55,10 @@ export function getRosterForLeague(
   teamId: string,
   league: LeagueState | null | undefined,
 ): PlayerData[] {
+  const custom = [...customPlayers.values()].filter(player => player.team === teamId);
+  const customKeys = new Set(custom.map(player => player.name));
   const base = players
-    .filter(player => player.team === teamId)
+    .filter(player => player.team === teamId && !customKeys.has(player.name))
     .map(player => {
       if (!league) return player;
       const projected = projectLeaguePlayer(
@@ -66,7 +70,6 @@ export function getRosterForLeague(
     })
     .filter((player): player is PlayerData => Boolean(player));
 
-  const custom = [...customPlayers.values()].filter(player => player.team === teamId);
   return [...base, ...custom].sort((a, b) => b.overall - a.overall);
 }
 
