@@ -47,7 +47,7 @@ export function stripCodeFence(s: string): string {
   if (!s) return s;
   let t = String(s).trim();
   // 移除起始围栏，例如 ```json, ```, ~~~
-  t = t.replace(/^\s*(?:```|~~~)\[a-zA-Z0-9_-\]*\s*\r?\n/, '');
+  t = t.replace(/^\s*(?:```|~~~)[a-zA-Z0-9_-]*\s*\r?\n/, '');
   // 移除结束围栏
   t = t.replace(/\r?\n(?:```|~~~)\s*$/, '');
   return t.trim();
