@@ -112,6 +112,22 @@ function buildPostGamePatch(
   const baseLeague = stat.联盟 ?? createLeagueState(nextCareer.球队);
   const advanced = advanceLeagueAfterGame(baseLeague, nextCareer.球队, nextMatch);
   let nextLeague = advanceInjuryRecovery(advanced.league);
+  const previousRole = stat.生涯?.球队角色;
+  if (previousRole && previousRole !== nextCareer.球队角色) {
+    nextLeague = {
+      ...nextLeague,
+      故事钩子: [
+        ...nextLeague.故事钩子,
+        {
+          id: `coach-role-${nextLeague.赛程索引}-${nextCareer.球队角色}`,
+          type: '球队关系',
+          title: '教练调整球队角色',
+          detail: `根据最近比赛、教练信任与队内竞争，球队角色由“${previousRole}”调整为“${nextCareer.球队角色}”。这是前端规则结论，后续叙事只能解释原因，不得改判。`,
+          createdDate: nextLeague.日期,
+        },
+      ],
+    };
+  }
   const nextOffCourt = {
     ...stat.场外,
     日程: {
