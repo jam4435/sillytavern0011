@@ -6,6 +6,7 @@ import {
   replacementCoach,
   type CoachProfile,
 } from './coachProfile';
+import { seasonLabelFromOffset } from './lifecycle';
 
 export type LeaguePhase = '常规赛' | '季后赛' | '休赛期';
 export type PlayoffRound = '首轮' | '分区半决赛' | '分区决赛' | '总决赛';
@@ -57,7 +58,8 @@ export interface PlayoffState {
 }
 
 export interface LeagueState {
-  赛季: '2015-16';
+  赛季: string;
+  赛季序号: number;
   日期: string;
   阶段: LeaguePhase;
   赛程索引: number;
@@ -79,9 +81,10 @@ export interface ScheduledGame {
 }
 
 const REGULAR_SEASON_GAMES = 82;
-const START_DATE = '2015-10-27';
-const END_DATE = '2016-04-13';
-const PLAYOFF_START_DATE = '2016-04-16';
+const INITIAL_START_YEAR = 2015;
+const regularStartDate = (seasonOffset: number) => `${INITIAL_START_YEAR + seasonOffset}-10-27`;
+const regularEndDate = (seasonOffset: number) => `${INITIAL_START_YEAR + seasonOffset + 1}-04-13`;
+const playoffStartDate = (seasonOffset: number) => `${INITIAL_START_YEAR + seasonOffset + 1}-04-16`;
 const PLAYOFF_HOME_PATTERN = ['A', 'A', 'B', 'B', 'A', 'B', 'A'] as const;
 
 function dateToUtc(iso: string): Date {
@@ -102,10 +105,12 @@ function teamSeed(teamId: string): number {
   return [...teamId].reduce((sum, char) => sum + char.charCodeAt(0), 0);
 }
 
-export function scheduleDate(index: number): string {
+export function scheduleDate(index: number, seasonOffset = 0): string {
   const bounded = Math.max(0, Math.min(REGULAR_SEASON_GAMES - 1, index));
-  const span = daysBetween(START_DATE, END_DATE);
-  return addDays(START_DATE, Math.round(span * bounded / (REGULAR_SEASON_GAMES - 1)));
+  const start = regularStartDate(seasonOffset);
+  const end = regularEndDate(seasonOffset);
+  const span = daysBetween(start, end);
+  return addDays(start, Math.round(span * bounded / (REGULAR_SEASON_GAMES - 1)));
 }
 
 /**
@@ -113,7 +118,7 @@ export function scheduleDate(index: number): string {
  * 不把整份赛程塞进 stat_data；同一球队 + 同一索引永远得到同一场比赛。
  * 后续若导入真实 2015-16 赛程，只需替换本函数，不影响存档结构。
  */
-export function getScheduledGame(teamId: string, index: number): ScheduledGame | null {
+export function getScheduledGame(teamId: string, index: number, seasonOffset = 0): ScheduledGame | null {
   if (index < 0 || index >= REGULAR_SEASON_GAMES) return null;
   const opponents = TEAMS.filter(team => team.id !== teamId).sort((a, b) => a.id.localeCompare(b.id));
   if (!opponents.length) return null;
@@ -122,7 +127,7 @@ export function getScheduledGame(teamId: string, index: number): ScheduledGame |
   const isHome = (index + seed) % 2 === 0;
   return {
     index,
-    date: scheduleDate(index),
+    date: scheduleDate(index, seasonOffset),
     home: isHome ? teamId : opponent.id,
     away: isHome ? opponent.id : teamId,
     opponent: opponent.id,
@@ -141,10 +146,11 @@ function emptyStanding(): StandingRecord {
 }
 
 export function createLeagueState(playerTeamId: string): LeagueState {
-  const first = getScheduledGame(playerTeamId, 0);
+  const first = getScheduledGame(playerTeamId, 0, 0);
   return {
-    赛季: '2015-16',
-    日期: first?.date ?? START_DATE,
+    赛季: seasonLabelFromOffset(0),
+    赛季序号: 0,
+    日期: first?.date ?? regularStartDate(0),
     阶段: '常规赛',
     赛程索引: 0,
     战绩: Object.fromEntries(TEAMS.map(team => [team.id, emptyStanding()])),
@@ -155,7 +161,7 @@ export function createLeagueState(playerTeamId: string): LeagueState {
       type: '赛历',
       title: '揭幕周',
       detail: '2015-16 赛季开幕，媒体开始建立新赛季叙事。',
-      createdDate: START_DATE,
+      createdDate: regularStartDate(0),
     }],
     季后赛: null,
   };
