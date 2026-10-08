@@ -24,7 +24,7 @@ import {
   quoteMartialArtLearn,
 } from '../../utils/factionManager';
 import {
-  getAllPublicFactions,
+  getPlayablePublicFactions,
   getPublicFactionByName,
   getPublicFactionRelations,
   resolveFactionPublicState,
@@ -62,7 +62,7 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
   onClose,
   isBusy = false,
 }) => {
-  const allPublicFactions = useMemo(() => getAllPublicFactions(), []);
+  const allPublicFactions = useMemo(() => getPlayablePublicFactions(), []);
   const playerFactions = stats.factions || {};
   const joinedSectNames = Object.keys(playerFactions);
   const hasJoinedAny = joinedSectNames.length > 0;
@@ -86,7 +86,7 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
   const [actionError, setActionError] = useState<string | null>(null);
   const [isActionPending, setIsActionPending] = useState(false);
 
-  // 天下势力鉴赏与 17 门派玩法库彻底分离；可加入势力通过 sectId 桥接回现有玩法数据。
+  // 天下势力鉴赏只展示 23 个正式可玩势力；完整 canonical 世界组织目录继续留在资料层。
   const currentPublicFaction = useMemo(
     () => getPublicFactionByName(selectedSectName),
     [selectedSectName],
