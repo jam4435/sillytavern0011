@@ -1510,8 +1510,15 @@ async function executeCheckout(
     const journal = readHistoryCheckoutJournal();
     if (journal) {
       const trace = journal.verificationTrace;
-      const baselineHash = loadHistoryTree().nodes[nodeId]?.verification?.eventStateHash;
-      const finalHash = readCurrentVerification().eventStateHash;
+      // 故障诊断只能尽力读取，不得让二次读取失败遮盖原始 checkout 异常。
+      let baselineHash: string | undefined;
+      let finalHash = '读取失败';
+      try {
+        baselineHash = loadHistoryTree().nodes[nodeId]?.verification?.eventStateHash;
+        finalHash = readCurrentVerification().eventStateHash;
+      } catch {
+        // 聊天已被删除或变量尚未装载时，保留原始错误和已有 journal。
+      }
       const causeHint = !trace || !baselineHash
         ? '缺少分阶段诊断：请重试恢复，以记录 ERA 同步与事件脚本检查各自的结果。'
         : trace.eraEventStateHash !== baselineHash
