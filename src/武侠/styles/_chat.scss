@@ -685,6 +685,47 @@
   flex-direction: column;
 }
 
+.history-restore-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin: 0 1.25rem 0.45rem;
+  padding: 0.55rem 0.75rem;
+  color: #f3d9a3;
+  background: rgba(31, 22, 14, 0.95);
+  border: 1px solid rgba(187, 145, 77, 0.55);
+  border-radius: 5px;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.2);
+
+  &.failed {
+    color: #ffd2c5;
+    border-color: rgba(218, 103, 72, 0.6);
+  }
+
+  span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  button {
+    flex: 0 0 auto;
+    padding: 0.35rem 0.6rem;
+    color: inherit;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  @media (max-width: 768px) {
+    margin: 0 0 0.35rem;
+    flex-wrap: wrap;
+  }
+}
+
 .variable-change-dock {
   flex-shrink: 0;
   padding: 0 1.25rem 0.5rem;
