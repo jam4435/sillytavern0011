@@ -19,6 +19,7 @@ import { advancePeriodIfNeeded, buildCanonicalAssistant, settleAssistantResponse
 import { createDevelopment, defaultBadges, defaultHotZones, defaultTendencies, initialGroups } from './engine/development';
 import type { MatchState, OnCourtStatus, PlayerData, Side, SituationContext, StructuredTeamTactics, UpgradeGroupKey } from './engine/types';
 import {
+  buildLeagueRosterSnapshot,
   createLeaguePlayerResolver,
   getAllPlayersForLeague,
   getBasePlayer,
@@ -164,7 +165,8 @@ function ensureOffseasonDraft(
 ): { league: NonNullable<Nba2kStat['联盟']>; picks: ReturnType<typeof runAnnualDraft>['picks']; newlyCompleted: boolean } {
   const entrySeason = league.赛季序号 + 1;
   const alreadyCompleted = league.选秀历史.some(pick => pick.entrySeason === entrySeason);
-  const result = runAnnualDraft(league, getRosterForLeague);
+  const snapshot = buildLeagueRosterSnapshot(league);
+  const result = runAnnualDraft(league, getRosterForLeague, snapshot.byTeam);
   let nextLeague = result.league;
   const hookId = `draft-${entrySeason}`;
   if (!alreadyCompleted && result.picks.length && !nextLeague.故事钩子.some(hook => hook.id === hookId)) {
