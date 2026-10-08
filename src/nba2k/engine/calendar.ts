@@ -15,7 +15,6 @@ export interface LeagueCalendar {
   byTeam: Record<string, LeagueCalendarGame[]>;
 }
 
-const DAYS_IN_SEASON = 170; // 10月27日至次年4月13日；闰年由实际日期计算
 const cache = new Map<number, LeagueCalendar>();
 function dateToTime(date: string): number {
   return Date.parse(`${date}T12:00:00Z`);
@@ -232,4 +231,11 @@ export function getLeagueCalendar(seasonOffset = 0): LeagueCalendar {
 export function daysBetweenGames(previousDate: string | null, currentDate: string): number | null {
   if (!previousDate) return null;
   return Math.max(0, Math.round((dateToTime(currentDate) - dateToTime(previousDate)) / 86_400_000) - 1);
+}
+
+/** 本场与本队上一场之间完整休息的自然日；0代表背靠背。 */
+export function getTeamRestDays(teamId: string, gameDate: string, seasonOffset = 0): number | null {
+  const fixtures = getLeagueCalendar(seasonOffset).byTeam[teamId] ?? [];
+  const index = fixtures.findIndex(game => game.date === gameDate);
+  return index > 0 ? daysBetweenGames(fixtures[index - 1].date, gameDate) : null;
 }
