@@ -33,6 +33,7 @@ const root = process.cwd();
 const sourceRoot = path.join(root, '世界书');
 const outputRoot = path.join(root, 'src', '事件脚本', 'generated', 'event-data');
 const openingEventSummaryPath = path.join(root, 'src', '武侠', 'data', '事件信息汇总.json');
+const followupLocationsPath = path.join(root, 'src', '武侠', 'data', '后续事件地点.generated.json');
 const RUNTIME_KEY_VERSION = EVENT_RUNTIME_KEY_VERSION;
 const SHARD_MAX_EVENTS = 50;
 const SHARD_MAX_BYTES = 350 * 1024;
@@ -395,6 +396,24 @@ function writeOpeningEventSummary(events) {
   return summary;
 }
 
+function writeFollowupLocationIndex(events) {
+  const byKey = new Map(events.map(event => [event.runtimeKey, event]));
+  const index = Object.fromEntries(
+    events.flatMap(event => {
+      const targets = Object.fromEntries(
+        Object.keys(event.followups).flatMap(targetKey => {
+          const location = byKey.get(targetKey)?.location;
+          return location ? [[targetKey, location]] : [];
+        }),
+      );
+      return Object.keys(targets).length > 0 ? [[event.runtimeKey, targets]] : [];
+    }),
+  );
+  fs.mkdirSync(path.dirname(followupLocationsPath), { recursive: true });
+  fs.writeFileSync(followupLocationsPath, `${JSON.stringify(index, null, 2)}\n`);
+  return Object.keys(index).length;
+}
+
 function createShards(events) {
   const shards = [];
   let current = [];
@@ -556,10 +575,12 @@ function main() {
   const { events, unresolvedReferences } = collectEvents();
   const manifest = writeAssets(events, unresolvedReferences);
   const openingEventSummary = writeOpeningEventSummary(events);
+  const followupLocationSources = writeFollowupLocationIndex(events);
   console.log(
     `生成事件运行时资产: ${manifest.eventCount} 个事件, ${manifest.shardCount} 个分片, ${manifest.checkpoints.length} 个检查点`,
   );
   console.log(`同步开局事件汇总: ${openingEventSummary.length} 个普通事件`);
+  console.log(`同步后续事件地点索引: ${followupLocationSources} 个来源事件`);
   console.log(`manifest hash: ${manifest.contentHash}`);
   if (unresolvedReferences.length > 0) {
     console.warn(`警告: ${unresolvedReferences.length} 条后续事件引用在当前源文件中找不到目标，已保留为非图边。`);
