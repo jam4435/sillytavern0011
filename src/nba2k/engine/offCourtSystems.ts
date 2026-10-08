@@ -139,8 +139,24 @@ export function collectOffCourtHooks(career: CareerState, offCourt: OffCourtStat
 
 export function advanceInjuryRecovery(league: LeagueState): LeagueState {
   const injuries = league.伤病.map(injury => {
-    if (injury.状态 === '可复出') return injury;
-    if (league.日期 >= injury.预计复出) return { ...injury, 状态: '可复出' as const };
+    const initialLimit = injury.严重度 === '严重' ? 18 : injury.严重度 === '中等' ? 24 : 30;
+    const rampStep = injury.严重度 === '严重' ? 4 : injury.严重度 === '中等' ? 5 : 6;
+
+    if (injury.状态 === '可复出') {
+      if (typeof injury.分钟限制 !== 'number') return injury;
+      const nextLimit = injury.分钟限制 + rampStep;
+      return {
+        ...injury,
+        分钟限制: nextLimit >= 36 ? null : Math.min(36, nextLimit),
+      };
+    }
+    if (league.日期 >= injury.预计复出) {
+      return {
+        ...injury,
+        状态: '可复出' as const,
+        分钟限制: injury.分钟限制 ?? initialLimit,
+      };
+    }
     return { ...injury, 状态: '恢复中' as const };
   });
   const recoveryHooks = injuries
@@ -149,7 +165,7 @@ export function advanceInjuryRecovery(league: LeagueState): LeagueState {
       id: `injury-return-${injury.球员}-${injury.预计复出}`,
       type: '伤病' as const,
       title: `${injury.球员} 可以复出`,
-      detail: `${injury.类型} 已达到预计恢复日期，可以进入复出/限时出场决策。`,
+      detail: `${injury.类型} 已达到预计恢复日期，当前复出分钟限制为${injury.分钟限制 ?? '无'}；限制会随后续比赛恢复逐步放宽。`,
       createdDate: league.日期,
     }));
   return { ...league, 伤病: injuries, 故事钩子: [...league.故事钩子, ...uniqueHooks(league.故事钩子, recoveryHooks)] };
