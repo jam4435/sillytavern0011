@@ -1,12 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { createLeagueState } from './season';
+import { beginNextSeason, createLeagueState } from './season';
+import { runAnnualDraft } from './draft';
+import { prepareOffseasonMarket } from './transactions';
+import { TEAMS } from '../data/teams';
 import {
   buildLeagueSimulationProfiles,
   deriveTeamPowerRaw,
   simulateLowFidelityGame,
   type TeamSimulationProfile,
 } from './teamPower';
-import { buildLeagueRosterSnapshot } from '../utils/rosters';
+import {
+  buildLeagueRosterSnapshot,
+  getAllPlayersForLeague,
+  getPlayerForLeague,
+  getRosterForLeague,
+} from '../utils/rosters';
 
 function seededRng(seed = 1): () => number {
   let state = seed >>> 0;
@@ -18,6 +26,45 @@ function seededRng(seed = 1): () => number {
 
 function cloneProfile(profile: TeamSimulationProfile, patch: Partial<TeamSimulationProfile>): TeamSimulationProfile {
   return { ...profile, ...patch };
+}
+
+/**
+ * 只用于回归压力测试的对称联盟赛历：
+ * 30队循环轮转，82轮每队出赛一次，所有赛果仍走正式低精度 GameSim。
+ * 第7步的生产赛程生成器上线后可改用生产赛程；不以2015固定胜场作为答案。
+ */
+function simulateSeasonStandings(
+  profiles: Record<string, TeamSimulationProfile>,
+  seed: number,
+): ReturnType<typeof createLeagueState>['战绩'] {
+  const teamIds = TEAMS.map(team => team.id).sort();
+  const standings = Object.fromEntries(teamIds.map(id => [id, {
+    胜: 0, 负: 0, 得分: 0, 失分: 0, 连胜: 0,
+  }])) as ReturnType<typeof createLeagueState>['战绩'];
+  const rng = seededRng(seed);
+  let order = [...teamIds];
+  for (let round = 0; round < 82; round++) {
+    for (let i = 0; i < 15; i++) {
+      const first = order[i];
+      const second = order[29 - i];
+      const [home, away] = (round + i) % 2 === 0 ? [first, second] : [second, first];
+      const [homeScore, awayScore] = simulateLowFidelityGame(home, away, profiles, rng);
+      const homeWon = homeScore > awayScore;
+      const homeRow = standings[home];
+      const awayRow = standings[away];
+      homeRow.胜 += Number(homeWon);
+      homeRow.负 += Number(!homeWon);
+      homeRow.得分 += homeScore;
+      homeRow.失分 += awayScore;
+      awayRow.胜 += Number(!homeWon);
+      awayRow.负 += Number(homeWon);
+      awayRow.得分 += awayScore;
+      awayRow.失分 += homeScore;
+    }
+    // Circle method：固定首队，其他29队旋转，不靠任何球队历史实力分组。
+    order = [order[0], order[29], ...order.slice(1, 29)];
+  }
+  return standings;
 }
 
 describe('dynamic TeamPowerEngine', () => {
@@ -158,4 +205,91 @@ describe('dynamic TeamPowerEngine', () => {
     expect(raw.offenseSkill).toBeGreaterThan(50);
     expect(raw.defenseSkill).toBeGreaterThan(50);
   });
+  it('交易影响真实长期胜场与排名，不仅仅是TeamPower数值变化', () => {
+    const original = createLeagueState('GSW');
+    const afterTrade = createLeagueState('GSW');
+    afterTrade.球员归属['Stephen Curry'] = 'PHI';
+    const beforeProfiles = buildLeagueSimulationProfiles(original, buildLeagueRosterSnapshot(original).byTeam);
+    const afterProfiles = buildLeagueSimulationProfiles(afterTrade, buildLeagueRosterSnapshot(afterTrade).byTeam);
+
+    const tally = { beforeGSW: 0, afterGSW: 0, beforePHI: 0, afterPHI: 0 };
+    // 同一批82场赛程与随机数，避免抽样波动盖过球员交易的因果效应。
+    for (let sample = 0; sample < 10; sample++) {
+      const seed = 4800 + sample;
+      const before = simulateSeasonStandings(beforeProfiles, seed);
+      const after = simulateSeasonStandings(afterProfiles, seed);
+      tally.beforeGSW += before.GSW.胜;
+      tally.afterGSW += after.GSW.胜;
+      tally.beforePHI += before.PHI.胜;
+      tally.afterPHI += after.PHI.胜;
+    }
+    console.info('[nba2k Curry trade 10x82-game standings]', tally);
+    expect(tally.beforeGSW - tally.afterGSW).toBeGreaterThan(10);
+    expect(tally.afterPHI - tally.beforePHI).toBeGreaterThan(10);
+  });
+
+  it('连续8年赛季赛果→选秀→自由市场→退役成长会重排联盟强弱', () => {
+    let league = createLeagueState('GSW');
+    let openingProfiles: ReturnType<typeof buildLeagueSimulationProfiles> | null = null;
+    let closingProfiles: ReturnType<typeof buildLeagueSimulationProfiles> | null = null;
+    const leaders: string[] = [];
+    const leagueIds = TEAMS.map(team => team.id);
+
+    for (let year = 0; year <= 8; year++) {
+      const snapshot = buildLeagueRosterSnapshot(league);
+      const profiles = buildLeagueSimulationProfiles(league, snapshot.byTeam);
+      const standings = simulateSeasonStandings(profiles, 6900 + year);
+      for (const teamId of leagueIds) {
+        expect(standings[teamId].胜 + standings[teamId].负).toBe(82);
+      }
+
+      const strongest = [...leagueIds].sort((a, b) => profiles[b].netRating - profiles[a].netRating);
+      leaders.push(strongest[0]);
+      expect(standings[strongest[0]].胜).toBeGreaterThan(standings[strongest[29]].胜);
+      if (year === 0) openingProfiles = profiles;
+      if (year === 8) {
+        closingProfiles = profiles;
+        break;
+      }
+
+      // 用当年真实模拟胜负决定下一届选秀顺位，不能人工灌入历史名次。
+      league = { ...league, 阶段: '休赛期', 战绩: standings };
+      const drafted = runAnnualDraft(league, getRosterForLeague, snapshot.byTeam);
+      const market = prepareOffseasonMarket(
+        drafted.league,
+        '__test_no_player_protagonist__',
+        getPlayerForLeague,
+        getRosterForLeague,
+        getAllPlayersForLeague,
+      );
+      league = beginNextSeason(market.league, 'GSW').league;
+    }
+
+    expect(league.赛季序号).toBe(8);
+    expect(Object.keys(league.生成球员)).toHaveLength(480);
+    expect(league.选秀历史).toHaveLength(480);
+    const latest = buildLeagueRosterSnapshot(league);
+    expect(Math.max(...leagueIds.map(id => latest.byTeam[id].length))).toBeLessThanOrEqual(15);
+    expect(leagueIds.flatMap(id => latest.byTeam[id]).filter(player => player.name.startsWith('Generated_')).length)
+      .toBeGreaterThan(100);
+    // Tim Duncan在第8年已越过44岁硬退役线；旧核心不能永久留在阵容里。
+    expect(leagueIds.flatMap(id => latest.byTeam[id]).some(player => player.name === 'Tim Duncan')).toBe(false);
+
+    const before = openingProfiles!;
+    const after = closingProfiles!;
+    const initialTopFive = [...leagueIds]
+      .sort((a, b) => before[b].netRating - before[a].netRating)
+      .slice(0, 5);
+    const futureTopFive = [...leagueIds]
+      .sort((a, b) => after[b].netRating - after[a].netRating)
+      .slice(0, 5);
+    const changedPower = leagueIds.filter(id => Math.abs(after[id].netRating - before[id].netRating) > 2);
+    console.info('[nba2k 8-year power turnover]', {
+      initialTopFive, futureTopFive, changedPower: changedPower.length, leaders,
+      generatedActive: leagueIds.flatMap(id => latest.byTeam[id]).filter(player => player.name.startsWith('Generated_')).length,
+    });
+    expect(futureTopFive.some(teamId => !initialTopFive.includes(teamId))).toBe(true);
+    expect(changedPower.length).toBeGreaterThanOrEqual(6);
+  });
+
 });
