@@ -631,10 +631,7 @@ export function runCpuTradeDeadline(
           status: '待定',
           outgoingPlayerKey: outgoing.name,
         };
-        next = {
-          ...next,
-          市场报价: [...next.市场报价.filter(item => item.playerKey !== target.name), offer],
-        };
+        // CPU交易直接走同一落地器，但不占用“玩家可交互市场报价”列表。
         next = applyMarketOffer(next, offer, getPlayer);
         usedTeams.add(buyer.team.id);
         usedTeams.add(seller.team.id);
