@@ -71,6 +71,7 @@ import {
 } from './engine/transactions';
 import type { MarketOffer } from './engine/transactionTypes';
 import { runAnnualDraft } from './engine/draft';
+import { buildLeagueSimulationProfiles } from './engine/teamPower';
 
 function freshStatus(): OnCourtStatus {
   return {
@@ -231,7 +232,17 @@ function buildPostGamePatch(
   if (!stat.场外) return patch;
 
   const baseLeague = stat.联盟 ?? createLeagueState(nextCareer.球队);
-  const advanced = advanceLeagueAfterGame(baseLeague, nextCareer.球队, nextMatch);
+  // 后台29队与非玩家季后赛系列赛共用当前世界Roster的即时球队画像。
+  // 不持久化球队总评；交易/伤病/成长/退役/新秀会在下一轮自然改变画像。
+  const leagueSnapshot = buildLeagueRosterSnapshot(baseLeague);
+  const simulationProfiles = buildLeagueSimulationProfiles(baseLeague, leagueSnapshot.byTeam);
+  const advanced = advanceLeagueAfterGame(
+    baseLeague,
+    nextCareer.球队,
+    nextMatch,
+    Math.random,
+    simulationProfiles,
+  );
   let nextLeague = advanceInjuryRecovery(advanced.league);
 
   const deadlineHookId = `cpu-deadline-market-${nextLeague.赛季}`;
