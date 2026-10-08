@@ -114,6 +114,7 @@ function buildTeamPlan(
     rotationDepth: profile?.rotationDepth ?? 10,
     smallBallAffinity: profile?.smallBallAffinity ?? 50,
     playoffShortening: profile?.playoffShortening ?? .18,
+    staggerGroups: profile?.staggerGroups,
     contextMode: '正常',
   };
 }
