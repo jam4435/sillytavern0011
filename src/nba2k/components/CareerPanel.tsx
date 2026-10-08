@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { BADGE_REGISTRY, GROUP_KEYS, GROUP_LABELS, HOT_ZONE_IDS, potentialLevelCap, upgradeCost } from '../engine/development';
 import type { UpgradeGroupKey } from '../engine/types';
 import type { CareerState, LeagueState, OffCourtState } from '../utils/statReader';
-import { getTeam } from '../utils/rosters';
+import { getPlayerForLeague, getTeam } from '../utils/rosters';
 import { careerPhase } from '../engine/lifecycle';
 import type { TeamSimulationProfile } from '../engine/teamPower';
 import { leaderboard, type LeaderboardCategory } from '../engine/leagueStats';
+import { careerLeaders, playerCareerAchievements } from '../engine/history';
 
 export function CareerPanel(props: {
   career: CareerState | null; offCourt: OffCourtState | null; league: LeagueState | null;
@@ -18,6 +19,7 @@ export function CareerPanel(props: {
   const [showDevelopment, setShowDevelopment] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showLeagueLeaders, setShowLeagueLeaders] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const team = career ? getTeam(career.球队) : undefined;
   const points = career?.发展.growthPoints ?? career?.成长点 ?? 0;
   const cap = potentialLevelCap(career?.能力.potential ?? 75);
@@ -42,6 +44,16 @@ export function CareerPanel(props: {
   const draftPreview = [...latestDraft.slice(0, 5), ...latestDraft.filter(pick => pick.teamId === career?.球队)]
     .filter((pick, index, list) => list.findIndex(item => item.playerKey === pick.playerKey) === index);
   const seasonAwards = league?.奖项记录?.[league.奖项记录.length - 1];
+  const history = league?.历史档案;
+  const protagonistHistory = history && career
+    ? playerCareerAchievements(history, league?.奖项记录 ?? [], career.附身球员) : null;
+  const historicalCategories = [
+    { key: 'pts' as const, label: '得分' },
+    { key: 'reb' as const, label: '篮板' },
+    { key: 'ast' as const, label: '助攻' },
+    { key: 'stl' as const, label: '抢断' },
+    { key: 'blk' as const, label: '盖帽' },
+  ];
   const statCategories: { key: LeaderboardCategory; title: string }[] = [
     { key: 'pts', title: '得分' }, { key: 'reb', title: '篮板' },
     { key: 'ast', title: '助攻' }, { key: 'stl', title: '抢断' }, { key: 'blk', title: '盖帽' },
@@ -80,6 +92,54 @@ export function CareerPanel(props: {
         {seasonAwards.allNBA.map((keys, index) => <div key={index}>最佳阵容第{index + 1}阵：{keys.join(' / ') || '—'}</div>)}
         {seasonAwards.allDefense.map((keys, index) => <div key={index}>最佳防守第{index + 1}阵：{keys.join(' / ') || '—'}</div>)}
       </div>}
+    </div>}
+    {history && <div className="cp-section league-history">
+      <div className="cp-section-title">联盟历史档案</div>
+      <div className="cp-row">
+        已封存 {history.lastCountedSeason ? '截至 ' + history.lastCountedSeason : '尚无完整赛季'} · 
+        {history.championships.length} 届冠军 · {Object.keys(history.career).length} 名球员生涯账本
+        <button type="button" onClick={() => setShowHistory(value => !value)}>
+          {showHistory ? '收起历史' : '查看历史 / 纪录 / 里程碑'}
+        </button>
+      </div>
+      {protagonistHistory?.stats && <div className="cp-row">
+        <b>我的生涯累计</b> · {protagonistHistory.stats.seasons}季 · {protagonistHistory.stats.gp}场 ·
+        {protagonistHistory.stats.pts}分 / {protagonistHistory.stats.reb}板 /
+        {protagonistHistory.stats.ast}助 · MVP {protagonistHistory.mvp}次 ·
+        DPOY {protagonistHistory.dpoy}次 · 最佳阵容 {protagonistHistory.allNBA}次
+      </div>}
+      {showHistory && <>
+        <div className="cp-row"><b>历届总冠军（最近10届）</b>
+          {[...history.championships].reverse().slice(0, 10).map(row =>
+            <div key={row.season}>{row.season} · {getTeam(row.champion)?.cn ?? row.champion}
+              （亚军 {getTeam(row.runnerUp)?.cn ?? row.runnerUp}）</div>)}
+          {!history.championships.length && <div>暂无已决出的总冠军</div>}
+        </div>
+        <div className="cp-row"><b>历史常规赛场均纪录（至少30场）</b>
+          {historicalCategories.map(({key,label}) => {
+            const record = history.records[key];
+            return <div key={key}>{label} · {record
+              ? `${record.playerKey} ${(record.total / record.gp).toFixed(1)} /场（${record.season}）`
+              : '暂无'}</div>;
+          })}
+        </div>
+        <div className="cp-row"><b>历史生涯累计排名</b>
+          {historicalCategories.map(({key,label}) => <div key={key}>
+            {label}：{careerLeaders(history, key, 5).map((row, index) =>
+              `${index+1}.${row.playerKey} ${row.total}${getPlayerForLeague(row.playerKey, league) ? '' : '（已退役）'}`
+            ).join(' / ') || '暂无'}</div>)}
+        </div>
+        <div className="cp-row"><b>近年个人荣誉</b>
+          {[...(league?.奖项记录 ?? [])].reverse().slice(0, 5).map(row =>
+            <div key={row.season}>{row.season} · MVP {row.mvp ?? '空缺'} ·
+              最佳新秀 {row.rookie ?? '空缺'} · DPOY {row.dpoy ?? '空缺'}</div>)}
+        </div>
+        <div className="cp-row"><b>最近里程碑</b>
+          {[...history.milestones].reverse().slice(0, 8).map(row =>
+            <div key={row.id}>{row.season} · {row.playerKey} · {row.category.toUpperCase()} 达到 {row.threshold}</div>)}
+          {!history.milestones.length && <div>暂无</div>}
+        </div>
+      </>}
     </div>}
     {draftPreview.length > 0 && <div className="cp-section draft-board"><div className="cp-section-title">最近选秀</div>
       {draftPreview.map(pick => <div key={pick.playerKey} className="cp-row">
