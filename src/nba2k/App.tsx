@@ -127,6 +127,33 @@ function playerResolverForStat(stat: Nba2kStat): (key: string) => PlayerData | u
   return key => career && key === career.附身球员 ? protagonist : leagueResolver(key);
 }
 
+function contractExpirySeason(expiresAfterSeason: number): string {
+  return seasonLabelFromOffset(expiresAfterSeason + 1);
+}
+
+function roleAfterRosterChange(
+  playerKey: string,
+  teamId: string,
+  league: NonNullable<Nba2kStat['联盟']>,
+): NonNullable<Nba2kStat['生涯']>['球队角色'] {
+  const roster = getRosterForLeague(teamId, league).sort((a, b) => b.overall - a.overall);
+  const rank = roster.findIndex(player => player.name === playerKey);
+  if (rank <= 1 && rank >= 0) return '核心';
+  if (rank <= 4 && rank >= 0) return '首发';
+  if (rank === 5) return '第六人';
+  if (rank <= 9 && rank >= 0) return '轮换';
+  return '边缘轮换';
+}
+
+function offerSummary(offer: MarketOffer): string {
+  const team = getTeam(offer.teamId)?.cn ?? offer.teamId;
+  if (offer.type === '交易') {
+    const outgoing = offer.outgoingPlayerKey ? (getBasePlayer(offer.outgoingPlayerKey)?.cn ?? offer.outgoingPlayerKey) : '待定筹码';
+    return `${team}：交易，主要回报 ${outgoing}，需求分${Math.round(offer.needScore)}，适配${Math.round(offer.fitScore)}`;
+  }
+  return `${team}：${offer.type} ${offer.years}年 / 年薪${Math.round(offer.annualSalary / 10_000)}万美元，适配${Math.round(offer.fitScore)}`;
+}
+
 function generatedText(result: string | GenerateToolCallResult): string {
   return (typeof result === 'string' ? result : result.content).trim();
 }
