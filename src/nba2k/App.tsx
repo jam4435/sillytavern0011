@@ -18,10 +18,7 @@ import { resolveAction } from './engine/resolveAction';
 import { advancePeriodIfNeeded, buildCanonicalAssistant, settleAssistantResponse } from './engine/settlement';
 import { createDevelopment, defaultBadges, defaultHotZones, defaultTendencies, initialGroups } from './engine/development';
 import type { MatchState, OnCourtStatus, Side, SituationContext, StructuredTeamTactics, UpgradeGroupKey } from './engine/types';
-import {
-  getPlayer, getRoster, getTeam, pickStarters, registerCustomPlayer,
-  starterEntriesFromPlayers, starterEntriesFromPlayersWith,
-} from './utils/rosters';
+import { getPlayer, getRoster, getTeam, registerCustomPlayer } from './utils/rosters';
 import type { Nba2kStat } from './utils/statReader';
 import { getLastAssistantNarrative, isInMatch, parseOptions, readStat, stripNarrative } from './utils/statReader';
 import { runTurnTransaction } from './utils/turnTransaction';
@@ -36,6 +33,7 @@ import { defaultTeamTactics } from './engine/tendencies';
 import { applyAutomaticRotation } from './engine/rotation';
 import { createRotationPlan } from './engine/rotationPlan';
 import { getPlayerAvailability } from './engine/availability';
+import { buildDynamicDepthChart } from './engine/depthChart';
 
 function freshStatus(): OnCourtStatus {
   return {
@@ -361,19 +359,20 @@ const App: React.FC = () => {
 
     const protagonistStarts = career.球队角色 === '首发' || career.球队角色 === '核心';
     const protagonistAvailable = getPlayerAvailability(protagonistKey, league).available;
-    const entriesFor = (teamId: string, roster: typeof homeAvailable) =>
-      teamId === myTeamId && protagonistStarts && protagonistAvailable
-        ? starterEntriesFromPlayersWith(roster, protagonistKey)
-        : starterEntriesFromPlayers(roster);
-    const homeEntries = entriesFor(homeId, homeAvailable);
-    const awayEntries = entriesFor(awayId, awayAvailable);
+    const homeTactics = defaultTeamTactics(homeId);
+    const awayTactics = defaultTeamTactics(awayId);
+    const entriesFor = (teamId: string, roster: typeof homeAvailable, tactics: StructuredTeamTactics) =>
+      buildDynamicDepthChart(roster, {
+        tactics,
+        forcedStarter: teamId === myTeamId && protagonistStarts && protagonistAvailable ? protagonistKey : null,
+      }).starters;
+    const homeEntries = entriesFor(homeId, homeAvailable, homeTactics);
+    const awayEntries = entriesFor(awayId, awayAvailable, awayTactics);
     const homeCenter = getPlayer(homeEntries.find(entry => entry.pos === 'C')?.key ?? homeEntries.at(-1)?.key ?? '');
     const awayCenter = getPlayer(awayEntries.find(entry => entry.pos === 'C')?.key ?? awayEntries.at(-1)?.key ?? '');
     const jumpScore = (player: typeof homeCenter) =>
       player ? player.height_cm * 0.6 + player.attrs.strength * 0.3 + player.overall * 0.1 : 0;
     const openingPossession: Side = jumpScore(homeCenter) >= jumpScore(awayCenter) ? '主' : '客';
-    const homeTactics = defaultTeamTactics(homeId);
-    const awayTactics = defaultTeamTactics(awayId);
     const offenseEntries = openingPossession === '主' ? homeEntries : awayEntries;
     const defenseEntries = openingPossession === '主' ? awayEntries : homeEntries;
     const offenseTactics = openingPossession === '主' ? homeTactics : awayTactics;
