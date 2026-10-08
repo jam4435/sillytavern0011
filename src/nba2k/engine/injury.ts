@@ -16,6 +16,8 @@ export interface InjuryGameExposure {
   lines: LeaguePlayerSeasonStats;
   /** 高精度玩家比赛中真实剩余体力（其他球队由分钟/耐力估算）。 */
   remainingStamina?: Record<string, number>;
+  /** 0表示前一天刚打过比赛；由统一日历计算。 */
+  restDaysByTeam?: Record<string, number | null>;
 }
 
 const DAY_MS = 86_400_000;
@@ -66,6 +68,7 @@ export function gameInjuryRisk(input: {
   recentAverageMinutes?: number;
   severeHistory?: number;
   recovering?: boolean;
+  restDays?: number | null;
 }): number {
   const { minutes, durability, age, stamina } = input;
   if (minutes <= 0) return 0;
@@ -77,8 +80,9 @@ export function gameInjuryRisk(input: {
   const chronic = clamp(1 + (input.severeHistory ?? 0) * .13, 1, 1.52);
   const workload = clamp(1 + Math.max(0, (input.recentAverageMinutes ?? minutes) - 32) * .035, 1, 1.3);
   const returnRisk = input.recovering ? 1.16 : 1;
+  const restFactor = input.restDays === 0 ? 1.29 : input.restDays === 1 ? 1.07 : 1;
   return clamp(.00285 * exposure * durabilityFactor * ageFactor * fatigueFactor
-    * workload * chronic * returnRisk, 0, .025);
+    * workload * chronic * returnRisk * restFactor, 0, .025);
 }
 
 const INJURY_TYPES = {
@@ -144,6 +148,7 @@ export function applyGameInjuries(
         recentAverageMinutes: avgMinutes,
         severeHistory,
         recovering: existing?.状态 === '可复出' && typeof existing.分钟限制 === 'number',
+        restDays: exposure.restDaysByTeam?.[line.teamId],
       });
       if (unit(`${incidentId}:injury`) >= risk) continue;
       const injury = chooseInjury(player, league, exposure);
