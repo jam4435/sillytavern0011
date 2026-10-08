@@ -27,6 +27,37 @@ export function getPlayer(key: string): PlayerData | undefined {
   return customPlayers.get(key) ?? players.find(p => p.name === key);
 }
 
+/** 从已筛选可用名单中按位置挑选首发。 */
+export function starterEntriesFromPlayers(roster: PlayerData[]): { key: string; pos: Position }[] {
+  const entries: { key: string; pos: Position }[] = [];
+  for (const pos of POSITIONS) {
+    const candidate = roster.find(
+      p => !entries.some(entry => entry.key === p.name) && (p.pos === pos || p.secondaryPos === pos),
+    );
+    if (candidate) entries.push({ key: candidate.name, pos });
+  }
+  for (const player of roster) {
+    if (entries.length >= 5) break;
+    if (!entries.some(entry => entry.key === player.name)) entries.push({ key: player.name, pos: player.pos });
+  }
+  return entries;
+}
+
+/** 保证指定球员在给定首发模板中，优先顶替同位置球员。 */
+export function starterEntriesFromPlayersWith(
+  roster: PlayerData[],
+  protagonistKey: string,
+): { key: string; pos: Position }[] {
+  const entries = starterEntriesFromPlayers(roster);
+  if (entries.some(e => e.key === protagonistKey)) return entries;
+  const hero = roster.find(player => player.name === protagonistKey);
+  if (!hero) return entries;
+  const idx = entries.findIndex(e => e.pos === hero.pos);
+  const slot = idx >= 0 ? idx : entries.length - 1;
+  entries[slot] = { key: protagonistKey, pos: entries[slot]?.pos ?? hero.pos };
+  return entries;
+}
+
 /** 按位置挑选首发五人：每个位置取该位置（含副位置）评分最高者，不重复 */
 export function pickStarters(teamId: string): PlayerData[] {
   const roster = getRoster(teamId);
