@@ -169,6 +169,8 @@ export interface OnCourtStatus {
   进攻篮板: number;
   防守篮板: number;
   上场秒数: number;
+  /** 仅用于教练评价降权；技术统计仍完整计入。 */
+  垃圾时间秒数?: number;
   手感: '热' | '平' | '冷';
   连续命中: number;
   连续打铁: number;
