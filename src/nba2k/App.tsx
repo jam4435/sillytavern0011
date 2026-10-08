@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ActionChoice, SubstitutionChoice } from './components/ActionPanel';
 import { ActionPanel } from './components/ActionPanel';
 import { BoxScore } from './components/BoxScore';
@@ -1256,6 +1256,20 @@ const App: React.FC = () => {
     [stat, sendTurn],
   );
 
+  const currentTeamPower = useMemo(() => {
+    if (!stat.联盟 || !stat.生涯) return null;
+    const snapshot = buildLeagueRosterSnapshot(stat.联盟);
+    const profiles = buildLeagueSimulationProfiles(stat.联盟, snapshot.byTeam);
+    const profile = profiles[stat.生涯.球队];
+    if (!profile) return null;
+    const ranking = Object.values(profiles).sort((a, b) => b.power - a.power || b.netRating - a.netRating);
+    return {
+      profile,
+      rank: ranking.findIndex(item => item.teamId === profile.teamId) + 1,
+      total: ranking.length,
+    };
+  }, [stat.联盟, stat.生涯]);
+
   // ---------- 渲染 ----------
 
   if (stat.validationErrors.length > 0) {
@@ -1336,6 +1350,7 @@ const App: React.FC = () => {
           career={stat.生涯}
           offCourt={stat.场外}
           league={stat.联盟}
+          teamPower={currentTeamPower}
           disabled={busy}
           onAction={t => void sendTurn(t)}
           onStartMatch={() => void handleStartMatch()}
