@@ -61,6 +61,29 @@ describe('persistent CoachProfile', () => {
     expect(coached.diagnostics.offenseScores.低位 - base.diagnostics.offenseScores.低位).toBeLessThan(7);
   });
 
+  it('新帅理念会随磨合场次逐步增强，而不是换帅后一场完全覆盖', () => {
+    const roster = getRoster('MEM');
+    const base = deriveTeamStyle(roster);
+    const fresh = stubborn({
+      id: 'fresh-coach',
+      generation: 1,
+      tenureGames: 0,
+      offensePreference: '五外',
+      defensePreference: '换防',
+      pacePreference: '快',
+    });
+    const settled = { ...fresh, tenureGames: 20 };
+
+    const early = deriveTeamStyle(roster, fresh);
+    const late = deriveTeamStyle(roster, settled);
+    const earlyBoost = early.diagnostics.offenseScores.五外 - base.diagnostics.offenseScores.五外;
+    const lateBoost = late.diagnostics.offenseScores.五外 - base.diagnostics.offenseScores.五外;
+
+    expect(earlyBoost).toBeGreaterThan(0);
+    expect(lateBoost).toBeGreaterThan(earlyBoost);
+    expect(late.diagnostics.paceScore).toBeGreaterThan(early.diagnostics.paceScore);
+  });
+
   it('League换帅只替换教练并生成球队关系钩子', () => {
     const league = createLeagueState('GSW');
     const before = league.教练.GSW;
