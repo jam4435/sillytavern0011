@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildFormation } from './positioning';
 import { applyAutomaticRotation, createRotationState } from './rotation';
-import { defaultTeamTactics } from './tendencies';
+import { deriveTeamTactics } from './teamStyle';
 import type { MatchState, OnCourtStatus } from './types';
 import { getPlayer, getRoster } from '../utils/rosters';
 import { buildDynamicDepthChart } from './depthChart';
@@ -15,8 +15,10 @@ const status = (): OnCourtStatus => ({
 function match(): MatchState {
   const homeRoster = getRoster('GSW');
   const awayRoster = getRoster('CLE');
-  const homeEntries = buildDynamicDepthChart(homeRoster, { tactics: defaultTeamTactics('GSW') }).starters;
-  const awayEntries = buildDynamicDepthChart(awayRoster, { tactics: defaultTeamTactics('CLE') }).starters;
+  const homeTactics = deriveTeamTactics(homeRoster);
+  const awayTactics = deriveTeamTactics(awayRoster);
+  const homeEntries = buildDynamicDepthChart(homeRoster, { tactics: homeTactics }).starters;
+  const awayEntries = buildDynamicDepthChart(awayRoster, { tactics: awayTactics }).starters;
   const homeOn = homeEntries.map(e => e.key);
   const awayOn = awayEntries.map(e => e.key);
   const homeAll = homeRoster.map(p => p.name);
@@ -24,10 +26,10 @@ function match(): MatchState {
   const base: MatchState = {
     进行中: true, 对阵: { 主队: 'GSW', 客队: 'CLE' }, 节次: 1, 剩余秒数: 720, 投篮时钟: 24,
     比分: { 主: 0, 客: 0 }, 球权: '主', 跳球胜方: '主',
-    战术: { 主: defaultTeamTactics('GSW'), 客: defaultTeamTactics('CLE') },
+    战术: { 主: homeTactics, 客: awayTactics },
     站位: buildFormation({
       offense: homeEntries, defense: awayEntries, offenseSide: '主',
-      tactic: defaultTeamTactics('GSW').offense, defenseScheme: defaultTeamTactics('CLE').defense,
+      tactic: homeTactics.offense, defenseScheme: awayTactics.defense,
       ballHolder: homeOn[0], attackRight: true,
     }),
     本节球队犯规: { 主: 0, 客: 0 }, 暂停: { 主: 7, 客: 7 },
