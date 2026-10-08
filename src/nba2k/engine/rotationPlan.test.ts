@@ -6,7 +6,7 @@ import { createLeagueState } from './season';
 import { advanceInjuryRecovery } from './offCourtSystems';
 import { getPlayerAvailability } from './availability';
 import { applyCoachReview } from './coachRole';
-import { defaultTeamTactics } from './tendencies';
+import { deriveTeamTactics } from './teamStyle';
 import type { MatchState, OnCourtStatus } from './types';
 import type { CareerState } from '../utils/statReader';
 import { getPlayer, getRoster } from '../utils/rosters';
@@ -21,8 +21,10 @@ const status = (): OnCourtStatus => ({
 function freshMatch(): MatchState {
   const homeRoster = getRoster('GSW');
   const awayRoster = getRoster('CLE');
-  const homeEntries = buildDynamicDepthChart(homeRoster, { tactics: defaultTeamTactics('GSW') }).starters;
-  const awayEntries = buildDynamicDepthChart(awayRoster, { tactics: defaultTeamTactics('CLE') }).starters;
+  const homeTactics = deriveTeamTactics(homeRoster);
+  const awayTactics = deriveTeamTactics(awayRoster);
+  const homeEntries = buildDynamicDepthChart(homeRoster, { tactics: homeTactics }).starters;
+  const awayEntries = buildDynamicDepthChart(awayRoster, { tactics: awayTactics }).starters;
   const homeAll = homeRoster.map(p => p.name);
   const awayAll = awayRoster.map(p => p.name);
   const match: MatchState = {
@@ -34,13 +36,13 @@ function freshMatch(): MatchState {
     比分: { 主: 0, 客: 0 },
     球权: '主',
     跳球胜方: '主',
-    战术: { 主: defaultTeamTactics('GSW'), 客: defaultTeamTactics('CLE') },
+    战术: { 主: homeTactics, 客: awayTactics },
     站位: buildFormation({
       offense: homeEntries,
       defense: awayEntries,
       offenseSide: '主',
-      tactic: defaultTeamTactics('GSW').offense,
-      defenseScheme: defaultTeamTactics('CLE').defense,
+      tactic: homeTactics.offense,
+      defenseScheme: awayTactics.defense,
       ballHolder: homeEntries[0].key,
       attackRight: true,
     }),
@@ -80,7 +82,7 @@ describe('RotationPlan / Availability / CoachRole', () => {
       team: 'FUT',
       overall: index === 0 ? 96 : player.overall,
     }));
-    const chart = buildDynamicDepthChart(generated, { tactics: defaultTeamTactics('GSW') });
+    const chart = buildDynamicDepthChart(generated, { tactics: deriveTeamTactics(generated) });
     const weights = deriveDynamicMinuteWeights(chart);
 
     expect(chart.starters).toHaveLength(5);
