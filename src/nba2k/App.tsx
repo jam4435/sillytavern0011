@@ -269,7 +269,13 @@ const App: React.FC = () => {
     async (r: SetupResult) => {
       const p = getPlayer(r.protagonistKey);
       const team = getTeam(r.teamId);
-      const league = createLeagueState(r.teamId);
+      const league = registerExistingContract(
+        createLeagueState(r.teamId),
+        r.protagonistKey,
+        r.teamId,
+        2,
+        2_000_000,
+      );
       const firstGame = getScheduledGame(r.teamId, 0, league.赛季序号);
       const firstOpponent = firstGame ? getTeam(firstGame.opponent) : undefined;
       await insertOrAssignVariables(
@@ -335,7 +341,13 @@ const App: React.FC = () => {
       const player = buildCustomPlayer(form);
       registerCustomPlayer(player);
       const team = getTeam(form.teamId);
-      const league = createLeagueState(form.teamId);
+      const league = registerExistingContract(
+        createLeagueState(form.teamId),
+        player.name,
+        form.teamId,
+        2,
+        1_100_000,
+      );
       const firstGame = getScheduledGame(form.teamId, 0, league.赛季序号);
       const firstOpponent = firstGame ? getTeam(firstGame.opponent) : undefined;
       await insertOrAssignVariables(
