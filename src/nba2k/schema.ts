@@ -54,6 +54,13 @@ const lineupSchema = z.object({ 场上: z.array(nonEmptyText).max(5), 替补: z.
 const teamRotationSchema = z.object({
   starters: z.array(nonEmptyText).max(5),
   targetMinutes: z.record(nonEmptyText, z.number().min(0).max(60)),
+  profileId: z.string().optional(),
+  closingPriority: z.record(nonEmptyText, z.number().min(0).max(100)).optional(),
+  garbagePriority: z.record(nonEmptyText, z.number().min(0).max(100)).optional(),
+  rotationDepth: z.number().int().min(5).max(15).optional(),
+  smallBallAffinity: z.number().min(0).max(100).optional(),
+  playoffShortening: z.number().min(0).max(1).optional(),
+  contextMode: z.enum(['正常', '终结阵容', '软垃圾时间', '硬垃圾时间']).optional(),
 }).strict();
 const rotationSchema = z.object({ 主: teamRotationSchema, 客: teamRotationSchema }).strict();
 
@@ -122,6 +129,10 @@ export const careerStateSchema = z.object({
     for (const zone of HOT_ZONE_IDS) if (!zones[zone]) ctx.addIssue({ code: 'custom', path: [zone], message: '缺少热区' });
   }) }).strict(),
   教练信任: z.number().min(0).max(100), 球队角色: z.enum(['边缘轮换', '轮换', '第六人', '首发', '核心']),
+  教练评估: z.object({
+    最近评分: z.array(z.number().min(0).max(100)).max(10),
+    上次角色调整场次: nonNegativeInt,
+  }).strict().optional(),
   赛季统计: z.record(nonEmptyText, finite.nonnegative()), 成长点: nonNegativeInt,
 }).strict();
 
@@ -143,6 +154,7 @@ const standingRecordSchema = z.object({
 const injuryRecordSchema = z.object({
   球员: nonEmptyText, 类型: nonEmptyText, 严重度: z.enum(['轻微', '中等', '严重']),
   受伤日期: nonEmptyText, 预计复出: nonEmptyText, 状态: z.enum(['休战', '恢复中', '可复出']),
+  分钟限制: z.number().min(0).max(40).nullable().optional(),
 }).strict();
 
 const storyHookSchema = z.object({
