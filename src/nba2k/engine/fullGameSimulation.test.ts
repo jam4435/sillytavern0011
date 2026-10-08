@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildFormation } from './positioning';
 import { simulateFullGame } from './fullGameSimulation';
-import { createRotationState } from './rotation';
+import { createRotationPlan } from './rotationPlan';
 import { defaultTeamTactics } from './tendencies';
 import type { MatchState, OnCourtStatus, Side } from './types';
 import { getPlayer, getRoster, starterEntries } from '../utils/rosters';
@@ -46,7 +46,7 @@ function freshMatch(homeId: string, awayId: string): MatchState {
     回合阶段: '常规回合', 待处理情境: { type: 'none' }, 回合情境: '',
     球员状态: Object.fromEntries([...homeAll, ...awayAll].map(k => [k, status()])), 回合摘要: '',
   };
-  match.轮换 = createRotationState(match, getPlayer);
+  match.轮换 = createRotationPlan(match, getPlayer);
   return match;
 }
 
