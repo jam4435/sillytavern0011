@@ -204,7 +204,7 @@ export function playerFromGeneratedSeed(seed: GeneratedPlayerSeed): PlayerData {
     secondaryPos: seed.secondaryPos,
     body: seed.body,
     height_cm: seed.body.heightCm,
-    number: 0,
+    number: Math.floor(unit(seed.seed + ':number') * 100),
     overall: overallOf(attrs, seed.pos),
     attrs,
   };
@@ -239,6 +239,7 @@ export function projectGeneratedPlayer(
 
 export function generateDraftClass(currentSeason: number, count = 60): GeneratedPlayerSeed[] {
   const entrySeason = currentSeason + 1;
+  const usedNames = new Set<string>();
   return Array.from({ length: count }, (_, index) => {
     const root = `draft:${entrySeason}:${index + 1}`;
     const pos = positionFor(root + ':pos');
@@ -253,8 +254,11 @@ export function generateDraftClass(currentSeason: number, count = 60): Generated
     );
     const first = FIRST_NAMES[pickIndex(root + ':first', FIRST_NAMES.length)];
     const last = LAST_NAMES[pickIndex(root + ':last', LAST_NAMES.length)];
-    const suffix = index >= FIRST_NAMES.length * LAST_NAMES.length ? ` ${index + 1}` : '';
-    const displayName = `${first} ${last}${suffix}`;
+    const baseName = `${first} ${last}`;
+    let displayName = baseName;
+    let suffix = 2;
+    while (usedNames.has(displayName)) displayName = `${baseName} ${suffix++}`;
+    usedNames.add(displayName);
     return {
       key: `Generated_${entrySeason}_${String(index + 1).padStart(2, '0')}_${first}_${last}`,
       displayName,
