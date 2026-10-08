@@ -178,11 +178,27 @@ export interface CourtSpot { 球员: string; x: number; y: number; 持球?: bool
 export type TurnPhase = '常规回合' | '篮板争抢' | '罚球结算' | '死球';
 export interface LineupState { 场上: string[]; 替补: string[] }
 
+export type RotationContextMode = '正常' | '终结阵容' | '软垃圾时间' | '硬垃圾时间';
+
 export interface TeamRotationState {
   /** 开场首发，用于稳定轮换角色，不随临场换人改变。 */
   starters: string[];
-  /** 常规48分钟目标；加时由 RotationEngine 自动延长核心球员时间。 */
+  /** 赛前基础计划；比赛中 GameContext 可上下浮动，而不是硬性命令。 */
   targetMinutes: Record<string, number>;
+  /** 球队级真实轮换档案的标识；缺失时使用通用算法。 */
+  profileId?: string;
+  /** 末节胶着时谁更值得留在场上。 */
+  closingPriority?: Record<string, number>;
+  /** 垃圾时间越高越优先使用。 */
+  garbagePriority?: Record<string, number>;
+  /** 正常情况下主要使用多少人。 */
+  rotationDepth?: number;
+  /** 0-100，决定终结阶段是否允许 PF/SF 顶到更大的位置。 */
+  smallBallAffinity?: number;
+  /** 0-1，季后赛压缩替补、增加核心分钟的强度。 */
+  playoffShortening?: number;
+  /** 当前由 GameContextManager 推导出的轮换语义，仅用于解释/执行。 */
+  contextMode?: RotationContextMode;
 }
 export interface RotationState { 主: TeamRotationState; 客: TeamRotationState }
 
