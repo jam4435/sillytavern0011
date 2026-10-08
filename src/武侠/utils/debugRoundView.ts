@@ -146,6 +146,15 @@ export function buildMainInputDebugContent(debugRound: LatestDebugRound): string
   return sections.filter(Boolean).join('\n');
 }
 
+export function buildMainOutputDebugContent(debugRound: LatestDebugRound): string {
+  return [
+    debugRound.main.output || '(暂无正文输出)',
+    debugRound.main.error ? `\n【错误】\n${debugRound.main.error}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 export function buildVariableInputDebugContent(debugRound: LatestDebugRound): string {
   const { variable } = debugRound;
   if (normalizeDebugText(variable.input)) {
@@ -217,4 +226,18 @@ export function buildVariableOutputDebugContent(debugRound: LatestDebugRound): s
   }
 
   return sections.filter(Boolean).join('\n');
+}
+
+/** 按调试页现有呈现内容完整复制最近一轮的四项数据。 */
+export function buildDebugRoundCopyText(debugRound: LatestDebugRound): string {
+  const variableLogged = shouldShowVariableDebug(debugRound);
+  const notRunText = '(本轮未进行额外变量更新)';
+  const sections: Array<[string, string]> = [
+    ['正文输入', buildMainInputDebugContent(debugRound)],
+    ['正文输出', buildMainOutputDebugContent(debugRound)],
+    ['变量输入', variableLogged ? buildVariableInputDebugContent(debugRound) : notRunText],
+    ['变量输出', variableLogged ? buildVariableOutputDebugContent(debugRound) : notRunText],
+  ];
+
+  return sections.map(([heading, content]) => `---\n${heading}\n---\n${content}`).join('\n\n');
 }

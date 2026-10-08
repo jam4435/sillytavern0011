@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { LatestDebugRound } from '../hooks/useDebugLogs';
 import {
+  buildDebugRoundCopyText,
   buildMainInputDebugContent,
   buildVariableInputDebugContent,
   buildVariableOutputDebugContent,
@@ -37,6 +38,39 @@ function createDebugRound(): LatestDebugRound {
 }
 
 describe('debugRoundView', () => {
+  it('一键复制使用四个标题分隔并保留完整输入输出', () => {
+    const debugRound = createDebugRound();
+    debugRound.variable = {
+      ...debugRound.variable,
+      status: 'success',
+      trigger: 'send',
+      modeSnapshot: 'extra',
+      input: '变量模型完整提示词',
+      output: '<VariableThink>更新修为</VariableThink>',
+      appendedBlocks: '<VariableEdit>更新内容</VariableEdit>',
+    };
+
+    const copied = buildDebugRoundCopyText(debugRound);
+    expect(copied.match(/^---\n(?:正文输入|正文输出|变量输入|变量输出)\n---$/gm)).toEqual([
+      '---\n正文输入\n---',
+      '---\n正文输出\n---',
+      '---\n变量输入\n---',
+      '---\n变量输出\n---',
+    ]);
+    expect(copied).toContain('【最终送模提示词】\n组合提示词');
+    expect(copied).toContain('---\n正文输出\n---\n正文输出');
+    expect(copied).toContain('---\n变量输入\n---\n变量模型完整提示词');
+    expect(copied).toContain('【原始返回】\n<VariableThink>更新修为</VariableThink>');
+    expect(copied).toContain('【合法变量块】\n<VariableEdit>更新内容</VariableEdit>');
+  });
+
+  it('未执行额外变量时仍保留两个变量分区并标记未执行', () => {
+    const copied = buildDebugRoundCopyText(createDebugRound());
+    expect(copied).toContain('---\n变量输入\n---\n(本轮未进行额外变量更新)');
+    expect(copied).toContain('---\n变量输出\n---\n(本轮未进行额外变量更新)');
+    expect(copied).not.toContain('【合法变量块】');
+  });
+
   it('skipped 状态会生成分支决策和跳过原因文本', () => {
     const debugRound = createDebugRound();
     debugRound.variable = {

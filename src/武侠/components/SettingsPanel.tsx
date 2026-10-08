@@ -36,7 +36,9 @@ import {
   type WuxiaUiTheme,
 } from '../utils/settingsManager';
 import {
+  buildDebugRoundCopyText,
   buildMainInputDebugContent,
+  buildMainOutputDebugContent,
   buildVariableInputDebugContent,
   buildVariableOutputDebugContent,
   getDebugStageStatusLabel,
@@ -451,6 +453,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [activeTab, setActiveTab] = useState<SettingsTab>('appearance');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [debugCopyMessage, setDebugCopyMessage] = useState('');
   const [openSettingBlocks, setOpenSettingBlocks] = useState(DEFAULT_OPEN_SETTING_BLOCKS);
   const autoAdvanceStopRequestedRef = useRef(false);
 
@@ -1992,6 +1995,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   }, [settings.summarySettings]);
 
+  const handleCopyDebugRound = useCallback(async () => {
+    if (!latestDebugRound) return;
+    try {
+      await copyTextToClipboard(buildDebugRoundCopyText(latestDebugRound));
+      setDebugCopyMessage('复制成功');
+    } catch (error) {
+      setDebugCopyMessage(`复制失败：${getErrorMessage(error)}`);
+    }
+  }, [latestDebugRound]);
+
   const shouldShowVariableDebugSection = shouldShowVariableDebug(latestDebugRound);
   const debugSections = latestDebugRound
     ? [
@@ -2005,12 +2018,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           id: 'main-output',
           title: '正文输出',
           status: latestDebugRound.main.status,
-          content: [
-            latestDebugRound.main.output || '(暂无正文输出)',
-            latestDebugRound.main.error ? `\n【错误】\n${latestDebugRound.main.error}` : '',
-          ]
-            .filter(Boolean)
-            .join('\n'),
+          content: buildMainOutputDebugContent(latestDebugRound),
         },
         ...(shouldShowVariableDebugSection
           ? [
@@ -4104,7 +4112,25 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       </div>
 
       {/* 底部操作栏 */}
-      <div className="settings-footer">
+      <div className={`settings-footer ${activeTab === 'debug' ? 'settings-footer--debug' : ''}`}>
+        {activeTab === 'debug' && (
+          <>
+            <button
+              type="button"
+              className="settings-reset-btn settings-copy-debug-btn"
+              onClick={handleCopyDebugRound}
+              disabled={!latestDebugRound}
+              data-wuxia-automation="copy-debug-round"
+              title="复制最近一轮正文和变量模型的输入输出"
+            >
+              <Icons.Copy size={14} />
+              <span>一键复制</span>
+            </button>
+            {debugCopyMessage && (
+              <span className="settings-debug-copy-message" role="status">{debugCopyMessage}</span>
+            )}
+          </>
+        )}
         <button className="settings-reset-btn" onClick={resetCurrentTab}>
           <Icons.Close size={14} />
           <span>{getResetButtonText()}</span>
