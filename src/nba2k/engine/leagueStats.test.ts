@@ -3,6 +3,7 @@ import { leagueStateSchema } from '../schema';
 import { buildLeagueRosterSnapshot } from '../utils/rosters';
 import { advanceLeagueAfterGame, beginNextSeason, createLeagueState } from './season';
 import { buildLeagueSimulationProfiles } from './teamPower';
+import { generateDraftClass, playerFromGeneratedSeed } from './draft';
 import {
   addSeasonLines, decideSeasonAwards, emptyPlayerSeasonTotals, leaderboard,
   matchSeasonLines, simulateTeamSeasonLines,
@@ -112,6 +113,29 @@ describe('league-wide season statistics and awards', () => {
     expect(afterTrade.A.teamId).toBe('PHI');
     expect(afterTrade.A.pts).toBe(590);
     expect(leaderboard(afterTrade, 'ast')[0].playerKey).toBe('A');
+  });
+
+  it('未来新秀只在自己的入盟首季有ROY资格，不会被高OVR老球员冒领', () => {
+    const league = createLeagueState('GSW');
+    league.赛季序号 = 1;
+    league.赛季 = '2016-17';
+    const rookieSeed = generateDraftClass(0)[0];
+    league.生成球员[rookieSeed.key] = rookieSeed;
+    const rookie = { ...playerFromGeneratedSeed(rookieSeed), team: 'PHI' };
+    const baseline = buildLeagueRosterSnapshot(league).byTeam;
+    const rosters = { ...baseline, PHI: [...baseline.PHI, rookie] };
+    for (const roster of Object.values(rosters)) {
+      for (const player of roster) {
+        league.球员赛季统计[player.name] = {
+          ...emptyPlayerSeasonTotals(player.team), gp: 70, pts: 840, reb: 300, ast: 180,
+        };
+      }
+    }
+    league.球员赛季统计[rookie.name].pts = 2000;
+    expect(decideSeasonAwards(league, rosters).rookie).toBe(rookie.name);
+    league.赛季序号 = 2;
+    league.赛季 = '2017-18';
+    expect(decideSeasonAwards(league, rosters).rookie).toBeNull();
   });
 
   it('第82轮正式结算奖项并保存在联盟，进入季后赛不二次改写赛季累计', () => {
