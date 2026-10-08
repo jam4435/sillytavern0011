@@ -14,7 +14,13 @@ function uniqueHooks(existing: StoryHook[], incoming: StoryHook[]): StoryHook[] 
 }
 
 export function isTradeWindowOpen(date: string): boolean {
-  return date >= '2015-10-27' && date <= '2016-02-18';
+  const monthDay = date.slice(5);
+  return monthDay >= '10-27' || monthDay <= '02-18';
+}
+
+export function isTradeDeadlinePeriod(date: string): boolean {
+  const monthDay = date.slice(5);
+  return monthDay >= '02-10' && monthDay <= '02-18';
 }
 
 export function tradeInterestScore(career: CareerState, league: LeagueState): number {
@@ -82,11 +88,11 @@ function sponsorshipHooks(career: CareerState, offCourt: OffCourtState, league: 
 }
 
 function tradeHooks(career: CareerState, league: LeagueState): StoryHook[] {
-  if (league.日期 < '2016-02-10' || league.日期 > '2016-02-18') return [];
+  if (!isTradeDeadlinePeriod(league.日期)) return [];
   const interest = tradeInterestScore(career, league);
   if (interest < 45) return [];
   return [{
-    id: `trade-window-${career.球队}-2016`,
+    id: `trade-window-${career.球队}-${league.赛季}`,
     type: '交易',
     title: '交易截止日前的询价',
     detail: `根据主角能力、潜力、球队战绩与角色估值，当前交易关注度约为 ${Math.round(interest)}/100。生成交易流言时必须服从球队需求与合同价值，不得由叙事模型凭空强制交易。`,
