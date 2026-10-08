@@ -4,6 +4,7 @@ import type { PlayerData, Position, TeamData } from '../engine/types';
 import { adaptLegacyPlayer } from '../engine/playerAdapter';
 import { projectLeaguePlayer } from '../engine/lifecycle';
 import { currentTeamOf } from '../engine/transactions';
+import { projectGeneratedPlayer } from '../engine/draft';
 import type { LeagueState } from '../engine/season';
 
 const POSITIONS: Position[] = ['PG', 'SG', 'SF', 'PF', 'C'];
@@ -50,6 +51,17 @@ export function getPlayerForLeague(
     const team = currentTeamOf(custom, league);
     return { ...custom, team: team ?? 'FA' };
   }
+  const generated = league?.生成球员?.[key];
+  if (generated && league) {
+    const projected = projectGeneratedPlayer(
+      generated,
+      league.赛季序号,
+      severeInjuryCount(league, key),
+    );
+    if (projected.retirementStatus === '退役') return undefined;
+    const team = currentTeamOf(projected.player, league);
+    return { ...projected.player, team: team ?? 'FA' };
+  }
   const base = getBasePlayer(key);
   if (!base || !league) return base;
   const projected = projectLeaguePlayer(base, league.赛季序号 ?? 0, severeInjuryCount(league, key));
@@ -84,7 +96,19 @@ export function getRosterForLeague(
       return currentTeam === teamId ? { ...player, team: teamId } : null;
     })
     .filter((player): player is PlayerData => Boolean(player));
-  return [...projectedBase, ...currentCustom].sort((a, b) => b.overall - a.overall);
+  const generated = Object.values(league.生成球员 ?? {})
+    .map(seed => {
+      const projected = projectGeneratedPlayer(
+        seed,
+        league.赛季序号,
+        severeInjuryCount(league, seed.key),
+      );
+      if (projected.retirementStatus === '退役') return null;
+      const currentTeam = currentTeamOf(projected.player, league);
+      return currentTeam === teamId ? { ...projected.player, team: teamId } : null;
+    })
+    .filter((player): player is PlayerData => Boolean(player));
+  return [...projectedBase, ...generated, ...currentCustom].sort((a, b) => b.overall - a.overall);
 }
 
 export function getAllPlayersForLeague(
@@ -106,11 +130,23 @@ export function getAllPlayersForLeague(
       return { ...projected.player, team: currentTeam ?? 'FA' };
     })
     .filter((player): player is PlayerData => Boolean(player));
+  const projectedGenerated = Object.values(league.生成球员 ?? {})
+    .map(seed => {
+      const projected = projectGeneratedPlayer(
+        seed,
+        league.赛季序号,
+        severeInjuryCount(league, seed.key),
+      );
+      if (projected.retirementStatus === '退役') return null;
+      const currentTeam = currentTeamOf(projected.player, league);
+      return { ...projected.player, team: currentTeam ?? 'FA' };
+    })
+    .filter((player): player is PlayerData => Boolean(player));
   const projectedCustom = custom.map(player => {
     const currentTeam = currentTeamOf(player, league);
     return { ...player, team: currentTeam ?? 'FA' };
   });
-  return [...projectedBase, ...projectedCustom];
+  return [...projectedBase, ...projectedGenerated, ...projectedCustom];
 }
 
 export function createLeaguePlayerResolver(
