@@ -1,7 +1,8 @@
 import { planPossession, simulatePossession } from './possession';
 import type { PlayerResolver, RandomSource } from './possession';
-import { applyAutomaticRotation, createRotationState } from './rotation';
+import { applyAutomaticRotation } from './rotation';
 import type { RotationOverrides } from './rotation';
+import { createRotationPlan } from './rotationPlan';
 import type { MatchState, Side } from './types';
 
 export interface FullGameSimulationResult {
@@ -32,7 +33,7 @@ export function simulateFullGame(
   const keepSummaries = options.keepSummaries ?? 20;
   let current: MatchState = initial.轮换
     ? initial
-    : { ...initial, 轮换: createRotationState(initial, resolvePlayer, options.rotationOverrides) };
+    : { ...initial, 轮换: createRotationPlan(initial, resolvePlayer, { overrides: options.rotationOverrides }) };
   const possessions = { 主: 0, 客: 0, total: 0 };
   const summaries: string[] = [];
   let iterations = 0;
