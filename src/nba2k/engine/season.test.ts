@@ -27,8 +27,10 @@ describe('SeasonEngine', () => {
 
   it('比赛结束会更新联盟战绩并推进下一场', () => {
     const league = createLeagueState('GSW');
+    const tenureBefore = league.教练.GSW.tenureGames;
     const result = advanceLeagueAfterGame(league, 'GSW', finishedMatch(), () => .5);
     expect(result.league.战绩.GSW.胜).toBe(1);
+    expect(result.league.教练.GSW.tenureGames).toBe(tenureBefore + 1);
     expect(result.league.战绩.CLE.负).toBe(1);
     expect(result.league.赛程索引).toBe(1);
     expect(result.nextGame?.index).toBe(1);
