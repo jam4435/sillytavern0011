@@ -79,7 +79,10 @@ function buildTeamPlan(
   const roster = rosterKeys
     .map(key => resolvePlayer(key))
     .filter((player): player is NonNullable<typeof player> => Boolean(player));
-  const chart = buildDynamicDepthChart(roster, { tactics: match.战术[side] });
+  const chart = buildDynamicDepthChart(roster, {
+    tactics: match.战术[side],
+    coachProfile: options.league?.教练?.[teamId] ?? null,
+  });
   let base = deriveDynamicMinuteWeights(chart);
 
   if ((options.phase ?? options.league?.阶段) === '季后赛') {
