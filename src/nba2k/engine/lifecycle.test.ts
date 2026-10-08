@@ -9,6 +9,7 @@ import {
   projectLeaguePlayer,
 } from './lifecycle';
 import { getBasePlayer, getRosterForLeague } from '../utils/rosters';
+import { TEAMS } from '../data/teams';
 
 describe('multi-season lifecycle', () => {
   it('初始年龄估算只靠球员种子，但与2015-16真实年龄大致接近', () => {
@@ -50,6 +51,20 @@ describe('multi-season lifecycle', () => {
     league.赛季 = '2018-19';
     const roster = getRosterForLeague('SAS', league);
     expect(roster.some(player => player.name === 'Tim Duncan')).toBe(false);
+  });
+
+  it('没有新秀补充前，5到10年内原始联盟不会因退役曲线过早清空', () => {
+    const counts: Record<number, number> = {};
+    for (const offset of [0, 5, 10]) {
+      const league = createLeagueState('GSW');
+      league.赛季序号 = offset;
+      league.赛季 = `${2015 + offset}-${String((2016 + offset) % 100).padStart(2, '0')}`;
+      counts[offset] = TEAMS.reduce((sum, team) => sum + getRosterForLeague(team.id, league).length, 0);
+    }
+    console.info('[nba2k lifecycle population]', counts);
+    expect(counts[5]).toBeGreaterThan(220);
+    expect(counts[10]).toBeGreaterThan(90);
+    expect(counts[10]).toBeLessThan(counts[5]);
   });
 
   it('主角每个休赛期只衰老一次，并按年龄/能力/角色进入生涯阶段', () => {
