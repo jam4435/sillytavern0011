@@ -62,7 +62,6 @@ import {
 } from './engine/lifecycle';
 import {
   applyMarketOffer,
-  contractExpiresThisOffseason,
   contractForPlayer,
   prepareOffseasonMarket,
   preparePlayerTradeMarket,
@@ -1005,7 +1004,7 @@ const App: React.FC = () => {
       ...offCourt,
       合同: contract ? {
         球队: offer.teamId,
-        年限: contract.years,
+        年限: Math.max(0, contract.expiresAfterSeason - nextLeague.赛季序号 + 1),
         年薪: contract.annualSalary,
         到期赛季: contractExpirySeason(contract.expiresAfterSeason),
       } : offCourt.合同,
