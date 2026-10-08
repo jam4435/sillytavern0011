@@ -1,6 +1,7 @@
 import {
   Check,
   Clock3,
+  Copy,
   GitBranch,
   Loader2,
   MapPin,
@@ -128,6 +129,7 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
   const [canSwitchInPlace, setCanSwitchInPlace] = useState(false);
   const [journal, setJournal] = useState<HistoryCheckoutJournal | null>(() => readHistoryCheckoutJournal());
   const [lastCheckout, setLastCheckout] = useState<HistoryCheckoutResult | null>(null);
+  const [diagnosticCopyState, setDiagnosticCopyState] = useState('');
   const [showAllLineages, setShowAllLineages] = useState(false);
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [renameDraft, setRenameDraft] = useState('');
@@ -153,7 +155,7 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
         let recovered: HistoryCheckoutResult | null = null;
         if (resume) {
           const pendingJournal = readHistoryCheckoutJournal();
-          if (pendingJournal && !isHistoryCheckoutJournalExpired(pendingJournal)) {
+          if (pendingJournal && !pendingJournal.failure && !isHistoryCheckoutJournalExpired(pendingJournal)) {
             recovered = await resumeCheckout();
           }
         }
@@ -228,20 +230,40 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
     }
     return false;
   }, [view, selectedNode, selectedIsOtherBranchLeaf]);
-  const checkoutPending = Boolean(journal && !isHistoryCheckoutJournalExpired(journal));
+  const checkoutPending = Boolean(journal && !journal.failure && !isHistoryCheckoutJournalExpired(journal));
   const recoveryAvailable = Boolean(
     journal &&
-    (isHistoryCheckoutJournalExpired(journal) ||
+    (journal.failure ||
+      isHistoryCheckoutJournalExpired(journal) ||
       lastCheckout?.status === 'recovery_failed' ||
       lastCheckout?.status === 'broken'),
   );
-  const isWorking = workState.type === 'loading' || checkoutPending || isBusy || isRenamingChat;
-  const recoveryActionDisabled = workState.type === 'loading';
+  const isWorking = workState.type === 'loading' || Boolean(journal) || isBusy || isRenamingChat;
+  const recoveryActionDisabled = workState.type === 'loading' || isRenamingChat;
   const recoveryFailureText = journal?.failure
     ? `失败阶段：${journal.failure.stage}；原始异常：${journal.failure.message}`
     : journal && isHistoryCheckoutJournalExpired(journal)
-      ? '失败阶段未被旧版本记录；恢复窗口已超过 120 秒。'
+      ? '恢复窗口已超过 120 秒，未能继续自动恢复。'
       : '';
+  const recoveryDiagnostics = journal
+    ? journal.failure?.details ?? [
+        `恢复事务：${journal.transactionId}`,
+        `当前阶段：${journal.stage}`,
+        `目标节点：${journal.targetNodeId}`,
+        `来源聊天：${journal.sourceChatName}（${journal.sourceChatId}）`,
+        `目标聊天：${journal.targetLocator.chatName}（${journal.targetLocator.chatId}）`,
+        `原始异常：${journal.failure?.message ?? '未记录'}`,
+      ].join('\n')
+    : '';
+  const copyRecoveryDiagnostics = async () => {
+    try {
+      if (!navigator.clipboard) throw new Error('剪贴板不可用');
+      await navigator.clipboard.writeText(recoveryDiagnostics);
+      setDiagnosticCopyState('诊断信息已复制');
+    } catch {
+      setDiagnosticCopyState('复制失败，可手动选中下方诊断文本');
+    }
+  };
 
   useEffect(() => {
     setLabelDraft(selectedNode?.label ?? '');
@@ -460,12 +482,42 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
         </div>
       )}
       {recoveryAvailable && (
-        <div className="history-journal-banner">
-          <ShieldAlert size={14} />
-          <span title={recoveryFailureText || undefined}>
-            上次分叉未能完成。新聊天会保留，不会自动删除。
-            {recoveryFailureText ? ` ${recoveryFailureText}` : ''}
-          </span>
+        <div className="history-journal-banner history-recovery-failure" role="alert">
+          <ShieldAlert size={16} aria-hidden="true" />
+          <div className="history-recovery-body">
+            <strong>上次分叉未能完成。新聊天会保留，不会自动删除。</strong>
+            <p>{recoveryFailureText || '请查看恢复诊断并选择处理方式。'}</p>
+            <details className="history-recovery-diagnostics" open>
+              <summary>完整恢复诊断</summary>
+              <dl>
+                <dt>事务 ID</dt><dd>{journal?.transactionId}</dd>
+                <dt>失败阶段</dt><dd>{journal?.failure?.stage ?? journal?.stage}</dd>
+                <dt>恢复动作</dt><dd>{journal?.actionKind ?? '未知'}</dd>
+                <dt>目标节点</dt><dd>{journal?.targetNodeId}</dd>
+                <dt>来源聊天</dt><dd>{journal?.sourceChatName}（{journal?.sourceChatId}）</dd>
+                <dt>目标聊天</dt><dd>{journal?.targetLocator.chatName}（{journal?.targetLocator.chatId}）</dd>
+                <dt>目标楼层</dt>
+                <dd>User {journal?.targetLocator.userMessageId ?? '无'} / Assistant {journal?.targetLocator.assistantMessageId} / swipe {journal?.targetLocator.swipeId}</dd>
+                <dt>失败时间</dt><dd>{journal?.failure ? formatDate(journal.failure.occurredAt) : '尚未记录'}</dd>
+              </dl>
+              <pre tabIndex={0}>{recoveryDiagnostics}</pre>
+              <button type="button" className="history-secondary-action" onClick={() => void copyRecoveryDiagnostics()}>
+                <Copy size={14} /> 复制诊断信息
+              </button>
+              {diagnosticCopyState && <span className="history-copy-feedback">{diagnosticCopyState}</span>}
+            </details>
+            <div className="history-recovery-actions">
+              <button type="button" className="history-secondary-action" disabled={recoveryActionDisabled} onClick={() => void handleRetryRecovery()}>
+                <RotateCcw size={14} /> 重试恢复
+              </button>
+              <button type="button" className="history-secondary-action" disabled={recoveryActionDisabled} onClick={() => void handleReturnSource()}>
+                <Undo2 size={14} /> 返回来源聊天
+              </button>
+              <button type="button" className="history-secondary-action" disabled={recoveryActionDisabled} onClick={() => void handleAbandonRecovery()} title="保留分支但解除恢复锁，不代表当前变量已通过历史校验">
+                <X size={14} /> 放弃此次恢复
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -620,38 +672,7 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
                 {selectedNode.pinned ? <PinOff size={14} /> : <Pin size={14} />}
                 {selectedNode.pinned ? '取消钉住' : '钉住节点'}
               </button>
-              {recoveryAvailable && (
-                <>
-                  <button
-                    type="button"
-                    className="history-secondary-action"
-                    disabled={recoveryActionDisabled}
-                    onClick={() => void handleRetryRecovery()}
-                  >
-                    <RotateCcw size={14} />
-                    重试恢复
-                  </button>
-                  <button
-                    type="button"
-                    className="history-secondary-action"
-                    disabled={recoveryActionDisabled}
-                    onClick={() => void handleReturnSource()}
-                  >
-                    <Undo2 size={14} />
-                    返回来源聊天
-                  </button>
-                  <button
-                    type="button"
-                    className="history-secondary-action"
-                    disabled={recoveryActionDisabled}
-                    onClick={() => void handleAbandonRecovery()}
-                    title="保留已创建的聊天和分支，只解除本次未完成恢复造成的锁定"
-                  >
-                    <X size={14} />
-                    放弃此次恢复
-                  </button>
-                </>
-              )}
+
             </div>
           )}
         </aside>
