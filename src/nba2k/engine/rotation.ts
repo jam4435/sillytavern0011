@@ -140,7 +140,15 @@ function playerRotationScore(
   const garbagePriority = rotation.garbagePriority?.[key] ?? clamp(100 - target * 2, 0, 100);
 
   let contextBonus = 0;
-  if (context.mode === '终结阵容') {
+  if (context.mode === '正常') {
+    const stagger = rotation.staggerGroups?.find(group => group.includes(key));
+    if (stagger) {
+      const onCourt = stagger.filter(member => match.阵容[side].场上.includes(member));
+      if (onCourt.length === 0) contextBonus += 8;
+      else if (onCourt.length === 1 && onCourt[0] === key) contextBonus += 5;
+      else if (onCourt.length >= 2) contextBonus -= 1.5;
+    }
+  } else if (context.mode === '终结阵容') {
     contextBonus += (closingPriority - 60) * .36;
     // 终结阶段减少“欠分钟补课”，优先真正适合收比赛的人。
     contextBonus -= Math.max(0, deficit) / 28;
