@@ -359,15 +359,23 @@ const App: React.FC = () => {
 
     const protagonistStarts = career.球队角色 === '首发' || career.球队角色 === '核心';
     const protagonistAvailable = getPlayerAvailability(protagonistKey, league).available;
-    const homeTactics = deriveTeamTactics(homeAvailable);
-    const awayTactics = deriveTeamTactics(awayAvailable);
-    const entriesFor = (teamId: string, roster: typeof homeAvailable, tactics: StructuredTeamTactics) =>
+    const homeCoach = league?.教练?.[homeId] ?? null;
+    const awayCoach = league?.教练?.[awayId] ?? null;
+    const homeTactics = deriveTeamTactics(homeAvailable, homeCoach);
+    const awayTactics = deriveTeamTactics(awayAvailable, awayCoach);
+    const entriesFor = (
+      teamId: string,
+      roster: typeof homeAvailable,
+      tactics: StructuredTeamTactics,
+      coachProfile: typeof homeCoach,
+    ) =>
       buildDynamicDepthChart(roster, {
         tactics,
+        coachProfile,
         forcedStarter: teamId === myTeamId && protagonistStarts && protagonistAvailable ? protagonistKey : null,
       }).starters;
-    const homeEntries = entriesFor(homeId, homeAvailable, homeTactics);
-    const awayEntries = entriesFor(awayId, awayAvailable, awayTactics);
+    const homeEntries = entriesFor(homeId, homeAvailable, homeTactics, homeCoach);
+    const awayEntries = entriesFor(awayId, awayAvailable, awayTactics, awayCoach);
     const homeCenter = getPlayer(homeEntries.find(entry => entry.pos === 'C')?.key ?? homeEntries.at(-1)?.key ?? '');
     const awayCenter = getPlayer(awayEntries.find(entry => entry.pos === 'C')?.key ?? awayEntries.at(-1)?.key ?? '');
     const jumpScore = (player: typeof homeCenter) =>
