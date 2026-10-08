@@ -4851,6 +4851,14 @@
     background: rgba(184, 134, 11, 0.1);
   }
 
+  .history-recovery-diagnostics {
+    border-color: var(--wuxia-ink-border-soft);
+
+    pre {
+      background: rgba(61, 48, 40, 0.07);
+    }
+  }
+
   .history-status-line {
     color: var(--wuxia-ink-text-muted);
     border-top-color: var(--wuxia-ink-border-soft);

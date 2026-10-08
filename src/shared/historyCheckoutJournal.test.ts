@@ -150,11 +150,21 @@ describe('historyCheckoutJournal', () => {
     });
     const failed = updateHistoryCheckoutJournal({
       stage: 'sync_era',
-      failure: { stage: 'sync_era', message: 'ERA 全量同步超时', occurredAt: 42 },
+      failure: {
+        stage: 'sync_era',
+        message: 'ERA 全量同步超时',
+        occurredAt: 42,
+        details: '事务 checkout-test\\n目标聊天 A\\n等待 syncId 超时',
+      },
     });
 
-    expect(failed?.failure).toEqual({ stage: 'sync_era', message: 'ERA 全量同步超时', occurredAt: 42 });
-    expect(readHistoryCheckoutJournal()?.failure?.message).toBe('ERA 全量同步超时');
+    expect(failed?.failure).toEqual({
+      stage: 'sync_era',
+      message: 'ERA 全量同步超时',
+      occurredAt: 42,
+      details: '事务 checkout-test\\n目标聊天 A\\n等待 syncId 超时',
+    });
+    expect(readHistoryCheckoutJournal()?.failure?.details).toContain('等待 syncId 超时');
     expect(renewHistoryCheckoutJournal(readHistoryCheckoutJournal()!, 50).failure).toBeUndefined();
   });
 

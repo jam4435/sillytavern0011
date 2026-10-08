@@ -20,6 +20,7 @@ interface OpeningScreenProps extends OpeningChatInputProps {
   playerName?: string;
   location?: string;
   isLoading?: boolean;
+  restoreNotice?: React.ReactNode;
   onSend: (message: string) => Promise<void> | void;
   onOpenSettings?: () => void;
 }
@@ -29,6 +30,7 @@ const OpeningScreen: React.FC<OpeningScreenProps> = ({
   playerName,
   location,
   isLoading = false,
+  restoreNotice = null,
   onSend,
   onOpenSettings,
   onRegenerate,
@@ -76,6 +78,7 @@ const OpeningScreen: React.FC<OpeningScreenProps> = ({
         </section>
 
         <div className="opening-input-wrap">
+          {restoreNotice}
           <ChatInput
             onSend={onSend}
             onRegenerate={onRegenerate}

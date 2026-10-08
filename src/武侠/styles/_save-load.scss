@@ -196,6 +196,73 @@
   background: linear-gradient(90deg, rgba(120, 53, 15, 0.42), rgba(69, 26, 3, 0.18));
 }
 
+.history-recovery-failure {
+  align-items: flex-start;
+}
+
+.history-recovery-body {
+  flex: 1;
+  min-width: 0;
+
+  p {
+    margin: 0.3rem 0 0.5rem;
+    overflow-wrap: anywhere;
+  }
+}
+
+.history-recovery-diagnostics {
+  max-height: min(39vh, 370px);
+  overflow-y: auto;
+  margin-bottom: 0.6rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(202, 153, 80, 0.32);
+  border-radius: 4px;
+
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  dl {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 0.3rem 0.8rem;
+    margin: 0.65rem 0;
+  }
+
+  dt {
+    opacity: 0.76;
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+    user-select: text;
+  }
+
+  pre {
+    max-height: 14rem;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    user-select: text;
+    padding: 0.65rem;
+    background: rgba(10, 9, 8, 0.28);
+    border-radius: 4px;
+    font-size: 0.72rem;
+  }
+}
+
+.history-copy-feedback {
+  margin-left: 0.55rem;
+}
+
+.history-recovery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .history-status-line {
   min-height: 2rem;
   color: var(--stone-400);

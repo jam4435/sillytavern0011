@@ -3,6 +3,8 @@ import { eventEmitMock, eventOnMock } from '../武侠/test/setup';
 
 const logErrorMock = vi.fn();
 const initializeEventListMock = vi.fn();
+const needsEventRuntimeStateResetMock = vi.fn(() => false);
+const resetLegacyEventRuntimeStateMock = vi.fn(async () => true);
 const readHistoryCheckoutJournalMock = vi.fn();
 const reconcileWorldEventArchiveMock = vi.fn();
 const syncParticipationOutcomeStatesMock = vi.fn();
@@ -67,8 +69,8 @@ vi.mock('./era-world-events.js', () => ({
 }));
 
 vi.mock('./era-runtime-state.js', () => ({
-  needsEventRuntimeStateReset: vi.fn(() => false),
-  resetLegacyEventRuntimeState: vi.fn(async () => true),
+  needsEventRuntimeStateReset: needsEventRuntimeStateResetMock,
+  resetLegacyEventRuntimeState: resetLegacyEventRuntimeStateMock,
 }));
 
 vi.mock('./era-turn-queue.js', () => ({
@@ -112,6 +114,8 @@ describe('ERA 主线初始化控制', () => {
     vi.resetModules();
     logErrorMock.mockReset();
     initializeEventListMock.mockReset();
+    needsEventRuntimeStateResetMock.mockReset().mockReturnValue(false);
+    resetLegacyEventRuntimeStateMock.mockReset().mockResolvedValue(true);
     reconcileWorldEventArchiveMock.mockReset();
     syncParticipationOutcomeStatesMock.mockReset();
     cleanupInvalidParticipationEntriesMock.mockReset();
@@ -231,6 +235,38 @@ describe('ERA 主线初始化控制', () => {
       cleanupInvalidParticipationEntriesMock.mock.invocationCallOrder[0],
     );
     expect(eventEmitMock.mock.calls.some(([name]) => name === 'wuxia:history-event-state-stable')).toBe(false);
+  });
+
+  it('历史恢复发现旧事件运行时版本时拒绝直接清空事件变量', async () => {
+    needsEventRuntimeStateResetMock.mockReturnValue(true);
+    readHistoryCheckoutJournalMock.mockReturnValue({
+      version: 1,
+      transactionId: 'checkout-old-runtime-version',
+      stage: 'sync_era',
+      targetNodeId: 'node-old',
+      targetLocator: {
+        chatId: 'test-chat',
+        chatName: 'test',
+        userMessageId: 1,
+        assistantMessageId: 2,
+        swipeId: 0,
+      },
+      sourceHeadNodeId: 'node-source',
+      sourceChatId: 'test-chat',
+      sourceChatName: 'test',
+      startedAt: Date.now(),
+    });
+
+    // @ts-expect-error 测试用模块 query
+    await import('./era-main.js?history-checkout-version-mismatch-test');
+    const prepareListener = eventOnMock.mock.calls
+      .filter(([name]) => name === 'wuxia:history-checkout-prepare-verification')
+      .at(-1)?.[1] as ((detail: { transactionId: string }) => Promise<void>) | undefined;
+    expect(prepareListener).toBeDefined();
+    await expect(prepareListener!({ transactionId: 'checkout-old-runtime-version' }))
+      .rejects.toThrow('禁止在历史检出期间直接清空事件状态');
+    expect(resetLegacyEventRuntimeStateMock).not.toHaveBeenCalled();
+    expect(initializeEventListMock).not.toHaveBeenCalled();
   });
 
   it('initializeEventList 抛错时初始化返回失败且不显示成功 toast', async () => {
