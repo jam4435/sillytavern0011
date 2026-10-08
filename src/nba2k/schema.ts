@@ -279,6 +279,21 @@ const playoffStateSchema = z.object({
   champion: nonEmptyText.nullable(),
 }).strict();
 
+const playerSeasonTotalsSchema = z.object({
+  teamId: nonEmptyText,
+  gp: nonNegativeInt, min: finite.nonnegative(), pts: nonNegativeInt, reb: nonNegativeInt,
+  ast: nonNegativeInt, stl: nonNegativeInt, blk: nonNegativeInt, tov: nonNegativeInt,
+  fgm: nonNegativeInt, fga: nonNegativeInt, threePm: nonNegativeInt, threePa: nonNegativeInt,
+  ftm: nonNegativeInt, fta: nonNegativeInt,
+}).strict().superRefine((row, ctx) => {
+  if (row.fgm > row.fga || row.threePm > row.threePa || row.ftm > row.fta || row.threePm > row.fgm || row.threePa > row.fga)
+    ctx.addIssue({ code: 'custom', message: '球员赛季累计命中不能超过出手，三分须包含于投篮' });
+});
+const seasonAwardsSchema = z.object({
+  season: nonEmptyText, mvp: nonEmptyText.nullable(), rookie: nonEmptyText.nullable(), dpoy: nonEmptyText.nullable(),
+  allNBA: z.array(z.array(nonEmptyText).max(5)).max(3),
+  allDefense: z.array(z.array(nonEmptyText).max(5)).max(2),
+}).strict();
 export const leagueStateSchema = z.object({
   赛季: z.string().regex(/^\d{4}-\d{2}$/),
   赛季序号: nonNegativeInt,
@@ -293,6 +308,8 @@ export const leagueStateSchema = z.object({
   交易记录: z.array(transactionRecordSchema).max(240),
   生成球员: z.record(nonEmptyText, generatedPlayerSeedSchema),
   选秀历史: z.array(draftPickRecordSchema).max(600),
+  球员赛季统计: z.record(nonEmptyText, playerSeasonTotalsSchema).default({}),
+  奖项记录: z.array(seasonAwardsSchema).max(20).default([]),
   伤病: z.array(injuryRecordSchema),
   故事钩子: z.array(storyHookSchema),
   季后赛: playoffStateSchema.nullable().default(null),
