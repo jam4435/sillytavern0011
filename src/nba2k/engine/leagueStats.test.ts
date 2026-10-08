@@ -114,6 +114,30 @@ describe('league-wide season statistics and awards', () => {
     expect(leaderboard(afterTrade, 'ast')[0].playerKey).toBe('A');
   });
 
+  it('第82轮正式结算奖项并保存在联盟，进入季后赛不二次改写赛季累计', () => {
+    const league = createLeagueState('GSW');
+    league.赛程索引 = 81;
+    league.日期 = '2016-04-13';
+    const snapshot = buildLeagueRosterSnapshot(league);
+    for (const roster of Object.values(snapshot.byTeam)) {
+      for (const player of roster) {
+        league.球员赛季统计[player.name] = {
+          ...emptyPlayerSeasonTotals(player.team), gp: 67, min: 1800,
+          pts: player.overall * 13, reb: 310, ast: 230, stl: 65, blk: 35,
+        };
+      }
+    }
+    const profiles = buildLeagueSimulationProfiles(league, snapshot.byTeam);
+    const closed = advanceLeagueAfterGame(league, 'GSW', completedMatch(), seededRng(84), profiles, snapshot.byTeam).league;
+    expect(closed.赛程索引).toBe(82);
+    expect(closed.奖项记录).toHaveLength(1);
+    expect(closed.奖项记录[0].season).toBe('2015-16');
+    expect(closed.奖项记录[0].mvp).toBeTruthy();
+    expect(closed.球员赛季统计['Stephen Curry'].gp).toBe(68);
+    expect(closed.故事钩子.some(hook => hook.type === '奖项')).toBe(true);
+    expect(leagueStateSchema.safeParse(closed).success).toBe(true);
+  });
+
   it('年终按全联盟比赛数据评选MVP/DPOY/新秀并生成互不重复的最佳阵容', () => {
     const league = createLeagueState('GSW');
     const snapshot = buildLeagueRosterSnapshot(league);
