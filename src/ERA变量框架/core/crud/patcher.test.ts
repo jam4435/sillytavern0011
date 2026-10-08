@@ -69,6 +69,30 @@ describe('ERA 同一楼层变量块的原始次序', () => {
     expect(restored.事件系统.人物事件占用.段誉).toEqual(oldOccupant);
   });
 
+  it('二次处理时覆盖非空日志为 [] 必须留下可查询的诊断，而不是擅自保留旧日志', async () => {
+    state.stat.事件系统.人物事件占用.段誉 = structuredClone(newOccupant);
+    state.meta = {
+      EditLogs: {
+        'mk-checkout-regression': [{
+          op: 'update',
+          path: '事件系统.人物事件占用.段誉.事件名',
+          value_old: '第06事件',
+          value_new: '第07事件',
+        }],
+      },
+    };
+    state.message = insertNew;
+    await ApplyVarChangeForMessage({ message_id: 12 });
+
+    expect(state.meta.EditLogs['mk-checkout-regression']).toEqual([]);
+    const { recordEraDiagnostic } = await import('../../utils/diagnostics');
+    expect(recordEraDiagnostic).toHaveBeenCalledWith(
+      'core-crud-patcher',
+      'nonempty-editlog-overwritten-by-empty',
+      expect.objectContaining({ messageId: 12, oldLogCount: 1, newLogCount: 0 }),
+    );
+  });
+
   it('如果实际顺序是 Insert 再 Delete，最终仍应删除占用', async () => {
     state.stat = { 事件系统: { 人物事件占用: {} } };
     state.message = `${insertNew}\n${deleteOld}`;
