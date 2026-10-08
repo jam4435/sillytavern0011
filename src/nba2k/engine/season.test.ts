@@ -9,7 +9,7 @@ function finishedMatch(): MatchState {
   const scheduled = getScheduledGame('GSW', 0)!;
   return {
     进行中: false, 对阵: { 主队: scheduled.home, 客队: scheduled.away }, 节次: 4, 剩余秒数: 0, 投篮时钟: 0,
-    比分: { 主: 112, 客: 104 }, 球权: '客', 跳球胜方: '主',
+    比分: scheduled.home === 'GSW' ? { 主: 112, 客: 104 } : { 主: 104, 客: 112 }, 球权: '客', 跳球胜方: '主',
     战术: {
       主: { offense: '动态进攻', defense: '换防', pace: '快', helpIntensity: 60, rebound: '均衡' },
       客: { offense: '四外一内', defense: '人盯人', pace: '标准', helpIntensity: 55, rebound: '均衡' },
