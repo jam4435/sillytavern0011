@@ -970,9 +970,11 @@ const App: React.FC = () => {
     let nextLeague = league;
     let offers: MarketOffer[] = [];
     let label = '';
+    let draftNote = '';
     if (league.阶段 === '休赛期') {
+      const drafted = ensureOffseasonDraft(league, career.球队);
       const result = prepareOffseasonMarket(
-        league,
+        drafted.league,
         career.附身球员,
         getPlayerForLeague,
         getRosterForLeague,
@@ -981,6 +983,9 @@ const App: React.FC = () => {
       nextLeague = result.league;
       offers = result.protagonistOffers;
       label = result.protagonistMustSign ? '自由市场' : '续约市场';
+      if (drafted.newlyCompleted) {
+        draftNote = `\n【本届选秀】\n${draftSummary(nextLeague, drafted.picks, career.球队)}\n`;
+      }
     } else {
       if (!isTradeWindowOpen(league.日期)) {
         toastr.warning('当前不在交易窗口。');
@@ -1005,6 +1010,7 @@ const App: React.FC = () => {
       return;
     }
     await sendTurn(
+      draftNote +
       `【${label}】前端根据球队位置需求、阵容深度、战绩、球员市场价值与合同条件生成了固定报价：\n` +
       offers.map(offer => `- ${offerSummary(offer)}`).join('\n') +
       '\n这些报价已经写入联盟状态，不得由叙事模型新增、删除或改价；只需演出经纪人/管理层如何把报价摆到我面前。',
@@ -1094,8 +1100,9 @@ const App: React.FC = () => {
     const currentProjection = careerPlayerProjection(career);
     if (currentProjection) registerCustomPlayer(currentProjection);
 
+    const drafted = ensureOffseasonDraft(league, career.球队);
     const market = prepareOffseasonMarket(
-      league,
+      drafted.league,
       career.附身球员,
       getPlayerForLeague,
       getRosterForLeague,
@@ -1121,6 +1128,7 @@ const App: React.FC = () => {
       setStat(current => ({ ...current, ...patch }));
       const offers = market.protagonistOffers;
       await sendTurn(
+        (drafted.newlyCompleted ? `【选秀夜】前端已完成本届两轮选秀：\n${draftSummary(marketLeague, drafted.picks, career.球队)}\n\n` : '') +
         '【自由市场必须决策】我的上一份合同已经到期，前端已完成其他球队的休赛期市场，并生成了固定的正式报价：\n' +
           offers.map(offer => `- ${offerSummary(offer)}`).join('\n') +
           '\n在接受其中一份合同前不能进入下一赛季。报价已写入存档，叙事模型不得重新报价。',
@@ -1196,7 +1204,7 @@ const App: React.FC = () => {
     await sendTurn(
       agedCareer.退役状态 === '退役'
         ? `【休赛期结算】前端生命周期系统已判定我在${agedCareer.年龄}岁正式退役。请以生涯纪录片口吻总结，不得改变退役结论或能力数值。`
-        : `【新赛季】休赛期阵容市场与生命周期结算已经完成，进入${nextLeague.赛季}赛季。我现在${agedCareer.年龄}岁，总评${agedCareer.能力.overall}，效力${getTeam(nextCareer.球队)?.cn ?? nextCareer.球队}。请演出训练营报到和新赛季期待，不得重新计算合同、Roster或能力。`,
+        : (drafted.newlyCompleted ? `【选秀夜】本届选秀已由前端完成：\n${draftSummary(nextLeague, drafted.picks, career.球队)}\n\n` : '') + `【新赛季】休赛期阵容市场与生命周期结算已经完成，进入${nextLeague.赛季}赛季。我现在${agedCareer.年龄}岁，总评${agedCareer.能力.overall}，效力${getTeam(nextCareer.球队)?.cn ?? nextCareer.球队}。请演出训练营报到和新赛季期待，不得重新计算合同、Roster或能力。`,
       { transformAssistant: async raw => stripMatchVariableBlocks(raw, patch) },
     );
   }, [stat, sendTurn]);
