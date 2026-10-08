@@ -2,7 +2,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const source = readFileSync(resolve(process.cwd(), '世界书/金庸群侠传1/世界书/输出提示词.txt'), 'utf8');
+const fullSource = readFileSync(resolve(process.cwd(), '世界书/金庸群侠传1/世界书/输出提示词.txt'), 'utf8');
+const locationStart = fullSource.indexOf('<%\nconst rawSurrounding =');
+const locationEnd = fullSource.indexOf('</可用地点>', locationStart) + '</可用地点>'.length;
+const source = fullSource.slice(locationStart, locationEnd);
 
 function renderPrompt(
   variables: Record<string, unknown>,
@@ -10,7 +13,14 @@ function renderPrompt(
 ): string {
   const blockPattern = /<%([\s\S]*?)%>/g;
   let cursor = 0;
-  let body = "let output = '';\n";
+  let body = [
+    "let output = '';",
+    "const participation = getvar('stat_data.参与事件') || {};",
+    "const normalizeFullLocationPath = v => typeof v === 'string' ? v : '';",
+    "const getLocationScopePath = v => normalizeFullLocationPath(v).split('/').slice(0, 3).join('/');",
+    "const uniqueFullLocationPaths = items => [...new Set(items.map(normalizeFullLocationPath).filter(Boolean))];",
+    "const compactPromptKey = value => String(value);",
+  ].join('\\n') + '\\n';
   for (const match of source.matchAll(blockPattern)) {
     body += `output += ${JSON.stringify(source.slice(cursor, match.index))};\n`;
     let code = match[1];
