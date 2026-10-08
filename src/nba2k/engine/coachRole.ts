@@ -42,7 +42,13 @@ export function applyCoachReview(
 
   const minutes = status.上场秒数 / 60;
   const workloadCredit = Math.min(1, minutes / 24);
-  const trustDelta = clamp((performance - 64) / 11, -3.2, 3.6) * workloadCredit + (teamWon(career, match) ? .45 : -.15);
+  const garbageShare = Math.min(1, (status.垃圾时间秒数 ?? 0) / Math.max(1, status.上场秒数));
+  // 垃圾时间数据照常进入技术统计，但对教练长期评价最多降权45%。
+  const competitiveWeight = 1 - garbageShare * .45;
+  const trustDelta = (
+    clamp((performance - 64) / 11, -3.2, 3.6) * workloadCredit +
+    (teamWon(career, match) ? .45 : -.15)
+  ) * competitiveWeight;
   const trust = Math.round(clamp(career.教练信任 + trustDelta) * 10) / 10;
   const review = career.教练评估 ?? { 最近评分: [], 上次角色调整场次: 0 };
   const recent = [...review.最近评分, performance].slice(-5);
