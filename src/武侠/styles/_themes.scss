@@ -4851,17 +4851,6 @@
     background: rgba(184, 134, 11, 0.1);
   }
 
-  .history-restore-notice {
-    color: var(--wuxia-ink-text-strong);
-    background: var(--wuxia-ink-paper-strong);
-    border-color: var(--wuxia-ink-border);
-
-    &.failed {
-      color: #8b1a1a;
-      border-color: rgba(139, 26, 26, 0.45);
-    }
-  }
-
   .history-recovery-diagnostics {
     border-color: var(--wuxia-ink-border-soft);
 
