@@ -194,6 +194,40 @@ function buildPostGamePatch(
   const baseLeague = stat.联盟 ?? createLeagueState(nextCareer.球队);
   const advanced = advanceLeagueAfterGame(baseLeague, nextCareer.球队, nextMatch);
   let nextLeague = advanceInjuryRecovery(advanced.league);
+
+  const deadlineHookId = `cpu-deadline-market-${nextLeague.赛季}`;
+  if (
+    isTradeDeadlinePeriod(nextLeague.日期) &&
+    !nextLeague.故事钩子.some(hook => hook.id === deadlineHookId)
+  ) {
+    const deadline = runCpuTradeDeadline(
+      nextLeague,
+      nextCareer.附身球员,
+      getPlayerForLeague,
+      getRosterForLeague,
+    );
+    nextLeague = deadline.league;
+    const detail = deadline.trades.length
+      ? deadline.trades.map(record => {
+          const incoming = getBasePlayer(record.playerKey)?.cn ?? record.playerKey;
+          const outgoing = record.outgoingPlayerKey
+            ? (getBasePlayer(record.outgoingPlayerKey)?.cn ?? record.outgoingPlayerKey)
+            : '筹码';
+          return `${record.fromTeam}送出${incoming}，${record.toTeam}送出${outgoing}`;
+        }).join('；')
+      : '本赛季截止日前没有出现满足球队需求与价值匹配条件的CPU交易。';
+    nextLeague = {
+      ...nextLeague,
+      故事钩子: [...nextLeague.故事钩子, {
+        id: deadlineHookId,
+        type: '交易',
+        title: '交易截止日结算',
+        detail,
+        createdDate: nextLeague.日期,
+      }],
+    };
+  }
+
   const previousRole = stat.生涯?.球队角色;
   if (previousRole && previousRole !== nextCareer.球队角色) {
     nextLeague = {
