@@ -10,8 +10,8 @@ describe('全联盟正式赛程生成器', () => {
       expect(schedule.games).toHaveLength(1230);
       const teams = new Map(TEAMS.map(team => [team.id, team]));
       const byPair = new Map<string, { games: number; homeA: number; homeB: number }>();
-      expect(schedule.games[0].date).toBeGreaterThanOrEqual(seasonOpeningDate(year));
-      expect(schedule.games.at(-1)!.date).toBeLessThanOrEqual(seasonFinaleDate(year));
+      expect(schedule.games[0].date >= seasonOpeningDate(year)).toBe(true);
+      expect(schedule.games.at(-1)!.date <= seasonFinaleDate(year)).toBe(true);
       for (const game of schedule.games) {
         expect(game.home).not.toBe(game.away);
         expect(teams.has(game.home)).toBe(true);
@@ -87,6 +87,7 @@ describe('全联盟正式赛程生成器', () => {
       firstDayGames: calendar.games.filter(game => game.date === seasonOpeningDate(0)).length,
       lastDayGames: calendar.games.filter(game => game.date === seasonFinaleDate(0)).length,
     });
+    expect(calendar.games.filter(game => game.date === seasonOpeningDate(0))).toHaveLength(3);
     expect(backToBack).toBeGreaterThan(0);
     expect(backToBack).toBeLessThan(35);
     expect(daysOff).toBeGreaterThan(0);
