@@ -176,6 +176,43 @@ const standingRecordSchema = z.object({
   连胜: z.number().int(),
 }).strict();
 
+const leagueContractSchema = z.object({
+  playerKey: nonEmptyText,
+  teamId: nonEmptyText.nullable(),
+  signedSeason: nonNegativeInt,
+  expiresAfterSeason: nonNegativeInt,
+  annualSalary: finite.nonnegative(),
+  years: nonNegativeInt,
+  status: z.enum(['有效', '自由球员']),
+}).strict();
+
+const marketOfferSchema = z.object({
+  id: nonEmptyText,
+  playerKey: nonEmptyText,
+  type: z.enum(['交易', '续约', '自由市场']),
+  teamId: nonEmptyText,
+  annualSalary: finite.nonnegative(),
+  years: nonNegativeInt,
+  fitScore: finite.min(0).max(100),
+  needScore: finite.min(0).max(100),
+  createdDate: nonEmptyText,
+  status: z.enum(['待定', '接受', '拒绝']),
+  outgoingPlayerKey: nonEmptyText.nullable().optional(),
+}).strict();
+
+const transactionRecordSchema = z.object({
+  id: nonEmptyText,
+  type: z.enum(['交易', '签约', '续约', '自由球员']),
+  playerKey: nonEmptyText,
+  fromTeam: nonEmptyText.nullable(),
+  toTeam: nonEmptyText.nullable(),
+  season: nonEmptyText,
+  date: nonEmptyText,
+  annualSalary: finite.nonnegative().optional(),
+  years: nonNegativeInt.optional(),
+  outgoingPlayerKey: nonEmptyText.nullable().optional(),
+}).strict();
+
 const injuryRecordSchema = z.object({
   球员: nonEmptyText, 类型: nonEmptyText, 严重度: z.enum(['轻微', '中等', '严重']),
   受伤日期: nonEmptyText, 预计复出: nonEmptyText, 状态: z.enum(['休战', '恢复中', '可复出']),
@@ -218,6 +255,10 @@ export const leagueStateSchema = z.object({
   赛程索引: nonNegativeInt,
   战绩: z.record(nonEmptyText, standingRecordSchema),
   教练: z.record(nonEmptyText, coachProfileSchema),
+  球员归属: z.record(nonEmptyText, nonEmptyText.nullable()),
+  合同册: z.record(nonEmptyText, leagueContractSchema),
+  市场报价: z.array(marketOfferSchema),
+  交易记录: z.array(transactionRecordSchema).max(240),
   伤病: z.array(injuryRecordSchema),
   故事钩子: z.array(storyHookSchema),
   季后赛: playoffStateSchema.nullable().default(null),
