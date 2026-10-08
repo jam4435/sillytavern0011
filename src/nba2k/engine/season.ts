@@ -34,7 +34,7 @@ export interface InjuryRecord {
 
 export interface StoryHook {
   id: string;
-  type: '赛历' | '交易' | '合同' | '代言' | '伤病' | '球队关系' | '奖项';
+  type: '赛历' | '交易' | '合同' | '代言' | '伤病' | '球队关系' | '奖项' | '选秀';
   title: string;
   detail: string;
   createdDate: string;
