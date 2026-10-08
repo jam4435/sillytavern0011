@@ -19,7 +19,7 @@ import { Logger } from '../../utils/log';
 import { recordEraDiagnostic } from '../../utils/diagnostics';
 
 const logger = new Logger('core-crud-update');
-const eventRootPattern = /^(?:事件系统|参与事件|世界事件|事件分支结果|后续事件线索|后续事件线索计数)(?:\\.|$)/;
+const eventRootPattern = /^(?:事件系统|参与事件|世界事件|事件分支结果|后续事件线索|后续事件线索计数)(?:\.|$)/;
 const traceEventEditSkip = (path: string, messageId: number, reason: string, extra: Record<string, unknown> = {}) => {
   if (eventRootPattern.test(path)) {
     recordEraDiagnostic('core-crud-update', 'event-edit-skipped', { path, messageId, reason, ...extra });
