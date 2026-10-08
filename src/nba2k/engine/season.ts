@@ -1,5 +1,6 @@
 import { TEAMS } from '../data/teams';
 import type { MatchState } from './types';
+import { createInitialCoachProfiles, type CoachProfile } from './coachProfile';
 
 export type LeaguePhase = '常规赛' | '季后赛' | '休赛期';
 export type PlayoffRound = '首轮' | '分区半决赛' | '分区决赛' | '总决赛';
@@ -56,6 +57,7 @@ export interface LeagueState {
   阶段: LeaguePhase;
   赛程索引: number;
   战绩: Record<string, StandingRecord>;
+  教练: Record<string, CoachProfile>;
   伤病: InjuryRecord[];
   故事钩子: StoryHook[];
   季后赛: PlayoffState | null;
@@ -141,6 +143,7 @@ export function createLeagueState(playerTeamId: string): LeagueState {
     阶段: '常规赛',
     赛程索引: 0,
     战绩: Object.fromEntries(TEAMS.map(team => [team.id, emptyStanding()])),
+    教练: createInitialCoachProfiles(TEAMS.map(team => team.id)),
     伤病: [],
     故事钩子: [{
       id: 'opening-night-2015',
