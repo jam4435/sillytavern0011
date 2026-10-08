@@ -89,57 +89,57 @@ export const ApplyVarChangeForMessage = async (msg: any): Promise<string | null>
     }
 
     const rawContent = getMessageContent(msg) || '';
-  const operationBlocks = extractOrderedVariableActionBlocks(rawContent);
-  const oldEditLog = parseEditLog(getEraData().meta?.[LOGS_PATH]?.[MK]);
-  const beforeEventRoots = fingerprintEventRoots();
-  const editLog: any[] = [];
+    const operationBlocks = extractOrderedVariableActionBlocks(rawContent);
+    const oldEditLog = parseEditLog(getEraData().meta?.[LOGS_PATH]?.[MK]);
+    const beforeEventRoots = fingerprintEventRoots();
+    const editLog: any[] = [];
 
-  if (operationBlocks.length === 0) {
-    logger.debug('ApplyVarChangeForMessage', `消息 (ID: ${messageId}) 未检测到变量修改标签。`);
-  }
-
-  // 同一消息中的变量动作严格按文本顺序执行。按 Insert/Edit/Delete 分桶会
-  // 将“Delete 旧事件占用 → Insert 新事件占用”错误变成“Insert → Delete”。
-  for (const block of operationBlocks) {
-    const records = escapeEraData(parseJsonl(block.body));
-    if (block.tag === 'VariableInsert') {
-      await processInsertBlocks(records, editLog);
-    } else if (block.tag === 'VariableEdit') {
-      await processEditBlocks(records, editLog, messageId);
-    } else {
-      await processDeleteBlocks(records, editLog);
+    if (operationBlocks.length === 0) {
+      logger.debug('ApplyVarChangeForMessage', `消息 (ID: ${messageId}) 未检测到变量修改标签。`);
     }
-  }
 
-  const afterEventRoots = fingerprintEventRoots();
-  const changedEventRoots = TRACKED_EVENT_ROOTS.filter(
-    key => beforeEventRoots[key] !== afterEventRoots[key],
-  );
-  const logSummary = {
-    messageId,
-    mk: MK,
-    blockOrder: operationBlocks.map(block => block.tag.replace('Variable', '')),
-    oldLogCount: oldEditLog.length,
-    newLogCount: editLog.length,
-    changedEventRoots,
-    beforeEventRoots,
-    afterEventRoots,
-  };
-  if (operationBlocks.length > 0 || changedEventRoots.length > 0 || oldEditLog.length > 0) {
-    recordEraDiagnostic('core-crud-patcher', 'message-apply-log-audit', logSummary);
-  }
-  if (changedEventRoots.length > 0 && editLog.length === 0) {
-    recordEraDiagnostic('core-crud-patcher', 'event-state-changed-without-editlog', logSummary);
-    logger.warn('ApplyVarChangeForMessage', '事件根状态发生变化，但本楼没有生成 ERA EditLog', logSummary);
-  } else if (operationBlocks.length > 0 && editLog.length === 0) {
-    recordEraDiagnostic('core-crud-patcher', 'action-blocks-produced-empty-editlog', logSummary);
-  }
-  if (oldEditLog.length > 0 && editLog.length === 0) {
-    // 只记录事实；合法的 Swipe/回滚重算同样可能产生空日志，不能直接保留旧日志。
-    recordEraDiagnostic('core-crud-patcher', 'nonempty-editlog-overwritten-by-empty', logSummary);
-  }
+    // 同一消息中的变量动作严格按文本顺序执行。按 Insert/Edit/Delete 分桶会
+    // 将“Delete 旧事件占用 → Insert 新事件占用”错误变成“Insert → Delete”。
+    for (const block of operationBlocks) {
+      const records = escapeEraData(parseJsonl(block.body));
+      if (block.tag === 'VariableInsert') {
+        await processInsertBlocks(records, editLog);
+      } else if (block.tag === 'VariableEdit') {
+        await processEditBlocks(records, editLog, messageId);
+      } else {
+        await processDeleteBlocks(records, editLog);
+      }
+    }
 
-  // 5. --- 覆盖式写入 EditLog ---
+    const afterEventRoots = fingerprintEventRoots();
+    const changedEventRoots = TRACKED_EVENT_ROOTS.filter(
+      key => beforeEventRoots[key] !== afterEventRoots[key],
+    );
+    const logSummary = {
+      messageId,
+      mk: MK,
+      blockOrder: operationBlocks.map(block => block.tag.replace('Variable', '')),
+      oldLogCount: oldEditLog.length,
+      newLogCount: editLog.length,
+      changedEventRoots,
+      beforeEventRoots,
+      afterEventRoots,
+    };
+    if (operationBlocks.length > 0 || changedEventRoots.length > 0 || oldEditLog.length > 0) {
+      recordEraDiagnostic('core-crud-patcher', 'message-apply-log-audit', logSummary);
+    }
+    if (changedEventRoots.length > 0 && editLog.length === 0) {
+      recordEraDiagnostic('core-crud-patcher', 'event-state-changed-without-editlog', logSummary);
+      logger.warn('ApplyVarChangeForMessage', '事件根状态发生变化，但本楼没有生成 ERA EditLog', logSummary);
+    } else if (operationBlocks.length > 0 && editLog.length === 0) {
+      recordEraDiagnostic('core-crud-patcher', 'action-blocks-produced-empty-editlog', logSummary);
+    }
+    if (oldEditLog.length > 0 && editLog.length === 0) {
+      // 只记录事实；合法的 Swipe/回滚重算同样可能产生空日志，不能直接保留旧日志。
+      recordEraDiagnostic('core-crud-patcher', 'nonempty-editlog-overwritten-by-empty', logSummary);
+    }
+
+    // 5. --- 覆盖式写入 EditLog ---
     /*
      * 核心逻辑：无论本轮是否产生了有效的变量修改，都必须用当前的 editLog (哪怕是空数组) 覆盖旧的 EditLog。
      *
