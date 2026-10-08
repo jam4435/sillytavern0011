@@ -187,8 +187,12 @@ export interface TeamRotationState {
   starters: string[];
   /** 赛前基础计划；比赛中 GameContext 可上下浮动，而不是硬性命令。 */
   targetMinutes: Record<string, number>;
-  /** 球队级真实轮换档案的标识；缺失时使用通用算法。 */
-  profileId?: string;
+  /** 轮换计划来源。生产运行时只使用 dynamic；历史数据仅供测试。 */
+  planSource?: 'dynamic';
+  /** 纯模拟推导出的教练用人倾向。 */
+  benchTrust?: number;
+  starLoad?: number;
+  loadManagement?: number;
   /** 末节胶着时谁更值得留在场上。 */
   closingPriority?: Record<string, number>;
   /** 垃圾时间越高越优先使用。 */
