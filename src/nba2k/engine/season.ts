@@ -10,6 +10,7 @@ import { seasonLabelFromOffset } from './lifecycle';
 import type { LeagueContract, MarketOffer, TransactionRecord } from './transactionTypes';
 import type { DraftPickRecord, GeneratedPlayerSeed } from './draft';
 import { simulateLowFidelityGame, type LeagueSimulationProfiles } from './teamPower';
+import { applyGameInjuries, advanceInjuryRecovery, type InjuryGameExposure } from './injury';
 import { addSeasonLines, decideSeasonAwards, matchSeasonLines, simulateTeamSeasonLines,
   type LeaguePlayerSeasonStats, type SeasonAwards } from './leagueStats';
 import type { PlayerData } from './types';
@@ -233,10 +234,11 @@ function simulateOtherLeagueGames(
   profiles?: LeagueSimulationProfiles | null,
   rosters?: Record<string, PlayerData[]>,
   league?: LeagueState,
-): { standings: Record<string, StandingRecord>; seasonLines: LeaguePlayerSeasonStats } {
+): { standings: Record<string, StandingRecord>; seasonLines: LeaguePlayerSeasonStats; exposures: InjuryGameExposure[] } {
   const teams = TEAMS.filter(team => !excluded.has(team.id)).map(team => team.id).sort();
   const seasonLines: LeaguePlayerSeasonStats = {};
-  if (teams.length < 2) return { standings, seasonLines };
+  const exposures: InjuryGameExposure[] = [];
+  if (teams.length < 2) return { standings, seasonLines, exposures };
   const rotation = roundIndex % teams.length;
   const rotated = [...teams.slice(rotation), ...teams.slice(0, rotation)];
   let next = standings;
@@ -247,11 +249,14 @@ function simulateOtherLeagueGames(
     next = recordResult(next, home, away, homeScore, awayScore);
     // 只追加本轮新产生的累计增量，不保存14场完整比赛日志。
     if (league && rosters && profiles?.[home] && profiles?.[away]) {
-      Object.assign(seasonLines, simulateTeamSeasonLines(home, rosters[home] ?? [], league, profiles[home], homeScore, rng));
-      Object.assign(seasonLines, simulateTeamSeasonLines(away, rosters[away] ?? [], league, profiles[away], awayScore, rng));
+      const homeLines = simulateTeamSeasonLines(home, rosters[home] ?? [], league, profiles[home], homeScore, rng);
+      const awayLines = simulateTeamSeasonLines(away, rosters[away] ?? [], league, profiles[away], awayScore, rng);
+      Object.assign(seasonLines, homeLines, awayLines);
+      exposures.push({ gameId: `regular-${roundIndex}-${home}-${away}`, date: league.日期,
+        lines: { ...homeLines, ...awayLines } });
     }
   }
-  return { standings: next, seasonLines };
+  return { standings: next, seasonLines, exposures };
 }
 
 export function calendarHooksForDate(date: string): StoryHook[] {
@@ -349,6 +354,7 @@ function simulateSeriesGame(
   series: PlayoffSeries,
   rng: () => number,
   profiles?: LeagueSimulationProfiles | null,
+  onGame?: (home: string, away: string, homeScore: number, awayScore: number, gameId: string) => void,
 ): PlayoffSeries {
   if (seriesWinner(series)) return series;
   const gameNo = Math.min(6, series.winsA + series.winsB);
@@ -356,6 +362,7 @@ function simulateSeriesGame(
   const home = homeA ? series.teamA : series.teamB;
   const away = homeA ? series.teamB : series.teamA;
   const [homeScore, awayScore] = simulateLowFidelityGame(home, away, profiles, rng, true);
+  onGame?.(home, away, homeScore, awayScore, `${series.id}-g${gameNo + 1}`);
   const winner = homeScore > awayScore ? home : away;
   return {
     ...series,
@@ -369,11 +376,12 @@ function simulateOtherPlayoffSeries(
   playerTeamId: string,
   rng: () => number,
   profiles?: LeagueSimulationProfiles | null,
+  onGame?: (home: string, away: string, homeScore: number, awayScore: number, gameId: string) => void,
 ): PlayoffState {
   return {
     ...state,
     series: state.series.map(series =>
-      seriesContains(series, playerTeamId) ? series : simulateSeriesGame(series, rng, profiles),
+      seriesContains(series, playerTeamId) ? series : simulateSeriesGame(series, rng, profiles, onGame),
     ),
   };
 }
@@ -383,12 +391,13 @@ function completeOtherSeries(
   playerTeamId: string,
   rng: () => number,
   profiles?: LeagueSimulationProfiles | null,
+  onGame?: (home: string, away: string, homeScore: number, awayScore: number, gameId: string) => void,
 ): PlayoffState {
   let next = state;
   for (let guard = 0; guard < 7; guard++) {
     const incompleteOther = next.series.some(series => !seriesContains(series, playerTeamId) && !seriesWinner(series));
     if (!incompleteOther) break;
-    next = simulateOtherPlayoffSeries(next, playerTeamId, rng, profiles);
+    next = simulateOtherPlayoffSeries(next, playerTeamId, rng, profiles, onGame);
   }
   return next;
 }
@@ -523,7 +532,7 @@ export function beginNextSeason(league: LeagueState, playerTeamId: string): Adva
     }]),
     季后赛: null,
   };
-  return { league: nextLeague, nextGame };
+  return { league: advanceInjuryRecovery(nextLeague), nextGame };
 }
 
 /**
@@ -562,18 +571,44 @@ export function advanceLeagueAfterGame(
   rng: () => number = Math.random,
   profiles?: LeagueSimulationProfiles | null,
   rosters?: Record<string, PlayerData[]>,
+  protagonist?: { key: string; age: number },
 ): AdvanceSeasonResult {
   // 每个玩家比赛轮次同时代表联盟推进一轮；所有现任教练增加1场磨合。
   league = { ...league, 教练: advanceCoachTenure(league.教练) };
+  // 在本场真实Box Score已经结算后才判伤，供下一场轮换读取。
+  const realGame = rosters && (league.阶段 === '常规赛' || league.阶段 === '季后赛')
+    ? matchSeasonLines(match) : {};
+  if (rosters && Object.keys(realGame).length) {
+    const fatigue = Object.fromEntries(Object.entries(match.球员状态)
+      .map(([key, status]) => [key, status.体力]));
+    league = applyGameInjuries(league, rosters, [{
+      gameId: `player-${league.赛季序号}-${league.赛程索引}-${match.对阵.主队}-${match.对阵.客队}`,
+      date: league.日期, lines: realGame, remainingStamina: fatigue,
+    }], protagonist);
+  }
   if (league.阶段 === '季后赛' && league.季后赛) {
+    const otherExposures: InjuryGameExposure[] = [];
+    const onOtherGame = (home: string, away: string, homeScore: number, awayScore: number, gameId: string) => {
+      if (!rosters || !profiles?.[home] || !profiles?.[away]) return;
+      otherExposures.push({
+        gameId: `playoffs-${gameId}`, date: league.日期,
+        lines: {
+          ...simulateTeamSeasonLines(home, rosters[home] ?? [], league, profiles[home], homeScore, rng),
+          ...simulateTeamSeasonLines(away, rosters[away] ?? [], league, profiles[away], awayScore, rng),
+        },
+      });
+    };
+    const finalizeOtherInjuries = () => rosters
+      ? applyGameInjuries(league, rosters, otherExposures, protagonist) : league;
     let playoffs = recordPlayerPlayoffGame(league.季后赛, match, playerTeamId);
-    playoffs = simulateOtherPlayoffSeries(playoffs, playerTeamId, rng, profiles);
+    playoffs = simulateOtherPlayoffSeries(playoffs, playerTeamId, rng, profiles, onOtherGame);
     const playerSeries = playoffs.series.find(series => seriesContains(series, playerTeamId));
     const playerWinner = playerSeries ? seriesWinner(playerSeries) : null;
     const nextIndex = league.赛程索引 + 1;
     const nextDate = addDays(league.日期, 2);
 
     if (playerSeries && playerWinner && playerWinner !== playerTeamId) {
+      league = finalizeOtherInjuries();
       const nextLeague: LeagueState = {
         ...league,
         日期: nextDate,
@@ -588,7 +623,8 @@ export function advanceLeagueAfterGame(
     }
 
     if (playerSeries && playerWinner === playerTeamId) {
-      playoffs = completeOtherSeries(playoffs, playerTeamId, rng, profiles);
+      playoffs = completeOtherSeries(playoffs, playerTeamId, rng, profiles, onOtherGame);
+      league = finalizeOtherInjuries();
       playoffs = nextRoundState(playoffs);
 
       if (playoffs.champion) {
@@ -617,6 +653,7 @@ export function advanceLeagueAfterGame(
       return { league: advancedLeague, nextGame: getNextPlayoffGame(advancedLeague, playerTeamId) };
     }
 
+    league = finalizeOtherInjuries();
     const continuingLeague: LeagueState = {
       ...league,
       日期: nextDate,
@@ -637,8 +674,9 @@ export function advanceLeagueAfterGame(
   const standings = background.standings;
   const seasonStats = rosters
     ? addSeasonLines(league.球员赛季统计,
-        { ...background.seasonLines, ...matchSeasonLines(match) })
+        { ...background.seasonLines, ...realGame })
     : league.球员赛季统计;
+  if (rosters) league = applyGameInjuries(league, rosters, background.exposures, protagonist);
 
   const nextIndex = league.赛程索引 + 1;
   const nextGame = getScheduledGame(playerTeamId, nextIndex, league.赛季序号);
