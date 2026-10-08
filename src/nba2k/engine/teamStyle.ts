@@ -1,4 +1,5 @@
 import { deriveCpuTendencies } from './tendencies';
+import { coachInfluence, type CoachProfile } from './coachProfile';
 import type { DefensiveScheme, OffensiveScheme, PlayerData, StructuredTeamTactics } from './types';
 
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
@@ -64,7 +65,7 @@ function defenseScheme(scores: Record<DefensiveScheme, number>): DefensiveScheme
  * TeamStyleEngine：只读取“当前可用阵容”。
  * 不读取球队ID、历史年份或真实球队答案，因此交易、退役、选秀、生成球员后会自然重算。
  */
-export function deriveTeamStyle(roster: PlayerData[]): DerivedTeamStyle {
+export function deriveTeamStyle(roster: PlayerData[], coachProfile?: CoachProfile | null): DerivedTeamStyle {
   const pool = rotationPool(roster);
   if (!pool.length) {
     const tactics: StructuredTeamTactics = {
@@ -138,11 +139,34 @@ export function deriveTeamStyle(roster: PlayerData[]): DerivedTeamStyle {
     延误: mobileBig * .28 + perimeterDefense * .26 + help * .20 + defensiveMobility * .18 + teamDefense * .08,
   };
 
-  const paceScore = clamp(
+  const influence = coachInfluence(coachProfile);
+  if (coachProfile?.offensePreference) {
+    const boost = (3 + coachProfile.stubbornness * .045) * influence;
+    offenseScores[coachProfile.offensePreference] += boost;
+  }
+  if (coachProfile?.defensePreference) {
+    const boost = (2.5 + coachProfile.stubbornness * .035) * influence;
+    defenseScores[coachProfile.defensePreference] += boost;
+  }
+
+  const rawPaceScore = clamp(
     mobility * .31 + handling * .18 + initiation * .12 + stamina * .25 + offBall * .14 - Math.max(0, post - 78) * .22,
   );
-  const helpScore = clamp(help * .48 + interiorAnchor * .24 + teamDefense * .20 + (100 - perimeterDefense) * .08);
-  const reboundScore = clamp(offensiveRebound * .58 + defensiveRebound * .20 + stamina * .12 + (100 - paceScore) * .10);
+  const paceBias =
+    coachProfile?.pacePreference === '快' ? 4 * influence :
+    coachProfile?.pacePreference === '慢' ? -4 * influence :
+    0;
+  const paceScore = clamp(rawPaceScore + paceBias);
+  const helpScore = clamp(
+    help * .48 + interiorAnchor * .24 + teamDefense * .20 + (100 - perimeterDefense) * .08 +
+    (coachProfile?.helpBias ?? 0) * influence,
+  );
+  const rawReboundScore = clamp(offensiveRebound * .58 + defensiveRebound * .20 + stamina * .12 + (100 - paceScore) * .10);
+  const reboundBias =
+    coachProfile?.reboundPreference === '冲抢' ? 4 * influence :
+    coachProfile?.reboundPreference === '优先退防' ? -4 * influence :
+    0;
+  const reboundScore = clamp(rawReboundScore + reboundBias);
 
   const tactics: StructuredTeamTactics = {
     offense: offenseScheme(offenseScores),
@@ -169,6 +193,6 @@ export function deriveTeamStyle(roster: PlayerData[]): DerivedTeamStyle {
   };
 }
 
-export function deriveTeamTactics(roster: PlayerData[]): StructuredTeamTactics {
-  return deriveTeamStyle(roster).tactics;
+export function deriveTeamTactics(roster: PlayerData[], coachProfile?: CoachProfile | null): StructuredTeamTactics {
+  return deriveTeamStyle(roster, coachProfile).tactics;
 }
