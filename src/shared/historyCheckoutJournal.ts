@@ -27,6 +27,8 @@ const CheckoutJournalFailureSchema = z
     stage: CheckoutJournalStageSchema,
     message: z.string(),
     occurredAt: z.number().finite(),
+    /** 只保存可复制的恢复诊断，不保存完整事件变量内容。 */
+    details: z.string().optional(),
   })
   .strict();
 
