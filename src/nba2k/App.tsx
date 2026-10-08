@@ -20,8 +20,10 @@ import { createDevelopment, defaultBadges, defaultHotZones, defaultTendencies, i
 import type { MatchState, OnCourtStatus, PlayerData, Side, SituationContext, StructuredTeamTactics, UpgradeGroupKey } from './engine/types';
 import {
   createLeaguePlayerResolver,
+  getAllPlayersForLeague,
   getBasePlayer,
   getPlayer,
+  getPlayerForLeague,
   getRosterForLeague,
   getTeam,
   registerCustomPlayer,
@@ -41,7 +43,12 @@ import {
   formatScheduledOpponent,
   getScheduledGame,
 } from './engine/season';
-import { advanceInjuryRecovery, collectOffCourtHooks } from './engine/offCourtSystems';
+import {
+  advanceInjuryRecovery,
+  collectOffCourtHooks,
+  isTradeDeadlinePeriod,
+  isTradeWindowOpen,
+} from './engine/offCourtSystems';
 import { deriveTeamTactics } from './engine/teamStyle';
 import { applyAutomaticRotation } from './engine/rotation';
 import { createRotationPlan } from './engine/rotationPlan';
@@ -51,7 +58,18 @@ import {
   advanceCareerLifecycleOneSeason,
   estimateInitialAge,
   estimatePeakAge,
+  seasonLabelFromOffset,
 } from './engine/lifecycle';
+import {
+  applyMarketOffer,
+  contractExpiresThisOffseason,
+  contractForPlayer,
+  prepareOffseasonMarket,
+  preparePlayerTradeMarket,
+  registerExistingContract,
+  runCpuTradeDeadline,
+} from './engine/transactions';
+import type { MarketOffer } from './engine/transactionTypes';
 
 function freshStatus(): OnCourtStatus {
   return {
