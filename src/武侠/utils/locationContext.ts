@@ -4,6 +4,7 @@ import { getLocationScopePath, normalizeLocationPath, parseLocationPath } from '
 import { loadMapData } from './mapLoader';
 import { FRONTEND_VARIABLES_KEY } from './frontendVariableKeys';
 import { isLocationUnlocked } from './mapUtils';
+import { deriveActiveEventFollowupLocations } from './activeEventFollowups';
 
 const DEFAULT_ADJACENT_REGION_LIMIT = 4;
 export const LOCATION_CONTEXT_VARIABLE_KEY = '周围地点';
@@ -38,10 +39,12 @@ export interface DynamicLocationContextVariable {
   附近地点: string[];
   目标事件地点: string[];
   地图移动目的地: string[];
+  后续事件: Record<string, string>;
 }
 
 export interface DynamicLocationContextVariableOptions {
   eventTargetPaths?: string[];
+  followupLocations?: Record<string, string>;
   explicitMapTargets?: string[];
 }
 
@@ -235,13 +238,18 @@ export function createDynamicLocationContextVariable(
   context: DynamicLocationContext,
   options: DynamicLocationContextVariableOptions = {},
 ): DynamicLocationContextVariable {
-  const eventTargets = normalizeCompleteLocationPaths(options.eventTargetPaths || []);
+  const followupLocations = options.followupLocations || {};
+  const eventTargets = normalizeCompleteLocationPaths([
+    ...(options.eventTargetPaths || []),
+    ...Object.values(followupLocations),
+  ]);
   const explicitMapTargets = normalizeCompleteLocationPaths(options.explicitMapTargets || []);
   return {
     当前活动区: context.currentScopePath,
     附近地点: [...new Set(context.allowedLocationPaths)],
     目标事件地点: eventTargets,
     地图移动目的地: explicitMapTargets,
+    后续事件: { ...followupLocations },
   };
 }
 
@@ -355,6 +363,7 @@ export async function syncDynamicLocationContextVariable(
     const statData = isRecord(variables.stat_data) ? variables.stat_data : variables;
     const value = createDynamicLocationContextVariable(await buildCurrentDynamicLocationContext(), {
       eventTargetPaths: collectEventTargetPaths(statData),
+      followupLocations: deriveActiveEventFollowupLocations(statData),
       explicitMapTargets: options.explicitMapTargets,
     });
     const frontendVariables = getFrontendVariablesRecord(variables);
