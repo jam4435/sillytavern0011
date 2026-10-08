@@ -9,3 +9,7 @@ NBA 2K16（2015-16赛季揭幕阵容，即2K16首发名单）。overall：各队
 
 ## calibration/rotationBenchmarks2015_16.ts
 2015-16 历史轮换分钟只作为**测试答案**保留。生产运行时不会导入该文件，也不会把 Curry/LeBron 等真实历史分钟作为赛前输入。校准测试使用当季阵容和能力数据跑纯模拟 RotationPlan，再把输出分钟与历史基准比较，以判断算法是否大致像真实 NBA。
+
+
+## calibration/teamStyleBenchmarks2015_16.ts
+2015-16 GSW/HOU/SAS/MEM 等球队的粗粒度进攻体系、节奏、防守和篮板风格只作为**校准参照**。生产运行时不会读取这些标签；`TeamStyleEngine` 先根据当前 roster 纯模拟本场战术，再由测试比较“精确命中”和“是否落在第一梯队”。历史标签本身较粗，因此不以逐队100%复刻为目标。
