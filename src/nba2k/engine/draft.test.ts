@@ -7,7 +7,8 @@ import {
   projectGeneratedPlayer,
   runAnnualDraft,
 } from './draft';
-import { getPlayerForLeague, getRosterForLeague } from '../utils/rosters';
+import { getAllPlayersForLeague, getPlayerForLeague, getRosterForLeague } from '../utils/rosters';
+import { prepareOffseasonMarket } from './transactions';
 import { TEAMS } from '../data/teams';
 
 describe('procedural rookie draft', () => {
@@ -66,6 +67,54 @@ describe('procedural rookie draft', () => {
     const again = runAnnualDraft(result.league, getRosterForLeague);
     expect(again.league.选秀历史).toHaveLength(60);
     expect(again.picks).toEqual(result.picks);
+  });
+
+  it('选秀后接自由市场会把所有球队收敛到15人上限以内', () => {
+    let league = createLeagueState('GSW');
+    league.阶段 = '休赛期';
+    for (const [index, team] of TEAMS.entries()) {
+      const wins = 18 + (index * 7) % 48;
+      league.战绩[team.id] = { 胜: wins, 负: 82 - wins, 得分: 7900 + wins * 9, 失分: 8500 - wins * 4, 连胜: 0 };
+    }
+    const drafted = runAnnualDraft(league, getRosterForLeague);
+    const market = prepareOffseasonMarket(
+      drafted.league,
+      'Stephen Curry',
+      getPlayerForLeague,
+      getRosterForLeague,
+      getAllPlayersForLeague,
+    );
+    const sizes = Object.fromEntries(TEAMS.map(team => [team.id, getRosterForLeague(team.id, market.league).length]));
+    console.info('[nba2k post-draft roster sizes]', sizes);
+    expect(Math.max(...Object.values(sizes))).toBeLessThanOrEqual(15);
+    expect(Object.values(sizes).filter(size => size >= 12).length).toBeGreaterThanOrEqual(25);
+  });
+
+  it('连续5届选秀能持续补充联盟人口，不会重复生成同届或把Roster无限撑大', () => {
+    let league = createLeagueState('GSW');
+    for (let season = 0; season < 5; season++) {
+      league.阶段 = '休赛期';
+      for (const [index, team] of TEAMS.entries()) {
+        const wins = 15 + (index * 11 + season * 5) % 54;
+        league.战绩[team.id] = { 胜: wins, 负: 82 - wins, 得分: 7800 + wins * 10, 失分: 8600 - wins * 5, 连胜: 0 };
+      }
+      const drafted = runAnnualDraft(league, getRosterForLeague);
+      const market = prepareOffseasonMarket(
+        drafted.league,
+        'Stephen Curry',
+        getPlayerForLeague,
+        getRosterForLeague,
+        getAllPlayersForLeague,
+      );
+      league = beginNextSeason(market.league, 'GSW').league;
+      expect(Math.max(...TEAMS.map(team => getRosterForLeague(team.id, league).length))).toBeLessThanOrEqual(15);
+    }
+    expect(Object.keys(league.生成球员)).toHaveLength(300);
+    expect(league.选秀历史).toHaveLength(300);
+    const activeRosterPlayers = TEAMS.reduce((sum, team) => sum + getRosterForLeague(team.id, league).length, 0);
+    console.info('[nba2k five-season roster population]', activeRosterPlayers);
+    expect(activeRosterPlayers).toBeGreaterThanOrEqual(330);
+    expect(activeRosterPlayers).toBeLessThanOrEqual(450);
   });
 
   it('新秀进入下一赛季真实Roster，并按已知年龄而不是历史年龄估算器成长', () => {
