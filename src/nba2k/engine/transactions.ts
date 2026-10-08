@@ -138,7 +138,8 @@ export function derivedInitialContract(player: PlayerData, league: LeagueState):
     teamId,
     signedSeason: 0,
     expiresAfterSeason: termIndex,
-    annualSalary: salaryFor(player, { ...league, 赛季序号: 0 }, 50, teamId ?? 'FA'),
+    // 初始合同金额不能因为之后被交易到另一队而重算。
+    annualSalary: salaryFor(player, { ...league, 赛季序号: 0 }, 50, 'INITIAL'),
     years: termIndex + 1,
     status: teamId ? '有效' : '自由球员',
   };
