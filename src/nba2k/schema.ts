@@ -150,6 +150,22 @@ export const offCourtStateSchema = z.object({
   日程: z.object({ 日期: nonEmptyText, 下一场: nonEmptyText, 待办: z.array(z.string()) }).strict(),
 }).strict();
 
+const coachProfileSchema = z.object({
+  id: nonEmptyText,
+  generation: nonNegativeInt,
+  offensePreference: z.enum(['基础', '五外', '四外一内', '挡拆', '低位', '动态进攻']).nullable(),
+  defensePreference: z.enum(['人盯人', '二三联防', '换防', '沉退', '延误']).nullable(),
+  pacePreference: z.enum(['慢', '标准', '快']),
+  reboundPreference: z.enum(['优先退防', '均衡', '冲抢']),
+  stubbornness: z.number().min(0).max(100),
+  helpBias: z.number().min(-20).max(20),
+  rotationDepthBias: z.number().int().min(-2).max(2),
+  benchTrustBias: z.number().min(-20).max(20),
+  starLoadBias: z.number().min(-20).max(20),
+  smallBallBias: z.number().min(-25).max(25),
+  playoffShorteningBias: z.number().min(-0.15).max(0.15),
+}).strict();
+
 const standingRecordSchema = z.object({
   胜: nonNegativeInt, 负: nonNegativeInt, 得分: nonNegativeInt, 失分: nonNegativeInt,
   连胜: z.number().int(),
@@ -195,6 +211,7 @@ export const leagueStateSchema = z.object({
   阶段: z.enum(['常规赛', '季后赛', '休赛期']),
   赛程索引: nonNegativeInt,
   战绩: z.record(nonEmptyText, standingRecordSchema),
+  教练: z.record(nonEmptyText, coachProfileSchema),
   伤病: z.array(injuryRecordSchema),
   故事钩子: z.array(storyHookSchema),
   季后赛: playoffStateSchema.nullable().default(null),
