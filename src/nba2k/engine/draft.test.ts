@@ -7,9 +7,19 @@ import {
   projectGeneratedPlayer,
   runAnnualDraft,
 } from './draft';
-import { getAllPlayersForLeague, getPlayerForLeague, getRosterForLeague } from '../utils/rosters';
+import {
+  buildLeagueRosterSnapshot,
+  getAllPlayersForLeague,
+  getPlayerForLeague,
+  getRosterForLeague,
+} from '../utils/rosters';
 import { prepareOffseasonMarket } from './transactions';
 import { TEAMS } from '../data/teams';
+
+function draftWithSnapshot(league: ReturnType<typeof createLeagueState>) {
+  const snapshot = buildLeagueRosterSnapshot(league);
+  return runAnnualDraft(league, getRosterForLeague, snapshot.byTeam);
+}
 
 describe('procedural rookie draft', () => {
   it('每届确定性生成60名唯一新秀，包含身体、位置、模板、潜力与43项初始能力', () => {
@@ -50,7 +60,7 @@ describe('procedural rookie draft', () => {
       league.战绩[team.id] = { 胜: wins, 负: 82 - wins, 得分: 8000 + wins * 10, 失分: 8500 - wins * 5, 连胜: 0 };
     }
 
-    const result = runAnnualDraft(league, getRosterForLeague);
+    const result = draftWithSnapshot(league);
     expect(result.picks).toHaveLength(60);
     for (const team of TEAMS) {
       expect(result.picks.filter(pick => pick.teamId === team.id)).toHaveLength(2);
@@ -64,7 +74,7 @@ describe('procedural rookie draft', () => {
       expect(contract?.annualSalary).toBeGreaterThan(0);
     }
 
-    const again = runAnnualDraft(result.league, getRosterForLeague);
+    const again = runAnnualDraft(result.league, getRosterForLeague, buildLeagueRosterSnapshot(result.league).byTeam);
     expect(again.league.选秀历史).toHaveLength(60);
     expect(again.picks).toEqual(result.picks);
   });
@@ -76,7 +86,7 @@ describe('procedural rookie draft', () => {
       const wins = 18 + (index * 7) % 48;
       league.战绩[team.id] = { 胜: wins, 负: 82 - wins, 得分: 7900 + wins * 9, 失分: 8500 - wins * 4, 连胜: 0 };
     }
-    const drafted = runAnnualDraft(league, getRosterForLeague);
+    const drafted = draftWithSnapshot(league);
     const market = prepareOffseasonMarket(
       drafted.league,
       'Stephen Curry',
@@ -84,7 +94,8 @@ describe('procedural rookie draft', () => {
       getRosterForLeague,
       getAllPlayersForLeague,
     );
-    const sizes = Object.fromEntries(TEAMS.map(team => [team.id, getRosterForLeague(team.id, market.league).length]));
+    const marketSnapshot = buildLeagueRosterSnapshot(market.league);
+    const sizes = Object.fromEntries(TEAMS.map(team => [team.id, marketSnapshot.byTeam[team.id].length]));
     console.info('[nba2k post-draft roster sizes]', sizes);
     expect(Math.max(...Object.values(sizes))).toBeLessThanOrEqual(15);
     expect(Object.values(sizes).filter(size => size >= 12).length).toBeGreaterThanOrEqual(25);
@@ -98,7 +109,7 @@ describe('procedural rookie draft', () => {
         const wins = 15 + (index * 11 + season * 5) % 54;
         league.战绩[team.id] = { 胜: wins, 负: 82 - wins, 得分: 7800 + wins * 10, 失分: 8600 - wins * 5, 连胜: 0 };
       }
-      const drafted = runAnnualDraft(league, getRosterForLeague);
+      const drafted = draftWithSnapshot(league);
       const market = prepareOffseasonMarket(
         drafted.league,
         'Stephen Curry',
@@ -107,11 +118,13 @@ describe('procedural rookie draft', () => {
         getAllPlayersForLeague,
       );
       league = beginNextSeason(market.league, 'GSW').league;
-      expect(Math.max(...TEAMS.map(team => getRosterForLeague(team.id, league).length))).toBeLessThanOrEqual(15);
+      const seasonSnapshot = buildLeagueRosterSnapshot(league);
+      expect(Math.max(...TEAMS.map(team => seasonSnapshot.byTeam[team.id].length))).toBeLessThanOrEqual(15);
     }
     expect(Object.keys(league.生成球员)).toHaveLength(300);
     expect(league.选秀历史).toHaveLength(300);
-    const activeRosterPlayers = TEAMS.reduce((sum, team) => sum + getRosterForLeague(team.id, league).length, 0);
+    const finalSnapshot = buildLeagueRosterSnapshot(league);
+    const activeRosterPlayers = TEAMS.reduce((sum, team) => sum + finalSnapshot.byTeam[team.id].length, 0);
     console.info('[nba2k five-season roster population]', activeRosterPlayers);
     expect(activeRosterPlayers).toBeGreaterThanOrEqual(330);
     expect(activeRosterPlayers).toBeLessThanOrEqual(450);
@@ -120,7 +133,7 @@ describe('procedural rookie draft', () => {
   it('新秀进入下一赛季真实Roster，并按已知年龄而不是历史年龄估算器成长', () => {
     let league = createLeagueState('GSW');
     league.阶段 = '休赛期';
-    const drafted = runAnnualDraft(league, getRosterForLeague);
+    const drafted = draftWithSnapshot(league);
     const firstPick = drafted.picks[0];
     const seed = drafted.league.生成球员[firstPick.playerKey];
     const atDraft = projectGeneratedPlayer(seed, seed.entrySeason);
@@ -129,7 +142,7 @@ describe('procedural rookie draft', () => {
     const next = beginNextSeason(drafted.league, 'GSW').league;
     const player = getPlayerForLeague(firstPick.playerKey, next);
     expect(player).toBeTruthy();
-    expect(getRosterForLeague(firstPick.teamId, next).some(item => item.name === firstPick.playerKey)).toBe(true);
+    expect(buildLeagueRosterSnapshot(next).byTeam[firstPick.teamId].some(item => item.name === firstPick.playerKey)).toBe(true);
 
     const yearTwo = projectGeneratedPlayer(seed, seed.entrySeason + 1);
     expect(yearTwo.age).toBe(seed.ageAtEntry + 1);
