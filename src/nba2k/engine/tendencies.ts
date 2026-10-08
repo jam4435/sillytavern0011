@@ -77,33 +77,16 @@ export function cpuTendencies(player: PlayerData): CpuTendencies {
   return { ...deriveCpuTendencies(player), ...(STAR_TENDENCY_OVERRIDES[player.name] ?? {}) };
 }
 
-const BASE_TACTICS: StructuredTeamTactics = {
-  offense: '基础',
-  defense: '人盯人',
-  pace: '标准',
-  helpIntensity: 50,
-  rebound: '均衡',
-};
-
 /**
- * 球队体系从“世界书风格描述”落成 CPU 可读的结构。
- * 只放明显、稳定的 2015-16 风格；未列球队继续使用基础体系。
+ * 只作为“没有可用阵容数据”时的中性fallback。
+ * 正式比赛请使用 teamStyle.ts 的 deriveTeamTactics(roster)。
  */
-const TEAM_TACTICS: Record<string, Partial<StructuredTeamTactics>> = {
-  GSW: { offense: '动态进攻', pace: '快', defense: '换防', helpIntensity: 68, rebound: '优先退防' },
-  HOU: { offense: '五外', pace: '快', defense: '换防', helpIntensity: 55, rebound: '优先退防' },
-  POR: { offense: '挡拆', pace: '快', defense: '人盯人', helpIntensity: 48 },
-  OKC: { offense: '挡拆', pace: '快', defense: '人盯人', helpIntensity: 55, rebound: '冲抢' },
-  SAS: { offense: '动态进攻', pace: '标准', defense: '人盯人', helpIntensity: 72, rebound: '均衡' },
-  CLE: { offense: '四外一内', pace: '标准', defense: '人盯人', helpIntensity: 58 },
-  LAC: { offense: '挡拆', pace: '快', defense: '人盯人', helpIntensity: 60 },
-  MEM: { offense: '低位', pace: '慢', defense: '人盯人', helpIntensity: 70, rebound: '冲抢' },
-  CHI: { offense: '基础', pace: '慢', defense: '人盯人', helpIntensity: 67, rebound: '冲抢' },
-  MIA: { offense: '四外一内', pace: '慢', defense: '人盯人', helpIntensity: 65 },
-  NYK: { offense: '低位', pace: '标准', defense: '人盯人', helpIntensity: 48 },
-  LAL: { offense: '低位', pace: '标准', defense: '人盯人', helpIntensity: 45 },
-};
-
-export function defaultTeamTactics(teamId: string): StructuredTeamTactics {
-  return { ...BASE_TACTICS, ...(TEAM_TACTICS[teamId] ?? {}) };
+export function neutralTeamTactics(): StructuredTeamTactics {
+  return {
+    offense: '基础',
+    defense: '人盯人',
+    pace: '标准',
+    helpIntensity: 50,
+    rebound: '均衡',
+  };
 }
