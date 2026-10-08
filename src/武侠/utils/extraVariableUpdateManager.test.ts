@@ -1098,6 +1098,30 @@ describe('executeExtraVariableUpdate', () => {
     expect(fallbackProjection).not.toContain('前端变量');
   });
 
+  it('参与事件尚未结算时变量模型提前收到后续地点与有条件移动指引', async () => {
+    requestConfiguredTextMock.mockResolvedValue('<VariableThink>无变化</VariableThink>');
+    const statData = variableSnapshot.stat_data as Record<string, unknown>;
+    statData.参与事件 = {
+      '天龙第二回07-段誉蒲团得绝学启程奔万劫谷': {
+        描述: '1202年3月16日17时12分 到 1202年3月16日18时45分，仍在琅嬛福地',
+        地点: '大理/无量山/琅嬛福地',
+      },
+    };
+
+    await executeExtraVariableUpdate({
+      settings: {
+        ...DEFAULT_SUMMARY_SETTINGS,
+        variableUpdateMode: 'extra',
+      },
+      assistantMessageId: 28,
+      latestRawReply: '正文继续推进当前事件',
+    });
+
+    const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
+    expect(prompt).toContain('后续事件:天龙第三回01-段誉入谷寻访空寂瓦房:大理/万劫谷/万劫谷庄院/正堂瓦房');
+    expect(prompt).toContain('当参与事件全阶段完成且玩家有继续推进想法时，往后续事件地点移动');
+  });
+
   it('参与事件为空时发送普通回合检查清单并保持修为参考只读', async () => {
     requestConfiguredTextMock.mockResolvedValue('<VariableThink>无变化</VariableThink>');
     const statData = variableSnapshot.stat_data as Record<string, unknown>;
@@ -1116,6 +1140,7 @@ describe('executeExtraVariableUpdate', () => {
     expect(prompt).toContain('修炼一天的修为增幅参考值:33');
     expect(prompt).not.toContain('<参与事件>');
     expect(prompt).not.toContain('参与事件:{');
+    expect(prompt).not.toContain('后续事件移动指引:');
   });
 });
 
