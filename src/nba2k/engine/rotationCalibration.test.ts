@@ -3,7 +3,7 @@ import { ROTATION_BENCHMARKS_2015_16 } from '../data/calibration/rotationBenchma
 import { buildDynamicDepthChart } from './depthChart';
 import { buildFormation } from './positioning';
 import { createRotationPlan } from './rotationPlan';
-import { defaultTeamTactics } from './tendencies';
+import { deriveTeamTactics } from './teamStyle';
 import type { MatchState, OnCourtStatus } from './types';
 import { getPlayer, getRoster } from '../utils/rosters';
 
@@ -18,8 +18,8 @@ function matchFor(teamId: string): MatchState {
   const opponent = teamId === 'CLE' ? 'GSW' : 'CLE';
   const homeRoster = getRoster(teamId);
   const awayRoster = getRoster(opponent);
-  const homeTactics = defaultTeamTactics(teamId);
-  const awayTactics = defaultTeamTactics(opponent);
+  const homeTactics = deriveTeamTactics(homeRoster);
+  const awayTactics = deriveTeamTactics(awayRoster);
   const homeEntries = buildDynamicDepthChart(homeRoster, { tactics: homeTactics }).starters;
   const awayEntries = buildDynamicDepthChart(awayRoster, { tactics: awayTactics }).starters;
   const homeOn = homeEntries.map(entry => entry.key);
