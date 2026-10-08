@@ -20,7 +20,7 @@ function renderPrompt(
     "const getLocationScopePath = v => normalizeFullLocationPath(v).split('/').slice(0, 3).join('/');",
     "const uniqueFullLocationPaths = items => [...new Set(items.map(normalizeFullLocationPath).filter(Boolean))];",
     "const compactPromptKey = value => String(value);",
-  ].join('\\n') + '\\n';
+  ].join(String.fromCharCode(10)) + String.fromCharCode(10);
   for (const match of source.matchAll(blockPattern)) {
     body += `output += ${JSON.stringify(source.slice(cursor, match.index))};\n`;
     let code = match[1];
