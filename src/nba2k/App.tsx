@@ -17,8 +17,15 @@ import { buildFormation } from './engine/positioning';
 import { resolveAction } from './engine/resolveAction';
 import { advancePeriodIfNeeded, buildCanonicalAssistant, settleAssistantResponse } from './engine/settlement';
 import { createDevelopment, defaultBadges, defaultHotZones, defaultTendencies, initialGroups } from './engine/development';
-import type { MatchState, OnCourtStatus, Side, SituationContext, StructuredTeamTactics, UpgradeGroupKey } from './engine/types';
-import { getPlayer, getRoster, getTeam, registerCustomPlayer } from './utils/rosters';
+import type { MatchState, OnCourtStatus, PlayerData, Side, SituationContext, StructuredTeamTactics, UpgradeGroupKey } from './engine/types';
+import {
+  createLeaguePlayerResolver,
+  getBasePlayer,
+  getPlayer,
+  getRosterForLeague,
+  getTeam,
+  registerCustomPlayer,
+} from './utils/rosters';
 import type { Nba2kStat } from './utils/statReader';
 import { getLastAssistantNarrative, isInMatch, parseOptions, readStat, stripNarrative } from './utils/statReader';
 import { runTurnTransaction } from './utils/turnTransaction';
@@ -27,13 +34,25 @@ import { finishCareerGame, trainCareer, updateCareerDynamics, upgradeCareer } fr
 import { continuePossessionAfterAdvantage, simulatePossession } from './engine/possession';
 import type { SimulationMode } from './engine/simulationMode';
 import { simulateUntilInterruption } from './engine/simulationMode';
-import { advanceLeagueAfterGame, createLeagueState, formatScheduledOpponent, getScheduledGame } from './engine/season';
+import {
+  advanceLeagueAfterGame,
+  beginNextSeason,
+  createLeagueState,
+  formatScheduledOpponent,
+  getScheduledGame,
+} from './engine/season';
 import { advanceInjuryRecovery, collectOffCourtHooks } from './engine/offCourtSystems';
 import { deriveTeamTactics } from './engine/teamStyle';
 import { applyAutomaticRotation } from './engine/rotation';
 import { createRotationPlan } from './engine/rotationPlan';
 import { getPlayerAvailability } from './engine/availability';
 import { buildDynamicDepthChart } from './engine/depthChart';
+import {
+  advanceCareerLifecycleOneSeason,
+  careerPhase,
+  estimateInitialAge,
+  estimatePeakAge,
+} from './engine/lifecycle';
 
 function freshStatus(): OnCourtStatus {
   return {
@@ -69,6 +88,26 @@ function readSimulationMode(): SimulationMode {
     if (value === '全回合' || value === '精简比赛' || value === '关键时刻') return value;
   } catch {}
   return '精简比赛';
+}
+
+function careerPlayerProjection(career: NonNullable<Nba2kStat['生涯']>): PlayerData | undefined {
+  const base = career.自定义球员 ?? getBasePlayer(career.附身球员);
+  if (!base) return undefined;
+  const { overall, ...attrs } = career.能力;
+  return {
+    ...base,
+    team: career.球队,
+    pos: career.位置,
+    overall,
+    attrs,
+  };
+}
+
+function playerResolverForStat(stat: Nba2kStat): (key: string) => PlayerData | undefined {
+  const leagueResolver = createLeaguePlayerResolver(stat.联盟);
+  const career = stat.生涯;
+  const protagonist = career ? careerPlayerProjection(career) : undefined;
+  return key => career && key === career.附身球员 ? protagonist : leagueResolver(key);
 }
 
 function generatedText(result: string | GenerateToolCallResult): string {
@@ -156,9 +195,11 @@ const App: React.FC = () => {
 
   const refresh = useCallback(async () => {
     const next = readStat();
-    // 自定义球员随存档恢复时重新注册进球员库
-    const custom = (next.生涯 as any)?.自定义球员;
-    if (custom?.name) registerCustomPlayer(custom);
+    // 主角始终以生涯中的“当季能力”覆盖静态球员种子；训练/衰退才能真实进入比赛。
+    if (next.生涯) {
+      const projection = careerPlayerProjection(next.生涯);
+      if (projection) registerCustomPlayer(projection);
+    }
     setStat(next);
     const last = await getLastAssistantNarrative();
     setNarrative(stripNarrative(last));
@@ -212,7 +253,7 @@ const App: React.FC = () => {
       const p = getPlayer(r.protagonistKey);
       const team = getTeam(r.teamId);
       const league = createLeagueState(r.teamId);
-      const firstGame = getScheduledGame(r.teamId, 0);
+      const firstGame = getScheduledGame(r.teamId, 0, league.赛季序号);
       const firstOpponent = firstGame ? getTeam(firstGame.opponent) : undefined;
       await insertOrAssignVariables(
         {
@@ -223,8 +264,12 @@ const App: React.FC = () => {
               球队: r.teamId,
               位置: p?.pos ?? 'SG',
               附身球员: r.protagonistKey,
-              赛季: '2015-16',
+              赛季: league.赛季,
               赛程索引: 1,
+              年龄: p ? estimateInitialAge(p) : 24,
+              巅峰年龄: p ? estimatePeakAge(p) : 28,
+              生涯赛季数: 0,
+              退役状态: '现役',
               能力: { overall: p?.overall ?? 75, ...p?.attrs },
               发展: createDevelopment('2K16模式', '均衡', initialGroups('2K16模式', '均衡')),
               倾向: defaultTendencies(),
@@ -245,7 +290,8 @@ const App: React.FC = () => {
               合同: { 球队: r.teamId, 年限: 2, 年薪: 2000000, 到期赛季: '2017-18' },
               关系: [],
               队友好感: Object.fromEntries(
-                pickStarters(r.teamId)
+                getRosterForLeague(r.teamId, league)
+                  .slice(0, 5)
                   .filter(sp => sp.name !== r.protagonistKey)
                   .map(sp => [sp.name, 50]),
               ),
@@ -273,7 +319,7 @@ const App: React.FC = () => {
       registerCustomPlayer(player);
       const team = getTeam(form.teamId);
       const league = createLeagueState(form.teamId);
-      const firstGame = getScheduledGame(form.teamId, 0);
+      const firstGame = getScheduledGame(form.teamId, 0, league.赛季序号);
       const firstOpponent = firstGame ? getTeam(firstGame.opponent) : undefined;
       await insertOrAssignVariables(
         {
@@ -285,8 +331,12 @@ const App: React.FC = () => {
               位置: form.pos,
               附身球员: player.name,
               自定义球员: player,
-              赛季: '2015-16',
+              赛季: league.赛季,
               赛程索引: 1,
+              年龄: 19,
+              巅峰年龄: estimatePeakAge(player),
+              生涯赛季数: 0,
+              退役状态: '现役',
               能力: { overall: player.overall, ...player.attrs },
               发展: createDevelopment(form.mode, form.style, form.groups),
               倾向: defaultTendencies(),
@@ -307,7 +357,7 @@ const App: React.FC = () => {
               合同: { 球队: form.teamId, 年限: 2, 年薪: 1100000, 到期赛季: '2017-18' },
               关系: [],
               队友好感: Object.fromEntries(
-                pickStarters(form.teamId)
+                getRosterForLeague(form.teamId, league)
                   .slice(0, 5)
                   .map(sp => [sp.name, 45]),
               ),
@@ -348,8 +398,11 @@ const App: React.FC = () => {
 
     const protagonistKey = (career as any).附身球员 ?? '';
     const league = stat.联盟;
-    const homeFullRoster = getRoster(homeId);
-    const awayFullRoster = getRoster(awayId);
+    const projection = careerPlayerProjection(career);
+    if (projection) registerCustomPlayer(projection);
+    const resolvePlayer = playerResolverForStat(stat);
+    const homeFullRoster = getRosterForLeague(homeId, league);
+    const awayFullRoster = getRosterForLeague(awayId, league);
     const homeAvailable = homeFullRoster.filter(player => getPlayerAvailability(player.name, league).available);
     const awayAvailable = awayFullRoster.filter(player => getPlayerAvailability(player.name, league).available);
     if (homeAvailable.length < 5 || awayAvailable.length < 5) {
@@ -376,8 +429,8 @@ const App: React.FC = () => {
       }).starters;
     const homeEntries = entriesFor(homeId, homeAvailable, homeTactics, homeCoach);
     const awayEntries = entriesFor(awayId, awayAvailable, awayTactics, awayCoach);
-    const homeCenter = getPlayer(homeEntries.find(entry => entry.pos === 'C')?.key ?? homeEntries.at(-1)?.key ?? '');
-    const awayCenter = getPlayer(awayEntries.find(entry => entry.pos === 'C')?.key ?? awayEntries.at(-1)?.key ?? '');
+    const homeCenter = resolvePlayer(homeEntries.find(entry => entry.pos === 'C')?.key ?? homeEntries.at(-1)?.key ?? '');
+    const awayCenter = resolvePlayer(awayEntries.find(entry => entry.pos === 'C')?.key ?? awayEntries.at(-1)?.key ?? '');
     const jumpScore = (player: typeof homeCenter) =>
       player ? player.height_cm * 0.6 + player.attrs.strength * 0.3 + player.overall * 0.1 : 0;
     const openingPossession: Side = jumpScore(homeCenter) >= jumpScore(awayCenter) ? '主' : '客';
@@ -425,7 +478,7 @@ const App: React.FC = () => {
       球员状态,
       回合摘要: `${openingPossession}队赢得跳球`,
     };
-    match.轮换 = createRotationPlan(match, getPlayer, {
+    match.轮换 = createRotationPlan(match, resolvePlayer, {
       league,
       phase: league?.阶段,
       protagonist: { teamId: myTeamId, key: protagonistKey, role: career.球队角色 },
