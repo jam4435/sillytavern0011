@@ -4,7 +4,8 @@ import { simulateFullGame } from './fullGameSimulation';
 import { createRotationPlan } from './rotationPlan';
 import { defaultTeamTactics } from './tendencies';
 import type { MatchState, OnCourtStatus, Side } from './types';
-import { getPlayer, getRoster, starterEntries } from '../utils/rosters';
+import { getPlayer, getRoster } from '../utils/rosters';
+import { buildDynamicDepthChart } from './depthChart';
 
 const status = (): OnCourtStatus => ({
   体力: 100, 得分: 0, 篮板: 0, 助攻: 0, 抢断: 0, 盖帽: 0, 失误: 0, 犯规: 0,
@@ -21,14 +22,16 @@ function seeded(seed: number) {
 }
 
 function freshMatch(homeId: string, awayId: string): MatchState {
-  const homeEntries = starterEntries(homeId);
-  const awayEntries = starterEntries(awayId);
-  const homeOn = homeEntries.map(e => e.key);
-  const awayOn = awayEntries.map(e => e.key);
-  const homeAll = getRoster(homeId).map(p => p.name);
-  const awayAll = getRoster(awayId).map(p => p.name);
+  const homeRoster = getRoster(homeId);
+  const awayRoster = getRoster(awayId);
   const homeTactics = defaultTeamTactics(homeId);
   const awayTactics = defaultTeamTactics(awayId);
+  const homeEntries = buildDynamicDepthChart(homeRoster, { tactics: homeTactics }).starters;
+  const awayEntries = buildDynamicDepthChart(awayRoster, { tactics: awayTactics }).starters;
+  const homeOn = homeEntries.map(e => e.key);
+  const awayOn = awayEntries.map(e => e.key);
+  const homeAll = homeRoster.map(p => p.name);
+  const awayAll = awayRoster.map(p => p.name);
   const match: MatchState = {
     进行中: true, 对阵: { 主队: homeId, 客队: awayId }, 节次: 1, 剩余秒数: 720, 投篮时钟: 24,
     比分: { 主: 0, 客: 0 }, 球权: '主', 跳球胜方: '主',
