@@ -1,4 +1,5 @@
 import { buildFormation } from './positioning';
+import { deriveRotationGameContext } from './gameContext';
 import type {
   MatchState,
   PlayerData,
@@ -20,7 +21,7 @@ function rosterKeys(match: MatchState, side: Side): string[] {
   return [...match.阵容[side].场上, ...match.阵容[side].替补];
 }
 
-function buildBaseTargets(
+export function buildGenericRotationTargets(
   match: MatchState,
   side: Side,
   resolvePlayer: RotationPlayerResolver,
@@ -37,7 +38,7 @@ function buildBaseTargets(
   return Object.fromEntries(ranked.map((player, index) => [player.name, BASE_MINUTES[index] ?? 0]));
 }
 
-function normalizedTargets(
+export function normalizeRotationTargets(
   base: Record<string, number>,
   fixed: Record<string, number> = {},
 ): Record<string, number> {
@@ -96,7 +97,7 @@ export function createRotationState(
 ): RotationState {
   const build = (side: Side): TeamRotationState => ({
     starters: [...match.阵容[side].场上],
-    targetMinutes: normalizedTargets(buildBaseTargets(match, side, resolvePlayer), overrides[side]),
+    targetMinutes: normalizeRotationTargets(buildGenericRotationTargets(match, side, resolvePlayer), overrides[side]),
   });
   return { 主: build('主'), 客: build('客') };
 }
@@ -134,24 +135,42 @@ function playerRotationScore(
   const deficit = expected - status.上场秒数;
   const currentBonus = match.阵容[side].场上.includes(key) ? 1.5 : 0;
   const stamina = (status.体力 - 75) * .18;
-  const closing =
-    match.节次 >= 4 &&
-    match.剩余秒数 <= 360 &&
-    Math.abs(match.比分.主 - match.比分.客) <= 12
-      ? Math.max(0, player.overall - 72) * .20 + target * .06
-      : 0;
+  const context = deriveRotationGameContext(match, side, rotation);
+  const closingPriority = rotation.closingPriority?.[key] ?? clamp(player.overall + target * .4, 0, 100);
+  const garbagePriority = rotation.garbagePriority?.[key] ?? clamp(100 - target * 2, 0, 100);
 
-  return player.overall + deficit / 10 + stamina + currentBonus + closing + foulPenalty(match, status.犯规);
+  let contextBonus = 0;
+  if (context.mode === '终结阵容') {
+    contextBonus += (closingPriority - 60) * .36;
+    // 终结阶段减少“欠分钟补课”，优先真正适合收比赛的人。
+    contextBonus -= Math.max(0, deficit) / 28;
+  } else if (context.mode === '软垃圾时间') {
+    contextBonus += (garbagePriority - 55) * .28;
+    if (target >= 30) contextBonus -= 8;
+  } else if (context.mode === '硬垃圾时间') {
+    contextBonus += (garbagePriority - 45) * .48;
+    if (target >= 28) contextBonus -= 18;
+    if (rotation.starters.includes(key)) contextBonus -= 10;
+  }
+
+  return player.overall + deficit / 10 + stamina + currentBonus + contextBonus + foulPenalty(match, status.犯规);
 }
 
-function positionFit(player: PlayerData, position: Position): number {
+function positionFit(
+  player: PlayerData,
+  position: Position,
+  rotation: TeamRotationState,
+  closing: boolean,
+): number {
   if (player.pos === position) return 8;
   if (player.secondaryPos === position) return 5;
   const from = POSITIONS.indexOf(player.pos);
   const to = POSITIONS.indexOf(position);
   const distance = Math.abs(from - to);
-  if (distance === 1) return -8;
-  if (distance === 2) return -18;
+  if (closing && position === 'C' && (rotation.smallBallAffinity ?? 0) >= 75 && player.pos === 'PF') return 3;
+  if (closing && position === 'PF' && (rotation.smallBallAffinity ?? 0) >= 70 && player.pos === 'SF') return 1;
+  if (distance === 1) return closing ? -5 : -8;
+  if (distance === 2) return closing ? -14 : -18;
   return -32;
 }
 
@@ -166,7 +185,17 @@ function desiredLineup(
   rotation: TeamRotationState,
   resolvePlayer: RotationPlayerResolver,
 ): DesiredLineup {
-  const keys = rosterKeys(match, side);
+  const context = deriveRotationGameContext(match, side, rotation);
+  const allKeys = rosterKeys(match, side);
+  const rankedByTarget = [...allKeys].sort((a, b) => (rotation.targetMinutes[b] ?? 0) - (rotation.targetMinutes[a] ?? 0));
+  const depth = context.mode === '硬垃圾时间'
+    ? allKeys.length
+    : context.mode === '软垃圾时间'
+      ? Math.min(allKeys.length, Math.max(rotation.rotationDepth ?? 10, 10))
+      : Math.min(allKeys.length, rotation.rotationDepth ?? 10);
+  const activePool = new Set(rankedByTarget.slice(0, Math.max(5, depth)));
+  match.阵容[side].场上.forEach(key => activePool.add(key));
+  const keys = [...activePool];
   const unused = new Set(keys);
   const byPosition = new Map<Position, string>();
   const scores: Record<string, number> = {};
@@ -179,7 +208,8 @@ function desiredLineup(
     for (const key of unused) {
       const player = resolvePlayer(key);
       if (!player) continue;
-      const score = playerRotationScore(match, side, key, rotation, resolvePlayer) + positionFit(player, position);
+      const score = playerRotationScore(match, side, key, rotation, resolvePlayer) +
+        positionFit(player, position, rotation, context.mode === '终结阵容');
       if (score > bestScore) {
         bestScore = score;
         bestKey = key;
@@ -307,6 +337,16 @@ export function applyAutomaticRotation(
   let match: MatchState = input.轮换 ? input : { ...input, 轮换: rotationState };
   if (!match.进行中 || match.回合阶段 !== '常规回合') return match;
 
+  const homeContext = deriveRotationGameContext(match, '主', rotationState.主);
+  const awayContext = deriveRotationGameContext(match, '客', rotationState.客);
+  match = {
+    ...match,
+    轮换: {
+      主: { ...rotationState.主, contextMode: homeContext.mode },
+      客: { ...rotationState.客, contextMode: awayContext.mode },
+    },
+  };
+
   const forcedExists = (['主', '客'] as Side[]).some(side =>
     match.阵容[side].场上.some(key => {
       const status = match.球员状态[key];
@@ -316,9 +356,9 @@ export function applyAutomaticRotation(
   // 只在一个 possession 刚结束/节开始时常规换人；强制离场例外。
   if (!forcedExists && match.投篮时钟 < 20) return match;
 
-  const home = rotateSide(match, '主', rotationState.主, resolvePlayer);
+  const home = rotateSide(match, '主', match.轮换!.主, resolvePlayer);
   match = { ...match, 阵容: { ...match.阵容, 主: home.lineup } };
-  const away = rotateSide(match, '客', rotationState.客, resolvePlayer);
+  const away = rotateSide(match, '客', match.轮换!.客, resolvePlayer);
   match = { ...match, 阵容: { ...match.阵容, 客: away.lineup } };
 
   const changes = [
