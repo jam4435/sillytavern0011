@@ -3,6 +3,7 @@ import { buildFormation } from './positioning';
 import { applyAutomaticRotation } from './rotation';
 import { createRotationPlan } from './rotationPlan';
 import { createLeagueState } from './season';
+import { advanceInjuryRecovery } from './offCourtSystems';
 import { getPlayerAvailability } from './availability';
 import { applyCoachReview } from './coachRole';
 import { defaultTeamTactics } from './tendencies';
@@ -83,6 +84,23 @@ describe('RotationPlan / Availability / CoachRole', () => {
     expect(plan.主.targetMinutes['Stephen Curry']).toBe(0);
     expect(plan.主.targetMinutes['Klay Thompson']).toBeLessThanOrEqual(22);
     expect(Object.values(plan.主.targetMinutes).reduce((sum, value) => sum + value, 0)).toBeCloseTo(240, 5);
+  });
+
+
+  it('复出分钟限制会随后续比赛逐步放宽并最终解除', () => {
+    let league = createLeagueState('GSW');
+    league.伤病 = [{
+      球员: 'Stephen Curry', 类型: '脚踝扭伤', 严重度: '中等',
+      受伤日期: league.日期, 预计复出: league.日期, 状态: '恢复中',
+    }];
+    league = advanceInjuryRecovery(league);
+    expect(league.伤病[0].状态).toBe('可复出');
+    expect(league.伤病[0].分钟限制).toBe(24);
+    league = advanceInjuryRecovery(league);
+    expect(league.伤病[0].分钟限制).toBe(29);
+    league = advanceInjuryRecovery(league);
+    league = advanceInjuryRecovery(league);
+    expect(league.伤病[0].分钟限制).toBeNull();
   });
 
   it('末节大比分自动进入硬垃圾时间并撤下一部分常规主力', () => {
