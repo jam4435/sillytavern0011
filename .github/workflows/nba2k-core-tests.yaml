@@ -54,6 +54,7 @@ jobs:
           src/nba2k/engine/teamPower.test.ts
           src/nba2k/engine/leagueStats.test.ts
           src/nba2k/engine/injury.test.ts
+          src/nba2k/engine/calendar.test.ts
           src/nba2k/engine/season.test.ts
           src/nba2k/engine/coachProfile.test.ts
           src/nba2k/engine/lifecycle.test.ts
