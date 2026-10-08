@@ -1,6 +1,11 @@
 import { TEAMS } from '../data/teams';
 import type { MatchState } from './types';
-import { createInitialCoachProfiles, type CoachProfile } from './coachProfile';
+import {
+  advanceCoachTenure,
+  createInitialCoachProfiles,
+  replacementCoach,
+  type CoachProfile,
+} from './coachProfile';
 
 export type LeaguePhase = '常规赛' | '季后赛' | '休赛期';
 export type PlayoffRound = '首轮' | '分区半决赛' | '分区决赛' | '总决赛';
@@ -432,6 +437,30 @@ export interface AdvanceSeasonResult {
 }
 
 /**
+ * 确定性换帅入口：只更换教练人格与磨合进度，不改 roster、不改球员能力。
+ * AI只能演出管理层决定和更衣室反应，不能改判新教练的 Profile。
+ */
+export function replaceTeamCoach(league: LeagueState, teamId: string): LeagueState {
+  const previous = league.教练[teamId] ?? null;
+  const next = replacementCoach(teamId, previous);
+  const hook: StoryHook = {
+    id: `coach-change-${teamId}-${next.generation}-${league.日期}`,
+    type: '球队关系',
+    title: '球队更换主教练',
+    detail:
+      `${teamId} 更换主教练。新教练进入磨合期：进攻偏好${next.offensePreference ?? '随阵容'}、` +
+      `防守偏好${next.defensePreference ?? '随阵容'}、节奏偏好${next.pacePreference}；` +
+      '其理念只作为阵容适配上的有限偏置，将在约15场比赛内逐步完全落地。',
+    createdDate: league.日期,
+  };
+  return {
+    ...league,
+    教练: { ...league.教练, [teamId]: next },
+    故事钩子: mergeHooks(league.故事钩子, [hook]),
+  };
+}
+
+/**
  * 玩家比赛结束后推进联盟。
  * 常规赛：记录真实比赛 + 低精度模拟其他球队 + 固定赛历。
  * 季后赛：玩家系列赛使用真实结果；其他系列赛低精度模拟；七场四胜纯代码晋级。
@@ -442,6 +471,8 @@ export function advanceLeagueAfterGame(
   match: MatchState,
   rng: () => number = Math.random,
 ): AdvanceSeasonResult {
+  // 每个玩家比赛轮次同时代表联盟推进一轮；所有现任教练增加1场磨合。
+  league = { ...league, 教练: advanceCoachTenure(league.教练) };
   if (league.阶段 === '季后赛' && league.季后赛) {
     let playoffs = recordPlayerPlayoffGame(league.季后赛, match, playerTeamId);
     playoffs = simulateOtherPlayoffSeries(playoffs, playerTeamId, rng);
