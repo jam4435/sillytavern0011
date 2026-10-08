@@ -1272,6 +1272,8 @@ const App: React.FC = () => {
           onAction={t => void sendTurn(t)}
           onStartMatch={() => void handleStartMatch()}
           onNextSeason={() => void handleNextSeason()}
+          onPrepareMarket={() => void handlePrepareMarket()}
+          onAcceptOffer={offerId => void handleAcceptOffer(offerId)}
           onTrain={() => void handleTrain()}
           onUpgrade={group => void handleUpgrade(group)}
         />
