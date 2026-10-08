@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   getAllPublicFactions,
   getPublicFactionByName,
+  getPublicFactionDisplayProfile,
   getPublicFactionRelations,
   resolveCanonicalFactionId,
   resolveFactionPublicState,
@@ -30,6 +31,22 @@ describe('publicFactionManager', () => {
     const beggars = getPublicFactionByName('丐帮');
     expect(beggars?.sectId).toBe('丐帮');
     expect(beggars?.组织结构.length).toBeGreaterThan(0);
+  });
+
+  it('玩家展示层应合并重复组织层级并把长篇人数证据压成短文案', () => {
+    const display = getPublicFactionDisplayProfile('全真教');
+    expect(display).toBeDefined();
+    expect(display?.概况).not.toContain('射雕英雄传');
+    expect(display?.概况).not.toContain('神雕侠侣');
+
+    const thirdGeneration = display?.组织结构.filter(layer => layer.名称.startsWith('三代弟子')) || [];
+    expect(thirdGeneration).toHaveLength(1);
+
+    const founder = display?.组织结构.find(layer => layer.名称.startsWith('创教祖师'));
+    expect(founder?.人数).toBe('1人');
+
+    expect(display?.组织结构.every(layer => !layer.人数.includes('原来全真七子'))).toBe(true);
+    expect(display?.组织结构.some(layer => layer.人数 === '人数众多' || layer.人数 === '五百余人')).toBe(true);
   });
 
   it('应当保留势力之间的归一关系边', () => {
