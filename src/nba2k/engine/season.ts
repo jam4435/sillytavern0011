@@ -7,6 +7,7 @@ import {
   type CoachProfile,
 } from './coachProfile';
 import { seasonLabelFromOffset } from './lifecycle';
+import type { LeagueContract, MarketOffer, TransactionRecord } from './transactionTypes';
 
 export type LeaguePhase = '常规赛' | '季后赛' | '休赛期';
 export type PlayoffRound = '首轮' | '分区半决赛' | '分区决赛' | '总决赛';
@@ -65,6 +66,14 @@ export interface LeagueState {
   赛程索引: number;
   战绩: Record<string, StandingRecord>;
   教练: Record<string, CoachProfile>;
+  /** 缺省时沿用球员初始球队；null 表示自由球员。仅记录发生过变动的球员。 */
+  球员归属: Record<string, string | null>;
+  /** 缺省时使用 deterministic 初始合同；续约/签约后写覆盖。 */
+  合同册: Record<string, LeagueContract>;
+  /** 只持久化当前玩家可交互的报价，防止叙事回合后重掷。 */
+  市场报价: MarketOffer[];
+  /** 联盟正式交易/签约流水。 */
+  交易记录: TransactionRecord[];
   伤病: InjuryRecord[];
   故事钩子: StoryHook[];
   季后赛: PlayoffState | null;
@@ -155,6 +164,10 @@ export function createLeagueState(playerTeamId: string): LeagueState {
     赛程索引: 0,
     战绩: Object.fromEntries(TEAMS.map(team => [team.id, emptyStanding()])),
     教练: createInitialCoachProfiles(TEAMS.map(team => team.id)),
+    球员归属: {},
+    合同册: {},
+    市场报价: [],
+    交易记录: [],
     伤病: [],
     故事钩子: [{
       id: 'opening-night-2015',
