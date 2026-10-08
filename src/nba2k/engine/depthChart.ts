@@ -139,8 +139,8 @@ function deriveCoach(entries: DepthChartEntry[]): CoachRotationProfile {
   const starCapacity = top ? avg(top.player.attrs.stamina, top.player.attrs.durability) : 75;
   const starLoad = clamp(63 + starGap * 2.2 + (starCapacity - 75) * .32 - (benchTrust - 60) * .12, 48, 96);
 
-  let rotationDepth = 8;
-  if (benchTrust >= 58) rotationDepth += 1;
+  // NBA常规赛即便浅轮换通常也会稳定使用约9人；深板凳球队再扩到10-11人。
+  let rotationDepth = 9;
   if (benchTrust >= 70) rotationDepth += 1;
   if (benchTrust >= 82) rotationDepth += 1;
   rotationDepth = Math.min(rotationDepth, entries.length, 11);
