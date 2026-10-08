@@ -37,8 +37,81 @@ export function getPlayer(key: string): PlayerData | undefined {
   return customPlayers.get(key) ?? getBasePlayer(key);
 }
 
+function severeInjuryCounts(league: LeagueState | null | undefined): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const injury of league?.伤病 ?? []) {
+    if (injury.严重度 !== '严重') continue;
+    counts.set(injury.球员, (counts.get(injury.球员) ?? 0) + 1);
+  }
+  return counts;
+}
+
 function severeInjuryCount(league: LeagueState | null | undefined, playerKey: string): number {
-  return league?.伤病.filter(item => item.球员 === playerKey && item.严重度 === '严重').length ?? 0;
+  return severeInjuryCounts(league).get(playerKey) ?? 0;
+}
+
+export interface LeagueRosterSnapshot {
+  byTeam: Record<string, PlayerData[]>;
+  byKey: Map<string, PlayerData>;
+  freeAgents: PlayerData[];
+  all: PlayerData[];
+}
+
+/**
+ * 一次性投影当前联盟全部现役球员并按球队分组。
+ * 长期赛季里生成球员越来越多，Draft / FreeAgency / 排名审计必须复用这个快照，
+ * 避免“查30支球队 = 把整个联盟重算30次”。
+ */
+export function buildLeagueRosterSnapshot(
+  league: LeagueState | null | undefined,
+): LeagueRosterSnapshot {
+  const byTeam = Object.fromEntries(TEAMS.map(team => [team.id, [] as PlayerData[]])) as Record<string, PlayerData[]>;
+  const byKey = new Map<string, PlayerData>();
+  const freeAgents: PlayerData[] = [];
+  const all: PlayerData[] = [];
+
+  if (!league) {
+    const custom = [...customPlayers.values()];
+    const customKeys = new Set(custom.map(player => player.name));
+    for (const player of [...players.filter(player => !customKeys.has(player.name)), ...custom]) {
+      const projected = { ...player };
+      all.push(projected);
+      byKey.set(projected.name, projected);
+      if (byTeam[projected.team]) byTeam[projected.team].push(projected);
+      else freeAgents.push(projected);
+    }
+  } else {
+    const severeCounts = severeInjuryCounts(league);
+    const custom = [...customPlayers.values()];
+    const customKeys = new Set(custom.map(player => player.name));
+
+    const add = (player: PlayerData) => {
+      const team = currentTeamOf(player, league);
+      const current = { ...player, team: team ?? 'FA' };
+      all.push(current);
+      byKey.set(current.name, current);
+      if (team && byTeam[team]) byTeam[team].push(current);
+      else freeAgents.push(current);
+    };
+
+    for (const base of players) {
+      if (customKeys.has(base.name)) continue;
+      const projected = projectLeaguePlayer(base, league.赛季序号 ?? 0, severeCounts.get(base.name) ?? 0);
+      if (projected.retirementStatus !== '退役') add(projected.player);
+    }
+
+    for (const seed of Object.values(league.生成球员 ?? {})) {
+      if (customKeys.has(seed.key)) continue;
+      const projected = projectGeneratedPlayer(seed, league.赛季序号, severeCounts.get(seed.key) ?? 0);
+      if (projected.retirementStatus !== '退役') add(projected.player);
+    }
+
+    for (const player of custom) add(player);
+  }
+
+  for (const roster of Object.values(byTeam)) roster.sort((a, b) => b.overall - a.overall);
+  freeAgents.sort((a, b) => b.overall - a.overall);
+  return { byTeam, byKey, freeAgents, all };
 }
 
 export function getPlayerForLeague(
@@ -74,85 +147,20 @@ export function getRosterForLeague(
   teamId: string,
   league: LeagueState | null | undefined,
 ): PlayerData[] {
-  if (!league) return getRoster(teamId);
-  const custom = [...customPlayers.values()];
-  const customKeys = new Set(custom.map(player => player.name));
-  const projectedBase = players
-    .filter(player => !customKeys.has(player.name))
-    .map(player => {
-      const projected = projectLeaguePlayer(
-        player,
-        league.赛季序号 ?? 0,
-        severeInjuryCount(league, player.name),
-      );
-      if (projected.retirementStatus === '退役') return null;
-      const currentTeam = currentTeamOf(projected.player, league);
-      return currentTeam === teamId ? { ...projected.player, team: teamId } : null;
-    })
-    .filter((player): player is PlayerData => Boolean(player));
-  const currentCustom = custom
-    .map(player => {
-      const currentTeam = currentTeamOf(player, league);
-      return currentTeam === teamId ? { ...player, team: teamId } : null;
-    })
-    .filter((player): player is PlayerData => Boolean(player));
-  const generated = Object.values(league.生成球员 ?? {})
-    .map(seed => {
-      const projected = projectGeneratedPlayer(
-        seed,
-        league.赛季序号,
-        severeInjuryCount(league, seed.key),
-      );
-      if (projected.retirementStatus === '退役') return null;
-      const currentTeam = currentTeamOf(projected.player, league);
-      return currentTeam === teamId ? { ...projected.player, team: teamId } : null;
-    })
-    .filter((player): player is PlayerData => Boolean(player));
-  return [...projectedBase, ...generated, ...currentCustom].sort((a, b) => b.overall - a.overall);
+  return buildLeagueRosterSnapshot(league).byTeam[teamId] ?? [];
 }
 
 export function getAllPlayersForLeague(
   league: LeagueState | null | undefined,
 ): PlayerData[] {
-  if (!league) return [...players, ...customPlayers.values()];
-  const custom = [...customPlayers.values()];
-  const customKeys = new Set(custom.map(player => player.name));
-  const projectedBase = players
-    .filter(player => !customKeys.has(player.name))
-    .map(player => {
-      const projected = projectLeaguePlayer(
-        player,
-        league.赛季序号 ?? 0,
-        severeInjuryCount(league, player.name),
-      );
-      if (projected.retirementStatus === '退役') return null;
-      const currentTeam = currentTeamOf(projected.player, league);
-      return { ...projected.player, team: currentTeam ?? 'FA' };
-    })
-    .filter((player): player is PlayerData => Boolean(player));
-  const projectedGenerated = Object.values(league.生成球员 ?? {})
-    .map(seed => {
-      const projected = projectGeneratedPlayer(
-        seed,
-        league.赛季序号,
-        severeInjuryCount(league, seed.key),
-      );
-      if (projected.retirementStatus === '退役') return null;
-      const currentTeam = currentTeamOf(projected.player, league);
-      return { ...projected.player, team: currentTeam ?? 'FA' };
-    })
-    .filter((player): player is PlayerData => Boolean(player));
-  const projectedCustom = custom.map(player => {
-    const currentTeam = currentTeamOf(player, league);
-    return { ...player, team: currentTeam ?? 'FA' };
-  });
-  return [...projectedBase, ...projectedGenerated, ...projectedCustom];
+  return buildLeagueRosterSnapshot(league).all;
 }
 
 export function createLeaguePlayerResolver(
   league: LeagueState | null | undefined,
 ): (key: string) => PlayerData | undefined {
-  return key => getPlayerForLeague(key, league);
+  const snapshot = buildLeagueRosterSnapshot(league);
+  return key => snapshot.byKey.get(key);
 }
 
 /** 从已筛选可用名单中按位置挑选首发。 */
