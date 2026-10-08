@@ -242,6 +242,7 @@ function buildPostGamePatch(
     nextMatch,
     Math.random,
     simulationProfiles,
+    leagueSnapshot.byTeam,
   );
   let nextLeague = advanceInjuryRecovery(advanced.league);
 

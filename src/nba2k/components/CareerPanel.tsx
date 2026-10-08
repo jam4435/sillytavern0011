@@ -5,6 +5,7 @@ import type { CareerState, LeagueState, OffCourtState } from '../utils/statReade
 import { getTeam } from '../utils/rosters';
 import { careerPhase } from '../engine/lifecycle';
 import type { TeamSimulationProfile } from '../engine/teamPower';
+import { leaderboard, type LeaderboardCategory } from '../engine/leagueStats';
 
 export function CareerPanel(props: {
   career: CareerState | null; offCourt: OffCourtState | null; league: LeagueState | null;
@@ -16,6 +17,7 @@ export function CareerPanel(props: {
   const { career, offCourt, league } = props;
   const [showDevelopment, setShowDevelopment] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showLeagueLeaders, setShowLeagueLeaders] = useState(false);
   const team = career ? getTeam(career.球队) : undefined;
   const points = career?.发展.growthPoints ?? career?.成长点 ?? 0;
   const cap = potentialLevelCap(career?.能力.potential ?? 75);
@@ -39,6 +41,11 @@ export function CareerPanel(props: {
     : [];
   const draftPreview = [...latestDraft.slice(0, 5), ...latestDraft.filter(pick => pick.teamId === career?.球队)]
     .filter((pick, index, list) => list.findIndex(item => item.playerKey === pick.playerKey) === index);
+  const seasonAwards = league?.奖项记录?.[league.奖项记录.length - 1];
+  const statCategories: { key: LeaderboardCategory; title: string }[] = [
+    { key: 'pts', title: '得分' }, { key: 'reb', title: '篮板' },
+    { key: 'ast', title: '助攻' }, { key: 'stl', title: '抢断' }, { key: 'blk', title: '盖帽' },
+  ];
   const quickActions = [
     { label: '会见经纪人', text: '我约经纪人见面，聊聊最近的代言机会和职业规划。' },
     { label: '代言谈判', text: '我想推进当前的代言谈判或寻找新的代言机会。' },
@@ -56,6 +63,24 @@ export function CareerPanel(props: {
       <div className="cp-row"><b>体系</b> · {props.teamPower.profile.tactics.offense} / {props.teamPower.profile.tactics.defense} · {props.teamPower.profile.tactics.pace}节奏 · 可用 {props.teamPower.profile.healthyPlayers} 人</div>
     </div>}
         {activeHooks.length > 0 && <div className="cp-section league-pulse"><div className="cp-section-title">联盟动态</div>{activeHooks.map(hook => <div key={hook.id} className="cp-row"><b>{hook.title}</b> · {hook.detail}</div>)}</div>}
+    {league && <div className="cp-section league-leaders">
+      <div className="cp-section-title">联盟个人统计榜 · {league.赛季}</div>
+      <div className="cp-row">
+        赛季已累计 {Object.keys(league.球员赛季统计 ?? {}).length} 名球员的数据
+        <button type="button" onClick={() => setShowLeagueLeaders(value => !value)}>
+          {showLeagueLeaders ? '收起榜单' : '查看五项榜单'}
+        </button>
+      </div>
+      {showLeagueLeaders && statCategories.map(category => <div key={category.key} className="cp-row">
+        <b>{category.title}榜（场均）</b> · {leaderboard(league.球员赛季统计 ?? {}, category.key)
+          .map((row, index) => `${index + 1}.${row.playerKey} ${row.average.toFixed(1)}（${row.gp}场）`).join(' / ') || '暂无赛季数据'}
+      </div>)}
+      {seasonAwards && <div className="cp-row">
+        <b>{seasonAwards.season} 正式奖项</b> · MVP {seasonAwards.mvp ?? '空缺'} · 最佳新秀 {seasonAwards.rookie ?? '空缺'} · DPOY {seasonAwards.dpoy ?? '空缺'}
+        {seasonAwards.allNBA.map((keys, index) => <div key={index}>最佳阵容第{index + 1}阵：{keys.join(' / ') || '—'}</div>)}
+        {seasonAwards.allDefense.map((keys, index) => <div key={index}>最佳防守第{index + 1}阵：{keys.join(' / ') || '—'}</div>)}
+      </div>}
+    </div>}
     {draftPreview.length > 0 && <div className="cp-section draft-board"><div className="cp-section-title">最近选秀</div>
       {draftPreview.map(pick => <div key={pick.playerKey} className="cp-row">
         <b>#{pick.overallPick} {getTeam(pick.teamId)?.cn ?? pick.teamId}</b> · {pick.playerName} · {pick.pos} · {pick.template} · OVR {pick.overallAtDraft} / POT {pick.potential}

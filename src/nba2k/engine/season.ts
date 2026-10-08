@@ -10,6 +10,9 @@ import { seasonLabelFromOffset } from './lifecycle';
 import type { LeagueContract, MarketOffer, TransactionRecord } from './transactionTypes';
 import type { DraftPickRecord, GeneratedPlayerSeed } from './draft';
 import { simulateLowFidelityGame, type LeagueSimulationProfiles } from './teamPower';
+import { addSeasonLines, decideSeasonAwards, matchSeasonLines, simulateTeamSeasonLines,
+  type LeaguePlayerSeasonStats, type SeasonAwards } from './leagueStats';
+import type { PlayerData } from './types';
 
 export type LeaguePhase = '常规赛' | '季后赛' | '休赛期';
 export type PlayoffRound = '首轮' | '分区半决赛' | '分区决赛' | '总决赛';
@@ -80,6 +83,10 @@ export interface LeagueState {
   生成球员: Record<string, GeneratedPlayerSeed>;
   /** 最近最多10届（600签）的选秀历史。 */
   选秀历史: DraftPickRecord[];
+  /** 当前赛季逐球员累计数据；不保存后台逐场Box Score。 */
+  球员赛季统计: LeaguePlayerSeasonStats;
+  /** 历年只存紧凑正式奖项结果。 */
+  奖项记录: SeasonAwards[];
   伤病: InjuryRecord[];
   故事钩子: StoryHook[];
   季后赛: PlayoffState | null;
@@ -176,6 +183,8 @@ export function createLeagueState(playerTeamId: string): LeagueState {
     交易记录: [],
     生成球员: {},
     选秀历史: [],
+    球员赛季统计: {},
+    奖项记录: [],
     伤病: [],
     故事钩子: [{
       id: 'opening-night-2015',
@@ -222,9 +231,12 @@ function simulateOtherLeagueGames(
   excluded: Set<string>,
   rng: () => number,
   profiles?: LeagueSimulationProfiles | null,
-): Record<string, StandingRecord> {
+  rosters?: Record<string, PlayerData[]>,
+  league?: LeagueState,
+): { standings: Record<string, StandingRecord>; seasonLines: LeaguePlayerSeasonStats } {
   const teams = TEAMS.filter(team => !excluded.has(team.id)).map(team => team.id).sort();
-  if (teams.length < 2) return standings;
+  const seasonLines: LeaguePlayerSeasonStats = {};
+  if (teams.length < 2) return { standings, seasonLines };
   const rotation = roundIndex % teams.length;
   const rotated = [...teams.slice(rotation), ...teams.slice(0, rotation)];
   let next = standings;
@@ -233,8 +245,13 @@ function simulateOtherLeagueGames(
     const away = rotated[i + 1];
     const [homeScore, awayScore] = simulateLowFidelityGame(home, away, profiles, rng);
     next = recordResult(next, home, away, homeScore, awayScore);
+    // 只追加本轮新产生的累计增量，不保存14场完整比赛日志。
+    if (league && rosters && profiles?.[home] && profiles?.[away]) {
+      Object.assign(seasonLines, simulateTeamSeasonLines(home, rosters[home] ?? [], league, profiles[home], homeScore, rng));
+      Object.assign(seasonLines, simulateTeamSeasonLines(away, rosters[away] ?? [], league, profiles[away], awayScore, rng));
+    }
   }
-  return next;
+  return { standings: next, seasonLines };
 }
 
 export function calendarHooksForDate(date: string): StoryHook[] {
@@ -495,6 +512,7 @@ export function beginNextSeason(league: LeagueState, playerTeamId: string): Adva
     阶段: '常规赛',
     赛程索引: 0,
     战绩: Object.fromEntries(TEAMS.map(team => [team.id, emptyStanding()])),
+    球员赛季统计: {},
     市场报价: [],
     故事钩子: mergeHooks(league.故事钩子, [{
       id: `season-open-${nextOffset}`,
@@ -543,6 +561,7 @@ export function advanceLeagueAfterGame(
   match: MatchState,
   rng: () => number = Math.random,
   profiles?: LeagueSimulationProfiles | null,
+  rosters?: Record<string, PlayerData[]>,
 ): AdvanceSeasonResult {
   // 每个玩家比赛轮次同时代表联盟推进一轮；所有现任教练增加1场磨合。
   league = { ...league, 教练: advanceCoachTenure(league.教练) };
@@ -611,8 +630,15 @@ export function advanceLeagueAfterGame(
 
   const home = match.对阵.主队;
   const away = match.对阵.客队;
-  let standings = recordResult(league.战绩, home, away, match.比分.主, match.比分.客);
-  standings = simulateOtherLeagueGames(standings, league.赛程索引, new Set([home, away]), rng, profiles);
+  const playerGameStandings = recordResult(league.战绩, home, away, match.比分.主, match.比分.客);
+  const background = simulateOtherLeagueGames(
+    playerGameStandings, league.赛程索引, new Set([home, away]), rng, profiles, rosters, league,
+  );
+  const standings = background.standings;
+  const seasonStats = rosters
+    ? addSeasonLines(league.球员赛季统计,
+        { ...background.seasonLines, ...matchSeasonLines(match) })
+    : league.球员赛季统计;
 
   const nextIndex = league.赛程索引 + 1;
   const nextGame = getScheduledGame(playerTeamId, nextIndex, league.赛季序号);
@@ -624,18 +650,32 @@ export function advanceLeagueAfterGame(
         日期: nextDate,
         赛程索引: nextIndex,
         战绩: standings,
+        球员赛季统计: seasonStats,
         故事钩子: mergeHooks(league.故事钩子, calendarHooksForDate(nextDate)),
       },
       nextGame,
     };
   }
 
-  const seededBase: LeagueState = { ...league, 战绩: standings };
+  const seededBase: LeagueState = { ...league, 战绩: standings, 球员赛季统计: seasonStats };
+  // MVP/ROY/DPOY与最佳阵容只在常规赛结束后按全联盟真实累计一次性裁定。
+  const awards = rosters ? decideSeasonAwards(seededBase, rosters) : null;
+  const awardHistory = awards && awards.mvp
+    ? [...league.奖项记录.filter(item => item.season !== league.赛季), awards].slice(-20)
+    : league.奖项记录;
+  const awardHook: StoryHook[] = awards?.mvp ? [{
+    id: `league-awards-${league.赛季}`,
+    type: '奖项',
+    title: `${league.赛季} 赛季个人奖项揭晓`,
+    detail: `MVP：${awards.mvp}；最佳新秀：${awards.rookie ?? '空缺'}；DPOY：${awards.dpoy ?? '空缺'}。所有结果由联盟赛季统计裁定，叙事模型不得改写。`,
+    createdDate: league.日期,
+  }] : [];
   const playoffs = createPlayoffState(seededBase);
   const qualified = playoffs.series.some(series => seriesContains(series, playerTeamId));
   const nextDate = playoffStartDate(league.赛季序号);
   const hooks = mergeHooks(league.故事钩子, [
     playoffHook(`playoffs-${playoffYearTag(league)}`, '季后赛', qualified ? '常规赛结束，球队获得季后赛席位，首轮对阵已生成。' : '常规赛结束，球队未进入季后赛，进入赛季总结与休赛期。', nextDate),
+    ...awardHook,
   ]);
   const nextLeague: LeagueState = {
     ...league,
@@ -643,6 +683,8 @@ export function advanceLeagueAfterGame(
     阶段: qualified ? '季后赛' : '休赛期',
     赛程索引: nextIndex,
     战绩: standings,
+    球员赛季统计: seasonStats,
+    奖项记录: awardHistory,
     故事钩子: hooks,
     季后赛: playoffs,
   };
