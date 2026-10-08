@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { advanceLeagueAfterGame, beginNextSeason, createLeagueState, getScheduledGame, scheduleDate } from './season';
 import type { MatchState } from './types';
+import { buildLeagueRosterSnapshot } from '../utils/rosters';
+import { buildLeagueSimulationProfiles } from './teamPower';
 
 function finishedMatch(): MatchState {
   return {
@@ -36,6 +38,32 @@ describe('SeasonEngine', () => {
     expect(result.league.战绩.CLE.负).toBe(1);
     expect(result.league.赛程索引).toBe(1);
     expect(result.nextGame?.index).toBe(1);
+  });
+
+  it('SeasonEngine后台比赛真实读取动态球队画像，而不是静态球队overall', () => {
+    const league = createLeagueState('GSW');
+    const snapshot = buildLeagueRosterSnapshot(league);
+    const base = buildLeagueSimulationProfiles(league, snapshot.byTeam);
+
+    const atlStrong = {
+      ...base,
+      ATL: { ...base.ATL, offenseRating: 116, defenseRating: 100, netRating: 16, power: 93 },
+      BOS: { ...base.BOS, offenseRating: 99, defenseRating: 113, netRating: -14, power: 68 },
+    };
+    const bosStrong = {
+      ...base,
+      ATL: { ...base.ATL, offenseRating: 99, defenseRating: 113, netRating: -14, power: 68 },
+      BOS: { ...base.BOS, offenseRating: 116, defenseRating: 100, netRating: 16, power: 93 },
+    };
+
+    // Round 0 排除玩家场 GSW/CLE 后，排序中的第一组后台对阵就是 ATL vs BOS。
+    const first = advanceLeagueAfterGame(league, 'GSW', finishedMatch(), () => .5, atlStrong);
+    const second = advanceLeagueAfterGame(league, 'GSW', finishedMatch(), () => .5, bosStrong);
+
+    expect(first.league.战绩.ATL.胜).toBe(1);
+    expect(first.league.战绩.BOS.负).toBe(1);
+    expect(second.league.战绩.ATL.负).toBe(1);
+    expect(second.league.战绩.BOS.胜).toBe(1);
   });
 
   it('休赛期进入下一赛季会重置战绩并使用下一年度赛历', () => {
