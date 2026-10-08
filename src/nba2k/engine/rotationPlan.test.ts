@@ -9,7 +9,8 @@ import { applyCoachReview } from './coachRole';
 import { defaultTeamTactics } from './tendencies';
 import type { MatchState, OnCourtStatus } from './types';
 import type { CareerState } from '../utils/statReader';
-import { getPlayer, getRoster, starterEntries } from '../utils/rosters';
+import { getPlayer, getRoster } from '../utils/rosters';
+import { buildDynamicDepthChart } from './depthChart';
 
 const status = (): OnCourtStatus => ({
   体力: 100, 得分: 0, 篮板: 0, 助攻: 0, 抢断: 0, 盖帽: 0, 失误: 0, 犯规: 0,
@@ -18,10 +19,12 @@ const status = (): OnCourtStatus => ({
 });
 
 function freshMatch(): MatchState {
-  const homeEntries = starterEntries('GSW');
-  const awayEntries = starterEntries('CLE');
-  const homeAll = getRoster('GSW').map(p => p.name);
-  const awayAll = getRoster('CLE').map(p => p.name);
+  const homeRoster = getRoster('GSW');
+  const awayRoster = getRoster('CLE');
+  const homeEntries = buildDynamicDepthChart(homeRoster, { tactics: defaultTeamTactics('GSW') }).starters;
+  const awayEntries = buildDynamicDepthChart(awayRoster, { tactics: defaultTeamTactics('CLE') }).starters;
+  const homeAll = homeRoster.map(p => p.name);
+  const awayAll = awayRoster.map(p => p.name);
   const match: MatchState = {
     进行中: true,
     对阵: { 主队: 'GSW', 客队: 'CLE' },
@@ -57,12 +60,14 @@ function freshMatch(): MatchState {
 }
 
 describe('RotationPlan / Availability / CoachRole', () => {
-  it('球队Profile替代通用分钟表，并保持每队240分钟', () => {
+  it('轮换计划完全由当前阵容动态推导，并保持每队240分钟', () => {
     const match = freshMatch();
     const plan = createRotationPlan(match, getPlayer);
-    expect(plan.主.profileId).toBe('GSW');
+    expect(plan.主.planSource).toBe('dynamic');
     expect(plan.主.targetMinutes['Stephen Curry']).toBeGreaterThan(plan.主.targetMinutes['Andrew Bogut']);
-    expect(plan.主.closingPriority?.['Andre Iguodala']).toBeGreaterThan(plan.主.closingPriority?.['Andrew Bogut'] ?? 0);
+    expect(plan.主.rotationDepth).toBeGreaterThanOrEqual(8);
+    expect(plan.主.benchTrust).toBeGreaterThan(0);
+    expect(plan.主.starLoad).toBeGreaterThan(0);
     expect(Object.values(plan.主.targetMinutes).reduce((sum, value) => sum + value, 0)).toBeCloseTo(240, 5);
   });
 
