@@ -1,7 +1,6 @@
-import { getTeamRotationProfile } from '../data/rotationProfiles';
+import { buildDynamicDepthChart, deriveDynamicMinuteWeights } from './depthChart';
 import { getPlayerAvailability } from './availability';
 import {
-  buildGenericRotationTargets,
   normalizeRotationTargets,
   type RotationPlayerResolver,
 } from './rotation';
@@ -58,22 +57,19 @@ function buildTeamPlan(
   options: RotationPlanOptions,
 ): TeamRotationState {
   const teamId = teamIdFor(match, side);
-  const profile = getTeamRotationProfile(teamId);
-  const roster = [...match.阵容[side].场上, ...match.阵容[side].替补];
-  const generic = buildGenericRotationTargets(match, side, resolvePlayer);
-  let base: Record<string, number> = {};
+  const rosterKeys = [...match.阵容[side].场上, ...match.阵容[side].替补];
+  const roster = rosterKeys
+    .map(key => resolvePlayer(key))
+    .filter((player): player is NonNullable<typeof player> => Boolean(player));
+  const chart = buildDynamicDepthChart(roster, { tactics: match.战术[side] });
+  let base = deriveDynamicMinuteWeights(chart);
 
-  for (const key of roster) {
-    const historical = profile?.regularMinutes?.[key];
-    base[key] = typeof historical === 'number' ? historical : (generic[key] ?? 0);
-  }
-
-  if ((options.phase ?? options.league?.阶段) === '季后赛' && profile) {
-    base = playoffAdjusted(base, profile.playoffShortening);
+  if ((options.phase ?? options.league?.阶段) === '季后赛') {
+    base = playoffAdjusted(base, chart.coach.playoffShortening);
   }
 
   const fixed: Record<string, number> = { ...(options.overrides?.[side] ?? {}) };
-  for (const key of roster) {
+  for (const key of rosterKeys) {
     const availability = getPlayerAvailability(key, options.league);
     if (!availability.available) {
       fixed[key] = 0;
@@ -85,7 +81,7 @@ function buildTeamPlan(
     }
   }
 
-  if (options.protagonist?.teamId === teamId && roster.includes(options.protagonist.key)) {
+  if (options.protagonist?.teamId === teamId && rosterKeys.includes(options.protagonist.key)) {
     const availability = getPlayerAvailability(options.protagonist.key, options.league);
     const roleMinutes = minutesForCareerRole(options.protagonist.role);
     fixed[options.protagonist.key] = availability.available
@@ -96,25 +92,27 @@ function buildTeamPlan(
   const targetMinutes = normalizeRotationTargets(base, fixed);
   const closingPriority: Record<string, number> = {};
   const garbagePriority: Record<string, number> = {};
-  for (const key of roster) {
-    const player = resolvePlayer(key);
+  const entryMap = new Map(chart.entries.map(entry => [entry.key, entry]));
+  for (const key of rosterKeys) {
+    const entry = entryMap.get(key);
     const target = targetMinutes[key] ?? 0;
-    closingPriority[key] =
-      profile?.closingPriority?.[key] ??
-      Math.max(0, Math.min(100, (player?.overall ?? 70) * .72 + target * .75 - 5));
-    garbagePriority[key] = Math.max(0, Math.min(100, 105 - target * 2.25 - (player?.overall ?? 70) * .15));
+    closingPriority[key] = Math.max(0, Math.min(100, (entry?.closingScore ?? 50) * .82 + target * .55 - 7));
+    garbagePriority[key] = Math.max(0, Math.min(100, 108 - target * 2.25 - (entry?.rotationScore ?? 65) * .16));
   }
 
   return {
     starters: [...match.阵容[side].场上],
     targetMinutes,
-    profileId: profile?.teamId ?? 'generic',
+    planSource: 'dynamic',
+    benchTrust: chart.coach.benchTrust,
+    starLoad: chart.coach.starLoad,
+    loadManagement: chart.coach.loadManagement,
     closingPriority,
     garbagePriority,
-    rotationDepth: profile?.rotationDepth ?? 10,
-    smallBallAffinity: profile?.smallBallAffinity ?? 50,
-    playoffShortening: profile?.playoffShortening ?? .18,
-    staggerGroups: profile?.staggerGroups,
+    rotationDepth: chart.coach.rotationDepth,
+    smallBallAffinity: chart.coach.smallBallAffinity,
+    playoffShortening: chart.coach.playoffShortening,
+    staggerGroups: chart.staggerGroups,
     contextMode: '正常',
   };
 }
