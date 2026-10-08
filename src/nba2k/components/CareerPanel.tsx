@@ -3,10 +3,11 @@ import { BADGE_REGISTRY, GROUP_KEYS, GROUP_LABELS, HOT_ZONE_IDS, potentialLevelC
 import type { UpgradeGroupKey } from '../engine/types';
 import type { CareerState, LeagueState, OffCourtState } from '../utils/statReader';
 import { getTeam } from '../utils/rosters';
+import { careerPhase } from '../engine/lifecycle';
 
 export function CareerPanel(props: {
   career: CareerState | null; offCourt: OffCourtState | null; league: LeagueState | null; disabled: boolean;
-  onAction: (text: string) => void; onStartMatch: () => void;
+  onAction: (text: string) => void; onStartMatch: () => void; onNextSeason: () => void;
   onTrain: () => void; onUpgrade: (group: UpgradeGroupKey) => void;
 }) {
   const { career, offCourt, league } = props;
@@ -24,6 +25,7 @@ export function CareerPanel(props: {
   const starLoadLabel = coach
     ? coach.starLoadBias > 3 ? '偏重核心' : coach.starLoadBias < -3 ? '偏分担' : '均衡'
     : '—';
+  const phase = career ? careerPhase(career.年龄, career.巅峰年龄, career.退役状态) : '—';
   const activeHooks = (league?.故事钩子 ?? []).filter(hook => !hook.consumed).slice(-3).reverse();
   const quickActions = [
     { label: '会见经纪人', text: '我约经纪人见面，聊聊最近的代言机会和职业规划。' },
@@ -33,7 +35,7 @@ export function CareerPanel(props: {
   ];
 
   return <div className="career-panel career-v3">
-    <div className="cp-header"><div className="cp-identity"><span className="cp-eyebrow">2015–16 / MYCAREER</span><span className="cp-name">{career?.姓名 ?? '未建档'}</span><span className="cp-team" style={{ color: team?.colors.primary }}>{team?.cn ?? career?.球队} · {career?.位置} · {career?.球队角色}</span><span className="cp-season">第 {career?.赛程索引 ?? 0} 场 · {record ? `${record.胜}胜${record.负}负 · ` : ''}教练信任 {career?.教练信任 ?? 0}</span></div><div className="career-ovr"><span>OVR</span><b>{career?.能力.overall ?? 0}</b><small>POT {career?.能力.potential ?? 0}</small></div></div>
+    <div className="cp-header"><div className="cp-identity"><span className="cp-eyebrow">{career?.赛季 ?? '—'} / MYCAREER</span><span className="cp-name">{career?.姓名 ?? '未建档'}</span><span className="cp-team" style={{ color: team?.colors.primary }}>{team?.cn ?? career?.球队} · {career?.位置} · {career?.球队角色} · {career?.年龄 ?? '—'}岁 · {phase}</span><span className="cp-season">第 {career?.赛程索引 ?? 0} 场 · {record ? `${record.胜}胜${record.负}负 · ` : ''}教练信任 {career?.教练信任 ?? 0}</span></div><div className="career-ovr"><span>OVR</span><b>{career?.能力.overall ?? 0}</b><small>POT {career?.能力.potential ?? 0}</small></div></div>
     <div className="career-resource-strip"><span>资金 <b>{((offCourt?.资金 ?? 0) / 10000).toFixed(1)}万</b></span><span>声望 <b>{offCourt?.声望 ?? 0}</b></span><span>粉丝 <b>{((offCourt?.粉丝 ?? 0) / 10000).toFixed(1)}万</b></span><span>成长点 <b>{points}</b></span></div>
     <div className="cp-schedule"><span>{offCourt?.日程?.日期 ?? '—'}</span><span>下一场：{offCourt?.日程?.下一场 ?? '—'}</span>{(offCourt?.日程?.待办 ?? []).map(item => <span key={item} className="cp-todo">{item}</span>)}</div>
     {activeHooks.length > 0 && <div className="cp-section league-pulse"><div className="cp-section-title">联盟动态</div>{activeHooks.map(hook => <div key={hook.id} className="cp-row"><b>{hook.title}</b> · {hook.detail}</div>)}</div>}
@@ -48,6 +50,11 @@ export function CareerPanel(props: {
     {showProfile && career && <section className="player-dynamics"><div><h3>核心徽章</h3><div className="badge-grid">{BADGE_REGISTRY.map(name => { const badge = career.动态徽章.badges[name]; return <span key={name} data-level={badge?.level ?? '未解锁'}>{name}<b>{badge?.level ?? '未解锁'}</b><small>{badge?.progress ?? 0}</small></span>; })}</div></div><div><h3>14区热图</h3><div className="hotzone-grid">{HOT_ZONE_IDS.map(zone => { const item = career.热区.zones[zone]; return <span key={zone} data-state={item?.state ?? '中性'}>{zone}<b>{item?.state ?? '中性'}</b><small>{item?.makes ?? 0}/{item?.attempts ?? 0}</small></span>; })}</div></div></section>}
 
     {(offCourt?.代言?.length ?? 0) > 0 && <div className="cp-section"><div className="cp-section-title">代言</div>{offCourt!.代言.map(item => <div key={item.品牌} className="cp-row">{item.品牌} · {(item.年薪 / 10000).toFixed(0)}万/年 · {item.状态}</div>)}</div>}
-    <div className="cp-actions">{quickActions.map(action => <button key={action.label} disabled={props.disabled} onClick={() => props.onAction(action.text)}>{action.label}</button>)}<button className="cp-start-match" disabled={props.disabled} onClick={props.onStartMatch}>进入下一场比赛</button></div>
+    <div className="cp-actions">
+      {quickActions.map(action => <button key={action.label} disabled={props.disabled || career?.退役状态 === '退役'} onClick={() => props.onAction(action.text)}>{action.label}</button>)}
+      {league?.阶段 === '休赛期'
+        ? <button className="cp-start-match" disabled={props.disabled || career?.退役状态 === '退役'} onClick={props.onNextSeason}>进入下一赛季</button>
+        : <button className="cp-start-match" disabled={props.disabled || career?.退役状态 === '退役'} onClick={props.onStartMatch}>{career?.退役状态 === '退役' ? '生涯已退役' : '进入下一场比赛'}</button>}
+    </div>
   </div>;
 }
