@@ -16,6 +16,14 @@ export function CareerPanel(props: {
   const points = career?.发展.growthPoints ?? career?.成长点 ?? 0;
   const cap = potentialLevelCap(career?.能力.potential ?? 75);
   const record = career ? league?.战绩?.[career.球队] : undefined;
+  const coach = career ? league?.教练?.[career.球队] : undefined;
+  const coachAssimilation = coach ? Math.min(15, coach.tenureGames) : 0;
+  const rotationLabel = coach
+    ? coach.rotationDepthBias > 0 ? '偏深轮换' : coach.rotationDepthBias < 0 ? '偏短轮换' : '常规轮换'
+    : '—';
+  const starLoadLabel = coach
+    ? coach.starLoadBias > 3 ? '偏重核心' : coach.starLoadBias < -3 ? '偏分担' : '均衡'
+    : '—';
   const activeHooks = (league?.故事钩子 ?? []).filter(hook => !hook.consumed).slice(-3).reverse();
   const quickActions = [
     { label: '会见经纪人', text: '我约经纪人见面，聊聊最近的代言机会和职业规划。' },
@@ -29,6 +37,11 @@ export function CareerPanel(props: {
     <div className="career-resource-strip"><span>资金 <b>{((offCourt?.资金 ?? 0) / 10000).toFixed(1)}万</b></span><span>声望 <b>{offCourt?.声望 ?? 0}</b></span><span>粉丝 <b>{((offCourt?.粉丝 ?? 0) / 10000).toFixed(1)}万</b></span><span>成长点 <b>{points}</b></span></div>
     <div className="cp-schedule"><span>{offCourt?.日程?.日期 ?? '—'}</span><span>下一场：{offCourt?.日程?.下一场 ?? '—'}</span>{(offCourt?.日程?.待办 ?? []).map(item => <span key={item} className="cp-todo">{item}</span>)}</div>
     {activeHooks.length > 0 && <div className="cp-section league-pulse"><div className="cp-section-title">联盟动态</div>{activeHooks.map(hook => <div key={hook.id} className="cp-row"><b>{hook.title}</b> · {hook.detail}</div>)}</div>}
+    {coach && <div className="cp-section coach-profile"><div className="cp-section-title">教练理念</div>
+      <div className="cp-row"><b>体系</b> · 进攻偏好 {coach.offensePreference ?? '随阵容'} · 防守偏好 {coach.defensePreference ?? '随阵容'} · 节奏 {coach.pacePreference}</div>
+      <div className="cp-row"><b>用人</b> · {rotationLabel} · {starLoadLabel} · 小阵容 {coach.smallBallBias > 4 ? '偏爱' : coach.smallBallBias < -4 ? '保守' : '中性'}</div>
+      <div className="cp-row"><b>磨合</b> · {coach.tenureGames >= 15 ? '理念已稳定落地' : `${coachAssimilation}/15 场`} · 固执度 {Math.round(coach.stubbornness)}</div>
+    </div>}
 
     <div className="career-toolbar"><button className={showDevelopment ? 'active' : ''} onClick={() => setShowDevelopment(value => !value)}>能力升级</button><button className={showProfile ? 'active' : ''} onClick={() => setShowProfile(value => !value)}>徽章 / 热区</button><button disabled={props.disabled} onClick={props.onTrain}>今日训练 +1</button></div>
     {showDevelopment && career && <section className="development-panel"><header><div><span>NONLINEAR DEVELOPMENT</span><b>潜力等级上限 {cap}</b></div><strong>{points} GP</strong></header><div className="development-grid">{GROUP_KEYS.map(key => { const level = career.发展.groups[key]; const cost = upgradeCost(level); return <div className="development-row" key={key}><div><span>{GROUP_LABELS[key]}</span><small>LV {level}/{cap} · 下级 {cost}点</small></div><div className="development-track"><i style={{ width: `${level / 20 * 100}%` }} /></div><button disabled={props.disabled || level >= cap || points < cost} onClick={() => props.onUpgrade(key)}>升级</button></div>; })}</div></section>}
