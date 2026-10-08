@@ -1,3 +1,4 @@
+import { getBasePlayer } from '../utils/rosters';
 import { getPlayerAvailability } from './availability';
 import { estimateInitialAge } from './lifecycle';
 import type { LeagueState, InjuryRecord, StoryHook } from './season';
@@ -52,7 +53,7 @@ function ageOf(player: PlayerData, league: LeagueState, ageOverride?: { key: str
   const generated = league.生成球员[player.name];
   return generated
     ? generated.ageAtEntry + Math.max(0, league.赛季序号 - generated.entrySeason)
-    : estimateInitialAge(player) + league.赛季序号;
+    : estimateInitialAge(getBasePlayer(player.name) ?? player) + league.赛季序号;
 }
 
 /** 单次出场的风险：分钟、耐久、年龄、疲劳与既往严重伤病均参与。 */
