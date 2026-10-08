@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advanceLeagueAfterGame, createLeagueState, getScheduledGame, scheduleDate } from './season';
+import { advanceLeagueAfterGame, beginNextSeason, createLeagueState, getScheduledGame, scheduleDate } from './season';
 import type { MatchState } from './types';
 
 function finishedMatch(): MatchState {
@@ -22,6 +22,8 @@ describe('SeasonEngine', () => {
     expect(getScheduledGame('GSW', 0)).toEqual(getScheduledGame('GSW', 0));
     expect(scheduleDate(0)).toBe('2015-10-27');
     expect(scheduleDate(81)).toBe('2016-04-13');
+    expect(scheduleDate(0, 1)).toBe('2016-10-27');
+    expect(scheduleDate(81, 1)).toBe('2017-04-13');
     expect(getScheduledGame('GSW', 82)).toBeNull();
   });
 
@@ -34,6 +36,17 @@ describe('SeasonEngine', () => {
     expect(result.league.战绩.CLE.负).toBe(1);
     expect(result.league.赛程索引).toBe(1);
     expect(result.nextGame?.index).toBe(1);
+  });
+
+  it('休赛期进入下一赛季会重置战绩并使用下一年度赛历', () => {
+    const league = createLeagueState('GSW');
+    league.阶段 = '休赛期';
+    const next = beginNextSeason(league, 'GSW');
+    expect(next.league.赛季).toBe('2016-17');
+    expect(next.league.赛季序号).toBe(1);
+    expect(next.league.日期).toBe('2016-10-27');
+    expect(next.nextGame?.index).toBe(0);
+    expect(next.league.战绩.GSW.胜).toBe(0);
   });
 
   it('第82场结束后按排名生成七场四胜季后赛首轮', () => {
