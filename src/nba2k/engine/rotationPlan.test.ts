@@ -98,6 +98,29 @@ describe('RotationPlan / Availability / CoachRole', () => {
     expect(next.阵容.主.场上.some(key => !before.has(key))).toBe(true);
   });
 
+
+  it('同样表现主要来自垃圾时间时，教练信任增幅会被降权', () => {
+    const normalMatch = freshMatch();
+    normalMatch.球员状态['Stephen Curry'].上场秒数 = 30 * 60;
+    normalMatch.比分 = { 主: 115, 客: 100 };
+    const garbageMatch = structuredClone(normalMatch);
+    garbageMatch.球员状态['Stephen Curry'].垃圾时间秒数 = 30 * 60;
+
+    const base = {
+      球队: 'GSW',
+      附身球员: 'Stephen Curry',
+      球队角色: '轮换',
+      教练信任: 40,
+      教练评估: { 最近评分: [], 上次角色调整场次: 0 },
+      能力: { overall: 90 },
+    } as unknown as CareerState;
+
+    const normal = applyCoachReview(base, normalMatch, 90, 1);
+    const garbage = applyCoachReview(base, garbageMatch, 90, 1);
+    expect(garbage.trustDelta).toBeLessThan(normal.trustDelta);
+    expect(garbage.trustDelta).toBeGreaterThan(0);
+  });
+
   it('连续五场高质量表现最多只把轮换球员提升一级', () => {
     const match = freshMatch();
     match.球员状态['Stephen Curry'].上场秒数 = 30 * 60;
