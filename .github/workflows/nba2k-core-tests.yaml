@@ -47,5 +47,6 @@ jobs:
           src/nba2k/engine/teamStyle.test.ts
           src/nba2k/engine/coachProfile.test.ts
           src/nba2k/engine/lifecycle.test.ts
+          src/nba2k/engine/draft.test.ts
           src/nba2k/engine/transactions.test.ts
           src/nba2k/engine/fullGameSimulation.test.ts
