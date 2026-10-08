@@ -49,7 +49,6 @@ import { getPlayerAvailability } from './engine/availability';
 import { buildDynamicDepthChart } from './engine/depthChart';
 import {
   advanceCareerLifecycleOneSeason,
-  careerPhase,
   estimateInitialAge,
   estimatePeakAge,
 } from './engine/lifecycle';
@@ -831,6 +830,67 @@ const App: React.FC = () => {
     await sendTurn('【训练】我完成了今天的专项训练，前端已确定性增加1成长点并推进日期。请简短描写训练内容与教练反馈，不再修改数值。', { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 生涯: result.career, 场外: result.offCourt }) });
   }, [stat, sendTurn]);
 
+  const handleNextSeason = useCallback(async () => {
+    const career = stat.生涯;
+    const offCourt = stat.场外;
+    const league = stat.联盟;
+    if (!career || !offCourt || !league || league.阶段 !== '休赛期' || busyRef.current) return;
+
+    const severeInjuries = league.伤病.filter(
+      item => item.球员 === career.附身球员 && item.严重度 === '严重',
+    ).length;
+    const agedCareer = advanceCareerLifecycleOneSeason(career, severeInjuries);
+    const advanced = beginNextSeason(league, career.球队);
+    let nextLeague = advanced.league;
+    const nextCareer = {
+      ...agedCareer,
+      赛季: nextLeague.赛季,
+      赛程索引: 1,
+      教练评估: { 最近评分: [], 上次角色调整场次: 0 },
+      赛季统计: { 场均得分: 0, 场均篮板: 0, 场均助攻: 0, 出场数: 0 },
+    };
+    if (agedCareer.退役状态 !== career.退役状态) {
+      nextLeague = {
+        ...nextLeague,
+        故事钩子: [
+          ...nextLeague.故事钩子,
+          {
+            id: `career-retirement-${nextLeague.赛季序号}-${agedCareer.退役状态}`,
+            type: '球队关系' as const,
+            title: agedCareer.退役状态 === '退役' ? '生涯走到终点' : '退役话题升温',
+            detail: agedCareer.退役状态 === '退役'
+              ? `${career.姓名}在${agedCareer.年龄}岁正式结束球员生涯。`
+              : `${career.姓名}进入生涯暮年，年龄、能力、耐久与球队角色让退役成为现实议题。`,
+            createdDate: nextLeague.日期,
+          },
+        ],
+      };
+    }
+
+    const nextOffCourt = {
+      ...offCourt,
+      日程: {
+        日期: nextLeague.日期,
+        下一场: agedCareer.退役状态 === '退役'
+          ? '生涯已退役'
+          : formatScheduledOpponent(advanced.nextGame),
+        待办: agedCareer.退役状态 === '退役' ? ['生涯总结'] : ['新赛季报到'],
+      },
+    };
+
+    const projection = careerPlayerProjection(nextCareer);
+    if (projection) registerCustomPlayer(projection);
+    const patch = { 生涯: nextCareer, 场外: nextOffCourt, 联盟: nextLeague, 比赛: null };
+    await insertOrAssignVariables({ stat_data: patch }, { type: 'chat' });
+    setStat(current => ({ ...current, ...patch }));
+    await sendTurn(
+      agedCareer.退役状态 === '退役'
+        ? `【休赛期结算】前端生命周期系统已判定我在${agedCareer.年龄}岁正式退役。请以生涯纪录片口吻总结，不得改变退役结论或能力数值。`
+        : `【新赛季】前端已进入${nextLeague.赛季}赛季。我现在${agedCareer.年龄}岁，总评${agedCareer.能力.overall}，退役状态为“${agedCareer.退役状态}”。年龄成长/衰退已经由代码结算；请演出训练营报到和新赛季期待，不得重新计算能力。`,
+      { transformAssistant: async raw => stripMatchVariableBlocks(raw, patch) },
+    );
+  }, [stat, sendTurn]);
+
   const handleReset = useCallback(() => {
     if (!window.confirm('确定清除这段聊天中的 NBA2K 存档并重新开始吗？此操作不可撤销。')) return;
     const variables = getVariables({ type: 'chat' });
@@ -942,6 +1002,7 @@ const App: React.FC = () => {
           disabled={busy}
           onAction={t => void sendTurn(t)}
           onStartMatch={() => void handleStartMatch()}
+          onNextSeason={() => void handleNextSeason()}
           onTrain={() => void handleTrain()}
           onUpgrade={group => void handleUpgrade(group)}
         />
