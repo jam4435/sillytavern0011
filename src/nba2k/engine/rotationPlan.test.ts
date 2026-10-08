@@ -10,7 +10,7 @@ import { defaultTeamTactics } from './tendencies';
 import type { MatchState, OnCourtStatus } from './types';
 import type { CareerState } from '../utils/statReader';
 import { getPlayer, getRoster } from '../utils/rosters';
-import { buildDynamicDepthChart } from './depthChart';
+import { buildDynamicDepthChart, deriveDynamicMinuteWeights } from './depthChart';
 
 const status = (): OnCourtStatus => ({
   体力: 100, 得分: 0, 篮板: 0, 助攻: 0, 抢断: 0, 盖帽: 0, 失误: 0, 犯规: 0,
@@ -69,6 +69,28 @@ describe('RotationPlan / Availability / CoachRole', () => {
     expect(plan.主.benchTrust).toBeGreaterThan(0);
     expect(plan.主.starLoad).toBeGreaterThan(0);
     expect(Object.values(plan.主.targetMinutes).reduce((sum, value) => sum + value, 0)).toBeCloseTo(240, 5);
+  });
+
+
+  it('架空多年后的生成球员阵容无需历史姓名也能自行生成首发、轮换和错峰核心', () => {
+    const generated = getRoster('GSW').slice(0, 10).map((player, index) => ({
+      ...player,
+      name: `Future Player ${index + 1}`,
+      cn: `未来球员${index + 1}`,
+      team: 'FUT',
+      overall: index === 0 ? 96 : player.overall,
+    }));
+    const chart = buildDynamicDepthChart(generated, { tactics: defaultTeamTactics('GSW') });
+    const weights = deriveDynamicMinuteWeights(chart);
+
+    expect(chart.starters).toHaveLength(5);
+    expect(chart.activeRotation.length).toBeGreaterThanOrEqual(9);
+    expect(chart.starters.every(entry => entry.key.startsWith('Future Player'))).toBe(true);
+    expect(Object.keys(weights).every(key => key.startsWith('Future Player'))).toBe(true);
+    expect(weights['Future Player 1']).toBeGreaterThan(weights['Future Player 10']);
+    for (const group of chart.staggerGroups) {
+      expect(group.every(key => key.startsWith('Future Player'))).toBe(true);
+    }
   });
 
   it('伤病休战会归零分钟，复出限制会成为硬上限', () => {
