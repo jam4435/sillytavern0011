@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import _ from 'lodash';
 
 const state = vi.hoisted(() => ({
   message: '',
@@ -44,6 +45,7 @@ const insertNew =
 
 describe('ERA 同一楼层变量块的原始次序', () => {
   beforeEach(() => {
+    vi.stubGlobal('_', _);
     state.stat = { 事件系统: { 人物事件占用: { 段誉: structuredClone(oldOccupant) } } };
     state.meta = { EditLogs: {} };
     state.message = '';
