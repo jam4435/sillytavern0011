@@ -56,6 +56,7 @@ function freshStatus(): OnCourtStatus {
     进攻篮板: 0,
     防守篮板: 0,
     上场秒数: 0,
+    垃圾时间秒数: 0,
     手感: '平',
     连续命中: 0,
     连续打铁: 0,
