@@ -153,6 +153,7 @@ export const offCourtStateSchema = z.object({
 const coachProfileSchema = z.object({
   id: nonEmptyText,
   generation: nonNegativeInt,
+  tenureGames: nonNegativeInt,
   offensePreference: z.enum(['基础', '五外', '四外一内', '挡拆', '低位', '动态进攻']).nullable(),
   defensePreference: z.enum(['人盯人', '二三联防', '换防', '沉退', '延误']).nullable(),
   pacePreference: z.enum(['慢', '标准', '快']),
