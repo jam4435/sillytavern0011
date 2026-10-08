@@ -16,8 +16,15 @@ import { findLatestNewValue } from '../rollback';
 import { updateEraStatData } from '../../utils/era_data';
 import { sanitizeArrays } from '../../utils/data';
 import { Logger } from '../../utils/log';
+import { recordEraDiagnostic } from '../../utils/diagnostics';
 
 const logger = new Logger('core-crud-update');
+const eventRootPattern = /^(?:事件系统|参与事件|世界事件|事件分支结果|后续事件线索|后续事件线索计数)(?:\\.|$)/;
+const traceEventEditSkip = (path: string, messageId: number, reason: string, extra: Record<string, unknown> = {}) => {
+  if (eventRootPattern.test(path)) {
+    recordEraDiagnostic('core-crud-update', 'event-edit-skipped', { path, messageId, reason, ...extra });
+  }
+};
 
 /**
  * **【递归编辑】**
@@ -49,6 +56,7 @@ export async function applyEditAtLevel(
   const currentNodeInVars = basePath ? _.get(statData, basePath) : statData;
   if (currentNodeInVars === undefined) {
     logger.warn('applyEditAtLevel', `VariableEdit 跳过：路径不存在 -> ${basePath || '(root)'}`);
+    traceEventEditSkip(basePath, messageId, 'parent-path-missing');
     return;
   }
 
@@ -89,6 +97,7 @@ export async function applyEditAtLevel(
     // 路径合法性检查：确保要写入的完整路径是存在的。
     if (!_.has(statData, subPath)) {
       logger.warn('applyEditAtLevel', `VariableEdit 失败：路径非法，无法写入 -> ${subPath}`);
+      traceEventEditSkip(subPath, messageId, 'leaf-path-missing');
       continue;
     }
 
@@ -114,6 +123,9 @@ export async function applyEditAtLevel(
     // 比较当前 stat_data 而不是历史 valOld，可正确处理同一消息内对同一路径的连续编辑。
     if (_.isEqual(currentValue, cleaned)) {
       logger.debug('applyEditAtLevel', `VariableEdit 无实际变化，跳过 EditLog -> ${subPath}`);
+      traceEventEditSkip(subPath, messageId, 'already-at-target', {
+        historyOldDiffersFromTarget: !_.isEqual(valOld, cleaned),
+      });
       intraMessageState.set(subPath, _.cloneDeep(cleaned));
       continue;
     }
