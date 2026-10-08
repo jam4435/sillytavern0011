@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildFormation } from './positioning';
 import { simulateFullGame } from './fullGameSimulation';
 import { createRotationPlan } from './rotationPlan';
-import { defaultTeamTactics } from './tendencies';
+import { deriveTeamTactics } from './teamStyle';
 import type { MatchState, OnCourtStatus, Side } from './types';
 import { getPlayer, getRoster } from '../utils/rosters';
 import { buildDynamicDepthChart } from './depthChart';
@@ -24,8 +24,8 @@ function seeded(seed: number) {
 function freshMatch(homeId: string, awayId: string): MatchState {
   const homeRoster = getRoster(homeId);
   const awayRoster = getRoster(awayId);
-  const homeTactics = defaultTeamTactics(homeId);
-  const awayTactics = defaultTeamTactics(awayId);
+  const homeTactics = deriveTeamTactics(homeRoster);
+  const awayTactics = deriveTeamTactics(awayRoster);
   const homeEntries = buildDynamicDepthChart(homeRoster, { tactics: homeTactics }).starters;
   const awayEntries = buildDynamicDepthChart(awayRoster, { tactics: awayTactics }).starters;
   const homeOn = homeEntries.map(e => e.key);
