@@ -482,6 +482,7 @@ export function beginNextSeason(league: LeagueState, playerTeamId: string): Adva
     阶段: '常规赛',
     赛程索引: 0,
     战绩: Object.fromEntries(TEAMS.map(team => [team.id, emptyStanding()])),
+    市场报价: [],
     故事钩子: mergeHooks(league.故事钩子, [{
       id: `season-open-${nextOffset}`,
       type: '赛历',
