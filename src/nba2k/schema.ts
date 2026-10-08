@@ -176,6 +176,38 @@ const standingRecordSchema = z.object({
   连胜: z.number().int(),
 }).strict();
 
+const rookieTemplateSchema = z.enum(['神射手', '组织核心', '突破手', '双向侧翼', '禁区终结者', '护框中锋', '空间内线', '全能前锋']);
+
+const generatedPlayerSeedSchema = z.object({
+  key: nonEmptyText,
+  displayName: nonEmptyText,
+  entrySeason: nonNegativeInt,
+  ageAtEntry: z.number().int().min(18).max(23),
+  peakAge: z.number().int().min(24).max(34),
+  pos: positionSchema,
+  secondaryPos: positionSchema.nullable(),
+  body: bodyProfileSchema,
+  potential: rating,
+  targetOverall: rating,
+  template: rookieTemplateSchema,
+  seed: nonEmptyText,
+}).strict();
+
+const draftPickRecordSchema = z.object({
+  season: nonEmptyText,
+  entrySeason: nonNegativeInt,
+  round: z.union([z.literal(1), z.literal(2)]),
+  pick: z.number().int().min(1).max(30),
+  overallPick: z.number().int().min(1).max(60),
+  teamId: nonEmptyText,
+  playerKey: nonEmptyText,
+  playerName: nonEmptyText,
+  pos: positionSchema,
+  template: rookieTemplateSchema,
+  overallAtDraft: rating,
+  potential: rating,
+}).strict();
+
 const leagueContractSchema = z.object({
   playerKey: nonEmptyText,
   teamId: nonEmptyText.nullable(),
@@ -221,7 +253,7 @@ const injuryRecordSchema = z.object({
 
 const storyHookSchema = z.object({
   id: nonEmptyText,
-  type: z.enum(['赛历', '交易', '合同', '代言', '伤病', '球队关系', '奖项']),
+  type: z.enum(['赛历', '交易', '合同', '代言', '伤病', '球队关系', '奖项', '选秀']),
   title: nonEmptyText, detail: nonEmptyText, createdDate: nonEmptyText, consumed: z.boolean().optional(),
 }).strict();
 
@@ -259,6 +291,8 @@ export const leagueStateSchema = z.object({
   合同册: z.record(nonEmptyText, leagueContractSchema),
   市场报价: z.array(marketOfferSchema),
   交易记录: z.array(transactionRecordSchema).max(240),
+  生成球员: z.record(nonEmptyText, generatedPlayerSeedSchema),
+  选秀历史: z.array(draftPickRecordSchema).max(600),
   伤病: z.array(injuryRecordSchema),
   故事钩子: z.array(storyHookSchema),
   季后赛: playoffStateSchema.nullable().default(null),
