@@ -7,6 +7,18 @@ import { recordEraDiagnostic } from './diagnostics';
 export const ERA_MK_LEDGER_JOURNAL_KEY = 'era_mk_ledger_journal_v1';
 const MAX_RECORDS = 200;
 
+// 只在当前 iframe 记住已经执行过回滚的 MK；后续 Apply 对该 MK 必须真正重放，
+// 不得因为其它写入碰巧保留了原目标值，就将旧 EditLog 认作幂等重入记录。
+const rollbackWitnesses = new Set<string>();
+export function markMkRollbackPerformed(mk: string): void {
+  rollbackWitnesses.add(mk);
+}
+export function consumeMkRollbackWitness(mk: string): boolean {
+  const hadRollback = rollbackWitnesses.has(mk);
+  rollbackWitnesses.delete(mk);
+  return hadRollback;
+}
+
 export function recordMkLedgerTransition(
   stage: string,
   mk: string,
