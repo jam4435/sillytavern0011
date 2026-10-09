@@ -1,9 +1,32 @@
 import { describe, expect, it } from 'vitest';
 
-import { collectReachableMessageKeys, compactEditLogsInMeta, hashSyncAudit, pruneUnreachableEditLogs } from './sync';
+import { collectReachableMessageKeys, compactEditLogsInMeta, describeEventRollbackPathCheck, hashSyncAudit, pruneUnreachableEditLogs } from './sync';
 
 const era = (mk: string) =>
   `<era_data>{"era-message-key"="${mk}","era-message-type"="assistant"}</era_data>\n正文`;
+
+describe('ERA event rollback checks', () => {
+  it('recognizes correctly applied inverse updates without exposing values', () => {
+    const entry = { op: 'update', path: '事件系统.进行中事件.测试事件.年', value_old: 1200, value_new: 1201 };
+    const before = { 进行中事件: { 测试事件: { 年: 1201 } } };
+    const after = { 进行中事件: { 测试事件: { 年: 1200 } } };
+    const description = describeEventRollbackPathCheck(entry, before, after);
+    expect(description).toContain('before=new:true');
+    expect(description).toContain('before=old:false');
+    expect(description).toContain('after=old:true');
+    expect(description).not.toContain('1200');
+    expect(description).not.toContain('1201');
+  });
+
+  it('recognizes no-op rollback against stale event logs', () => {
+    const entry = { op: 'update', path: '事件系统.已完成事件.旧事件', value_old: 0, value_new: 1 };
+    const value = { 已完成事件: { 旧事件: 7 } };
+    const description = describeEventRollbackPathCheck(entry, value, value);
+    expect(description).toContain('before=new:false');
+    expect(description).toContain('before=old:false');
+    expect(description).toContain('after=old:false');
+  });
+});
 
 describe('ERA full resync audit fingerprints', () => {
   it('orders event bucket object keys deterministically and detects actual state changes', () => {
