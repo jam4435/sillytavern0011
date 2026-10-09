@@ -10,6 +10,7 @@ import {
 import { eventEmitMock, listeners } from '../武侠/test/setup';
 import { clearHistoryCheckoutJournal, createHistoryCheckoutJournal } from './historyCheckoutJournal';
 import { clearChatRenameJournal, createChatRenameJournal } from './chatRenameJournal';
+import { HISTORY_EVENT_FORENSICS_STORAGE_KEY } from './historyEventForensics';
 
 describe('runDirectChatVariableWrite', () => {
   beforeEach(() => {
@@ -190,6 +191,40 @@ describe('runDirectChatVariableWrite', () => {
         ],
       }),
     );
+  });
+
+  it('事件系统直接事务只读记录修改前后指纹与写入原因', async () => {
+    vi.mocked(globalThis.updateVariablesWith).mockImplementationOnce(updater =>
+      updater({
+        ERAMetaData: { SelectedMks: ['mk0'] },
+        stat_data: {
+          事件系统: {
+            进行中事件: { 事件07: { 年: 1202, 时: 16 } },
+            人物事件占用: { 段誉: { 事件名: '事件07' } },
+          },
+        },
+      }),
+    );
+    await writeDirectChatTransaction(
+      variables => {
+        (variables as any).stat_data.事件系统.进行中事件.事件07.时 = 17;
+        return variables;
+      },
+      'forensics-event-test',
+      { source: 'event-script', refreshHint: 'event-state' },
+    );
+    const entries = JSON.parse(localStorage.getItem(HISTORY_EVENT_FORENSICS_STORAGE_KEY) || '[]')
+      .filter((entry: any) => entry.details?.reason === 'forensics-event-test');
+    expect(entries).toHaveLength(1);
+    expect(entries[0].details).toMatchObject({
+      stage: 'direct-event-write',
+      source: 'event-script',
+      reason: 'forensics-event-test',
+      paths: ['事件系统.进行中事件.事件07.时'],
+    });
+    expect(entries[0].details.before.eventSystemHash).not.toBe(entries[0].details.after.eventSystemHash);
+    expect(entries[0].details.before.characterOccupancy[0].hash)
+      .toBe(entries[0].details.after.characterOccupancy[0].hash);
   });
 
   it('底层 ERA 等待器先监听后 emit，并统一发送 sourced 完成事件', async () => {
