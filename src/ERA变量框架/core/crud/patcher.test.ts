@@ -166,6 +166,17 @@ describe('ERA 同一楼层变量块的原始次序', () => {
     expect(state.meta.EditLogs['mk-checkout-regression']).toEqual([]);
   });
 
+  it('变量已改动而 EditLog 持久化失败时，不得返回成功 MK', async () => {
+    const { updateEraMetaData } = await import('../../utils/era_data');
+    vi.mocked(updateEraMetaData).mockRejectedValueOnce(new Error('metadata write failed'));
+    state.stat = { 事件系统: { 人物事件占用: {} } };
+    state.message = insertNew;
+
+    await expect(ApplyVarChangeForMessage({ message_id: 6 }))
+      .rejects.toThrow('metadata write failed');
+    expect(state.meta.EditLogs['mk-checkout-regression']).toBeUndefined();
+  });
+
   it('如果实际顺序是 Insert 再 Delete，最终仍应删除占用', async () => {
     state.stat = { 事件系统: { 人物事件占用: {} } };
     state.message = `${insertNew}\n${deleteOld}`;
