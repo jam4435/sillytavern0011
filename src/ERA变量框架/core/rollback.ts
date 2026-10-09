@@ -52,6 +52,7 @@ export async function rollbackByMk(MK: string, silent = false) {
         return v;
       }
 
+      let rollbackChangedState = false;
       // 关键：必须逆序遍历 EditLog 来执行回滚。
       // 这确保了对同一变量的多次修改能够被正确地、按相反的顺序撤销。
       for (let i = arr.length - 1; i >= 0; i--) {
@@ -59,10 +60,18 @@ export async function rollbackByMk(MK: string, silent = false) {
         const op = String(e?.op || '').toLowerCase();
         const path = String(e?.path || '');
         if (!path) continue;
+        const existedBefore = _.has(stat, path);
+        const valueBefore = _.cloneDeep(_.get(stat, path));
+        const didChange = () => {
+          if (existedBefore !== _.has(stat, path) || !_.isEqual(valueBefore, _.get(stat, path))) {
+            rollbackChangedState = true;
+          }
+        };
 
         if (op === 'insert') {
           // 对于“插入”操作，回滚即为“删除”。
           _.unset(stat, path);
+          didChange();
           continue;
         }
         if (op === 'update' || op === 'delete') {
@@ -73,12 +82,14 @@ export async function rollbackByMk(MK: string, silent = false) {
           } else {
             _.set(stat, path, _.cloneDeep(e.value_old));
           }
+          didChange();
         }
       }
 
       _.set(v, STAT_DATA_PATH, stat);
-      markMkRollbackPerformed(MK);
-      recordMkLedgerTransition('rollback-applied', MK, context);
+      // 仅有实际撤销效果时才禁止重入沿用旧日志；无效回滚不能成为丢日志的理由。
+      if (rollbackChangedState) markMkRollbackPerformed(MK);
+      recordMkLedgerTransition('rollback-applied', MK, { ...context, rollbackChangedState });
       return v;
     }, CHAT_SCOPE);
     logger.log('rollbackByMk', `回滚完成：MK=${MK}`);
