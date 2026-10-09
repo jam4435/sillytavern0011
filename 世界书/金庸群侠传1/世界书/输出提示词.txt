@@ -211,21 +211,132 @@ if (currentLocationInfo && typeof currentLocationInfo === 'object' && !Array.isA
 
 <%
 const rawSurrounding = getvar('stat_data.前端变量.周围地点', { scope: 'local' });
-const surrounding = rawSurrounding && typeof rawSurrounding === 'object' && !Array.isArray(rawSurrounding)
-  ? rawSurrounding
-  : {};
+const snapshotSurrounding = variables.stat_data.前端变量?.周围地点;
+const surrounding = {
+  ...(snapshotSurrounding && typeof snapshotSurrounding === 'object' && !Array.isArray(snapshotSurrounding) ? snapshotSurrounding : {}),
+  ...(rawSurrounding && typeof rawSurrounding === 'object' && !Array.isArray(rawSurrounding) ? rawSurrounding : {}),
+};
 const reachableLocations = uniqueFullLocationPaths([
   ...(Array.isArray(surrounding.附近地点) ? surrounding.附近地点 : []),
   ...(Array.isArray(surrounding.目标事件地点) ? surrounding.目标事件地点 : []),
   ...(Array.isArray(surrounding.地图移动目的地) ? surrounding.地图移动目的地 : []),
 ]);
-const activeFollowupLocations =
-  Object.entries(participation).some(([name, event]) => name.charCodeAt(0) !== 36 && event && typeof event === 'object' && !Array.isArray(event))
-  && surrounding.后续事件 && typeof surrounding.后续事件 === 'object' && !Array.isArray(surrounding.后续事件)
-    ? surrounding.后续事件
-    : {};
+const hasActiveParticipation = Object.entries(participation)
+  .some(([name, event]) => !name.startsWith('
+-%>
+<可用地点>
+当前: <%- currentFullLocation || '无效' %>
+活动区: <%- currentScope || '无效' %>
+<% if (reachableLocations.length > 0) { -%>
+可前往:
+<% for (const location of reachableLocations) { -%>
+  - <%- location %>
+<% } -%>
+<% } else { -%>
+可前往: 无
+<% } -%>
+<% if (Object.keys(activeFollowupLocations).length > 0) { -%>
+后续事件:
+<% for (const [eventName, location] of Object.entries(activeFollowupLocations)) { -%>
+  <%- compactPromptKey(eventName) %>: <%- location %>
+<% } -%>
+后续事件移动指引: 当参与事件全阶段完成且玩家有继续推进想法时，往后续事件地点移动；尊重玩家其他选择，按实际行程推进，不得直接传送或提前演出后续事件。
+<% } else if (unnamedEventTargets.length > 0) { -%>
+目标事件地点（后续事件名称尚未同步）:
+<% for (const location of unnamedEventTargets) { -%>
+  - <%- location %>
+<% } -%>
+地点接驳指引: 当前参与事件全阶段完成且玩家有继续推进想法时，可参考以上目标地点继续行程；这些地点尚未确认与后续事件的对应关系，不得据此强制触发事件、直接传送或覆盖玩家选择。
+<% } -%>
+规则: 路径=一级/二级/三级[/四级]；前三段相同仅表示同一活动区，不代表人物面对面同场。
+</可用地点>
+
+<%
+const allCharacters = variables.stat_data.角色数据;
+const playerLocation = variables.stat_data.user数据?.所在位置;
+const presentCharacters = {};
+if (playerLocation && allCharacters) {
+  for (const charName in allCharacters) {
+    if (!Object.prototype.hasOwnProperty.call(allCharacters, charName) || charName === '$template') continue;
+    const character = allCharacters[charName];
+    if (!isSameLocationScope(character.所在位置, playerLocation)) continue;
+    const filtered = {};
+    for (const key in character) {
+      if (key !== '初始属性' && !key.startsWith('$')) filtered[key] = character[key];
+    }
+    presentCharacters[charName] = filtered;
+  }
+}
+if (Object.keys(presentCharacters).length > 0) {
+-%>
+<角色数据>
+<%- toPromptYaml(presentCharacters) %>
+</角色数据>
+<% } -%>
+) && event && typeof event === 'object' && !Array.isArray(event));
+const snapshotFollowups = snapshotSurrounding && typeof snapshotSurrounding === 'object' && !Array.isArray(snapshotSurrounding)
+  ? snapshotSurrounding.后续事件
+  : null;
+const rawFollowups = rawSurrounding && typeof rawSurrounding === 'object' && !Array.isArray(rawSurrounding)
+  ? rawSurrounding.后续事件
+  : null;
+const activeFollowupLocations = hasActiveParticipation
+  ? Object.fromEntries([
+      ...Object.entries(snapshotFollowups && typeof snapshotFollowups === 'object' && !Array.isArray(snapshotFollowups) ? snapshotFollowups : {}),
+      ...Object.entries(rawFollowups && typeof rawFollowups === 'object' && !Array.isArray(rawFollowups) ? rawFollowups : {}),
+    ].filter(([name, location]) => !name.startsWith('
+-%>
+<可用地点>
+当前: <%- currentFullLocation || '无效' %>
+活动区: <%- currentScope || '无效' %>
+<% if (reachableLocations.length > 0) { -%>
+可前往:
+<% for (const location of reachableLocations) { -%>
+  - <%- location %>
+<% } -%>
+<% } else { -%>
+可前往: 无
+<% } -%>
+<% if (Object.keys(activeFollowupLocations).length > 0) { -%>
+后续事件:
+<% for (const [eventName, location] of Object.entries(activeFollowupLocations)) { -%>
+  <%- compactPromptKey(eventName) %>: <%- location %>
+<% } -%>
+后续事件移动指引: 当参与事件全阶段完成且玩家有继续推进想法时，往后续事件地点移动；尊重玩家其他选择，按实际行程推进，不得直接传送或提前演出后续事件。
+<% } -%>
+规则: 路径=一级/二级/三级[/四级]；前三段相同仅表示同一活动区，不代表人物面对面同场。
+</可用地点>
+
+<%
+const allCharacters = variables.stat_data.角色数据;
+const playerLocation = variables.stat_data.user数据?.所在位置;
+const presentCharacters = {};
+if (playerLocation && allCharacters) {
+  for (const charName in allCharacters) {
+    if (!Object.prototype.hasOwnProperty.call(allCharacters, charName) || charName === '$template') continue;
+    const character = allCharacters[charName];
+    if (!isSameLocationScope(character.所在位置, playerLocation)) continue;
+    const filtered = {};
+    for (const key in character) {
+      if (key !== '初始属性' && !key.startsWith('$')) filtered[key] = character[key];
+    }
+    presentCharacters[charName] = filtered;
+  }
+}
+if (Object.keys(presentCharacters).length > 0) {
+-%>
+<角色数据>
+<%- toPromptYaml(presentCharacters) %>
+</角色数据>
+<% } -%>
+) && normalizeFullLocationPath(location)))
+  : {};
 const currentFullLocation = normalizeFullLocationPath(variables.stat_data.user数据?.所在位置);
 const currentScope = getLocationScopePath(surrounding.当前活动区) || getLocationScopePath(currentFullLocation);
+const unnamedEventTargets = hasActiveParticipation && Object.keys(activeFollowupLocations).length === 0
+  ? uniqueFullLocationPaths(Array.isArray(surrounding.目标事件地点) ? surrounding.目标事件地点 : [])
+      .filter(location => location !== currentFullLocation && location !== currentScope)
+  : [];
 -%>
 <可用地点>
 当前: <%- currentFullLocation || '无效' %>
