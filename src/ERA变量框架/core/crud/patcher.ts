@@ -32,7 +32,7 @@ import { extractOrderedVariableActionBlocks } from '../../utils/string';
 import { escapeEraData, parseEditLog, parseJsonl } from '../../utils/data';
 import { Logger } from '../../utils/log';
 import { recordEraDiagnostic } from '../../utils/diagnostics';
-import { recordMkLedgerTransition, summarizeMkLedger } from '../../utils/mkLedgerJournal';
+import { consumeMkRollbackWitness, recordMkLedgerTransition, summarizeMkLedger } from '../../utils/mkLedgerJournal';
 
 const logger = new Logger('core-crud-patcher');
 
@@ -121,10 +121,12 @@ export const ApplyVarChangeForMessage = async (msg: any): Promise<string | null>
     const oldEditLog = parseEditLog(oldMeta?.[LOGS_PATH]?.[MK]);
     const oldRevision = oldMeta?.EditLogContentRevisions?.[MK];
     const revision = actionBlockRevision(operationBlocks);
+    const replayAfterRollback = consumeMkRollbackWitness(MK);
     recordMkLedgerTransition('apply-before', MK, {
       messageId,
       revision,
       oldRevision: typeof oldRevision === 'string' ? oldRevision : null,
+      replayAfterRollback,
       ...summarizeMkLedger(oldEditLog),
     });
     const beforeEventRoots = fingerprintEventRoots();
@@ -177,6 +179,7 @@ export const ApplyVarChangeForMessage = async (msg: any): Promise<string | null>
       editLog.length === 0 &&
       operationBlocks.length > 0 &&
       oldRevision === revision &&
+      !replayAfterRollback &&
       _.isEqual(beforeEventRoots, afterEventRoots) &&
       oldLedgerEffectsStillPresent(oldEditLog, getEraData().stat ?? {});
     const committedLog = retainLedger ? oldEditLog : editLog;
