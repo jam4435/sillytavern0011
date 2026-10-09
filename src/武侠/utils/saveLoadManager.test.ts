@@ -960,6 +960,48 @@ describe('history checkout', () => {
     expect(forkBranch?.headNodeId).toBe(target.id);
   });
 
+  it('分叉开始前和 slash 返回后均记录带事务 ID 的未来 MK 诊断', async () => {
+    currentChat().messages = [
+      { message_id: 0, role: 'assistant', message: '序章' },
+      { message_id: 1, role: 'user', message: '继续' },
+      { message_id: 2, role: 'assistant', message: '目标楼层' },
+      { message_id: 3, role: 'user', message: '继续探险' },
+      { message_id: 4, role: 'assistant', message: '后来楼层' },
+    ];
+    currentChat().variables.ERAMetaData = {
+      SelectedMks: ['mk0', 'mk1', 'mk2', 'mk3', 'mk4'],
+      EditLogs: {
+        mk4: [{ op: 'insert', path: '事件系统.进行中事件.测试后续事件', value_new: { 年: 1202 } }],
+      },
+    };
+    const scanned = await scanCurrentChat();
+    const target = findNodeByPreview(scanned.tree, '目标楼层')!;
+    const result = await checkoutNode(target.id, { forceBranch: true });
+    expect(result.status).toBe('commit');
+
+    const audits = (JSON.parse(localStorage.getItem('era_critical_diagnostics_v1') || '[]') as
+      Array<{ event: string; details?: Record<string, unknown> }>)
+      .filter(entry => entry.event === 'history-branch-mk-lifecycle-audit');
+    const before = audits.find(entry => entry.details?.stage === 'source-before-branch-create');
+    const after = audits.find(entry => entry.details?.stage === 'branch-create-returned');
+    expect(before?.details).toEqual(expect.objectContaining({
+      chatId: 'chat-a',
+      targetMessageId: 2,
+      messageCount: 5,
+      selectedMksLength: 5,
+      futureMksCount: 2,
+      futureEventSystemLogCount: 1,
+    }));
+    // 测试用 slash stub 保留来源聊天变量、截断消息。因此新聊天在 ERA 同步前仍能观察未来 MK。
+    expect(after?.details).toEqual(expect.objectContaining({
+      chatId: 'fork-1',
+      messageCount: 3,
+      selectedMksLength: 5,
+      futureMksCount: 2,
+      transactionId: before?.details?.transactionId,
+    }));
+  });
+
   it('分叉末尾多出一个助手节点时，报告实际叶节点和父链差异，而不是误报事件哈希', async () => {
     currentChat().messages = [
       { message_id: 0, role: 'assistant', message: '序章' },
