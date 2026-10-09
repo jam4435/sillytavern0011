@@ -70,7 +70,14 @@ describe('ERA API command write scheduling', () => {
 
   it('批事务按声明顺序一次更新消息并只发出一次带 transactionId 的 apiWrite', async () => {
     vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
-    const eventEmit = vi.fn(async () => undefined);
+    const eventEmit = vi.fn(async (type: string) => {
+      if (type === 'era:apiWrite') {
+        const callbacks = [...(listeners.get('era:writeDone') ?? [])];
+        await Promise.all(callbacks.map(fn => fn({
+          message_id: 7, actions: { apiWrite: true }, transactionIds: ['checkout-42'],
+        })));
+      }
+    });
     vi.stubGlobal('eventEmit', eventEmit);
     const { transactionByObject } = await import('./command');
 
