@@ -59,6 +59,23 @@ export function hashSyncAudit(value: unknown): string {
   return hash.toString(16).padStart(8, '0');
 }
 
+export function describeEventRollbackPathCheck(
+  entry: { op?: unknown; path: string; value_new?: unknown; value_old?: unknown },
+  beforeEventSystem: unknown,
+  afterEventSystem: unknown,
+): string {
+  const relativePath = entry.path === '事件系统' ? '' : entry.path.slice('事件系统.'.length);
+  const before = relativePath ? _.get(beforeEventSystem, relativePath) : beforeEventSystem;
+  const after = relativePath ? _.get(afterEventSystem, relativePath) : afterEventSystem;
+  return [
+    String(entry.op ?? '?'),
+    entry.path,
+    `before=new:${_.isEqual(before, entry.value_new)}`,
+    `before=old:${_.isEqual(before, entry.value_old)}`,
+    `after=old:${_.isEqual(after, entry.value_old)}`,
+  ].join(' ');
+}
+
 function recordFullSyncAudit(stage: string, selectedMks: (string | null)[]): void {
   try {
     const { stat, meta } = getEraData();
@@ -423,18 +440,9 @@ export const resyncStateOnHistoryChange = async (forceFullResync = false) => {
           const changedBuckets = AUDITED_EVENT_BUCKETS.filter(key =>
             !_.isEqual(beforeEventSystem?.[key], afterEventSystem?.[key]),
           );
-          const checks = relatedLogs.map(entry => {
-            const relativePath = entry.path === '事件系统' ? '' : entry.path.slice('事件系统.'.length);
-            const prior = relativePath ? _.get(beforeEventSystem, relativePath) : beforeEventSystem;
-            const after = relativePath ? _.get(afterEventSystem, relativePath) : afterEventSystem;
-            return [
-              String(entry.op ?? '?'),
-              entry.path,
-              `before=new:${_.isEqual(prior, entry.value_new)}`,
-              `before=old:${_.isEqual(prior, entry.value_old)}`,
-              `after=old:${_.isEqual(after, entry.value_old)}`,
-            ].join(' ');
-          });
+          const checks = relatedLogs.map(entry =>
+            describeEventRollbackPathCheck(entry, beforeEventSystem, afterEventSystem),
+          );
           rollbackAuditSteps.push({
             mk,
             messageId: oldSelectedMks.lastIndexOf(mk),
