@@ -1631,19 +1631,22 @@ async function executeCheckout(
       } catch {
         // 聊天已被删除或变量尚未装载时，保留原始错误和已有 journal。
       }
-      const causeHint = error instanceof HistoryVerificationError && message.includes('活动叶节点不是目标节点')
-        ? '失败于历史节点身份匹配，尚未进入事件封存指纹校验；应优先核对目标/实际节点的父链、MK 与 swipe，不应直接判断为事件变量漂移。'
-        : !trace
-          ? '缺少分阶段诊断：请重试恢复，以记录 ERA 同步与事件脚本检查各自的结果。'
-          : !baselineHash
-            ? '已记录分阶段诊断，但目标节点没有可用的封存事件指纹，无法进行封存状态比较。'
-        : trace.eraEventStateHash !== baselineHash
-          ? 'ERA 完全同步结束时就已经与历史封存不一致：优先排查未受 ERA 回滚管理的事件直接写入或原有快照缺失。'
-          : trace.preparedEventStateHash !== baselineHash
-            ? 'ERA 完全同步后与封存一致，但运行事件脚本预检查后发生漂移：请排查该检查期间的事件写入。'
-            : finalHash !== trace.preparedEventStateHash
-              ? '事件预检查完成后又发生事件变量变化：可能存在迟到的异步写入。'
-              : '分阶段校验结果一致，请检查更具体的事件差异。';
+      let causeHint: string;
+      if (error instanceof HistoryVerificationError && message.includes('活动叶节点不是目标节点')) {
+        causeHint = '失败于历史节点身份匹配，尚未进入事件封存指纹校验；应优先核对目标/实际节点的父链、MK 与 swipe，不应直接判断为事件变量漂移。';
+      } else if (!trace) {
+        causeHint = '缺少分阶段诊断：请重试恢复，以记录 ERA 同步与事件脚本检查各自的结果。';
+      } else if (!baselineHash) {
+        causeHint = '已记录分阶段诊断，但目标节点没有可用的封存事件指纹，无法进行封存状态比较。';
+      } else if (trace.eraEventStateHash !== baselineHash) {
+        causeHint = 'ERA 完全同步结束时就已经与历史封存不一致：优先排查未受 ERA 回滚管理的事件直接写入或原有快照缺失。';
+      } else if (trace.preparedEventStateHash !== baselineHash) {
+        causeHint = 'ERA 完全同步后与封存一致，但运行事件脚本预检查后发生漂移：请排查该检查期间的事件写入。';
+      } else if (finalHash !== trace.preparedEventStateHash) {
+        causeHint = '事件预检查完成后又发生事件变量变化：可能存在迟到的异步写入。';
+      } else {
+        causeHint = '分阶段校验结果一致，请检查更具体的事件差异。';
+      }
       const diagnostics = [
         `恢复事务：${journal.transactionId}`,
         `恢复动作：${actionKind}`,
@@ -1654,7 +1657,7 @@ async function executeCheckout(
         `目标楼层：User ${journal.targetLocator.userMessageId ?? '无'} / Assistant ${journal.targetLocator.assistantMessageId} / swipe ${journal.targetLocator.swipeId}`,
         `异常信息：${message}`,
         ...(error instanceof HistoryVerificationError && error.diagnostics
-          ? ['校验指纹详情：', error.diagnostics]
+          ? ['校验诊断详情：', error.diagnostics]
           : []),
         `阶段归因：${causeHint}`,
         ...(trace
