@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
-import { collectReachableMessageKeys, compactEditLogsInMeta, pruneUnreachableEditLogs } from './sync';
+import { collectReachableMessageKeys, compactEditLogsInMeta, hashSyncAudit, pruneUnreachableEditLogs } from './sync';
 
 const era = (mk: string) =>
   `<era_data>{"era-message-key"="${mk}","era-message-type"="assistant"}</era_data>\n正文`;
+
+describe('ERA full resync audit fingerprints', () => {
+  it('orders event bucket object keys deterministically and detects actual state changes', () => {
+    const first = { 已完成事件: { '事件02': 1, '事件01': 0 }, 进行中事件: { '事件03': 1 } };
+    const reordered = { 进行中事件: { '事件03': 1 }, 已完成事件: { '事件01': 0, '事件02': 1 } };
+    expect(hashSyncAudit(first)).toBe(hashSyncAudit(reordered));
+    expect(hashSyncAudit({ ...reordered, 已完成事件: { '事件01': 1, '事件02': 1 } }))
+      .not.toBe(hashSyncAudit(first));
+  });
+});
 
 describe('ERA EditLog storage compaction', () => {
   it('migrates legacy JSON strings and drops only no-op updates', () => {
