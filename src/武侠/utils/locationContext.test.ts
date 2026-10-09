@@ -87,12 +87,22 @@ describe('locationContext', () => {
   it('生成可供世界书读取的结构化聊天变量', () => {
     const value = createDynamicLocationContextVariable(buildDynamicLocationContext(mapData, '大宋/临安府/牛家村', 1));
 
-    expect(Object.keys(value)).toEqual(['当前活动区', '附近地点', '目标事件地点', '地图移动目的地']);
+    expect(Object.keys(value)).toEqual(['当前活动区', '附近地点', '目标事件地点', '地图移动目的地', '后续事件']);
     expect(value.当前活动区).toBe('大宋/临安府/牛家村');
     expect(value.附近地点).toContain('大宋/临安府/西湖');
     expect(value.附近地点).toContain('大宋/嘉兴府/烟雨楼');
     expect(value.目标事件地点).toEqual([]);
     expect(value.地图移动目的地).toEqual([]);
+    expect(value.后续事件).toEqual({});
+  });
+
+  it('当前事件的后续地点可作为剧情目标，但不会删除普通附近地点', () => {
+    const hint = { '天龙第三回01-段誉入谷寻访空寂瓦房': '大理/万劫谷/万劫谷庄院/正堂瓦房' };
+    const context = buildDynamicLocationContext(mapData, '大宋/临安府/牛家村', 1);
+    const value = createDynamicLocationContextVariable(context, { followupLocations: hint });
+    expect(value.后续事件).toEqual(hint);
+    expect(value.目标事件地点).toContain('大理/万劫谷/万劫谷庄院/正堂瓦房');
+    expect(value.附近地点).toContain('大宋/临安府/牛家村');
   });
 
   it('过滤相邻区域中尚未解锁的三级地点', () => {
@@ -178,6 +188,7 @@ describe('locationContext', () => {
             附近地点: expect.arrayContaining(['大宋/临安府/牛家村']),
             目标事件地点: [],
             地图移动目的地: [],
+            后续事件: {},
           },
         },
         世界信息: {

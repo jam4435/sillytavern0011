@@ -26,6 +26,7 @@ import {
   updateLocationContextInVariables,
   type DynamicLocationContextVariable,
 } from './locationContext';
+import { deriveActiveEventFollowupLocations } from './activeEventFollowups';
 import {
   FRONTEND_BATTLE_ZONE_KEY,
   FRONTEND_CULTIVATION_REFERENCE_KEY,
@@ -540,6 +541,7 @@ export async function syncFrontendDerivedVariables(
     const statData = getStatDataRecord(currentVariables);
     const locationContext = createDynamicLocationContextVariable(dynamicLocationContext, {
       eventTargetPaths: collectEventTargetPaths(statData),
+      followupLocations: deriveActiveEventFollowupLocations(statData),
       explicitMapTargets: options.explicitMapTargets,
     });
     const locationLore = buildCurrentLocationLoreFromStatData(statData);
