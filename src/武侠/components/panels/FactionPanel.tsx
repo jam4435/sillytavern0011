@@ -24,8 +24,9 @@ import {
   quoteMartialArtLearn,
 } from '../../utils/factionManager';
 import {
-  getAllPublicFactions,
+  getPlayablePublicFactions,
   getPublicFactionByName,
+  getPublicFactionDisplayProfile,
   getPublicFactionRelations,
   resolveFactionPublicState,
 } from '../../utils/publicFactionManager';
@@ -62,7 +63,7 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
   onClose,
   isBusy = false,
 }) => {
-  const allPublicFactions = useMemo(() => getAllPublicFactions(), []);
+  const allPublicFactions = useMemo(() => getPlayablePublicFactions(), []);
   const playerFactions = stats.factions || {};
   const joinedSectNames = Object.keys(playerFactions);
   const hasJoinedAny = joinedSectNames.length > 0;
@@ -86,7 +87,7 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
   const [actionError, setActionError] = useState<string | null>(null);
   const [isActionPending, setIsActionPending] = useState(false);
 
-  // 天下势力鉴赏与 17 门派玩法库彻底分离；可加入势力通过 sectId 桥接回现有玩法数据。
+  // 天下势力鉴赏只展示 23 个正式可玩势力；完整 canonical 世界组织目录继续留在资料层。
   const currentPublicFaction = useMemo(
     () => getPublicFactionByName(selectedSectName),
     [selectedSectName],
@@ -134,6 +135,11 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
 
   const currentPublicRelations = useMemo(
     () => (currentPublicFaction ? getPublicFactionRelations(currentPublicFaction.势力ID) : []),
+    [currentPublicFaction],
+  );
+
+  const currentPublicDisplay = useMemo(
+    () => (currentPublicFaction ? getPublicFactionDisplayProfile(currentPublicFaction) : undefined),
     [currentPublicFaction],
   );
 
@@ -654,7 +660,7 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
                   playerFactions[faction.势力名称] ||
                     (joinableSect ? playerFactions[joinableSect.门派名称] : undefined),
                 );
-                const summary = faction.规模资料[faction.规模资料.length - 1]?.描述 || '公开资料待补充';
+                const summary = getPublicFactionDisplayProfile(faction)?.概况 || '公开资料待补充。';
 
                 return (
                   <button
@@ -741,7 +747,7 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
               </div>
 
               <div className="detail-intro-section">
-                <h4 className="section-heading">当前掌舵与公开规模</h4>
+                <h4 className="section-heading">势力概况</h4>
                 <div className="sect-leaders-row">
                   <span className="leaders-label">当前掌舵人：</span>
                   {publicRuntimeState?.当前掌舵人.length ? (
@@ -752,66 +758,40 @@ export const FactionPanel: React.FC<FactionPanelProps> = ({
                     <span className="column-hint">当前人物变量尚未确认</span>
                   )}
                 </div>
-
-                {currentPublicFaction.资料首领.length > 0 && (
-                  <div className="sect-leaders-row">
-                    <span className="leaders-label">来源资料记载：</span>
-                    {currentPublicFaction.资料首领.map((leader, index) => (
-                      <span key={`${leader.来源}-${index}`} className="leader-pill">
-                        {leader.来源} · {leader.人物 || leader.称谓}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                <div className="public-faction-scale-list">
-                  {currentPublicFaction.规模资料.map((record, index) => (
-                    <p key={`${record.来源}-${index}`} className="intro-text">
-                      <strong>{record.来源}：</strong>{record.描述}
-                    </p>
-                  ))}
-                </div>
+                <p className="intro-text public-faction-overview">
+                  {currentPublicDisplay?.概况 || '公开资料待补充。'}
+                </p>
               </div>
 
               <div className="detail-intro-section">
                 <h4 className="section-heading">公开组织结构</h4>
-                {currentPublicFaction.组织结构.length > 0 ? (
+                {currentPublicDisplay?.组织结构.length ? (
                   <div className="public-faction-structure-list">
-                    {currentPublicFaction.组织结构.map(layer => (
-                      <div key={layer.名称} className="public-faction-structure-item">
-                        <div className="card-top">
-                          <span className="sect-title">{layer.名称}</span>
-                          {layer.显示人数 && <span className="member-mark">{layer.显示人数}</span>}
-                        </div>
-                        {layer.已知人物.length > 0 && (
-                          <div className="sect-leaders-row">
-                            {layer.已知人物.map(person => (
-                              <span key={person} className="leader-pill">{person}</span>
-                            ))}
+                    {currentPublicDisplay.组织结构.map(layer => {
+                      const visiblePeople = layer.已知人物.slice(0, 8);
+                      const hiddenCount = Math.max(0, layer.已知人物.length - visiblePeople.length);
+                      return (
+                        <div key={layer.名称} className="public-faction-structure-item">
+                          <div className="card-top">
+                            <span className="sect-title">{layer.名称}</span>
+                            {layer.人数 && <span className="member-mark">{layer.人数}</span>}
                           </div>
-                        )}
-                      </div>
-                    ))}
+                          {visiblePeople.length > 0 && (
+                            <div className="sect-leaders-row">
+                              {visiblePeople.map(person => (
+                                <span key={person} className="leader-pill">{person}</span>
+                              ))}
+                              {hiddenCount > 0 && <span className="people-more">另 {hiddenCount} 人</span>}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="column-hint">现有来源没有提供可公开的组织层级。</p>
                 )}
               </div>
-
-              {currentPublicFaction.重要人物.length > 0 && (
-                <div className="detail-intro-section">
-                  <h4 className="section-heading">公开重要人物</h4>
-                  <div className="public-faction-people-list">
-                    {currentPublicFaction.重要人物.map((person, index) => (
-                      <div key={`${person.人物}-${person.来源}-${index}`} className="public-faction-person-item">
-                        <strong>{person.人物}</strong>
-                        <span>{person.身份}</span>
-                        <small>{person.来源}</small>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {currentPublicRelations.length > 0 && (
                 <div className="detail-intro-section">

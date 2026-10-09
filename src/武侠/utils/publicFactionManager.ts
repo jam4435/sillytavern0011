@@ -38,6 +38,80 @@ const ALL_PUBLIC_FACTIONS: PublicFactionCatalogEntry[] = [
 
 const DEAD_STATUS_RE = /(死亡|已死|身亡|已身亡|圆寂|毙命|殒命|伏诛|自尽|战死)/;
 
+const DYNAMIC_OVERVIEW_RE =
+  /(后遭|后来|曾任|现任|已故|身亡|遇害|伏诛|接任|继任|传位|退隐|自尽|焚宫|攻山|散伙|解散|覆灭|推选新帮主|正文时代)/;
+
+export interface PublicFactionDisplayLayer {
+  名称: string;
+  人数: string;
+  已知人物: string[];
+}
+
+export interface PublicFactionDisplayProfile {
+  概况: string;
+  组织结构: PublicFactionDisplayLayer[];
+}
+
+function organizationGroupKey(name: string): string {
+  return name.replace(/（[^）]*）/g, '').replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function displayOrganizationName(name: string): string {
+  return name.replace(/（([^）]+)）/g, ' · $1').replace(/\(([^)]+)\)/g, ' · $1').replace(/\s+/g, ' ').trim();
+}
+
+function normalizeHeadcount(raw: string): string {
+  const value = raw.trim();
+  if (!value) return '';
+  if (/^\d+$/.test(value)) return `${value}人`;
+  if (/^(约|近|逾|至少|不下于)?\d+(?:[～~-]\d+)?(?:余|多)?人$/.test(value)) return value;
+  const arabicMatch = value.match(/(?:约|至少|少说也有)?(\d+)(?:余|多)?(?:人|名|位)/);
+  if (arabicMatch) return `${arabicMatch[1]}${/余|多/.test(arabicMatch[0]) ? '余人' : '人'}`;
+  if (/二千余|两千余/.test(value)) return '二千余人';
+  if (/五百余|五百多/.test(value)) return '五百余人';
+  if (/数百|几百/.test(value)) return '数百人';
+  if (/百余/.test(value)) return '百余人';
+  if (/数十[^；，。]*数百/.test(value)) return '数十至数百人';
+  if (/数十/.test(value)) return '数十人';
+  if (/人数众多|人多势众|众多|遍布天下|遍布全国|数千帮众/.test(value)) return '人数众多';
+  return '人数不详';
+}
+
+function cleanOverview(text: string): string {
+  const chunks = text.split(/[；。]/).map(chunk => chunk.trim()).filter(Boolean);
+  const stable = chunks.filter(chunk => !DYNAMIC_OVERVIEW_RE.test(chunk));
+  const selected = (stable.length ? stable : chunks).slice(0, 2);
+  if (!selected.length) return '';
+  const result = selected.join('；');
+  return result.length > 180 ? `${result.slice(0, 177)}…` : `${result}。`;
+}
+
+export function getPublicFactionDisplayProfile(
+  factionOrName: PublicFactionCatalogEntry | string,
+): PublicFactionDisplayProfile | undefined {
+  const faction = typeof factionOrName === 'string' ? getPublicFactionByName(factionOrName) : factionOrName;
+  if (!faction) return undefined;
+
+  const grouped = new Map<string, PublicFactionDisplayLayer>();
+  for (const layer of faction.组织结构) {
+    const key = organizationGroupKey(layer.名称);
+    if (!key) continue;
+    const current = grouped.get(key);
+    const count = normalizeHeadcount(layer.显示人数);
+    if (!current) {
+      grouped.set(key, { 名称: displayOrganizationName(layer.名称), 人数: count, 已知人物: [...new Set(layer.已知人物)] });
+      continue;
+    }
+    for (const person of layer.已知人物) if (!current.已知人物.includes(person)) current.已知人物.push(person);
+    if ((!current.人数 || current.人数 === '人数不详') && count && count !== '人数不详') current.人数 = count;
+    const nextName = displayOrganizationName(layer.名称);
+    if (nextName.length < current.名称.length) current.名称 = nextName;
+  }
+
+  const candidates = faction.规模资料.map(record => cleanOverview(record.描述)).filter(Boolean).sort((a,b)=>b.length-a.length);
+  return { 概况: candidates[0] || '公开资料待补充。', 组织结构: [...grouped.values()] };
+}
+
 function normalizeQuery(value: string): string {
   return value.trim().replace(/\s+/g, '');
 }
@@ -76,9 +150,14 @@ function collectLeaderCandidates(
   }
 }
 
-/** 天下势力鉴赏的完整公开目录；与 17 门派玩法静态库分离。 */
+/** 原著资料层的完整 canonical 组织目录；不直接等于玩家可加入势力列表。 */
 export function getAllPublicFactions(): PublicFactionCatalogEntry[] {
   return ALL_PUBLIC_FACTIONS;
+}
+
+/** 天下势力鉴赏只展示正式可玩势力；世界组织资料仍保留在完整目录中供归一/考据使用。 */
+export function getPlayablePublicFactions(): PublicFactionCatalogEntry[] {
+  return ALL_PUBLIC_FACTIONS.filter(faction => faction.可加入 && Boolean(faction.sectId));
 }
 
 /** 通过 canonical id、公开名称或别名查找公开势力。 */

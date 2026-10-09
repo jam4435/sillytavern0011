@@ -215,7 +215,7 @@ describe('FactionPanel Component', () => {
     const handleSendMessage = vi.fn(async () => '');
     const handleClaimTask = vi.fn(async () => {});
 
-    render(
+    const { container } = render(
       <FactionPanel
         stats={rogueStats}
         currentLocation="大宋/终南山/重阳宫"
@@ -227,8 +227,18 @@ describe('FactionPanel Component', () => {
 
     // 默认展示天下势力鉴赏
     expect(screen.getByText('天下势力鉴赏')).toBeInTheDocument();
-    expect(screen.getByText('当前掌舵与公开规模')).toBeInTheDocument();
+    const visibleFactionNames = [...container.querySelectorAll('.sects-card-list .sect-title')].map(
+      element => element.textContent,
+    );
+    expect(visibleFactionNames).toHaveLength(23);
+    for (const name of ['灵鹫宫', '大理天龙寺', '青城派', '蓬莱派', '神农帮', '西夏一品堂']) {
+      expect(visibleFactionNames).toContain(name);
+    }
+    expect(visibleFactionNames).not.toContain('王罕部');
+    expect(screen.getByText('势力概况')).toBeInTheDocument();
     expect(screen.getByText('公开组织结构')).toBeInTheDocument();
+    expect(screen.queryByText('来源资料记载：')).not.toBeInTheDocument();
+    expect(screen.queryByText('公开重要人物')).not.toBeInTheDocument();
     expect(screen.queryByText(/传承武学谱系图鉴/)).not.toBeInTheDocument();
   });
 });

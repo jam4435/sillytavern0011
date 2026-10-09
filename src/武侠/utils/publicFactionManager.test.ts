@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   getAllPublicFactions,
+  getPlayablePublicFactions,
   getPublicFactionByName,
   getPublicFactionRelations,
   resolveCanonicalFactionId,
@@ -12,19 +13,26 @@ afterEach(() => {
 });
 
 describe('publicFactionManager', () => {
-  it('应当把 54 条原著来源归一成 46 个 canonical 势力，并保留 1 个玩法补充势力', () => {
+  it('应保留 46 个 canonical 组织资料，但天下势力鉴赏只投影 23 个正式可玩势力', () => {
     const factions = getAllPublicFactions();
     expect(factions).toHaveLength(47);
     expect(new Set(factions.map(faction => faction.势力ID)).size).toBe(47);
-    expect(factions.map(faction => faction.势力名称)).toContain('丐帮');
-    expect(factions.map(faction => faction.势力名称)).toContain('少林');
-    expect(factions.map(faction => faction.势力名称)).toContain('吐蕃密宗·大轮寺一脉');
+
+    const playable = getPlayablePublicFactions();
+    expect(playable).toHaveLength(23);
+    expect(playable.every(faction => faction.可加入 && Boolean(faction.sectId))).toBe(true);
+    for (const name of ['灵鹫宫', '大理天龙寺', '青城派', '蓬莱派', '神农帮', '西夏一品堂']) {
+      expect(playable.map(faction => faction.势力名称)).toContain(name);
+    }
+    expect(playable.map(faction => faction.势力名称)).not.toContain('王罕部');
   });
 
   it('应当支持 canonical 名、来源名与玩法门派名归一查找', () => {
     expect(resolveCanonicalFactionId('少林派')).toBe('少林');
     expect(resolveCanonicalFactionId('少林寺')).toBe('少林');
     expect(resolveCanonicalFactionId('大理段氏与一灯门下')).toBe('一灯门下');
+    expect(getPublicFactionByName('大理段氏')?.sectId).toBe('大理段氏');
+    expect(getPublicFactionByName('天龙寺')?.sectId).toBe('大理天龙寺');
     expect(resolveCanonicalFactionId('蒙古军旅武学')).toBe('蒙古');
 
     const beggars = getPublicFactionByName('丐帮');
