@@ -195,31 +195,8 @@ export const ApplyVarChangeForMessage = async (msg: any): Promise<string | null>
       ...summarizeMkLedger(committedLog),
     });
 
-    // 5. --- 覆盖式写入 EditLog ---
-    /*
-     * 核心逻辑：无论本轮是否产生了有效的变量修改，都必须用当前的 editLog (哪怕是空数组) 覆盖旧的 EditLog。
-     *
-     * 为什么必须覆盖而不是在没有修改时跳过？
-     *
-     * 根本原因在于，必须确保每个 MK 对应的 EditLog，严格且唯一地反映其所属消息**当前内容**所产生的变量修改。
-     *
-     * 考虑一个场景：
-     * 1. 消息A (MK_A) 的内容包含指令，生成了 EditLog_A。
-     * 2. 用户对消息A进行 swipe，生成了消息B (MK_B)，其内容完全没有变量修改标签。
-     *
-     * 如果在处理消息B时，因为没有检测到指令就“跳过写入”，那么与 MK_B 关联的 EditLog 就会是空的或不存在的。
-     * 这在当前是正确的。
-     *
-     * 但如果用户再次 swipe，从消息B切换回消息A。此时框架会重新处理消息A。
-     * 如果我们不执行覆盖式写入，那么与 MK_A 关联的 EditLog 仍然是之前生成的 EditLog_A，这没有问题。
-     *
-     * 真正的问题在于状态的明确性。覆盖式写入确保了任何一个 MK 的日志，在任何时间点，
-     * 都是其**当前可见内容**的直接产物，没有任何历史遗留。这使得整个系统的状态变迁变得清晰、可预测，
-     * 极大地降低了在复杂操作（如多次 `swipe`、删除、编辑）中出现状态不一致的风险。
-     *
-     * 因此，正确的做法是：用本次解析消息内容生成的 editLog (在无指令的场景下是 `[]`) 去覆盖，
-     * 从而斩断任何可能存在的历史关联，确保数据的一致性和纯粹性。
-     */
+    // 5. 按本次执行结果替换账本；只有已验证的同内容幂等重复应用才沿用旧账本。
+    // Swipe/重新生成/真实回滚后的重放必须以新的动作记录为准。
     try {
       await updateEraMetaData(meta => {
         const newArr = Array.isArray(committedLog) ? committedLog : parseEditLog(committedLog);
@@ -244,13 +221,20 @@ export const ApplyVarChangeForMessage = async (msg: any): Promise<string | null>
       });
       logger.debug('ApplyVarChangeForMessage', `成功为 MK=${MK} 写入 EditLog。`);
     } catch (e: any) {
+      recordMkLedgerTransition('apply-persist-failed', MK, {
+        messageId, revision,
+        attemptedLogCount: committedLog.length,
+        reason: e instanceof Error ? e.message : String(e),
+      });
       logger.error('ApplyVarChangeForMessage', `为 MK=${MK} 写入 EditLogs 失败: ${e?.message || e}`, e);
+      throw e;
     }
 
     return MK;
   } catch (err: any) {
     logger.error('ApplyVarChangeForMessage', `变量写入器异常: ${err?.message || err}`, err);
-    return null;
+    // 不允许变量已落地但 EditLog 失败时，仍回传成功的 MK 并广播 apiWrite 完成。
+    throw err;
   }
 };
 
