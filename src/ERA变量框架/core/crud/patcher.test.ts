@@ -114,6 +114,35 @@ describe('ERA 同一楼层变量块的原始次序', () => {
     expect(state.meta.EditLogs['mk-checkout-regression']).toEqual(first);
   });
 
+  it('第6楼：加入参与事件并删除后续线索，两条事务重复应用后仍保留两条逆向记录', async () => {
+    state.stat = {
+      参与事件: {},
+      后续事件线索: { 事件06: { 地点: '琅嬛福地' } },
+    };
+    state.message = [
+      '<VariableInsert>\\n{"参与事件":{"事件06":{"结局":"进行中"}}}\\n</VariableInsert>',
+      '<VariableDelete>\\n{"后续事件线索":{"事件06":{}}}\\n</VariableDelete>',
+    ].join('\\n');
+    await ApplyVarChangeForMessage({ message_id: 6 });
+    const initial = structuredClone(state.meta.EditLogs['mk-checkout-regression']) as any[];
+    expect(initial.map(log => ({ op: log.op, path: log.path }))).toEqual([
+      { op: 'insert', path: '参与事件.事件06' },
+      { op: 'delete', path: '后续事件线索.事件06' },
+    ]);
+
+    // 同 MK 内容未改变、效果还在：不能把第二次无操作应用生成的 [] 覆盖成空账本。
+    await ApplyVarChangeForMessage({ message_id: 6 });
+    expect(state.meta.EditLogs['mk-checkout-regression']).toEqual(initial);
+
+    // 逆序回滚确实应该回到第4楼：参与事件消失，后续线索恢复。
+    for (const log of [...initial].reverse()) {
+      if (log.op === 'insert') _.unset(state.stat, log.path);
+      if (log.op === 'delete') _.set(state.stat, log.path, structuredClone(log.value_old));
+    }
+    expect(state.stat.参与事件.事件06).toBeUndefined();
+    expect(state.stat.后续事件线索.事件06).toEqual({ 地点: '琅嬛福地' });
+  });
+
   it('正常回滚后重新处理整楼，可以重建账本；修改变量块后不会沿用旧账本', async () => {
     state.message = `${deleteOld}\n${insertNew}`;
     await ApplyVarChangeForMessage({ message_id: 6 });
