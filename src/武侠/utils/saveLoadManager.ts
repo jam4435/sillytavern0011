@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { recordEraDiagnostic } from '../../ERA变量框架/utils/diagnostics';
+import { recordHistoryBranchMkAudit } from '../../shared/historyBranchMkAudit';
 import {
   clearHistoryCheckoutJournal,
   clearHistoryCheckoutReturnIntent,
@@ -1576,6 +1577,7 @@ async function executeCheckout(
       if (current.id !== branchSourceLocator.chatId && currentChatMatchesForkSnapshot(branchSourceLocator)) {
         // /branch-create 会切换聊天并销毁当前 iframe。新 iframe 从 create_branch
         // 恢复时，可以用截断后的末楼和 swipe 确认当前聊天就是已创建的分支。
+        recordHistoryBranchMkAudit('checkout-resumed-after-branch-create');
         branchedChat = current;
       } else {
         if (current.id !== branchSourceLocator.chatId) {
@@ -1583,7 +1585,11 @@ async function executeCheckout(
         }
         const restoreInMemorySwipe = activateSwipeForBranchSnapshot(branchSourceLocator);
         try {
+          // source-before 与 ERA 新 iframe 入口快照对比，可以确定未来 MK 在哪一步消失。
+          recordHistoryBranchMkAudit('source-before-branch-create');
           await triggerSlash(`/branch-create ${branchSourceLocator.assistantMessageId}`);
+          // 宿主有时在返回前已销毁旧 iframe，此采样属尽力而为，不能假设一定存在。
+          recordHistoryBranchMkAudit('branch-create-returned');
           branchedChat = await readCurrentChatIdentity();
         } finally {
           // 这里只恢复已经脱离当前聊天数组的内存对象，不会写回来源聊天文件。
@@ -1616,6 +1622,7 @@ async function executeCheckout(
 
     if (journal.stage === 'sync_era') {
       await openChat(journal.targetLocator);
+      recordHistoryBranchMkAudit('checkout-before-explicit-full-sync');
       await runFullHistorySync(true);
       journal = updateHistoryCheckoutJournal({ stage: 'verify' }) ?? journal;
     }
