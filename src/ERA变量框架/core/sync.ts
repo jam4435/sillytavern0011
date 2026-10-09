@@ -92,11 +92,11 @@ function recordFullSyncAudit(stage: string, selectedMks: (string | null)[]): voi
       logCounts: perMessage.slice(-32),
       omittedLogCounts: Math.max(0, perMessage.length - 32),
     });
-  } catch {
-    // 不允许辅助观测打断变量恢复流程。
+  } catch (error) {
+    // 诊断异常不能中断恢复，但也不能静默吞掉关键证据。
+    console.warn('[ERA] 强制全量同步阶段诊断失败', { stage, error });
   }
 }
-
 
 /**
  * 获取用于变量操作的MK。如果消息是用户消息，则返回null以跳过操作。
