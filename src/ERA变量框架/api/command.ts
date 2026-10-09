@@ -226,6 +226,45 @@ function compressVariableBlocksInText(text: string) {
   return output;
 }
 
+/**
+ * 不允许连续 API 事务在前一次 ERA 写入尚未完成时再次修改同一楼内容。
+ * 否则旧任务已经解析消息、尚在异步写变量时，新事务可能追加变量块，
+ * 造成某次 apply 的 EditLog 只反映部分消息状态。
+ * 以事务 ID 为确认条件，避免误把无关的 writeDone 当成完成信号。
+ */
+function waitForTransactionWriteDone(messageId: number, transactionIds: string[]) {
+  let stop = () => {};
+  if (transactionIds.length === 0) return { promise: Promise.resolve(true), stop };
+  let finish: (confirmed: boolean) => void = () => {};
+  const promise = new Promise<boolean>(resolve => { finish = resolve; });
+  let ended = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let registration: { stop?: () => void } | null = null;
+  const complete = (confirmed: boolean) => {
+    if (ended) return;
+    ended = true;
+    if (timer) clearTimeout(timer);
+    registration?.stop?.();
+    finish(confirmed);
+  };
+  try {
+    registration = eventOn('era:writeDone', (payload: any) => {
+      if (payload?.message_id !== messageId || payload?.actions?.apiWrite !== true) return;
+      const ids = [
+        ...(Array.isArray(payload.transactionIds) ? payload.transactionIds : []),
+        payload.transactionId,
+      ];
+      if (transactionIds.every(id => ids.includes(id))) complete(true);
+    }) as { stop?: () => void };
+    timer = setTimeout(() => complete(false), 15_000);
+    stop = () => complete(false);
+  } catch {
+    // 监听失败不能阻塞现有 API 提交流程，但记录为未确认。
+    complete(false);
+  }
+  return { promise, stop };
+}
+
 async function flushApiWriteQueue() {
   if (apiWriteFlushPromise) {
     recordEraDiagnostic('api-command', 'flush-reused-inflight-promise', {
@@ -318,6 +357,8 @@ async function flushApiWriteQueue() {
         phase: 'emit-api-write',
       });
       const emittedAt = Date.now();
+      // 在 emit 之前订阅确认，且保持 flush 锁至 ERA 实际完成，避免同楼事务写入交错。
+      const acknowledgement = waitForTransactionWriteDone(lastAiMessage.message_id, transactionIds);
       const emission = eventEmit(ERA_EVENT_EMITTER.API_WRITE, {
         flushId,
         sourceDiagnosticIds,
@@ -348,11 +389,22 @@ async function flushApiWriteQueue() {
             flushId,
           ),
       );
-      finishWatchdog('success', {
+      // 只有完成本事务的应用（而非仅完成消息内容追加）才允许后续事务刷新消息。
+      // 无事务 ID 的传统写入沿用现有异步行为；事务写入在超时后降级并留下诊断。
+      const confirmed = await acknowledgement.promise;
+      if (!confirmed && transactionIds.length > 0) {
+        recordEraDiagnostic('api-command', 'api-transaction-ack-timeout', {
+          flushId, messageId: lastAiMessage.message_id, transactionIds,
+          reason: '未收到对应 era:writeDone，无法确认 EditLog 已完成写入',
+        }, flushId);
+        logger.warn('flushApiWriteQueue', '事件事务未能在 15 秒内确认 ERA 记账完成', transactionIds);
+      }
+      finishWatchdog(confirmed ? 'success' : 'timeout', {
         messageId: lastAiMessage.message_id,
         mergedJobCount: mergedJobs.length,
+        transactionIds,
       });
-      logger.log('flushApiWriteQueue', '已触发 ' + ERA_EVENT_EMITTER.API_WRITE + ' 事件。');
+      logger.log('flushApiWriteQueue', '事务完成确认：' + transactionIds.join(', '));
     } catch (error) {
       finishWatchdog('error', { error: error instanceof Error ? error.message : String(error) });
       recordEraDiagnosticError(
