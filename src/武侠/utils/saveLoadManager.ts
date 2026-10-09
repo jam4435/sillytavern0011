@@ -1133,8 +1133,9 @@ async function waitForEraFullResync(): Promise<void> {
 }
 
 function readCheckoutEventSystemAudit(): Record<string, { hash: string; count: number }> {
-  const stat = getVariables({ type: 'chat' })?.stat_data;
-  const system = isRecord(stat?.事件系统) ? stat.事件系统 : {};
+  const variables = getVariables({ type: 'chat' });
+  const stat = isRecord(variables?.stat_data) ? variables.stat_data : {};
+  const system = isRecord(stat.事件系统) ? stat.事件系统 : {};
   const keys = [...new Set([
     '未发生事件', '进行中事件', '已完成事件', '已失效事件', '人物事件占用',
     ...Object.keys(system),
