@@ -399,7 +399,7 @@ async function flushApiWriteQueue() {
         }, flushId);
         logger.warn('flushApiWriteQueue', '事件事务未能在 15 秒内确认 ERA 记账完成', transactionIds);
       }
-      finishWatchdog(confirmed ? 'success' : 'timeout', {
+      finishWatchdog(confirmed ? 'success' : 'error', {
         messageId: lastAiMessage.message_id,
         mergedJobCount: mergedJobs.length,
         transactionIds,
