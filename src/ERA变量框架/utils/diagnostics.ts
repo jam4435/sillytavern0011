@@ -31,9 +31,7 @@ const MAX_STRING_LENGTH = 1_000;
 const runtimeId = `era-runtime-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 let sequence = 0;
 let memoryEntries: EraDiagnosticEntry[] = [];
-let persistedEntriesLoaded = false;
 let criticalEntries: EraDiagnosticEntry[] = [];
-let criticalEntriesLoaded = false;
 let activeTaskId: string | null = null;
 const runtimeState: Record<string, unknown> = {};
 
@@ -123,20 +121,20 @@ function sanitizeValue(value: unknown, depth = 0, seen = new WeakSet<object>()):
 }
 
 function readPersistedEntries(): EraDiagnosticEntry[] {
-  if (persistedEntriesLoaded) {
-    return memoryEntries;
-  }
-  persistedEntriesLoaded = true;
+  // ERA 与武侠分别打包时，各自有独立的模块内存，但共享 localStorage。
+  // 每次都读取最新存储，避免某个包用旧缓存覆盖另一包刚写入的诊断。
   try {
     const raw = localStorage.getItem(ERA_DIAGNOSTICS_STORAGE_KEY);
-    if (!raw) {
-      return memoryEntries;
+    if (raw === null) {
+      memoryEntries = [];
+    } else {
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) memoryEntries = parsed.slice(-MAX_DIAGNOSTIC_ENTRIES);
     }
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.slice(-MAX_DIAGNOSTIC_ENTRIES) : memoryEntries;
   } catch {
-    return memoryEntries;
+    // 存储不可用时沿用内存副本，不影响 ERA 业务逻辑。
   }
+  return memoryEntries;
 }
 
 function persistEntries(entries: EraDiagnosticEntry[]): void {
@@ -149,16 +147,19 @@ function persistEntries(entries: EraDiagnosticEntry[]): void {
 }
 
 function readPersistedCriticalEntries(): EraDiagnosticEntry[] {
-  if (criticalEntriesLoaded) return criticalEntries;
-  criticalEntriesLoaded = true;
+  // 不能使用一次性缓存：不同 bundle 写入同一 localStorage 时，旧缓存会丢弃新日志。
   try {
     const raw = localStorage.getItem(ERA_CRITICAL_DIAGNOSTICS_STORAGE_KEY);
-    if (!raw) return criticalEntries;
-    const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? (criticalEntries = parsed.slice(-MAX_CRITICAL_DIAGNOSTIC_ENTRIES)) : criticalEntries;
+    if (raw === null) {
+      criticalEntries = [];
+    } else {
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) criticalEntries = parsed.slice(-MAX_CRITICAL_DIAGNOSTIC_ENTRIES);
+    }
   } catch {
-    return criticalEntries;
+    // 降级为内存副本。
   }
+  return criticalEntries;
 }
 
 function persistCriticalEntry(entry: EraDiagnosticEntry): void {
@@ -197,9 +198,7 @@ export function readEraDiagnostics(): EraDiagnosticEntry[] {
 
 export function clearEraDiagnostics(): void {
   memoryEntries = [];
-  persistedEntriesLoaded = true;
   criticalEntries = [];
-  criticalEntriesLoaded = true;
   try {
     localStorage.removeItem(ERA_DIAGNOSTICS_STORAGE_KEY);
     localStorage.removeItem(ERA_CRITICAL_DIAGNOSTICS_STORAGE_KEY);
