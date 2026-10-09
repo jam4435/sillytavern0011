@@ -42,7 +42,7 @@ const logger = new Logger('core-sync');
 const AUDITED_EVENT_BUCKETS = ['未发生事件', '进行中事件', '已完成事件', '已失效事件', '人物事件占用'] as const;
 
 /** 仅用于阶段对比的轻量指纹；不作为历史封存哈希，也不存储事件变量内容。 */
-function hashSyncAudit(value: unknown): string {
+export function hashSyncAudit(value: unknown): string {
   const stable = (node: unknown): string => {
     if (node === undefined) return '"__undefined__"';
     if (node === null || typeof node !== 'object') return JSON.stringify(node) ?? String(node);
