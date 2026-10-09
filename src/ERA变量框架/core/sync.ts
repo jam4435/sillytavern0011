@@ -35,6 +35,7 @@ import { getEraData, updateEraMetaData } from '../utils/era_data';
 import { parseEditLog } from '../utils/data';
 import { Logger } from '../utils/log';
 import { recordEraDiagnostic } from '../utils/diagnostics';
+import { recordHistoryBranchMkAudit } from '../../shared/historyBranchMkAudit';
 import { ApplyVarChangeForMessage } from './crud/patcher';
 
 const logger = new Logger('core-sync');
@@ -297,6 +298,8 @@ async function updateSelectedMksAndPruneEditLogs(
  * @param {boolean} [forceFullResync=false] - 如果为 true，则强制从头开始完全重算，忽略差异检测。
  */
 export const resyncStateOnHistoryChange = async (forceFullResync = false) => {
+  const branchAuditLabel = forceFullResync ? 'era-full-resync' : 'era-auto-resync';
+  recordHistoryBranchMkAudit(`${branchAuditLabel}-before`);
   if (forceFullResync) {
     logger.warn('resyncStateOnHistoryChange', '强制完全重算模式已启动！');
   } else {
@@ -317,6 +320,7 @@ export const resyncStateOnHistoryChange = async (forceFullResync = false) => {
 
   if (!allMessages || allMessages.length === 0) {
     logger.log('resyncStateOnHistoryChange', '当前聊天记录为空，不执行任何操作，同步终止。');
+    recordHistoryBranchMkAudit(`${branchAuditLabel}-after-empty-messages`);
     return;
   }
 
@@ -373,6 +377,7 @@ export const resyncStateOnHistoryChange = async (forceFullResync = false) => {
       }
       await updateSelectedMksAndPruneEditLogs(allMessages, newSelectedMks);
       logger.log('resyncStateOnHistoryChange', '快速同步完成，已修正 SelectedMks 并清理不可达 EditLog。');
+      recordHistoryBranchMkAudit(`${branchAuditLabel}-after-fast-path`);
       return;
     }
   }
@@ -395,6 +400,7 @@ export const resyncStateOnHistoryChange = async (forceFullResync = false) => {
       logger.log('resyncStateOnHistoryChange', '所有MK均匹配，无需重算。');
       // 即使主干没有变化，也可安全清理已经不属于任何消息/备用 swipe 的历史孤儿日志。
       await updateSelectedMksAndPruneEditLogs(allMessages, oldSelectedMks);
+      recordHistoryBranchMkAudit(`${branchAuditLabel}-after-no-change`);
       // N.B. 在当前架构下，MK 已被直接写入消息内容，与内容强绑定。
       // 因此，任何导致内容变化的操作（如 swipe）也必然会导致 MK 的变化。
       return; // 直接返回，终止同步。
@@ -486,6 +492,7 @@ export const resyncStateOnHistoryChange = async (forceFullResync = false) => {
   // 5. 更新 SelectedMks，并在同步成功后只清理真正不可达的 EditLog。
   await updateSelectedMksAndPruneEditLogs(allMessages, newSelectedMks);
   logger.log('resyncStateOnHistoryChange', '状态同步完成。');
+  recordHistoryBranchMkAudit(`${branchAuditLabel}-after`);
 
   // ==================================================================
   // 【保险机制】 - 已于 2025/10/02 移除
