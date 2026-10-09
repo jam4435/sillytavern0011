@@ -960,6 +960,35 @@ describe('history checkout', () => {
     expect(forkBranch?.headNodeId).toBe(target.id);
   });
 
+  it('分叉末尾多出一个助手节点时，报告实际叶节点和父链差异，而不是误报事件哈希', async () => {
+    currentChat().messages = [
+      { message_id: 0, role: 'assistant', message: '序章' },
+      { message_id: 1, role: 'user', message: '前进' },
+      { message_id: 2, role: 'assistant', message: '目标旧节点' },
+      { message_id: 3, role: 'user', message: '继续' },
+      { message_id: 4, role: 'assistant', message: '来源当前节点' },
+    ];
+    const scanned = await scanCurrentChat();
+    const target = findNodeByPreview(scanned.tree, '目标旧节点')!;
+    eventOn('manual_full_sync', () => {
+      if (!currentChatId.startsWith('fork-')) return;
+      currentChat().messages.push(
+        { message_id: 3, role: 'user', message: '异常残留输入' },
+        { message_id: 4, role: 'assistant', message: '异常残留助手楼层' },
+      );
+    });
+
+    const result = await checkoutNode(target.id);
+    expect(result.status).toBe('recovery_failed');
+    const details = readHistoryCheckoutJournal()?.failure?.details ?? '';
+    expect(details).toContain('切换后的活动叶节点不是目标节点');
+    expect(details).toContain(`目标节点：${target.id}`);
+    expect(details).toContain('实际活动叶节点：');
+    expect(details).toContain('首个不同节点序号：');
+    expect(details).toContain('失败于历史节点身份匹配');
+    expect(details).not.toContain('缺少分阶段诊断');
+  });
+
   it('从有后继的历史节点分叉时，把原路线下一次玩家行动预填为草稿但不发送', async () => {
     currentChat().messages = [
       { message_id: 0, role: 'assistant', message: '序章' },
