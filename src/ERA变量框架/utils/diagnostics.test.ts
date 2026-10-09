@@ -45,6 +45,54 @@ describe('ERA 关键事件诊断独立存储', () => {
     );
   });
 
+  it('双 bundle 实例交替记录时不会用旧缓存覆盖另一实例写入的关键诊断', async () => {
+    // 模拟武侠和 ERA 独立 webpack bundle 各加载一次 diagnostics.ts。
+    const era = await import('./diagnostics');
+    vi.resetModules();
+    const wuxia = await import('./diagnostics');
+
+    era.recordEraDiagnostic('core-sync', 'full-resync-event-state-audit', {
+      stage: 'before-rollback',
+    });
+    wuxia.recordEraDiagnostic('wuxia-history-checkout', 'history-checkout-event-system-audit', {
+      stage: 'after-full-sync',
+    });
+    era.recordEraDiagnostic('core-sync', 'full-resync-event-state-audit', {
+      stage: 'after-replay',
+    });
+
+    const criticalEvents = wuxia.readEraCriticalDiagnostics().map(entry =>
+      `${entry.event}:${entry.details?.stage}`,
+    );
+    expect(criticalEvents).toEqual([
+      'full-resync-event-state-audit:before-rollback',
+      'history-checkout-event-system-audit:after-full-sync',
+      'full-resync-event-state-audit:after-replay',
+    ]);
+    expect(era.readEraCriticalDiagnostics()).toHaveLength(3);
+    expect(JSON.parse(localStorage.getItem('era_critical_diagnostics_v1') ?? '[]')).toHaveLength(3);
+
+    // 普通日志同样不应被另一份模块缓存覆盖。
+    const ordinaryEvents = era.readEraDiagnostics().filter(entry =>
+      entry.event === 'full-resync-event-state-audit' ||
+      entry.event === 'history-checkout-event-system-audit'
+    );
+    expect(ordinaryEvents).toHaveLength(3);
+  });
+
+  it('即使另一模块清空共享存储，旧模块也不会把缓存里的日志再次写回', async () => {
+    const first = await import('./diagnostics');
+    first.recordEraDiagnostic('core-sync', 'full-resync-event-state-audit', { stage: 'before-rollback' });
+    vi.resetModules();
+    const second = await import('./diagnostics');
+    second.clearEraDiagnostics();
+
+    first.recordEraDiagnostic('core-sync', 'full-resync-event-state-audit', { stage: 'after-replay' });
+    const entries = second.readEraCriticalDiagnostics();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.details?.stage).toBe('after-replay');
+  });
+
   it('clear 同时清空普通与独立关键诊断存储', async () => {
     const diagnostics = await import('./diagnostics');
     diagnostics.recordEraDiagnostic('core-crud-patcher', 'nonempty-editlog-overwritten-by-empty', { mk: 'mk-1' });
