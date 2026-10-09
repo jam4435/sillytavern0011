@@ -8,6 +8,12 @@ on:
     paths:
       - 'src/nba2k/**'
       - '.github/workflows/nba2k-core-tests.yaml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/nba2k/**'
+      - '.github/workflows/nba2k-core-tests.yaml'
   workflow_dispatch:
 
 permissions:
@@ -45,6 +51,17 @@ jobs:
           src/nba2k/engine/rotationPlan.test.ts
           src/nba2k/engine/rotationCalibration.test.ts
           src/nba2k/engine/teamStyle.test.ts
+          src/nba2k/engine/teamPower.test.ts
+          src/nba2k/engine/leagueStats.test.ts
+          src/nba2k/engine/injury.test.ts
+          src/nba2k/engine/calendar.test.ts
+          src/nba2k/engine/history.test.ts
+          src/nba2k/engine/season.test.ts
           src/nba2k/engine/coachProfile.test.ts
           src/nba2k/engine/lifecycle.test.ts
+          src/nba2k/engine/draft.test.ts
+          src/nba2k/engine/transactions.test.ts
           src/nba2k/engine/fullGameSimulation.test.ts
+
+      - name: Build source bundle
+        run: pnpm build:src:fast

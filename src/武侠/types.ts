@@ -599,6 +599,8 @@ export interface HistoryNode {
   verification: {
     selectedMksHash: string;
     eventStateHash: string;
+    /** 逐组事件状态指纹；旧历史节点可以没有。 */
+    eventPartHashes?: Record<string, string>;
   } | null;
 }
 

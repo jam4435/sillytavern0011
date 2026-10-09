@@ -14,7 +14,13 @@ function uniqueHooks(existing: StoryHook[], incoming: StoryHook[]): StoryHook[] 
 }
 
 export function isTradeWindowOpen(date: string): boolean {
-  return date >= '2015-10-27' && date <= '2016-02-18';
+  const monthDay = date.slice(5);
+  return monthDay >= '10-27' || monthDay <= '02-18';
+}
+
+export function isTradeDeadlinePeriod(date: string): boolean {
+  const monthDay = date.slice(5);
+  return monthDay >= '02-10' && monthDay <= '02-18';
 }
 
 export function tradeInterestScore(career: CareerState, league: LeagueState): number {
@@ -82,11 +88,11 @@ function sponsorshipHooks(career: CareerState, offCourt: OffCourtState, league: 
 }
 
 function tradeHooks(career: CareerState, league: LeagueState): StoryHook[] {
-  if (league.日期 < '2016-02-10' || league.日期 > '2016-02-18') return [];
+  if (!isTradeDeadlinePeriod(league.日期)) return [];
   const interest = tradeInterestScore(career, league);
   if (interest < 45) return [];
   return [{
-    id: `trade-window-${career.球队}-2016`,
+    id: `trade-window-${career.球队}-${league.赛季}`,
     type: '交易',
     title: '交易截止日前的询价',
     detail: `根据主角能力、潜力、球队战绩与角色估值，当前交易关注度约为 ${Math.round(interest)}/100。生成交易流言时必须服从球队需求与合同价值，不得由叙事模型凭空强制交易。`,
@@ -137,36 +143,5 @@ export function collectOffCourtHooks(career: CareerState, offCourt: OffCourtStat
   );
 }
 
-export function advanceInjuryRecovery(league: LeagueState): LeagueState {
-  const injuries = league.伤病.map(injury => {
-    const initialLimit = injury.严重度 === '严重' ? 18 : injury.严重度 === '中等' ? 24 : 30;
-    const rampStep = injury.严重度 === '严重' ? 4 : injury.严重度 === '中等' ? 5 : 6;
-
-    if (injury.状态 === '可复出') {
-      if (typeof injury.分钟限制 !== 'number') return injury;
-      const nextLimit = injury.分钟限制 + rampStep;
-      return {
-        ...injury,
-        分钟限制: nextLimit >= 36 ? null : Math.min(36, nextLimit),
-      };
-    }
-    if (league.日期 >= injury.预计复出) {
-      return {
-        ...injury,
-        状态: '可复出' as const,
-        分钟限制: injury.分钟限制 ?? initialLimit,
-      };
-    }
-    return { ...injury, 状态: '恢复中' as const };
-  });
-  const recoveryHooks = injuries
-    .filter((injury, index) => injury.状态 === '可复出' && league.伤病[index]?.状态 !== '可复出')
-    .map(injury => ({
-      id: `injury-return-${injury.球员}-${injury.预计复出}`,
-      type: '伤病' as const,
-      title: `${injury.球员} 可以复出`,
-      detail: `${injury.类型} 已达到预计恢复日期，当前复出分钟限制为${injury.分钟限制 ?? '无'}；限制会随后续比赛恢复逐步放宽。`,
-      createdDate: league.日期,
-    }));
-  return { ...league, 伤病: injuries, 故事钩子: [...league.故事钩子, ...uniqueHooks(league.故事钩子, recoveryHooks)] };
-}
+// 保留既有导出入口，实际康复判定统一交给 InjuryManager。
+export { advanceInjuryRecovery } from './injury';

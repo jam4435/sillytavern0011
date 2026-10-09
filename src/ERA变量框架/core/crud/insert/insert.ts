@@ -16,8 +16,10 @@ import { applyTemplateToPatch, getInheritedTemplateContent, resolveTemplate } fr
 import { updateEraStatData } from '../../../utils/era_data';
 import { sanitizeArrays } from '../../../utils/data';
 import { Logger } from '../../../utils/log';
+import { recordEraDiagnostic } from '../../../utils/diagnostics';
 
 const logger = new Logger('core-crud-insert-insert');
+const branchSensitiveEventPath = /^(?:事件系统|参与事件|世界事件|事件分支结果|后续事件线索|后续事件线索计数)(?:\.|$)/;
 
 /**
  * **【递归插入】**
@@ -100,6 +102,12 @@ export function applyInsertAtLevel(
     // 如果路径已存在，但不是可递归补充的对象结构（例如，一个是对象，另一个是字符串），
     // 则记录警告。insert 不会覆盖已存在的值。
     logger.warn('applyInsertAtLevel', `VariableInsert 失败：路径已存在且无法递归补充 -> ${basePath}`);
+    if (branchSensitiveEventPath.test(basePath)) {
+      recordEraDiagnostic('core-crud-insert', 'event-insert-skipped', {
+        path: basePath,
+        reason: 'existing-path-not-overwritten',
+      });
+    }
   }
   // 如果 basePath 为空（在根级别）且 patch 不是对象，则不执行任何操作，因为根不能被非对象替换。
 }

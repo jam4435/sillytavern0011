@@ -7,6 +7,7 @@ import {
   type DisplaySettings,
 } from '../utils/settingsManager';
 import type { VariableEditorCapability } from '../utils/variableEditorPolicy';
+import type { LatestDebugRound } from '../hooks/useDebugLogs';
 
 const variableEditorCapability: VariableEditorCapability = {
   canEdit: true,
@@ -506,5 +507,75 @@ describe('SettingsPanel variable groups', () => {
 
     fireEvent.click(decodedKeyNodes[decodedKeyNodes.length - 1]);
     expect(screen.getByLabelText('值')).toHaveValue('如\'白虹经天\'。');
+  });
+});
+
+describe('SettingsPanel 调试复制', () => {
+  it('无最近一轮日志时禁用一键复制', () => {
+    renderSettingsPanel(createDefaultDisplaySettings());
+    fireEvent.click(screen.getByRole('button', { name: '调试' }));
+    expect(screen.getByRole('button', { name: '一键复制' })).toBeDisabled();
+  });
+
+  it('在清空调试日志左侧复制最新一轮四项内容', () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const debugRound: LatestDebugRound = {
+      id: 'copy-latest',
+      startedAt: 1,
+      updatedAt: 1,
+      main: { status: 'success', userInput: '师父好', combinedPrompt: '正文送模提示词', output: '师父颔首' },
+      variable: {
+        status: 'success',
+        trigger: 'send',
+        modeSnapshot: 'extra',
+        skipReason: '',
+        input: '变量送模提示词',
+        output: '<VariableThink>无变化</VariableThink>',
+        appendedBlocks: '',
+        finalMessageText: '',
+        appendReadbackText: '',
+        appendVerification: '',
+        syncReadbackText: '',
+        syncVerification: '',
+        applyStatus: 'idle',
+        applyError: '',
+        applyVerification: '',
+        postProcessStatus: 'idle',
+        postProcessError: '',
+      },
+    };
+
+    try {
+      render(
+        <SettingsPanel
+          currentPresetName=""
+          settings={createDefaultDisplaySettings()}
+          onSettingsChange={vi.fn()}
+          variableEditorCapability={variableEditorCapability}
+          latestDebugRound={debugRound}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: '调试' }));
+      const copyButton = screen.getByRole('button', { name: '一键复制' });
+      const clearButton = screen.getByRole('button', { name: '清空调试日志' });
+      expect(copyButton.compareDocumentPosition(clearButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      fireEvent.click(copyButton);
+      expect(writeText).toHaveBeenCalledTimes(1);
+      const copied = writeText.mock.calls[0][0] as string;
+      expect(copied).toContain('---\n正文输入\n---');
+      expect(copied).toContain('正文送模提示词');
+      expect(copied).toContain('---\n正文输出\n---\n师父颔首');
+      expect(copied).toContain('---\n变量输入\n---\n变量送模提示词');
+      expect(copied).toContain('---\n变量输出\n---');
+      expect(copied).toContain('<VariableThink>无变化</VariableThink>');
+    } finally {
+      if (clipboardDescriptor) {
+        Object.defineProperty(navigator, 'clipboard', clipboardDescriptor);
+      } else {
+        Reflect.deleteProperty(navigator, 'clipboard');
+      }
+    }
   });
 });

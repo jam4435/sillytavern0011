@@ -176,6 +176,75 @@ const standingRecordSchema = z.object({
   连胜: z.number().int(),
 }).strict();
 
+const rookieTemplateSchema = z.enum(['神射手', '组织核心', '突破手', '双向侧翼', '禁区终结者', '护框中锋', '空间内线', '全能前锋']);
+
+const generatedPlayerSeedSchema = z.object({
+  key: nonEmptyText,
+  displayName: nonEmptyText,
+  entrySeason: nonNegativeInt,
+  ageAtEntry: z.number().int().min(18).max(23),
+  peakAge: z.number().int().min(24).max(34),
+  pos: positionSchema,
+  secondaryPos: positionSchema.nullable(),
+  body: bodyProfileSchema,
+  potential: rating,
+  targetOverall: rating,
+  template: rookieTemplateSchema,
+  seed: nonEmptyText,
+}).strict();
+
+const draftPickRecordSchema = z.object({
+  season: nonEmptyText,
+  entrySeason: nonNegativeInt,
+  round: z.union([z.literal(1), z.literal(2)]),
+  pick: z.number().int().min(1).max(30),
+  overallPick: z.number().int().min(1).max(60),
+  teamId: nonEmptyText,
+  playerKey: nonEmptyText,
+  playerName: nonEmptyText,
+  pos: positionSchema,
+  template: rookieTemplateSchema,
+  overallAtDraft: rating,
+  potential: rating,
+}).strict();
+
+const leagueContractSchema = z.object({
+  playerKey: nonEmptyText,
+  teamId: nonEmptyText.nullable(),
+  signedSeason: nonNegativeInt,
+  expiresAfterSeason: nonNegativeInt,
+  annualSalary: finite.nonnegative(),
+  years: nonNegativeInt,
+  status: z.enum(['有效', '自由球员']),
+}).strict();
+
+const marketOfferSchema = z.object({
+  id: nonEmptyText,
+  playerKey: nonEmptyText,
+  type: z.enum(['交易', '续约', '自由市场']),
+  teamId: nonEmptyText,
+  annualSalary: finite.nonnegative(),
+  years: nonNegativeInt,
+  fitScore: finite.min(0).max(100),
+  needScore: finite.min(0).max(100),
+  createdDate: nonEmptyText,
+  status: z.enum(['待定', '接受', '拒绝']),
+  outgoingPlayerKey: nonEmptyText.nullable().optional(),
+}).strict();
+
+const transactionRecordSchema = z.object({
+  id: nonEmptyText,
+  type: z.enum(['交易', '签约', '续约', '自由球员']),
+  playerKey: nonEmptyText,
+  fromTeam: nonEmptyText.nullable(),
+  toTeam: nonEmptyText.nullable(),
+  season: nonEmptyText,
+  date: nonEmptyText,
+  annualSalary: finite.nonnegative().optional(),
+  years: nonNegativeInt.optional(),
+  outgoingPlayerKey: nonEmptyText.nullable().optional(),
+}).strict();
+
 const injuryRecordSchema = z.object({
   球员: nonEmptyText, 类型: nonEmptyText, 严重度: z.enum(['轻微', '中等', '严重']),
   受伤日期: nonEmptyText, 预计复出: nonEmptyText, 状态: z.enum(['休战', '恢复中', '可复出']),
@@ -184,7 +253,7 @@ const injuryRecordSchema = z.object({
 
 const storyHookSchema = z.object({
   id: nonEmptyText,
-  type: z.enum(['赛历', '交易', '合同', '代言', '伤病', '球队关系', '奖项']),
+  type: z.enum(['赛历', '交易', '合同', '代言', '伤病', '球队关系', '奖项', '选秀']),
   title: nonEmptyText, detail: nonEmptyText, createdDate: nonEmptyText, consumed: z.boolean().optional(),
 }).strict();
 
@@ -210,6 +279,51 @@ const playoffStateSchema = z.object({
   champion: nonEmptyText.nullable(),
 }).strict();
 
+const playerSeasonTotalsSchema = z.object({
+  teamId: nonEmptyText,
+  gp: nonNegativeInt, min: finite.nonnegative(), pts: nonNegativeInt, reb: nonNegativeInt,
+  ast: nonNegativeInt, stl: nonNegativeInt, blk: nonNegativeInt, tov: nonNegativeInt,
+  fgm: nonNegativeInt, fga: nonNegativeInt, threePm: nonNegativeInt, threePa: nonNegativeInt,
+  ftm: nonNegativeInt, fta: nonNegativeInt,
+}).strict().superRefine((row, ctx) => {
+  if (row.fgm > row.fga || row.threePm > row.threePa || row.ftm > row.fta || row.threePm > row.fgm || row.threePa > row.fga)
+    ctx.addIssue({ code: 'custom', message: '球员赛季累计命中不能超过出手，三分须包含于投篮' });
+});
+const seasonAwardsSchema = z.object({
+  season: nonEmptyText, mvp: nonEmptyText.nullable(), rookie: nonEmptyText.nullable(), dpoy: nonEmptyText.nullable(),
+  allNBA: z.array(z.array(nonEmptyText).max(5)).max(3),
+  allDefense: z.array(z.array(nonEmptyText).max(5)).max(2),
+}).strict();
+// Lifetime entries are compact totals; they intentionally remain queryable after retirement.
+const historicalPlayerTotalsSchema = z.object({
+  teamId: nonEmptyText, gp: nonNegativeInt, min: finite.nonnegative(),
+  pts: nonNegativeInt, reb: nonNegativeInt, ast: nonNegativeInt, stl: nonNegativeInt,
+  blk: nonNegativeInt, tov: nonNegativeInt, fgm: nonNegativeInt, fga: nonNegativeInt,
+  threePm: nonNegativeInt, threePa: nonNegativeInt, ftm: nonNegativeInt, fta: nonNegativeInt,
+  seasons: nonNegativeInt, firstSeason: nonEmptyText, lastSeason: nonEmptyText,
+}).strict();
+const historicalRecordSchema = z.object({
+  season: nonEmptyText, playerKey: nonEmptyText, teamId: nonEmptyText,
+  gp: nonNegativeInt, total: nonNegativeInt,
+}).strict();
+const milestoneSchema = z.object({
+  id: nonEmptyText, season: nonEmptyText, playerKey: nonEmptyText,
+  category: z.enum(['gp', 'pts', 'reb', 'ast', 'stl', 'blk']),
+  threshold: nonNegativeInt,
+}).strict();
+const leagueHistorySchema = z.object({
+  lastCountedSeason: nonEmptyText.nullable(),
+  career: z.record(nonEmptyText, historicalPlayerTotalsSchema),
+  records: z.object({
+    pts: historicalRecordSchema.optional(), reb: historicalRecordSchema.optional(),
+    ast: historicalRecordSchema.optional(), stl: historicalRecordSchema.optional(),
+    blk: historicalRecordSchema.optional(),
+  }).strict(),
+  milestones: z.array(milestoneSchema).max(240),
+  championships: z.array(z.object({
+    season: nonEmptyText, champion: nonEmptyText, runnerUp: nonEmptyText,
+  }).strict()).max(120),
+}).strict();
 export const leagueStateSchema = z.object({
   赛季: z.string().regex(/^\d{4}-\d{2}$/),
   赛季序号: nonNegativeInt,
@@ -218,6 +332,15 @@ export const leagueStateSchema = z.object({
   赛程索引: nonNegativeInt,
   战绩: z.record(nonEmptyText, standingRecordSchema),
   教练: z.record(nonEmptyText, coachProfileSchema),
+  球员归属: z.record(nonEmptyText, nonEmptyText.nullable()),
+  合同册: z.record(nonEmptyText, leagueContractSchema),
+  市场报价: z.array(marketOfferSchema),
+  交易记录: z.array(transactionRecordSchema).max(240),
+  生成球员: z.record(nonEmptyText, generatedPlayerSeedSchema),
+  选秀历史: z.array(draftPickRecordSchema).max(600),
+  球员赛季统计: z.record(nonEmptyText, playerSeasonTotalsSchema).default({}),
+  奖项记录: z.array(seasonAwardsSchema).max(120).default([]),
+  历史档案: leagueHistorySchema.default({ lastCountedSeason: null, career: {}, records: {}, milestones: [], championships: [] }),
   伤病: z.array(injuryRecordSchema),
   故事钩子: z.array(storyHookSchema),
   季后赛: playoffStateSchema.nullable().default(null),

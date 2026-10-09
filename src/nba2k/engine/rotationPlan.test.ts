@@ -125,9 +125,15 @@ describe('RotationPlan / Availability / CoachRole', () => {
     league = advanceInjuryRecovery(league);
     expect(league.伤病[0].状态).toBe('可复出');
     expect(league.伤病[0].分钟限制).toBe(24);
+    // 同一天再次结算不能凭空增加康复分钟；实际跨3天才放宽。
+    league = advanceInjuryRecovery(league);
+    expect(league.伤病[0].分钟限制).toBe(24);
+    const recoveryBase = new Date(`${league.伤病[0].预计复出}T12:00:00Z`);
+    const advanceDate = (days: number) => new Date(recoveryBase.getTime() + days * 86_400_000).toISOString().slice(0, 10);
+    league = { ...league, 日期: advanceDate(3) };
     league = advanceInjuryRecovery(league);
     expect(league.伤病[0].分钟限制).toBe(29);
-    league = advanceInjuryRecovery(league);
+    league = { ...league, 日期: advanceDate(9) };
     league = advanceInjuryRecovery(league);
     expect(league.伤病[0].分钟限制).toBeNull();
   });

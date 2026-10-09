@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { recordEraDiagnostic } from '../../ERA变量框架/utils/diagnostics';
 import {
   clearHistoryCheckoutJournal,
   clearHistoryCheckoutReturnIntent,
@@ -67,6 +68,8 @@ export const HistoryNodeSchema = z
       .object({
         selectedMksHash: z.string(),
         eventStateHash: z.string(),
+        /** 新封存节点可用：用于定位具体哪组事件状态变化；老节点仍能读取。 */
+        eventPartHashes: z.record(z.string(), z.string()).optional(),
       })
       .strict()
       .nullable(),
@@ -151,6 +154,50 @@ export interface CurrentHistoryContext extends HistoryTreeViewState {
 }
 
 type HistoryVerification = NonNullable<HistoryNode['verification']>;
+const HISTORY_EVENT_STATE_KEYS = [
+  '事件系统', '参与事件', '世界事件', '事件分支结果', '后续事件线索', '后续事件线索计数',
+] as const;
+
+/** 对比 ERA 完整回滚完成时和事件脚本预检查完成时的真实事件根，避免旧哈希无法定位原因。 */
+function readCheckoutEventRoots(): Record<string, unknown> {
+  const variables = getVariables({ type: 'chat' });
+  const statData = isRecord(variables?.stat_data) ? variables.stat_data : {};
+  const roots = Object.fromEntries(HISTORY_EVENT_STATE_KEYS.map(key => [key, statData[key] ?? null]));
+  return structuredClone(roots);
+}
+
+function describeChangedEventPaths(before: Record<string, unknown>, after: Record<string, unknown>): string[] {
+  const changes: string[] = [];
+  const limit = 32;
+  const walk = (oldValue: unknown, nextValue: unknown, path: string, depth: number) => {
+    if (changes.length >= limit) return;
+    if (stableHistoryHash(oldValue) === stableHistoryHash(nextValue)) return;
+    if (depth < 6 && isRecord(oldValue) && isRecord(nextValue)) {
+      for (const key of [...new Set([...Object.keys(oldValue), ...Object.keys(nextValue)])].sort()) {
+        walk(oldValue[key], nextValue[key], `${path}.${key}`, depth + 1);
+        if (changes.length >= limit) break;
+      }
+      return;
+    }
+    const typeOf = (value: unknown) =>
+      value === null || value === undefined
+        ? '空'
+        : Array.isArray(value)
+          ? `数组(${value.length})`
+          : isRecord(value)
+            ? `对象(${Object.keys(value).length}项)`
+            : typeof value;
+    changes.push(`${path}（${typeOf(oldValue)} → ${typeOf(nextValue)}）`);
+  };
+  for (const key of HISTORY_EVENT_STATE_KEYS) {
+    walk(before[key], after[key], key, 0);
+    if (changes.length >= limit) {
+      changes.push('其余变化省略（最多列出 32 条路径）');
+      break;
+    }
+  }
+  return changes;
+}
 
 const ERA_MESSAGE_KEY_REGEX =
   /<era_data>[\s\S]*?["']?era-message-key["']?\s*[=:]\s*["']([^"']+)["'][\s\S]*?<\/era_data>/i;
@@ -614,16 +661,20 @@ function readCurrentVerification(): HistoryVerification {
   const statData = isRecord(variables?.stat_data) ? variables.stat_data : {};
   const metaData = isRecord(variables?.ERAMetaData) ? variables.ERAMetaData : {};
   const selectedMks = Array.isArray(metaData.SelectedMks) ? metaData.SelectedMks : [];
+  const eventState = {
+    事件系统: statData.事件系统 ?? null,
+    参与事件: statData.参与事件 ?? null,
+    世界事件: statData.世界事件 ?? null,
+    事件分支结果: statData.事件分支结果 ?? null,
+    后续事件线索: statData.后续事件线索 ?? null,
+    后续事件线索计数: statData.后续事件线索计数 ?? null,
+  };
   return {
     selectedMksHash: stableHistoryHash(selectedMks),
-    eventStateHash: stableHistoryHash({
-      事件系统: statData.事件系统 ?? null,
-      参与事件: statData.参与事件 ?? null,
-      世界事件: statData.世界事件 ?? null,
-      事件分支结果: statData.事件分支结果 ?? null,
-      后续事件线索: statData.后续事件线索 ?? null,
-      后续事件线索计数: statData.后续事件线索计数 ?? null,
-    }),
+    eventStateHash: stableHistoryHash(eventState),
+    eventPartHashes: Object.fromEntries(
+      HISTORY_EVENT_STATE_KEYS.map(key => [key, stableHistoryHash(eventState[key])]),
+    ),
   };
 }
 
@@ -1081,12 +1132,63 @@ async function waitForEraFullResync(): Promise<void> {
   });
 }
 
+function readCheckoutEventSystemAudit(): Record<string, { hash: string; count: number }> {
+  const variables = getVariables({ type: 'chat' });
+  const stat = isRecord(variables?.stat_data) ? variables.stat_data : {};
+  const system = isRecord(stat.事件系统) ? stat.事件系统 : {};
+  const keys = [...new Set([
+    '未发生事件', '进行中事件', '已完成事件', '已失效事件', '人物事件占用',
+    ...Object.keys(system),
+  ])].sort();
+  return Object.fromEntries(keys.map(key => {
+    const value = system[key] ?? null;
+    return [key, { hash: stableHistoryHash(value), count: isRecord(value) ? Object.keys(value).length : 0 }];
+  }));
+}
+
+function recordCheckoutEventSystemAudit(stage: string, journal: HistoryCheckoutJournal | null): void {
+  try {
+    const expected = journal?.targetNodeId
+      ? loadHistoryTree().nodes[journal.targetNodeId]?.verification?.eventPartHashes?.事件系统
+      : undefined;
+    const current = readCurrentVerification();
+    recordEraDiagnostic('wuxia-history-checkout', 'history-checkout-event-system-audit', {
+      transactionId: journal?.transactionId ?? '',
+      nodeId: journal?.targetNodeId ?? '',
+      stage,
+      expectedSystemHash: expected ?? '未封存子指纹',
+      actualSystemHash: current.eventPartHashes?.事件系统 ?? '',
+      bucketFingerprints: readCheckoutEventSystemAudit(),
+    });
+  } catch {
+    // 采集诊断不能成为历史恢复的新失败来源。
+  }
+}
+
 async function runFullHistorySync(prepareVerification = false): Promise<void> {
+  const traceJournal = prepareVerification ? readHistoryCheckoutJournal() : null;
+  if (prepareVerification) recordCheckoutEventSystemAudit('before-full-sync', traceJournal);
   await waitForEraFullResync();
+  if (prepareVerification) recordCheckoutEventSystemAudit('after-full-sync', traceJournal);
   if (prepareVerification) {
     const journal = readHistoryCheckoutJournal();
+    const afterEra = readCurrentVerification();
+    const rootsAfterEra = readCheckoutEventRoots();
     await eventEmit(WUXIA_HISTORY_PREPARE_VERIFICATION_EVENT, {
       transactionId: journal?.transactionId ?? '',
+    });
+    const afterPrepare = readCurrentVerification();
+    recordCheckoutEventSystemAudit('after-event-prepare', journal);
+    const rootsAfterPrepare = readCheckoutEventRoots();
+    // 只持久化诊断哈希与变更路径，不额外保存游戏变量或污染分支状态。
+    updateHistoryCheckoutJournal({
+      verificationTrace: {
+        eraSelectedMksHash: afterEra.selectedMksHash,
+        eraEventStateHash: afterEra.eventStateHash,
+        preparedSelectedMksHash: afterPrepare.selectedMksHash,
+        preparedEventStateHash: afterPrepare.eventStateHash,
+        changedPaths: describeChangedEventPaths(rootsAfterEra, rootsAfterPrepare),
+      },
     });
   }
 }
@@ -1167,7 +1269,12 @@ function markBranchStatus(
   return persistHistoryTree(tree);
 }
 
-class HistoryVerificationError extends Error {}
+class HistoryVerificationError extends Error {
+  constructor(message: string, readonly diagnostics?: string) {
+    super(message);
+    this.name = 'HistoryVerificationError';
+  }
+}
 
 function commitVerification(
   state: HistoryTreeViewState,
@@ -1180,11 +1287,22 @@ function commitVerification(
     (baseline.selectedMksHash !== verification.selectedMksHash ||
       baseline.eventStateHash !== verification.eventStateHash)
   ) {
-    markBranchStatus(state.currentBranchId, 'broken');
     const mksSame = baseline.selectedMksHash === verification.selectedMksHash;
     const eventSame = baseline.eventStateHash === verification.eventStateHash;
+    const eventDetails = baseline.eventPartHashes
+      ? HISTORY_EVENT_STATE_KEYS.map(key => {
+          const expected = baseline.eventPartHashes?.[key] ?? '未记录';
+          const actual = verification.eventPartHashes?.[key] ?? '未记录';
+          return `${key}：${expected === actual ? '一致' : '不一致'}（封存 ${expected}；恢复 ${actual}）`;
+        })
+      : ['旧封存记录没有逐组事件指纹，无法准确归因到某一组事件字段。'];
     throw new HistoryVerificationError(
       `历史节点校验失败：ERA 主干或事件状态与封存记录不一致（主干${mksSame ? '一致' : '不一致'}，事件状态${eventSame ? '一致' : '不一致'}）。`,
+      [
+        `ERA SelectedMks：封存 ${baseline.selectedMksHash}；恢复 ${verification.selectedMksHash}`,
+        `事件整体：封存 ${baseline.eventStateHash}；恢复 ${verification.eventStateHash}`,
+        ...eventDetails,
+      ].join('\n'),
     );
   }
 
@@ -1425,12 +1543,55 @@ async function executeCheckout(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const unavailableChat = error instanceof HistoryChatUnavailableError ? error : null;
-    const broken = error instanceof HistoryVerificationError || Boolean(unavailableChat);
+    // 状态指纹不一致仍可再次完成全量同步；只有聊天本身不可访问才是不可恢复的断链。
+    const broken = Boolean(unavailableChat);
     const journal = readHistoryCheckoutJournal();
     if (journal) {
+      const trace = journal.verificationTrace;
+      // 故障诊断只能尽力读取，不得让二次读取失败遮盖原始 checkout 异常。
+      let baselineHash: string | undefined;
+      let finalHash = '读取失败';
+      try {
+        baselineHash = loadHistoryTree().nodes[nodeId]?.verification?.eventStateHash;
+        finalHash = readCurrentVerification().eventStateHash;
+      } catch {
+        // 聊天已被删除或变量尚未装载时，保留原始错误和已有 journal。
+      }
+      const causeHint = !trace || !baselineHash
+        ? '缺少分阶段诊断：请重试恢复，以记录 ERA 同步与事件脚本检查各自的结果。'
+        : trace.eraEventStateHash !== baselineHash
+          ? 'ERA 完全同步结束时就已经与历史封存不一致：优先排查未受 ERA 回滚管理的事件直接写入或原有快照缺失。'
+          : trace.preparedEventStateHash !== baselineHash
+            ? 'ERA 完全同步后与封存一致，但运行事件脚本预检查后发生漂移：请排查该检查期间的事件写入。'
+            : finalHash !== trace.preparedEventStateHash
+              ? '事件预检查完成后又发生事件变量变化：可能存在迟到的异步写入。'
+              : '分阶段校验结果一致，请检查更具体的事件差异。';
+      const diagnostics = [
+        `恢复事务：${journal.transactionId}`,
+        `恢复动作：${actionKind}`,
+        `失败阶段：${journal.stage}`,
+        `目标节点：${nodeId}`,
+        `来源聊天：${journal.sourceChatName}（${journal.sourceChatId}）`,
+        `目标聊天：${journal.targetLocator.chatName}（${journal.targetLocator.chatId}）`,
+        `目标楼层：User ${journal.targetLocator.userMessageId ?? '无'} / Assistant ${journal.targetLocator.assistantMessageId} / swipe ${journal.targetLocator.swipeId}`,
+        `异常信息：${message}`,
+        ...(error instanceof HistoryVerificationError && error.diagnostics
+          ? ['校验指纹详情：', error.diagnostics]
+          : []),
+        `阶段归因：${causeHint}`,
+        ...(trace
+          ? [
+              `ERA 完全同步后：主干 ${trace.eraSelectedMksHash}；事件 ${trace.eraEventStateHash}`,
+              `事件预检查完成后：主干 ${trace.preparedSelectedMksHash}；事件 ${trace.preparedEventStateHash}`,
+              `最终事件指纹：${finalHash}`,
+              '事件预检查产生的路径变化：',
+              ...(trace.changedPaths.length ? trace.changedPaths : ['无（这不排除 ERA 同步前已出现事件状态漂移）']),
+            ]
+          : []),
+      ].join('\n');
       updateHistoryCheckoutJournal({
-        failure: { stage: journal.stage, message, occurredAt: Date.now() },
-      });
+        failure: { stage: journal.stage, message, occurredAt: Date.now(), details: diagnostics },
+      }, { touch: false });
     }
     const currentChat = unavailableChat ? null : await readCurrentChatIdentity().catch(() => null);
     const branchId = unavailableChat
@@ -1463,6 +1624,24 @@ async function executeCheckout(
   }
 }
 
+// 同一 iframe 可能同时由 App 自动续接和存档页挂载发起 resumeCheckout。
+ // 复用正在执行的事务，避免两个执行器交错推进同一个 journal / ERA 校验。
+let activeCheckout: Promise<HistoryCheckoutResult> | null = null;
+
+function executeCheckoutSingleFlight(
+  nodeId: string,
+  options: CheckoutHistoryOptions,
+  journal: HistoryCheckoutJournal | null,
+): Promise<HistoryCheckoutResult> {
+  if (activeCheckout) return activeCheckout;
+  const flight = executeCheckout(nodeId, options, journal);
+  activeCheckout = flight;
+  void flight.finally(() => {
+    if (activeCheckout === flight) activeCheckout = null;
+  }).catch(() => {});
+  return flight;
+}
+
 export async function checkoutNode(
   nodeId: string,
   options: CheckoutHistoryOptions = {},
@@ -1491,7 +1670,7 @@ export async function checkoutNode(
     // 过期 journal 只代表旧事务已经失去恢复锁资格，不应继续阻止用户重新“从此处继续”。
     clearHistoryCheckoutJournal();
   }
-  return executeCheckout(nodeId, options, null);
+  return executeCheckoutSingleFlight(nodeId, options, null);
 }
 
 export interface CheckoutRecoveryState {
@@ -1538,7 +1717,7 @@ export async function resumeCheckout(): Promise<HistoryCheckoutResult | null> {
       message,
     );
   }
-  return executeCheckout(journal.targetNodeId, {}, journal);
+  return executeCheckoutSingleFlight(journal.targetNodeId, {}, journal);
 }
 
 /** 放弃尚未完成的历史检出；保留已创建的聊天/分支，只解除恢复锁。 */
@@ -1567,9 +1746,14 @@ export function abandonCheckoutRecovery(): HistoryCheckoutResult | null {
 export async function retryCheckoutRecovery(): Promise<HistoryCheckoutResult | null> {
   const journal = readHistoryCheckoutJournal();
   if (!journal) return null;
+  if (activeCheckout) return activeCheckout;
   clearHistoryCheckoutReturnIntent();
   const renewed = renewHistoryCheckoutJournal(journal);
-  return executeCheckout(renewed.targetNodeId, {}, renewed);
+  // verify 失败后的重试必须重新执行 ERA 完全重算；只重比哈希不会改变事件状态。
+  const retryJournal = journal.failure?.stage === 'verify'
+    ? (updateHistoryCheckoutJournal({ stage: 'sync_era' }) ?? renewed)
+    : renewed;
+  return executeCheckoutSingleFlight(retryJournal.targetNodeId, {}, retryJournal);
 }
 
 export async function returnToCheckoutSource(): Promise<HistoryCheckoutResult | null> {
@@ -1608,6 +1792,14 @@ export async function returnToCheckoutSource(): Promise<HistoryCheckoutResult | 
       chatName: failedChat.chatName,
       originNodeId: journal.sourceHeadNodeId || null,
     });
+    updateHistoryCheckoutJournal({
+      failure: {
+        stage: journal.stage,
+        message,
+        occurredAt: Date.now(),
+        details: `返回来源聊天失败\n事务：${journal.transactionId}\n来源：${journal.sourceChatName}（${journal.sourceChatId}）\n目标：${journal.targetLocator.chatName}（${journal.targetLocator.chatId}）\n异常：${message}`,
+      },
+    }, { touch: false });
     notifyHistoryCheckoutFailure();
     return makeCheckoutResult(
       unavailableChat ? 'broken' : 'recovery_failed',

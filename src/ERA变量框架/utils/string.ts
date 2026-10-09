@@ -47,8 +47,25 @@ export function stripCodeFence(s: string): string {
   if (!s) return s;
   let t = String(s).trim();
   // 移除起始围栏，例如 ```json, ```, ~~~
-  t = t.replace(/^\s*(?:```|~~~)\[a-zA-Z0-9_-\]*\s*\r?\n/, '');
+  t = t.replace(/^\s*(?:```|~~~)[a-zA-Z0-9_-]*\s*\r?\n/, '');
   // 移除结束围栏
   t = t.replace(/\r?\n(?:```|~~~)\s*$/, '');
   return t.trim();
+}
+
+/**
+ * 按正文原始顺序读取全部变量动作块。
+ * 事件交接常在一个楼层中先 Delete 旧占用、再 Insert 新占用；
+ * 不能先按标签分组，否则会把新占用再次删除。
+ */
+export function extractOrderedVariableActionBlocks(
+  text: string,
+): Array<{ tag: 'VariableInsert' | 'VariableEdit' | 'VariableDelete'; body: string }> {
+  const result: Array<{ tag: 'VariableInsert' | 'VariableEdit' | 'VariableDelete'; body: string }> = [];
+  const pattern = /<(VariableInsert|VariableEdit|VariableDelete)>([\s\S]*?)<\/\1>/g;
+  for (const match of text.matchAll(pattern)) {
+    const body = stripCodeFence((match[2] || '').trim());
+    if (body) result.push({ tag: match[1] as 'VariableInsert' | 'VariableEdit' | 'VariableDelete', body });
+  }
+  return result;
 }

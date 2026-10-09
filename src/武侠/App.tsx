@@ -118,14 +118,25 @@ import {
   HISTORY_CHECKOUT_STATE_EVENT,
   clearHistoryCheckoutDraft,
   isHistoryCheckoutPending,
+  isHistoryCheckoutJournalExpired,
+  readHistoryCheckoutJournal,
   readHistoryCheckoutDraft,
   updateHistoryCheckoutDraftMessage,
   type HistoryCheckoutDraft,
+  type HistoryCheckoutJournal,
 } from '../shared/historyCheckoutJournal';
 import { CHAT_RENAME_COMMIT_EVENT, CHAT_RENAME_STATE_EVENT, isChatRenamePending } from '../shared/chatRenameJournal';
 
 const PLAYER_AVATAR_ENTITY_KEY = createAvatarEntityKey('player');
 const WUXIA_HISTORY_EVENT_STATE_STABLE_EVENT = 'wuxia:history-event-state-stable';
+const HISTORY_CHECKOUT_STAGE_LABELS: Record<HistoryCheckoutJournal['stage'], string> = {
+  navigate_source: '定位原聊天',
+  create_branch: '创建历史分支',
+  activate_swipe: '切换历史回复',
+  sync_era: '同步 ERA 与事件状态',
+  verify: '校验历史封存',
+  commit: '完成历史恢复',
+};
 
 function formatAttributePreviewSummary(rows: AttributePreviewRow[]): string {
   return rows.map(({ attribute, delta }) => `${attribute}${delta >= 0 ? '+' : ''}${delta}`).join('，');
@@ -184,7 +195,9 @@ const App: React.FC = () => {
     sendMessageWithCommands,
   } = useCommandQueue();
   const [playerAvatarVersion, setPlayerAvatarVersion] = useState(0);
-  const [historyCheckoutPending, setHistoryCheckoutPending] = useState(() => isHistoryCheckoutPending());
+  const [historyCheckoutJournal, setHistoryCheckoutJournal] = useState<HistoryCheckoutJournal | null>(
+    () => readHistoryCheckoutJournal(),
+  );
   const [chatRenamePending, setChatRenamePending] = useState(() => isChatRenamePending());
   const [isMeridianUpgradePending, setIsMeridianUpgradePending] = useState(false);
   const [historyInputDraft, setHistoryInputDraft] = useState<HistoryCheckoutDraft | null>(() =>
@@ -192,7 +205,17 @@ const App: React.FC = () => {
   );
   const historyResumeAttemptedRef = useRef(false);
   const chatRenameResumeAttemptedRef = useRef(false);
-  const historyMutationPending = historyCheckoutPending || chatRenamePending;
+  // journal 存在即代表恢复还需要处理（包括已超时或校验失败）；不能在不确定的分支继续发送。
+  const historyMutationPending = Boolean(historyCheckoutJournal) || chatRenamePending;
+  const historyRestoreMessage = historyCheckoutJournal?.failure
+    ? `历史恢复失败 · ${HISTORY_CHECKOUT_STAGE_LABELS[historyCheckoutJournal.failure.stage]}：${historyCheckoutJournal.failure.message}`
+    : historyCheckoutJournal
+      ? isHistoryCheckoutJournalExpired(historyCheckoutJournal)
+        ? '历史恢复已超时，需在存档页选择重试、返回来源聊天或放弃恢复。'
+        : `正在恢复历史节点 · ${HISTORY_CHECKOUT_STAGE_LABELS[historyCheckoutJournal.stage]}`
+      : chatRenamePending
+        ? '正在完成聊天分支命名，暂时不能发送。'
+        : null;
 
   const playerAvatarSource = useMemo(
     () =>
@@ -342,7 +365,18 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const syncCheckoutLock = () => setHistoryCheckoutPending(isHistoryCheckoutPending());
+    const syncCheckoutLock = () => {
+      const next = readHistoryCheckoutJournal();
+      setHistoryCheckoutJournal(current =>
+        current?.transactionId === next?.transactionId &&
+        current?.stage === next?.stage &&
+        current?.lastTouchedAt === next?.lastTouchedAt &&
+        current?.failure?.message === next?.failure?.message &&
+        current?.failure?.details === next?.failure?.details
+          ? current
+          : next,
+      );
+    };
     const handleCheckoutCommit = (event: Event) => {
       syncCheckoutLock();
       scheduleGameDataCompletion('history-checkout-commit', { fullScan: true });
@@ -402,17 +436,18 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (historyResumeAttemptedRef.current || !isHistoryCheckoutPending()) return;
+    // 失败记录应由玩家选择恢复操作；重新挂载 iframe 不应悄悄重复执行已失败的 verify。
+    if (historyResumeAttemptedRef.current || !isHistoryCheckoutPending() || readHistoryCheckoutJournal()?.failure) return;
     historyResumeAttemptedRef.current = true;
     void resumeCheckout()
       .then(result => {
-        setHistoryCheckoutPending(isHistoryCheckoutPending());
+        setHistoryCheckoutJournal(readHistoryCheckoutJournal());
         if (result && result.status !== 'commit') {
           showError(result.error || '历史分叉自动恢复失败，请打开江湖行迹谱处理。');
         }
       })
       .catch(error => {
-        setHistoryCheckoutPending(isHistoryCheckoutPending());
+        setHistoryCheckoutJournal(readHistoryCheckoutJournal());
         showError(`历史分叉自动恢复失败：${error instanceof Error ? error.message : String(error)}`);
       });
   }, [showError]);
@@ -1680,6 +1715,19 @@ const App: React.FC = () => {
   };
 
   // 根据页面状态渲染不同内容
+  const historyRestoreBanner = historyRestoreMessage ? (
+    <div
+      className={`history-restore-notice ${historyCheckoutJournal?.failure || (historyCheckoutJournal && isHistoryCheckoutJournalExpired(historyCheckoutJournal)) ? 'failed' : ''}`}
+      role="status"
+      aria-live="polite"
+      data-wuxia-automation="history-restore-notice"
+    >
+      <span>{historyRestoreMessage}</span>
+      <button type="button" onClick={() => setActivePanel(ActivePanel.SAVE_LOAD)}>
+        打开存档恢复
+      </button>
+    </div>
+  ) : null;
   const eventNotificationLayer = shouldDeferSetupEventNotifications(currentPage, isLoading) ? null : (
     <EventNotificationStack notifications={eventNotifications} onDismiss={dismissEventNotification} />
   );
@@ -1763,7 +1811,8 @@ const App: React.FC = () => {
           onRegenerateDraftModeChange={handlePrepareRegenerateDraftMode}
           onCancelRegenerateDraft={handleCancelRegenerateInputEdit}
           canRegenerate={canRegenerate && !historyMutationPending}
-          isRegenerating={isLoading || historyMutationPending}
+          isRegenerating={isLoading}
+          restoreNotice={historyRestoreBanner}
           regenerateDraftMode={regenerateDraftMode}
           regenerateDraftPrefill={regenerateDraftPrefill}
           onOpenSettings={() => setActivePanel(ActivePanel.SETTINGS)}
@@ -2015,6 +2064,7 @@ const App: React.FC = () => {
                 <VariableChangeBar summary={variableChanges || null} />
               </div>
 
+              {historyRestoreBanner}
               {/* 底部聊天输入区域 */}
               <ChatInput
               onSend={handlePlayerSend}
@@ -2049,7 +2099,7 @@ const App: React.FC = () => {
               onRegenerateDraftModeChange={handlePrepareRegenerateDraftMode}
               onCancelRegenerateDraft={handleCancelRegenerateInputEdit}
               canRegenerate={canRegenerate && !historyMutationPending}
-              isRegenerating={isLoading || historyMutationPending}
+              isRegenerating={isLoading}
               regenerateDraftMode={regenerateDraftMode}
               regenerateDraftPrefill={regenerateDraftPrefill}
               disabled={isLoading || historyMutationPending}

@@ -23,6 +23,7 @@ import {
 import { scheduleUnthrottledInterval, scheduleUnthrottledTimeout } from '../../shared/unthrottledTimer';
 import { requestConfiguredText, resolveConfiguredTextSettings, validateSummaryApiConfig } from './summaryApiClient';
 import { dataLogger, variableTraceLogger } from './logger';
+import { deriveActiveEventFollowupLocations, FOLLOWUP_MOVEMENT_GUIDANCE } from './activeEventFollowups';
 import { recordIframeLifecycleEvent } from './iframeLifecycleBlackBox';
 import { isFrontendLoaderOnlyMessage, normalizeDisplayedMessageContent } from './variableReader';
 import { runWithAutoAdvanceFailureRetry } from './autoAdvanceRetry';
@@ -1006,13 +1007,17 @@ function uniqueFullLocationPaths(value: unknown): string[] {
   return Array.from(new Set(value.map(normalizeLocationPath).filter(Boolean)));
 }
 
-function formatLocationContext(surroundingLocations: unknown, currentLocation: unknown): string {
+function formatLocationContext(
+  surroundingLocations: unknown,
+  currentLocation: unknown,
+  activeFollowups: Record<string, string>,
+): string {
   const locationGroups = isRecord(surroundingLocations) ? surroundingLocations : {};
   const normalizedCurrentLocation = normalizeLocationPath(currentLocation);
   const normalPaths = uniqueFullLocationPaths(locationGroups.附近地点);
   const eventPaths = uniqueFullLocationPaths(locationGroups.目标事件地点);
   const instructionPaths = uniqueFullLocationPaths(locationGroups.地图移动目的地);
-  if (!normalizedCurrentLocation && normalPaths.length === 0 && eventPaths.length === 0 && instructionPaths.length === 0) {
+  if (!normalizedCurrentLocation && normalPaths.length === 0 && eventPaths.length === 0 && instructionPaths.length === 0 && Object.keys(activeFollowups).length === 0) {
     return '';
   }
 
@@ -1021,6 +1026,10 @@ function formatLocationContext(surroundingLocations: unknown, currentLocation: u
   if (normalPaths.length > 0) lines.push(`附近地点:${normalPaths.map(formatCompactScalar).join('|')}`);
   if (eventPaths.length > 0) lines.push(`目标事件地点:${eventPaths.map(formatCompactScalar).join('|')}`);
   if (instructionPaths.length > 0) lines.push(`地图移动目的地:${instructionPaths.map(formatCompactScalar).join('|')}`);
+  if (Object.keys(activeFollowups).length > 0) {
+    lines.push(`后续事件:${Object.entries(activeFollowups).map(([name, location]) => `${formatCompactScalar(name)}:${formatCompactScalar(location)}`).join('|')}`);
+    lines.push(`后续事件移动指引:${FOLLOWUP_MOVEMENT_GUIDANCE}`);
+  }
   return lines.join('\n');
 }
 
@@ -1044,7 +1053,11 @@ function buildVariableProjectionSnapshot(
   const rawUserData = getNestedRecord(statData, 'user数据') || getNestedRecord(statData, '玩家数据') || {};
   const tasks = statData.任务;
   const projectedUserData = isRecord(projection.user数据) ? projection.user数据 : {};
-  const locationContext = formatLocationContext(frontendVariables.周围地点, projectedUserData.所在位置);
+  const locationContext = formatLocationContext(
+    frontendVariables.周围地点,
+    projectedUserData.所在位置,
+    deriveActiveEventFollowupLocations(statData),
+  );
 
   return {
     projection,

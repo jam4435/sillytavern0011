@@ -1,9 +1,26 @@
 'use strict';
 
 export const ERA_DIAGNOSTICS_STORAGE_KEY = 'era_diagnostics_v1';
+export const ERA_CRITICAL_DIAGNOSTICS_STORAGE_KEY = 'era_critical_diagnostics_v1';
 
 const ERA_DIAGNOSTICS_VERSION = 1;
 const MAX_DIAGNOSTIC_ENTRIES = 600;
+const MAX_CRITICAL_DIAGNOSTIC_ENTRIES = 300;
+
+// 历史恢复的重要证据独立保存；普通任务的 started/finished/watchdog 不会挤掉这些记录。
+// 这里只做诊断分流，不改变 ERA 写入、回滚或事件脚本行为。
+const CRITICAL_EVENTS = new Set([
+  'message-apply-log-audit',
+  'event-state-changed-without-editlog',
+  'action-blocks-produced-empty-editlog',
+  'nonempty-editlog-overwritten-by-empty',
+  'branch-sensitive-event-state-write',
+  'event-edit-skipped',
+  'event-insert-skipped',
+  'rollback-event-state-audit',
+  'full-resync-event-state-audit',
+  'history-checkout-event-system-audit',
+]);
 const DEFAULT_SLOW_THRESHOLD_MS = 5_000;
 const DEFAULT_WATCHDOG_INTERVAL_MS = 15_000;
 const MAX_DETAIL_DEPTH = 4;
@@ -14,6 +31,8 @@ const runtimeId = `era-runtime-${Date.now()}-${Math.random().toString(36).slice(
 let sequence = 0;
 let memoryEntries: EraDiagnosticEntry[] = [];
 let persistedEntriesLoaded = false;
+let criticalEntries: EraDiagnosticEntry[] = [];
+let criticalEntriesLoaded = false;
 let activeTaskId: string | null = null;
 const runtimeState: Record<string, unknown> = {};
 
@@ -48,6 +67,8 @@ interface EraDiagnosticsApi {
   version: 1;
   runtimeId: string;
   read: () => EraDiagnosticEntry[];
+  /** 不受普通 ERA watchdog/阶段日志 600 条上限挤占的独立诊断序列。 */
+  critical: () => EraDiagnosticEntry[];
   state: () => Record<string, unknown>;
   clear: () => void;
 }
@@ -126,6 +147,32 @@ function persistEntries(entries: EraDiagnosticEntry[]): void {
   }
 }
 
+function readPersistedCriticalEntries(): EraDiagnosticEntry[] {
+  if (criticalEntriesLoaded) return criticalEntries;
+  criticalEntriesLoaded = true;
+  try {
+    const raw = localStorage.getItem(ERA_CRITICAL_DIAGNOSTICS_STORAGE_KEY);
+    if (!raw) return criticalEntries;
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (criticalEntries = parsed.slice(-MAX_CRITICAL_DIAGNOSTIC_ENTRIES)) : criticalEntries;
+  } catch {
+    return criticalEntries;
+  }
+}
+
+function persistCriticalEntry(entry: EraDiagnosticEntry): void {
+  criticalEntries = [...readPersistedCriticalEntries(), entry].slice(-MAX_CRITICAL_DIAGNOSTIC_ENTRIES);
+  try {
+    localStorage.setItem(ERA_CRITICAL_DIAGNOSTICS_STORAGE_KEY, JSON.stringify(criticalEntries));
+  } catch {
+    // 诊断存储配额不足不能影响游戏；当前 iframe 内存仍保留这些记录。
+  }
+}
+
+export function readEraCriticalDiagnostics(): EraDiagnosticEntry[] {
+  return [...readPersistedCriticalEntries()];
+}
+
 export function createEraDiagnosticId(prefix: string): string {
   sequence += 1;
   return `${prefix}-${Date.now()}-${sequence}-${Math.random().toString(36).slice(2, 7)}`;
@@ -150,8 +197,11 @@ export function readEraDiagnostics(): EraDiagnosticEntry[] {
 export function clearEraDiagnostics(): void {
   memoryEntries = [];
   persistedEntriesLoaded = true;
+  criticalEntries = [];
+  criticalEntriesLoaded = true;
   try {
     localStorage.removeItem(ERA_DIAGNOSTICS_STORAGE_KEY);
+    localStorage.removeItem(ERA_CRITICAL_DIAGNOSTICS_STORAGE_KEY);
   } catch {
     // ignore
   }
@@ -176,6 +226,7 @@ export function recordEraDiagnostic(
     details: sanitizeValue(details) as Record<string, unknown>,
   };
   persistEntries([...readPersistedEntries(), entry]);
+  if (CRITICAL_EVENTS.has(event)) persistCriticalEntry(entry);
   return entry;
 }
 
@@ -244,6 +295,7 @@ function installDiagnosticsApi(): void {
     version: ERA_DIAGNOSTICS_VERSION,
     runtimeId,
     read: readEraDiagnostics,
+    critical: readEraCriticalDiagnostics,
     state: () => ({
       runtimeId,
       activeTaskId,

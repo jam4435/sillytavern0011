@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AGE_BENCHMARKS_2015_16 } from '../data/calibration/ageBenchmarks2015_16';
-import { createLeagueState, beginNextSeason } from './season';
+import { createLeagueState, beginNextSeason, getScheduledGame } from './season';
 import {
   advanceCareerLifecycleOneSeason,
   careerPhase,
@@ -94,8 +94,8 @@ describe('multi-season lifecycle', () => {
     const next = beginNextSeason(league, 'GSW');
     expect(next.league.赛季).toBe('2016-17');
     expect(next.league.赛季序号).toBe(1);
-    expect(next.league.日期).toBe('2016-10-27');
-    expect(next.nextGame?.date).toBe('2016-10-27');
+    expect(next.league.日期).toBe(getScheduledGame('GSW', 0, 1)!.date);
+    expect(next.nextGame?.date).toBe(getScheduledGame('GSW', 0, 1)!.date);
     expect(next.league.战绩.GSW).toEqual({ 胜: 0, 负: 0, 得分: 0, 失分: 0, 连胜: 0 });
   });
 });

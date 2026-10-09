@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ActionChoice, SubstitutionChoice } from './components/ActionPanel';
 import { ActionPanel } from './components/ActionPanel';
 import { BoxScore } from './components/BoxScore';
@@ -19,9 +19,12 @@ import { advancePeriodIfNeeded, buildCanonicalAssistant, settleAssistantResponse
 import { createDevelopment, defaultBadges, defaultHotZones, defaultTendencies, initialGroups } from './engine/development';
 import type { MatchState, OnCourtStatus, PlayerData, Side, SituationContext, StructuredTeamTactics, UpgradeGroupKey } from './engine/types';
 import {
+  buildLeagueRosterSnapshot,
   createLeaguePlayerResolver,
+  getAllPlayersForLeague,
   getBasePlayer,
   getPlayer,
+  getPlayerForLeague,
   getRosterForLeague,
   getTeam,
   registerCustomPlayer,
@@ -41,7 +44,12 @@ import {
   formatScheduledOpponent,
   getScheduledGame,
 } from './engine/season';
-import { advanceInjuryRecovery, collectOffCourtHooks } from './engine/offCourtSystems';
+import {
+  advanceInjuryRecovery,
+  collectOffCourtHooks,
+  isTradeDeadlinePeriod,
+  isTradeWindowOpen,
+} from './engine/offCourtSystems';
 import { deriveTeamTactics } from './engine/teamStyle';
 import { applyAutomaticRotation } from './engine/rotation';
 import { createRotationPlan } from './engine/rotationPlan';
@@ -51,7 +59,19 @@ import {
   advanceCareerLifecycleOneSeason,
   estimateInitialAge,
   estimatePeakAge,
+  seasonLabelFromOffset,
 } from './engine/lifecycle';
+import {
+  applyMarketOffer,
+  contractForPlayer,
+  prepareOffseasonMarket,
+  preparePlayerTradeMarket,
+  registerExistingContract,
+  runCpuTradeDeadline,
+} from './engine/transactions';
+import type { MarketOffer } from './engine/transactionTypes';
+import { runAnnualDraft } from './engine/draft';
+import { buildLeagueSimulationProfiles } from './engine/teamPower';
 
 function freshStatus(): OnCourtStatus {
   return {
@@ -109,6 +129,71 @@ function playerResolverForStat(stat: Nba2kStat): (key: string) => PlayerData | u
   return key => career && key === career.附身球员 ? protagonist : leagueResolver(key);
 }
 
+function contractExpirySeason(expiresAfterSeason: number): string {
+  return seasonLabelFromOffset(expiresAfterSeason + 1);
+}
+
+function roleAfterRosterChange(
+  playerKey: string,
+  teamId: string,
+  league: NonNullable<Nba2kStat['联盟']>,
+): NonNullable<Nba2kStat['生涯']>['球队角色'] {
+  const roster = getRosterForLeague(teamId, league).sort((a, b) => b.overall - a.overall);
+  const rank = roster.findIndex(player => player.name === playerKey);
+  if (rank <= 1 && rank >= 0) return '核心';
+  if (rank <= 4 && rank >= 0) return '首发';
+  if (rank === 5) return '第六人';
+  if (rank <= 9 && rank >= 0) return '轮换';
+  return '边缘轮换';
+}
+
+function draftSummary(
+  picks: ReturnType<typeof runAnnualDraft>['picks'],
+  playerTeamId: string,
+): string {
+  const top = picks.slice(0, 5).map(pick =>
+    `#${pick.overallPick} ${getTeam(pick.teamId)?.cn ?? pick.teamId}：${pick.playerName}（${pick.pos}，${pick.template}，OVR ${pick.overallAtDraft}/POT ${pick.potential}）`
+  );
+  const mine = picks
+    .filter(pick => pick.teamId === playerTeamId)
+    .map(pick => `本队#${pick.overallPick}：${pick.playerName}（${pick.pos}，${pick.template}）`);
+  return [...top, ...mine].join('\n');
+}
+
+function ensureOffseasonDraft(
+  league: NonNullable<Nba2kStat['联盟']>,
+  playerTeamId: string,
+): { league: NonNullable<Nba2kStat['联盟']>; picks: ReturnType<typeof runAnnualDraft>['picks']; newlyCompleted: boolean } {
+  const entrySeason = league.赛季序号 + 1;
+  const alreadyCompleted = league.选秀历史.some(pick => pick.entrySeason === entrySeason);
+  const snapshot = buildLeagueRosterSnapshot(league);
+  const result = runAnnualDraft(league, getRosterForLeague, snapshot.byTeam);
+  let nextLeague = result.league;
+  const hookId = `draft-${entrySeason}`;
+  if (!alreadyCompleted && result.picks.length && !nextLeague.故事钩子.some(hook => hook.id === hookId)) {
+    nextLeague = {
+      ...nextLeague,
+      故事钩子: [...nextLeague.故事钩子, {
+        id: hookId,
+        type: '选秀' as const,
+        title: `${seasonLabelFromOffset(entrySeason)} 新秀选秀完成`,
+        detail: draftSummary(result.picks, playerTeamId),
+        createdDate: nextLeague.日期,
+      }],
+    };
+  }
+  return { league: nextLeague, picks: result.picks, newlyCompleted: !alreadyCompleted };
+}
+
+function offerSummary(offer: MarketOffer): string {
+  const team = getTeam(offer.teamId)?.cn ?? offer.teamId;
+  if (offer.type === '交易') {
+    const outgoing = offer.outgoingPlayerKey ? (getBasePlayer(offer.outgoingPlayerKey)?.cn ?? offer.outgoingPlayerKey) : '待定筹码';
+    return `${team}：交易，主要回报 ${outgoing}，需求分${Math.round(offer.needScore)}，适配${Math.round(offer.fitScore)}`;
+  }
+  return `${team}：${offer.type} ${offer.years}年 / 年薪${Math.round(offer.annualSalary / 10_000)}万美元，适配${Math.round(offer.fitScore)}`;
+}
+
 function generatedText(result: string | GenerateToolCallResult): string {
   return (typeof result === 'string' ? result : result.content).trim();
 }
@@ -147,8 +232,54 @@ function buildPostGamePatch(
   if (!stat.场外) return patch;
 
   const baseLeague = stat.联盟 ?? createLeagueState(nextCareer.球队);
-  const advanced = advanceLeagueAfterGame(baseLeague, nextCareer.球队, nextMatch);
+  // 后台29队与非玩家季后赛系列赛共用当前世界Roster的即时球队画像。
+  // 不持久化球队总评；交易/伤病/成长/退役/新秀会在下一轮自然改变画像。
+  const leagueSnapshot = buildLeagueRosterSnapshot(baseLeague);
+  const simulationProfiles = buildLeagueSimulationProfiles(baseLeague, leagueSnapshot.byTeam);
+  const advanced = advanceLeagueAfterGame(
+    baseLeague,
+    nextCareer.球队,
+    nextMatch,
+    Math.random,
+    simulationProfiles,
+    leagueSnapshot.byTeam,
+    { key: nextCareer.附身球员, age: nextCareer.年龄 },
+  );
   let nextLeague = advanceInjuryRecovery(advanced.league);
+
+  const deadlineHookId = `cpu-deadline-market-${nextLeague.赛季}`;
+  if (
+    isTradeDeadlinePeriod(nextLeague.日期) &&
+    !nextLeague.故事钩子.some(hook => hook.id === deadlineHookId)
+  ) {
+    const deadline = runCpuTradeDeadline(
+      nextLeague,
+      nextCareer.附身球员,
+      getPlayerForLeague,
+      getRosterForLeague,
+    );
+    nextLeague = deadline.league;
+    const detail = deadline.trades.length
+      ? deadline.trades.map(record => {
+          const incoming = getBasePlayer(record.playerKey)?.cn ?? record.playerKey;
+          const outgoing = record.outgoingPlayerKey
+            ? (getBasePlayer(record.outgoingPlayerKey)?.cn ?? record.outgoingPlayerKey)
+            : '筹码';
+          return `${record.fromTeam}送出${incoming}，${record.toTeam}送出${outgoing}`;
+        }).join('；')
+      : '本赛季截止日前没有出现满足球队需求与价值匹配条件的CPU交易。';
+    nextLeague = {
+      ...nextLeague,
+      故事钩子: [...nextLeague.故事钩子, {
+        id: deadlineHookId,
+        type: '交易',
+        title: '交易截止日结算',
+        detail,
+        createdDate: nextLeague.日期,
+      }],
+    };
+  }
+
   const previousRole = stat.生涯?.球队角色;
   if (previousRole && previousRole !== nextCareer.球队角色) {
     nextLeague = {
@@ -251,7 +382,13 @@ const App: React.FC = () => {
     async (r: SetupResult) => {
       const p = getPlayer(r.protagonistKey);
       const team = getTeam(r.teamId);
-      const league = createLeagueState(r.teamId);
+      const league = registerExistingContract(
+        createLeagueState(r.teamId),
+        r.protagonistKey,
+        r.teamId,
+        2,
+        2_000_000,
+      );
       const firstGame = getScheduledGame(r.teamId, 0, league.赛季序号);
       const firstOpponent = firstGame ? getTeam(firstGame.opponent) : undefined;
       await insertOrAssignVariables(
@@ -317,7 +454,13 @@ const App: React.FC = () => {
       const player = buildCustomPlayer(form);
       registerCustomPlayer(player);
       const team = getTeam(form.teamId);
-      const league = createLeagueState(form.teamId);
+      const league = registerExistingContract(
+        createLeagueState(form.teamId),
+        player.name,
+        form.teamId,
+        2,
+        1_100_000,
+      );
       const firstGame = getScheduledGame(form.teamId, 0, league.赛季序号);
       const firstOpponent = firstGame ? getTeam(firstGame.opponent) : undefined;
       await insertOrAssignVariables(
@@ -830,17 +973,206 @@ const App: React.FC = () => {
     await sendTurn('【训练】我完成了今天的专项训练，前端已确定性增加1成长点并推进日期。请简短描写训练内容与教练反馈，不再修改数值。', { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 生涯: result.career, 场外: result.offCourt }) });
   }, [stat, sendTurn]);
 
+  const handlePrepareMarket = useCallback(async () => {
+    const career = stat.生涯;
+    const league = stat.联盟;
+    if (!career || !league || busyRef.current) return;
+
+    const projection = careerPlayerProjection(career);
+    if (projection) registerCustomPlayer(projection);
+
+    let nextLeague = league;
+    let offers: MarketOffer[] = [];
+    let label = '';
+    let draftNote = '';
+    if (league.阶段 === '休赛期') {
+      const drafted = ensureOffseasonDraft(league, career.球队);
+      const result = prepareOffseasonMarket(
+        drafted.league,
+        career.附身球员,
+        getPlayerForLeague,
+        getRosterForLeague,
+        getAllPlayersForLeague,
+      );
+      nextLeague = result.league;
+      offers = result.protagonistOffers;
+      label = result.protagonistMustSign ? '自由市场' : '续约市场';
+      if (drafted.newlyCompleted) {
+        draftNote = `\n【本届选秀】\n${draftSummary(drafted.picks, career.球队)}\n`;
+      }
+    } else {
+      if (!isTradeWindowOpen(league.日期)) {
+        toastr.warning('当前不在交易窗口。');
+        return;
+      }
+      nextLeague = preparePlayerTradeMarket(
+        league,
+        career.附身球员,
+        getPlayerForLeague,
+        getRosterForLeague,
+      );
+      offers = nextLeague.市场报价.filter(
+        offer => offer.playerKey === career.附身球员 && offer.type === '交易' && offer.status === '待定',
+      );
+      label = '交易市场';
+    }
+
+    await insertOrAssignVariables({ stat_data: { 联盟: nextLeague } }, { type: 'chat' });
+    setStat(current => ({ ...current, 联盟: nextLeague }));
+    if (!offers.length) {
+      if (draftNote) {
+        await sendTurn(
+          draftNote + '\n本次没有生成需要我处理的续约/自由市场正式报价。请只演出选秀夜和球队新秀加入后的联盟反应，不得改动选秀结果。',
+          { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 联盟: nextLeague }) },
+        );
+      } else {
+        toastr.info('当前没有满足球队需求与价值条件的正式报价。');
+      }
+      return;
+    }
+    await sendTurn(
+      draftNote +
+      `【${label}】前端根据球队位置需求、阵容深度、战绩、球员市场价值与合同条件生成了固定报价：\n` +
+      offers.map(offer => `- ${offerSummary(offer)}`).join('\n') +
+      '\n这些报价已经写入联盟状态，不得由叙事模型新增、删除或改价；只需演出经纪人/管理层如何把报价摆到我面前。',
+      { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 联盟: nextLeague }) },
+    );
+  }, [stat, sendTurn]);
+
+  const handleAcceptOffer = useCallback(async (offerId: string) => {
+    const career = stat.生涯;
+    const offCourt = stat.场外;
+    const league = stat.联盟;
+    if (!career || !offCourt || !league || busyRef.current) return;
+    const offer = league.市场报价.find(item => item.id === offerId && item.status === '待定');
+    if (!offer || offer.playerKey !== career.附身球员) return;
+
+    const projection = careerPlayerProjection(career);
+    if (projection) registerCustomPlayer(projection);
+    let nextLeague = applyMarketOffer(league, offer, getPlayerForLeague);
+    const previousTeam = career.球队;
+    const moved = offer.teamId !== previousTeam;
+    const nextRole = moved
+      ? roleAfterRosterChange(career.附身球员, offer.teamId, nextLeague)
+      : career.球队角色;
+    const nextCareer = {
+      ...career,
+      球队: offer.teamId,
+      球队角色: nextRole,
+      教练信任: moved ? 40 : career.教练信任,
+    };
+
+    const contract = contractForPlayer(career.附身球员, nextLeague, getPlayerForLeague);
+    const nextGame = moved && league.阶段 === '常规赛'
+      ? getScheduledGame(offer.teamId, nextLeague.赛程索引, nextLeague.赛季序号)
+      : null;
+    const nextOffCourt = {
+      ...offCourt,
+      合同: contract ? {
+        球队: offer.teamId,
+        年限: Math.max(
+          0,
+          contract.expiresAfterSeason - nextLeague.赛季序号 + (league.阶段 === '休赛期' ? 0 : 1),
+        ),
+        年薪: contract.annualSalary,
+        到期赛季: contractExpirySeason(contract.expiresAfterSeason),
+      } : offCourt.合同,
+      队友好感: moved
+        ? Object.fromEntries(
+            getRosterForLeague(offer.teamId, nextLeague)
+              .filter(player => player.name !== career.附身球员)
+              .slice(0, 10)
+              .map(player => [player.name, 45]),
+          )
+        : offCourt.队友好感,
+      日程: moved && nextGame
+        ? { ...offCourt.日程, 下一场: formatScheduledOpponent(nextGame) }
+        : offCourt.日程,
+    };
+
+    const hook = {
+      id: `player-market-${offer.id}`,
+      type: offer.type === '交易' ? '交易' as const : '合同' as const,
+      title: offer.type === '交易' ? '交易正式完成' : offer.type === '续约' ? '续约正式完成' : '自由市场签约',
+      detail: offer.type === '交易'
+        ? `${career.姓名}从${previousTeam}被交易至${offer.teamId}；主要回报为${offer.outgoingPlayerKey ?? '筹码'}。阵容、轮换与球队体系从下一场开始按新名单自动重算。`
+        : `${career.姓名}与${offer.teamId}签下${offer.years}年合同，年薪${Math.round(offer.annualSalary / 10_000)}万美元。`,
+      createdDate: nextLeague.日期,
+    };
+    nextLeague = { ...nextLeague, 故事钩子: [...nextLeague.故事钩子, hook] };
+
+    const nextProjection = careerPlayerProjection(nextCareer);
+    if (nextProjection) registerCustomPlayer(nextProjection);
+    const patch = { 生涯: nextCareer, 场外: nextOffCourt, 联盟: nextLeague };
+    await insertOrAssignVariables({ stat_data: patch }, { type: 'chat' });
+    setStat(current => ({ ...current, ...patch }));
+    await sendTurn(
+      `【正式落地】我接受了这份${offer.type}报价：${offerSummary(offer)}。前端已经完成合同和Roster变更，当前球队为${getTeam(offer.teamId)?.cn ?? offer.teamId}，球队角色为${nextRole}。请演出签字、官宣或更衣室反应，不得改动交易/签约结果。`,
+      { transformAssistant: async raw => stripMatchVariableBlocks(raw, patch) },
+    );
+  }, [stat, sendTurn]);
+
   const handleNextSeason = useCallback(async () => {
     const career = stat.生涯;
     const offCourt = stat.场外;
     const league = stat.联盟;
     if (!career || !offCourt || !league || league.阶段 !== '休赛期' || busyRef.current) return;
 
-    const severeInjuries = league.伤病.filter(
+    const currentProjection = careerPlayerProjection(career);
+    if (currentProjection) registerCustomPlayer(currentProjection);
+
+    const drafted = ensureOffseasonDraft(league, career.球队);
+    const market = prepareOffseasonMarket(
+      drafted.league,
+      career.附身球员,
+      getPlayerForLeague,
+      getRosterForLeague,
+      getAllPlayersForLeague,
+    );
+    let marketLeague = market.league;
+    if (market.npcMoves > 0 && !marketLeague.故事钩子.some(hook => hook.id === `offseason-market-${league.赛季}`)) {
+      marketLeague = {
+        ...marketLeague,
+        故事钩子: [...marketLeague.故事钩子, {
+          id: `offseason-market-${league.赛季}`,
+          type: '合同',
+          title: '联盟自由市场开始重组阵容',
+          detail: `本轮共有${market.npcMoves}名到期球员完成确定性签约/续约；球队依据位置需求、阵容深度、竞争力和市场价值做选择。`,
+          createdDate: marketLeague.日期,
+        }],
+      };
+    }
+
+    if (market.protagonistMustSign) {
+      const patch = { 联盟: marketLeague };
+      await insertOrAssignVariables({ stat_data: patch }, { type: 'chat' });
+      setStat(current => ({ ...current, ...patch }));
+      const offers = market.protagonistOffers;
+      await sendTurn(
+        (drafted.newlyCompleted ? `【选秀夜】前端已完成本届两轮选秀：\n${draftSummary(drafted.picks, career.球队)}\n\n` : '') +
+        '【自由市场必须决策】我的上一份合同已经到期，前端已完成其他球队的休赛期市场，并生成了固定的正式报价：\n' +
+          offers.map(offer => `- ${offerSummary(offer)}`).join('\n') +
+          '\n在接受其中一份合同前不能进入下一赛季。报价已写入存档，叙事模型不得重新报价。',
+        { transformAssistant: async raw => stripMatchVariableBlocks(raw, patch) },
+      );
+      return;
+    }
+
+    // 未接受的提前续约报价视为暂不续约，但原合同继续有效。
+    marketLeague = {
+      ...marketLeague,
+      市场报价: marketLeague.市场报价.map(offer =>
+        offer.playerKey === career.附身球员 && offer.status === '待定'
+          ? { ...offer, status: '拒绝' as const }
+          : offer,
+      ),
+    };
+
+    const severeInjuries = marketLeague.伤病.filter(
       item => item.球员 === career.附身球员 && item.严重度 === '严重',
     ).length;
     const agedCareer = advanceCareerLifecycleOneSeason(career, severeInjuries);
-    const advanced = beginNextSeason(league, career.球队);
+    const advanced = beginNextSeason(marketLeague, career.球队);
     let nextLeague = advanced.league;
     const nextCareer = {
       ...agedCareer,
@@ -867,8 +1199,15 @@ const App: React.FC = () => {
       };
     }
 
+    const nextContract = contractForPlayer(career.附身球员, nextLeague, getPlayerForLeague);
     const nextOffCourt = {
       ...offCourt,
+      合同: nextContract ? {
+        球队: career.球队,
+        年限: Math.max(0, nextContract.expiresAfterSeason - nextLeague.赛季序号 + 1),
+        年薪: nextContract.annualSalary,
+        到期赛季: contractExpirySeason(nextContract.expiresAfterSeason),
+      } : offCourt.合同,
       日程: {
         日期: nextLeague.日期,
         下一场: agedCareer.退役状态 === '退役'
@@ -886,7 +1225,7 @@ const App: React.FC = () => {
     await sendTurn(
       agedCareer.退役状态 === '退役'
         ? `【休赛期结算】前端生命周期系统已判定我在${agedCareer.年龄}岁正式退役。请以生涯纪录片口吻总结，不得改变退役结论或能力数值。`
-        : `【新赛季】前端已进入${nextLeague.赛季}赛季。我现在${agedCareer.年龄}岁，总评${agedCareer.能力.overall}，退役状态为“${agedCareer.退役状态}”。年龄成长/衰退已经由代码结算；请演出训练营报到和新赛季期待，不得重新计算能力。`,
+        : (drafted.newlyCompleted ? `【选秀夜】本届选秀已由前端完成：\n${draftSummary(drafted.picks, career.球队)}\n\n` : '') + `【新赛季】休赛期阵容市场与生命周期结算已经完成，进入${nextLeague.赛季}赛季。我现在${agedCareer.年龄}岁，总评${agedCareer.能力.overall}，效力${getTeam(nextCareer.球队)?.cn ?? nextCareer.球队}。请演出训练营报到和新赛季期待，不得重新计算合同、Roster或能力。`,
       { transformAssistant: async raw => stripMatchVariableBlocks(raw, patch) },
     );
   }, [stat, sendTurn]);
@@ -918,6 +1257,20 @@ const App: React.FC = () => {
     },
     [stat, sendTurn],
   );
+
+  const currentTeamPower = useMemo(() => {
+    if (!stat.联盟 || !stat.生涯) return null;
+    const snapshot = buildLeagueRosterSnapshot(stat.联盟);
+    const profiles = buildLeagueSimulationProfiles(stat.联盟, snapshot.byTeam);
+    const profile = profiles[stat.生涯.球队];
+    if (!profile) return null;
+    const ranking = Object.values(profiles).sort((a, b) => b.power - a.power || b.netRating - a.netRating);
+    return {
+      profile,
+      rank: ranking.findIndex(item => item.teamId === profile.teamId) + 1,
+      total: ranking.length,
+    };
+  }, [stat.联盟, stat.生涯]);
 
   // ---------- 渲染 ----------
 
@@ -999,10 +1352,13 @@ const App: React.FC = () => {
           career={stat.生涯}
           offCourt={stat.场外}
           league={stat.联盟}
+          teamPower={currentTeamPower}
           disabled={busy}
           onAction={t => void sendTurn(t)}
           onStartMatch={() => void handleStartMatch()}
           onNextSeason={() => void handleNextSeason()}
+          onPrepareMarket={() => void handlePrepareMarket()}
+          onAcceptOffer={offerId => void handleAcceptOffer(offerId)}
           onTrain={() => void handleTrain()}
           onUpgrade={group => void handleUpgrade(group)}
         />

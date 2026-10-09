@@ -7,12 +7,17 @@ import {
   type VariableSnapshotDiffChange,
 } from '../武侠/utils/variableChanges';
 import { recordIframeLifecycleEvent } from '../武侠/utils/iframeLifecycleBlackBox';
+import { recordEraDiagnostic } from '../ERA变量框架/utils/diagnostics';
 import { isChatRenamePending } from './chatRenameJournal';
 import { isHistoryCheckoutPending } from './historyCheckoutJournal';
 import { scheduleUnthrottledTimeout, type UnthrottledTimerHandle } from './unthrottledTimer';
 
 export const DIRECT_VARIABLE_WRITE_DONE_EVENT = 'wuxia:directVariableWriteDone';
 export const ERA_VARIABLE_WRITE_DONE_EVENT = 'wuxia:eraVariableWriteDone';
+
+const BRANCH_SENSITIVE_ROOTS = new Set([
+  '事件系统', '参与事件', '世界事件', '事件分支结果', '后续事件线索', '后续事件线索计数',
+]);
 
 export type DirectVariableWriteSource = 'event-script' | 'variable-editor' | 'frontend' | 'restore';
 export type DirectVariableWriteOperation = 'insert' | 'update' | 'delete' | 'assign' | 'replace';
@@ -352,6 +357,24 @@ export async function runDirectChatVariableWrite<TResult>(
     refreshHint: normalizeRefreshHint(metadata.refreshHint),
     ...(readOwnChanges ? { changes: readOwnChanges() } : {}),
   };
+
+  // 直接写入不会进入 ERA EditLogs。把触及分支敏感事件根的具体来源记入独立诊断，
+  // 以区别“ERA 未生成日志”和“事件脚本先行改写变量”。仅保存路径，不记录叙事内容或变量值。
+  const eventPaths = (eventDetail.changes ?? [])
+    .map(change => change.path?.[0] === 'stat_data' ? change.path.slice(1) : change.path)
+    .filter((path): path is VariablePath => Array.isArray(path) && BRANCH_SENSITIVE_ROOTS.has(String(path[0])))
+    .map(path => path.join('.'));
+  if (eventPaths.length > 0) {
+    recordEraDiagnostic('direct-variable-write', 'branch-sensitive-event-state-write', {
+      writeId: eventDetail.writeId,
+      source: eventDetail.source,
+      operation: eventDetail.operation,
+      reason: eventDetail.reason,
+      changeCount: eventPaths.length,
+      paths: eventPaths.slice(0, 25),
+      omittedPathCount: Math.max(0, eventPaths.length - 25),
+    });
+  }
 
   variableTraceLogger.log('[runDirectChatVariableWrite] 直接变量写入已完成，准备发送来源事件', eventDetail);
   try {
