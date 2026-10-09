@@ -40,7 +40,9 @@ describe('ERA 关键事件诊断独立存储', () => {
     expect(reloaded.readEraCriticalDiagnostics().some(entry =>
       entry.details?.transactionId === 'checkout-123'
     )).toBe(true);
-    expect(window.ERADiagnostics?.critical?.()).toEqual(reloaded.readEraCriticalDiagnostics());
+    expect((window as Window & { ERADiagnostics?: { critical: () => unknown[] } }).ERADiagnostics?.critical()).toEqual(
+      reloaded.readEraCriticalDiagnostics(),
+    );
   });
 
   it('clear 同时清空普通与独立关键诊断存储', async () => {
