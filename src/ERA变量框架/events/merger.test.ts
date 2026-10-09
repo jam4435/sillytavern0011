@@ -65,3 +65,36 @@ describe('collectSyncIdsFromDetail', () => {
     expect(collectSyncIdsFromDetail('manual')).toEqual([]);
   });
 });
+
+describe('WRITE 组批事务记账与确认不丢失', () => {
+  it('同楼两个相邻 apiWrite 合并成一次重放，但两个 transactionId 都可收到确认', () => {
+    const jobs = mergeEventBatch([
+      job('era:apiWrite', 1000, { messageId: 6, transactionId: 'participant-insert', transactionIds: ['participant-insert'] }),
+      job('era:apiWrite', 1001, { messageId: 6, transactionId: 'followup-delete', transactionIds: ['followup-delete'] }),
+    ]);
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].type).toBe('era:apiWrite');
+    expect(jobs[0].detail.transactionIds).toEqual(['participant-insert', 'followup-delete']);
+    expect(jobs[0].detail.transactionId).toBeUndefined();
+  });
+
+  it('WRITE 组合中的 APP_READY 不能吞掉 apiWrite 的事务身份', () => {
+    const jobs = mergeEventBatch([
+      job('era:apiWrite', 1000, { messageId: 6, transactionId: 'participant-insert' }),
+      job(tavern_events.APP_READY, 1001),
+    ]);
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].type).toBe('era:apiWrite');
+    expect(jobs[0].detail.transactionIds).toEqual(['participant-insert']);
+  });
+
+  it('不同楼层的 apiWrite 不进行跨楼合并', () => {
+    const jobs = mergeEventBatch([
+      job('era:apiWrite', 1000, { messageId: 4, transactionId: 'earlier' }),
+      job('era:apiWrite', 1001, { messageId: 6, transactionId: 'later' }),
+    ]);
+    expect(jobs).toHaveLength(2);
+    expect(jobs[0].detail.transactionId).toBe('earlier');
+    expect(jobs[1].detail.transactionId).toBe('later');
+  });
+});
