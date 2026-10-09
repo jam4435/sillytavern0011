@@ -97,6 +97,46 @@ describe('ERA 同一楼层变量块的原始次序', () => {
     );
   });
 
+  it('同一 MK 同内容在原效果尚存在时重复处理，不把可撤销的 Insert 账本覆盖成空', async () => {
+    state.stat = { 事件系统: { 人物事件占用: {} } };
+    state.message = insertNew;
+    await ApplyVarChangeForMessage({ message_id: 6 });
+
+    const first = structuredClone(state.meta.EditLogs['mk-checkout-regression']);
+    expect(first).toEqual([
+      expect.objectContaining({ op: 'insert', path: '事件系统.人物事件占用.段誉' }),
+    ]);
+    expect((state.meta as any).EditLogContentRevisions?.['mk-checkout-regression']).toEqual(expect.any(String));
+
+    // 重复 render/API 处理时实际变量已是目标值，此时重算会生成 []。
+    // 不能据此否认最初 Insert 曾发生。
+    await ApplyVarChangeForMessage({ message_id: 6 });
+    expect(state.meta.EditLogs['mk-checkout-regression']).toEqual(first);
+  });
+
+  it('正常回滚后重新处理整楼，可以重建账本；修改变量块后不会沿用旧账本', async () => {
+    state.message = `${deleteOld}\n${insertNew}`;
+    await ApplyVarChangeForMessage({ message_id: 6 });
+    const initial = structuredClone(state.meta.EditLogs['mk-checkout-regression']) as any[];
+    expect(initial.map(entry => entry.op)).toEqual(['delete', 'insert']);
+
+    // 模拟 dispatcher 先 rollbackByMk 后 ApplyVarChange。
+    for (const entry of [...initial].reverse()) {
+      if (entry.op === 'insert') _.unset(state.stat, entry.path);
+      else if (entry.op === 'delete') _.set(state.stat, entry.path, structuredClone(entry.value_old));
+    }
+    expect(state.stat.事件系统.人物事件占用.段誉).toEqual(oldOccupant);
+
+    await ApplyVarChangeForMessage({ message_id: 6 });
+    expect((state.meta.EditLogs['mk-checkout-regression'] as any[]).map(entry => entry.op))
+      .toEqual(['delete', 'insert']);
+
+    // 修改为不含动作的内容代表真正的消息替换，旧账本不能被永远保留。
+    state.message = '重新生成后不包含任何变量动作';
+    await ApplyVarChangeForMessage({ message_id: 6 });
+    expect(state.meta.EditLogs['mk-checkout-regression']).toEqual([]);
+  });
+
   it('如果实际顺序是 Insert 再 Delete，最终仍应删除占用', async () => {
     state.stat = { 事件系统: { 人物事件占用: {} } };
     state.message = `${insertNew}\n${deleteOld}`;
