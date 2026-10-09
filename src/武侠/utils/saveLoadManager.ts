@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { recordEraDiagnostic } from '../../ERA变量框架/utils/diagnostics';
 import { recordHistoryBranchMkAudit } from '../../shared/historyBranchMkAudit';
+import { recordHistoryEventForensics, snapshotHistoryEventForensics } from '../../shared/historyEventForensics';
 import {
   clearHistoryCheckoutJournal,
   clearHistoryCheckoutReturnIntent,
@@ -686,13 +687,34 @@ export async function finalizeCurrentTurn(options: FinalizeHistoryTurnOptions = 
   const tree = cloneTree(scanned.tree);
   const node = tree.nodes[scanned.currentNodeId];
   if (!node) return scanned;
+  const sealedVerification = readCurrentVerification();
   tree.nodes[node.id] = {
     ...node,
     location: options.location ?? node.location,
     worldTimeText: options.worldTimeText ?? node.worldTimeText,
-    verification: readCurrentVerification(),
+    verification: sealedVerification,
   };
   const state = buildViewState(persistHistoryTree(tree), scanned.currentChat);
+
+  // 必须在节点真正封存成功之后采样。仅记录指纹，不保存 stat_data 快照。
+  try {
+    const vars = getVariables({ type: 'chat' });
+    const stat = isRecord(vars?.stat_data) ? vars.stat_data : {};
+    const locator = node.locators.find(entry => entry.chatId === state.currentChat.id)
+      ?? node.locators[0];
+    recordHistoryEventForensics('history-node-sealed', {
+      chatId: state.currentChat.id,
+      nodeId: node.id,
+      messageId: locator?.assistantMessageId ?? null,
+      mk: node.messageKey,
+      sealedSelectedMksHash: sealedVerification.selectedMksHash,
+      sealedEventStateHash: sealedVerification.eventStateHash,
+      sealedEventSystemHash: sealedVerification.eventPartHashes?.事件系统 ?? null,
+      eventSnapshot: snapshotHistoryEventForensics(stat),
+    });
+  } catch (error) {
+    console.warn('[事件历史取证] 历史节点封存诊断失败', error);
+  }
   if (typeof window !== 'undefined') {
     window.dispatchEvent(
       new CustomEvent(WUXIA_HISTORY_TREE_UPDATED_EVENT, {
