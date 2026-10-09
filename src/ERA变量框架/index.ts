@@ -18,6 +18,7 @@ import { EVENT_GROUPS } from './events/merger';
 import { pushToQueue } from './events/queue';
 import { consumeInternalMessageUpdatedEvent } from '../shared/internalMessageUpdateGuard';
 import { ensureEraStringValueEncodingV2 } from './utils/era_data';
+import { recordHistoryBranchMkAudit } from '../shared/historyBranchMkAudit';
 
 // 导入查询模块, 以注册 {{ERA:...}} 宏
 import './api/macro/parser';
@@ -39,12 +40,16 @@ const eventsToListen = [
   ...EVENT_GROUPS.COMBO_STARTERS,
 ];
 
+// 新 iframe 的 ERA 入口尽早采样：在任何本框架事件监听入队前观察继承的 SelectedMks。
+recordHistoryBranchMkAudit('era-module-loaded');
+
 // 遍历事件列表，为每个事件注册一个回调函数。
 // 这个回调函数是所有事件的统一入口。
 eventsToListen.forEach(ev => {
   // 当前聊天首次加载或切换聊天时，先完成旧字符串值编码迁移，再进入正常 ERA 队列。
   if (ev === tavern_events.APP_READY || ev === tavern_events.CHAT_CHANGED) {
     eventOn(ev, (detail: any) => {
+      recordHistoryBranchMkAudit(ev === tavern_events.CHAT_CHANGED ? 'era-chat-changed-before-queue' : 'era-app-ready-before-queue');
       void ensureEraStringValueEncodingV2()
         .catch(error => console.error('[ERA] 字符串值编码迁移失败，将继续正常事件处理。', error))
         .finally(() => pushToQueue(ev, detail));
