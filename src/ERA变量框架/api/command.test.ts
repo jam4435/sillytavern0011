@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { listeners } from '../../武侠/test/setup';
 
 const diagnostics = vi.hoisted(() => ({
   createEraDiagnosticId: vi.fn(() => 'diagnostic-id'),
@@ -96,6 +97,41 @@ describe('ERA API command write scheduling', () => {
         transactionIds: ['checkout-42'],
       }),
     );
+  });
+
+  it('同一楼先插入参与事件再删除后续线索：前一事务未 writeDone 前不能修改消息发起后继事务', async () => {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    vi.stubGlobal('eventEmit', vi.fn(async () => undefined));
+    const { transactionByObject } = await import('./command');
+
+    transactionByObject({
+      transactionId: 'participant-insert',
+      operations: [{ type: 'insert', payload: { 参与事件: { 事件06: { 结局: '' } } } }],
+    });
+    await vi.waitFor(() => expect(messages.updateMessageContent).toHaveBeenCalledTimes(1));
+
+    transactionByObject({
+      transactionId: 'followup-delete',
+      operations: [{ type: 'delete', payload: { 后续事件线索: { 事件06: {} } } }],
+    });
+    await Promise.resolve();
+    expect(messages.updateMessageContent).toHaveBeenCalledTimes(1);
+
+    const firstListeners = [...(listeners.get('era:writeDone') ?? [])];
+    expect(firstListeners.length).toBeGreaterThan(0);
+    await Promise.all(firstListeners.map(fn => fn({
+      message_id: 7,
+      actions: { apiWrite: true },
+      transactionIds: ['participant-insert'],
+    })));
+    await vi.waitFor(() => expect(messages.updateMessageContent).toHaveBeenCalledTimes(2));
+
+    const secondListeners = [...(listeners.get('era:writeDone') ?? [])];
+    await Promise.all(secondListeners.map(fn => fn({
+      message_id: 7,
+      actions: { apiWrite: true },
+      transactionIds: ['followup-delete'],
+    })));
   });
 
   it.each([
