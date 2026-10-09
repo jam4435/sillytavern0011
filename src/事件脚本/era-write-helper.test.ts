@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { eventEmitMock } from '../武侠/test/setup';
 import { writeEraTransaction } from './era-write-helper.js';
+import { HISTORY_EVENT_FORENSICS_STORAGE_KEY } from '../shared/historyEventForensics';
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 const RECENT_SIGNATURE_TTL_FOR_TEST = 3001;
@@ -56,6 +57,20 @@ describe('writeEraTransaction', () => {
       transactionId: expect.stringMatching(/^event-script-/),
       operations: expect.any(Array),
     });
+
+    const forensicEntries = JSON.parse(localStorage.getItem(HISTORY_EVENT_FORENSICS_STORAGE_KEY) || '[]')
+      .filter((entry: any) => entry.details?.reason === 'test-transaction-success');
+    expect(forensicEntries.map((entry: any) => entry.details.stage)).toEqual([
+      'era-transaction-before', 'era-transaction-confirmed',
+    ]);
+    expect(forensicEntries[0].details.transactionId).toBe(forensicEntries[1].details.transactionId);
+    expect(forensicEntries[0].details.operations).toEqual([
+      { type: 'insert', path: '事件系统.进行中事件.测试事件' },
+      { type: 'delete', path: '事件系统.未发生事件.测试事件' },
+    ]);
+    expect(forensicEntries[0].details.eventSnapshot.eventSystemHash).not.toBe(
+      forensicEntries[1].details.eventSnapshot.eventSystemHash,
+    );
   });
 
   it('does not auto-resend an applied timeout but can reapply after ERA rollback', async () => {
