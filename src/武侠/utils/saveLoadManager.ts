@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { recordEraDiagnostic } from '../../ERA变量框架/utils/diagnostics';
 import {
   clearHistoryCheckoutJournal,
   clearHistoryCheckoutReturnIntent,
@@ -1131,8 +1132,43 @@ async function waitForEraFullResync(): Promise<void> {
   });
 }
 
+function readCheckoutEventSystemAudit(): Record<string, { hash: string; count: number }> {
+  const stat = getVariables({ type: 'chat' })?.stat_data;
+  const system = isRecord(stat?.事件系统) ? stat.事件系统 : {};
+  const keys = [...new Set([
+    '未发生事件', '进行中事件', '已完成事件', '已失效事件', '人物事件占用',
+    ...Object.keys(system),
+  ])].sort();
+  return Object.fromEntries(keys.map(key => {
+    const value = system[key] ?? null;
+    return [key, { hash: stableHistoryHash(value), count: isRecord(value) ? Object.keys(value).length : 0 }];
+  }));
+}
+
+function recordCheckoutEventSystemAudit(stage: string, journal: HistoryCheckoutJournal | null): void {
+  try {
+    const expected = journal?.targetNodeId
+      ? loadHistoryTree().nodes[journal.targetNodeId]?.verification?.eventPartHashes?.事件系统
+      : undefined;
+    const current = readCurrentVerification();
+    recordEraDiagnostic('wuxia-history-checkout', 'history-checkout-event-system-audit', {
+      transactionId: journal?.transactionId ?? '',
+      nodeId: journal?.targetNodeId ?? '',
+      stage,
+      expectedSystemHash: expected ?? '未封存子指纹',
+      actualSystemHash: current.eventPartHashes?.事件系统 ?? '',
+      bucketFingerprints: readCheckoutEventSystemAudit(),
+    });
+  } catch {
+    // 采集诊断不能成为历史恢复的新失败来源。
+  }
+}
+
 async function runFullHistorySync(prepareVerification = false): Promise<void> {
+  const traceJournal = prepareVerification ? readHistoryCheckoutJournal() : null;
+  if (prepareVerification) recordCheckoutEventSystemAudit('before-full-sync', traceJournal);
   await waitForEraFullResync();
+  if (prepareVerification) recordCheckoutEventSystemAudit('after-full-sync', traceJournal);
   if (prepareVerification) {
     const journal = readHistoryCheckoutJournal();
     const afterEra = readCurrentVerification();
@@ -1141,6 +1177,7 @@ async function runFullHistorySync(prepareVerification = false): Promise<void> {
       transactionId: journal?.transactionId ?? '',
     });
     const afterPrepare = readCurrentVerification();
+    recordCheckoutEventSystemAudit('after-event-prepare', journal);
     const rootsAfterPrepare = readCheckoutEventRoots();
     // 只持久化诊断哈希与变更路径，不额外保存游戏变量或污染分支状态。
     updateHistoryCheckoutJournal({
