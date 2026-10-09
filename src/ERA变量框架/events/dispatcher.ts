@@ -16,6 +16,7 @@ import { ApplyVarChange } from '../core/crud/patcher';
 import { ensureMkForLatestMessage, readMessageKey, updateLatestSelectedMk } from '../core/key/mk';
 import { rollbackByMk } from '../core/rollback';
 import { resyncStateOnHistoryChange } from '../core/sync';
+import { recordHistoryBranchMkAudit } from '../../shared/historyBranchMkAudit';
 import { ApiWriteEventPayload, ERA_API_EVENTS, ERA_EVENT_EMITTER, LOGS_PATH, SEL_PATH } from '../utils/constants';
 import { getEraData, removeMetaFields } from '../utils/era_data';
 import {
@@ -154,6 +155,9 @@ export async function dispatchAndExecuteTask(job: EventJob, mkToIgnore: IgnoreRu
   // 在每轮任务开始时，初始化操作记录器
   const actionsTaken = { rollback: false, apply: false, resync: false, api: false, apiWrite: false };
 
+  // 在 ensureMkForLatestMessage 之前观察状态，避免把 MK 补写误归因于 resync。
+  if (eventGroup === 'SYNC') recordHistoryBranchMkAudit('era-sync-task-before-mk-ensure', eventType);
+
   try {
     // **前置保障**: 确保最新消息有 MK 并设置日志上下文。
     const {
@@ -223,6 +227,7 @@ export async function dispatchAndExecuteTask(job: EventJob, mkToIgnore: IgnoreRu
       // 供外部脚本区分"自己发起的同步"与其他 SYNC（例如 chat_changed）产生的 resync 信号。
       syncIds = collectSyncIdsFromDetail(detail);
       await runPhase('resync-history', () => resyncStateOnHistoryChange(isFullSync));
+      recordHistoryBranchMkAudit('era-sync-task-after-resync', eventType);
       actionsTaken.resync = true;
       // 在同步完成后，强制重新渲染消息以触发宏
       forceRenderRecentMessages();
