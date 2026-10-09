@@ -1224,6 +1224,17 @@ function recordCheckoutEventSystemAudit(stage: string, journal: HistoryCheckoutJ
       bucketFingerprints: readCheckoutEventSystemAudit(),
       eraLogInventory: readCheckoutEraLogInventory(),
     });
+    // 恢复时也取一次同算法的事件/人物精确指纹，才能与历史节点封存当刻逐项对比。
+    const restoredVars = getVariables({ type: 'chat' });
+    recordHistoryEventForensics('checkout-event-verification', {
+      transactionId: journal?.transactionId ?? '',
+      nodeId: journal?.targetNodeId ?? '',
+      checkoutStage: stage,
+      chatId: String(SillyTavern.getCurrentChatId?.() ?? ''),
+      expectedEventSystemHash: expected ?? null,
+      actualEventSystemHash: current.eventPartHashes?.事件系统 ?? null,
+      eventSnapshot: snapshotHistoryEventForensics(restoredVars?.stat_data),
+    });
   } catch {
     // 采集诊断不能成为历史恢复的新失败来源。
   }
