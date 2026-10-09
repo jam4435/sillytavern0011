@@ -114,6 +114,21 @@ describe('ERA 同一楼层变量块的原始次序', () => {
     expect(state.meta.EditLogs['mk-checkout-regression']).toEqual(first);
   });
 
+  it('重复 Delete 再 Insert 同一路径时保留首次删除的真实旧占用，不用新占用覆盖旧值', async () => {
+    state.message = `${deleteOld}\n${insertNew}`;
+    await ApplyVarChangeForMessage({ message_id: 6 });
+    const initial = structuredClone(state.meta.EditLogs['mk-checkout-regression']) as any[];
+    expect(initial[0].value_old).toEqual(oldOccupant);
+
+    // 再执行同样的 Delete→Insert，生成的新日志看似仍有两条，
+    // 但其 Delete.value_old 已变成第07事件，不能用它替代原账本。
+    await ApplyVarChangeForMessage({ message_id: 6 });
+    const persisted = state.meta.EditLogs['mk-checkout-regression'] as any[];
+    expect(persisted).toEqual(initial);
+    expect(persisted[0].value_old).toEqual(oldOccupant);
+    expect(state.stat.事件系统.人物事件占用.段誉).toEqual(newOccupant);
+  });
+
   it('第6楼：加入参与事件并删除后续线索，两条事务重复应用后仍保留两条逆向记录', async () => {
     state.stat = {
       参与事件: {},
