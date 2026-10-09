@@ -14,6 +14,7 @@ const CRITICAL_EVENTS = new Set([
   'event-state-changed-without-editlog',
   'action-blocks-produced-empty-editlog',
   'nonempty-editlog-overwritten-by-empty',
+  'api-transaction-ack-timeout',
   'branch-sensitive-event-state-write',
   'event-edit-skipped',
   'event-insert-skipped',
