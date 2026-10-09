@@ -397,19 +397,69 @@ export const resyncStateOnHistoryChange = async (forceFullResync = false) => {
   }
 
   // 3. 收集需要回滚的 MK 列表，并执行逆序回滚
+  const rollbackAuditSteps: Array<Record<string, unknown>> = [];
   if (firstRecalcId > -1) {
     const mksToRollback = oldSelectedMks.slice(firstRecalcId).filter(mk => mk) as string[];
     if (mksToRollback.length > 0) {
       logger.log('resyncStateOnHistoryChange', `准备回滚 ${mksToRollback.length} 个MK: [${mksToRollback.join(', ')}]`);
       for (const mk of mksToRollback.reverse()) {
         logger.debug('resyncStateOnHistoryChange', `[回滚] 正在回滚 MK: ${mk}`);
+        let beforeEventSystem: any;
+        let relatedLogs: any[] = [];
+        let allLogCount = 0;
+        if (forceFullResync) {
+          const { stat, meta } = getEraData();
+          beforeEventSystem = _.cloneDeep(stat?.事件系统);
+          const records = parseEditLog(_.get(meta, [LOGS_PATH, mk]));
+          allLogCount = records.length;
+          relatedLogs = records.filter(entry =>
+            typeof entry?.path === 'string' &&
+            (entry.path === '事件系统' || entry.path.startsWith('事件系统.')),
+          );
+        }
         await rollbackByMk(mk, true); // true 表示只回滚，不重写
+        if (forceFullResync) {
+          const afterEventSystem = getEraData().stat?.事件系统;
+          const changedBuckets = AUDITED_EVENT_BUCKETS.filter(key =>
+            !_.isEqual(beforeEventSystem?.[key], afterEventSystem?.[key]),
+          );
+          const checks = relatedLogs.map(entry => {
+            const relativePath = entry.path === '事件系统' ? '' : entry.path.slice('事件系统.'.length);
+            const prior = relativePath ? _.get(beforeEventSystem, relativePath) : beforeEventSystem;
+            const after = relativePath ? _.get(afterEventSystem, relativePath) : afterEventSystem;
+            return [
+              String(entry.op ?? '?'),
+              entry.path,
+              `before=new:${_.isEqual(prior, entry.value_new)}`,
+              `before=old:${_.isEqual(prior, entry.value_old)}`,
+              `after=old:${_.isEqual(after, entry.value_old)}`,
+            ].join(' ');
+          });
+          rollbackAuditSteps.push({
+            mk,
+            messageId: oldSelectedMks.lastIndexOf(mk),
+            allLogCount,
+            eventSystemLogCount: relatedLogs.length,
+            beforeHash: hashSyncAudit(beforeEventSystem),
+            afterHash: hashSyncAudit(afterEventSystem),
+            changedBuckets,
+            eventLogPathChecks: checks.join(' | '),
+          });
+        }
       }
       logger.log('resyncStateOnHistoryChange', '逆序回滚完成。');
     }
   }
 
-  if (forceFullResync) recordFullSyncAudit('after-rollback', oldSelectedMks);
+  if (forceFullResync) {
+    recordEraDiagnostic('core-sync', 'rollback-event-state-audit', {
+      stage: 'per-mk',
+      steps: rollbackAuditSteps,
+      totalMks: rollbackAuditSteps.length,
+      changedMks: rollbackAuditSteps.filter(step => step.beforeHash !== step.afterHash).length,
+    });
+    recordFullSyncAudit('after-rollback', oldSelectedMks);
+  }
 
   // 4. 从不匹配点开始，顺序重新应用变量修改，并构建新的 selectedMks
   logger.log('resyncStateOnHistoryChange', `从 ID ${firstRecalcId} 开始顺序重算...`);
