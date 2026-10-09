@@ -8,6 +8,12 @@ import {
 } from '../武侠/utils/variableChanges';
 import { recordIframeLifecycleEvent } from '../武侠/utils/iframeLifecycleBlackBox';
 import { recordEraDiagnostic } from '../ERA变量框架/utils/diagnostics';
+import {
+  getHistoryEventMessageContext,
+  recordHistoryEventForensics,
+  snapshotHistoryEventForensics,
+} from './historyEventForensics';
+
 import { isChatRenamePending } from './chatRenameJournal';
 import { isHistoryCheckoutPending } from './historyCheckoutJournal';
 import { scheduleUnthrottledTimeout, type UnthrottledTimerHandle } from './unthrottledTimer';
@@ -345,6 +351,10 @@ export async function runDirectChatVariableWrite<TResult>(
   metadata: DirectVariableWriteMetadata,
   writer: () => TResult | Promise<TResult>,
   readOwnChanges?: () => VariableSnapshotDiffChange[],
+  readEventSnapshots?: () => {
+    before: ReturnType<typeof snapshotHistoryEventForensics>;
+    after: ReturnType<typeof snapshotHistoryEventForensics>;
+  } | null,
 ): Promise<TResult> {
   assertFrontendWriteAllowed(metadata.source);
   const result = await writer();
@@ -374,6 +384,24 @@ export async function runDirectChatVariableWrite<TResult>(
       paths: eventPaths.slice(0, 25),
       omittedPathCount: Math.max(0, eventPaths.length - 25),
     });
+    try {
+      const snapshots = readEventSnapshots?.();
+      if (snapshots) {
+        recordHistoryEventForensics('direct-event-write', {
+          writeId: eventDetail.writeId,
+          source: eventDetail.source,
+          operation: eventDetail.operation,
+          reason: eventDetail.reason,
+          ...getHistoryEventMessageContext(result),
+          paths: eventPaths.slice(0, 25),
+          omittedPaths: Math.max(0, eventPaths.length - 25),
+          before: snapshots.before,
+          after: snapshots.after,
+        });
+      }
+    } catch (error) {
+      variableTraceLogger.warn('[事件历史取证] 直接写入指纹采集失败，不影响提交', error);
+    }
   }
 
   variableTraceLogger.log('[runDirectChatVariableWrite] 直接变量写入已完成，准备发送来源事件', eventDetail);
@@ -403,6 +431,10 @@ export async function writeDirectChatTransaction(
   options: DirectChatTransactionOptions = {},
 ): Promise<Record<string, unknown>> {
   let ownChanges: VariableSnapshotDiffChange[] = [];
+  let eventSnapshots: {
+    before: ReturnType<typeof snapshotHistoryEventForensics>;
+    after: ReturnType<typeof snapshotHistoryEventForensics>;
+  } | null = null;
   return runDirectChatVariableWrite(
     {
       source: options.source ?? 'event-script',
@@ -418,11 +450,20 @@ export async function writeDirectChatTransaction(
           const nextVariables = updater(variables);
           const afterStatData = readStatDataSnapshotFromUnknown(nextVariables);
           ownChanges = createVariableSnapshotDiff(beforeStatData, afterStatData);
+          try {
+            eventSnapshots = {
+              before: snapshotHistoryEventForensics(beforeStatData),
+              after: snapshotHistoryEventForensics(afterStatData),
+            };
+          } catch (error) {
+            variableTraceLogger.warn('[事件历史取证] 直接写入快照失败，跳过诊断', error);
+          }
           return nextVariables;
         },
         { type: 'chat' },
       ) as Record<string, unknown>,
     () => ownChanges,
+    () => eventSnapshots,
   );
 }
 
