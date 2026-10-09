@@ -20,6 +20,7 @@ const CRITICAL_EVENTS = new Set([
   'rollback-event-state-audit',
   'full-resync-event-state-audit',
   'history-checkout-event-system-audit',
+  'history-checkout-node-identity-audit',
 ]);
 const DEFAULT_SLOW_THRESHOLD_MS = 5_000;
 const DEFAULT_WATCHDOG_INTERVAL_MS = 15_000;
