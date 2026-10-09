@@ -77,4 +77,48 @@ describe('正文提示词提前显示后续事件地点', () => {
     expect(result).not.toContain('后续事件移动指引');
     expect(result).not.toContain(`${nextEvent}: ${nextLocation}`);
   });
+
+  it('宏读取的缓存缺少后续事件时，从当前变量快照补足名称与地点', () => {
+    const result = renderPrompt(
+      {
+        ...variables,
+        stat_data: {
+          ...variables.stat_data,
+          前端变量: { 周围地点: surrounding },
+        },
+      },
+      path => {
+        if (path === 'stat_data.参与事件') return { [currentEvent]: {} };
+        if (path === 'stat_data.前端变量.周围地点') return { ...surrounding, 后续事件: {} };
+        return undefined;
+      },
+    );
+    expect(result).toContain(`${nextEvent}: ${nextLocation}`);
+    expect(result).toContain('后续事件移动指引');
+    expect(result).not.toContain('后续事件名称尚未同步');
+  });
+
+  it('后续事件映射尚未同步时，保留目标地点但不伪造事件归属', () => {
+    const result = renderPrompt(variables, path => {
+      if (path === 'stat_data.参与事件') return { [currentEvent]: {} };
+      if (path === 'stat_data.前端变量.周围地点') return { ...surrounding, 后续事件: {} };
+      return undefined;
+    });
+    expect(result).toContain('目标事件地点（后续事件名称尚未同步）');
+    expect(result).toContain(nextLocation);
+    expect(result).toContain('地点接驳指引');
+    expect(result).not.toContain(`${nextEvent}: ${nextLocation}`);
+    expect(result).not.toContain('后续事件移动指引');
+  });
+
+  it('参与事件只有模板键时不渲染后续移动指引', () => {
+    const result = renderPrompt(variables, path => {
+      if (path === 'stat_data.参与事件') return { $template: {} };
+      if (path === 'stat_data.前端变量.周围地点') return surrounding;
+      return undefined;
+    });
+    expect(result).not.toContain('后续事件移动指引');
+    expect(result).not.toContain('目标事件地点（后续事件名称尚未同步）');
+  });
+
 });
