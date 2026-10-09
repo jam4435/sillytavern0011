@@ -1276,6 +1276,77 @@ class HistoryVerificationError extends Error {
   }
 }
 
+function describeCheckoutNodeMismatch(
+  state: HistoryTreeViewState,
+  targetNodeId: string,
+  journal: HistoryCheckoutJournal,
+): string {
+  const tree = state.tree;
+  const expected = tree.nodes[targetNodeId];
+  const actual = state.currentNodeId ? tree.nodes[state.currentNodeId] : null;
+  const pathOf = (nodeId: string | null): HistoryNode[] => {
+    if (!nodeId || !tree.nodes[nodeId]) return [];
+    try {
+      return getNodePath(tree, nodeId);
+    } catch {
+      return [];
+    }
+  };
+  const expectedPath = pathOf(targetNodeId);
+  const actualPath = pathOf(state.currentNodeId);
+  let divergedAt = 0;
+  while (
+    divergedAt < expectedPath.length &&
+    divergedAt < actualPath.length &&
+    expectedPath[divergedAt].id === actualPath[divergedAt].id
+  ) divergedAt += 1;
+  const describeNode = (node: HistoryNode | null | undefined): string => {
+    if (!node) return '无';
+    const locator = node.locators.find(candidate => candidate.chatId === state.currentChat.id)
+      ?? node.locators[0];
+    return [
+      node.id,
+      `parent=${node.parentId ?? 'root'}`,
+      `MK=${node.messageKey ?? '无'}`,
+      `Assistant=${locator?.assistantMessageId ?? '无'}`,
+      `swipe=${locator?.swipeId ?? '无'}`,
+      `locatorChat=${locator?.chatId ?? '无'}`,
+    ].join('；');
+  };
+  const displayPath = (path: HistoryNode[]): string[] =>
+    path.slice(Math.max(0, divergedAt - 1), divergedAt + 5)
+      .map((node, index) => `  第${Math.max(0, divergedAt - 1) + index + 1}节点：${describeNode(node)}`);
+
+  const lines = [
+    `目标节点：${targetNodeId}`,
+    `实际活动叶节点：${state.currentNodeId ?? '无'}`,
+    `当前聊天：${state.currentChat.id}（${state.currentChat.name}）`,
+    `分叉预期楼层：Assistant ${journal.targetLocator.assistantMessageId} / swipe ${journal.targetLocator.swipeId}`,
+    `目标节点当前仍存在：${Boolean(expected)}；目标节点有当前聊天 locator：${Boolean(expected?.locators.some(x => x.chatId === state.currentChat.id))}`,
+    `目标节点详情：${describeNode(expected)}`,
+    `实际节点详情：${describeNode(actual)}`,
+    `目标链长度：${expectedPath.length}；实际链长度：${actualPath.length}；首个不同节点序号：${divergedAt + 1}`,
+    '目标链（分歧附近）：',
+    ...displayPath(expectedPath),
+    '实际链（分歧附近）：',
+    ...displayPath(actualPath),
+  ];
+  recordEraDiagnostic('wuxia-history-checkout', 'history-checkout-node-identity-audit', {
+    transactionId: journal.transactionId,
+    nodeId: targetNodeId,
+    chatId: state.currentChat.id,
+    actualNodeId: state.currentNodeId,
+    divergenceIndex: divergedAt,
+    expectedPath: expectedPath.slice(Math.max(0, divergedAt - 1), divergedAt + 5).map(node => ({
+      id: node.id, parentId: node.parentId, mk: node.messageKey,
+    })),
+    actualPath: actualPath.slice(Math.max(0, divergedAt - 1), divergedAt + 5).map(node => ({
+      id: node.id, parentId: node.parentId, mk: node.messageKey,
+    })),
+  });
+  return lines.join('\n');
+}
+
 function commitVerification(
   state: HistoryTreeViewState,
   targetNodeId: string,
@@ -1513,7 +1584,10 @@ async function executeCheckout(
         originNodeId: actionKind === 'fork_branch' ? nodeId : undefined,
       });
       if (state.currentNodeId !== nodeId) {
-        throw new HistoryVerificationError('切换后的活动叶节点不是目标节点。');
+        throw new HistoryVerificationError(
+          '切换后的活动叶节点不是目标节点。',
+          describeCheckoutNodeMismatch(state, nodeId, journal),
+        );
       }
       state = commitVerification(state, nodeId, node.verification);
       journal = updateHistoryCheckoutJournal({ stage: 'commit' }) ?? journal;
@@ -1557,8 +1631,12 @@ async function executeCheckout(
       } catch {
         // 聊天已被删除或变量尚未装载时，保留原始错误和已有 journal。
       }
-      const causeHint = !trace || !baselineHash
-        ? '缺少分阶段诊断：请重试恢复，以记录 ERA 同步与事件脚本检查各自的结果。'
+      const causeHint = error instanceof HistoryVerificationError && message.includes('活动叶节点不是目标节点')
+        ? '失败于历史节点身份匹配，尚未进入事件封存指纹校验；应优先核对目标/实际节点的父链、MK 与 swipe，不应直接判断为事件变量漂移。'
+        : !trace
+          ? '缺少分阶段诊断：请重试恢复，以记录 ERA 同步与事件脚本检查各自的结果。'
+          : !baselineHash
+            ? '已记录分阶段诊断，但目标节点没有可用的封存事件指纹，无法进行封存状态比较。'
         : trace.eraEventStateHash !== baselineHash
           ? 'ERA 完全同步结束时就已经与历史封存不一致：优先排查未受 ERA 回滚管理的事件直接写入或原有快照缺失。'
           : trace.preparedEventStateHash !== baselineHash
