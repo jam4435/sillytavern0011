@@ -1333,6 +1333,20 @@ describe('history checkout', () => {
     expect(detail).toContain('事件系统：不一致');
     expect(detail).toContain('参与事件：一致');
     expect(detail).toContain('目标楼层：User 无 / Assistant 0 / swipe 1');
+    // 恢复失败仍保留三阶段 ERA 日志库存，帮助区分日志在分叉前已缺失还是同步中丢失。
+    const audits = (JSON.parse(localStorage.getItem('era_critical_diagnostics_v1') || '[]') as
+      Array<{ event: string; details?: { nodeId?: string; stage?: string; eraLogInventory?: Record<string, unknown> } }>)
+      .filter(entry => entry.event === 'history-checkout-event-system-audit' && entry.details?.nodeId === target.id)
+      .slice(-3);
+    expect(audits.map(entry => entry.details?.stage)).toEqual([
+      'before-full-sync', 'after-full-sync', 'after-event-prepare',
+    ]);
+    for (const entry of audits) {
+      expect(entry.details?.eraLogInventory).toEqual(expect.objectContaining({
+        selectedMksLength: 0,
+        selectedMks: [],
+      }));
+    }
     const beforeRetry = eventEmitMock.mock.calls.filter(call => call[0] === 'manual_full_sync').length;
 
     const retried = await retryCheckoutRecovery();
