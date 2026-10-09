@@ -1146,6 +1146,46 @@ function readCheckoutEventSystemAudit(): Record<string, { hash: string; count: n
   }));
 }
 
+function readCheckoutEraLogInventory(): Record<string, unknown> {
+  const vars = getVariables({ type: 'chat' });
+  const meta = isRecord(vars?.ERAMetaData) ? vars.ERAMetaData : {};
+  const selectedMks: unknown[] = Array.isArray(meta.SelectedMks) ? meta.SelectedMks : [];
+  const logs = isRecord(meta.EditLogs) ? meta.EditLogs : {};
+
+  const parseLog = (raw: unknown): unknown[] => {
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw !== 'string') return [];
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+  const selected = selectedMks.map((raw, messageId) => {
+    const mk = typeof raw === 'string' ? raw : '';
+    const entries = mk ? parseLog(logs[mk]) : [];
+    return {
+      messageId,
+      mk,
+      logCount: entries.length,
+      eventSystemLogCount: entries.filter(entry =>
+        isRecord(entry) && typeof entry.path === 'string' &&
+        (entry.path === '事件系统' || entry.path.startsWith('事件系统.')),
+      ).length,
+    };
+  }).filter(item => item.mk);
+
+  return {
+    selectedMksLength: selectedMks.length,
+    editLogKeysCount: Object.keys(logs).length,
+    selectedMksWithLogs: selected.filter(item => item.logCount > 0).length,
+    selectedMksWithEventLogs: selected.filter(item => item.eventSystemLogCount > 0).length,
+    selectedMks: selected.slice(-32),
+    omittedSelectedMks: Math.max(0, selected.length - 32),
+  };
+}
+
 function recordCheckoutEventSystemAudit(stage: string, journal: HistoryCheckoutJournal | null): void {
   try {
     const expected = journal?.targetNodeId
@@ -1159,6 +1199,7 @@ function recordCheckoutEventSystemAudit(stage: string, journal: HistoryCheckoutJ
       expectedSystemHash: expected ?? '未封存子指纹',
       actualSystemHash: current.eventPartHashes?.事件系统 ?? '',
       bucketFingerprints: readCheckoutEventSystemAudit(),
+      eraLogInventory: readCheckoutEraLogInventory(),
     });
   } catch {
     // 采集诊断不能成为历史恢复的新失败来源。
