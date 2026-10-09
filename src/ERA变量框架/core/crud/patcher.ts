@@ -72,16 +72,29 @@ function actionBlockRevision(blocks: Array<{ tag: string; body: string }>): stri
   return hash.toString(16).padStart(8, '0');
 }
 
-/** 旧账本仍反映在实际状态中的最低限度证据（只用于相同内容的重复应用）。 */
+/** 同一楼可能在同一路径上先 Delete 后 Insert，只看逐条旧值会把正确账本误判无效。 */
+function ledgerTouchedRoots(logs: any[]): string[] {
+  return _.uniq(logs
+    .filter(entry => typeof entry?.path === 'string' && entry.path.length > 0)
+    .map(entry => String(entry.path).split('.')[0]));
+}
+
+/** 把旧账本在当前状态上再正向执行一次；最终无差异才说明旧账本的效果已存在。 */
 function oldLedgerEffectsStillPresent(logs: any[], stat: Record<string, unknown>): boolean {
-  if (logs.length === 0) return false;
-  return logs.every(entry => {
+  if (logs.length === 0 || ledgerTouchedRoots(logs).length === 0) return false;
+  const touchedRoots = ledgerTouchedRoots(logs);
+  const simulated: Record<string, unknown> = {};
+  for (const root of touchedRoots) {
+    simulated[root] = _.cloneDeep(stat[root]);
+  }
+  for (const entry of logs) {
     if (!entry || typeof entry.path !== 'string' || !entry.path) return false;
-    if (entry.op === 'delete') return !_.has(stat, entry.path);
-    if (entry.op === 'insert') return _.has(stat, entry.path);
-    if (entry.op === 'update') return _.isEqual(_.get(stat, entry.path), entry.value_new);
-    return false;
-  });
+    if (entry.op === 'delete') _.unset(simulated, entry.path);
+    else if ((entry.op === 'insert' || entry.op === 'update') && 'value_new' in entry) {
+      _.set(simulated, entry.path, _.cloneDeep(entry.value_new));
+    } else return false;
+  }
+  return touchedRoots.every(root => _.isEqual(simulated[root], stat[root]));
 }
 
 /**
@@ -122,6 +135,12 @@ export const ApplyVarChangeForMessage = async (msg: any): Promise<string | null>
     const oldRevision = oldMeta?.EditLogContentRevisions?.[MK];
     const revision = actionBlockRevision(operationBlocks);
     const replayAfterRollback = consumeMkRollbackWitness(MK);
+    const candidateRoots = oldEditLog.length > 0 && oldRevision === revision
+      ? ledgerTouchedRoots(oldEditLog) : [];
+    const initialStat = getEraData().stat ?? {};
+    const beforeIdempotentRoots = Object.fromEntries(
+      candidateRoots.map(root => [root, _.cloneDeep(initialStat[root])]),
+    );
     recordMkLedgerTransition('apply-before', MK, {
       messageId,
       revision,
@@ -172,16 +191,19 @@ export const ApplyVarChangeForMessage = async (msg: any): Promise<string | null>
     } else if (operationBlocks.length > 0 && editLog.length === 0) {
       recordEraDiagnostic('core-crud-patcher', 'action-blocks-produced-empty-editlog', logSummary);
     }
-    // 只有同一套变量块、旧账本的效果仍在游戏变量中且本轮完全无变化时，
-    // 才允许沿用旧账本：这是重入幂等应用，不是新一轮真正的回滚后重放。
+    // 只有同一套变量块、旧账本的最终效果仍在游戏变量中且相关根状态没有净变化时，
+    // 才沿用旧账本。即使重复执行 Delete→Insert 产生了新日志，仍不能改写原始 value_old。
     // 内容改变（包括 Swipe / 重新生成 / 新 API 事务）或效果已被回滚时仍覆盖旧日志。
+    const currentStat = getEraData().stat ?? {};
+    const rootStateUnchanged = candidateRoots.length > 0 && candidateRoots.every(
+      root => _.isEqual(beforeIdempotentRoots[root], currentStat[root]),
+    );
     const retainLedger = oldEditLog.length > 0 &&
-      editLog.length === 0 &&
       operationBlocks.length > 0 &&
       oldRevision === revision &&
       !replayAfterRollback &&
-      _.isEqual(beforeEventRoots, afterEventRoots) &&
-      oldLedgerEffectsStillPresent(oldEditLog, getEraData().stat ?? {});
+      rootStateUnchanged &&
+      oldLedgerEffectsStillPresent(oldEditLog, currentStat);
     const committedLog = retainLedger ? oldEditLog : editLog;
 
     if (oldEditLog.length > 0 && committedLog.length === 0) {
