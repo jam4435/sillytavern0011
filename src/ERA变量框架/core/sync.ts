@@ -28,6 +28,7 @@ import _ from 'lodash';
  */
 
 import { LOGS_PATH, SEL_PATH } from '../utils/constants';
+import { recordMkLedgerTransition, summarizeMkLedger } from '../utils/mkLedgerJournal';
 import { readMessageKey, readMessageKeyFromContent } from './key/mk';
 import { findLastAiMessage } from '../utils/message';
 import { rollbackByMk } from './rollback';
@@ -233,6 +234,12 @@ export function compactEditLogsInMeta(meta: any): EditLogCompactionResult {
     });
 
     if (!Array.isArray(raw) || compacted.length !== parsed.length) {
+      if (parsed.length > 0 && compacted.length === 0) {
+        recordMkLedgerTransition('compaction-nonempty-to-empty', mk, {
+          ...summarizeMkLedger(parsed),
+          nextLogCount: 0,
+        });
+      }
       editLogs[mk] = _.cloneDeep(compacted);
       convertedLogs += 1;
     }
@@ -259,8 +266,16 @@ export function pruneUnreachableEditLogs(
   const removed: string[] = [];
   for (const mk of Object.keys(editLogs)) {
     if (!reachable.has(mk)) {
+      recordMkLedgerTransition('pruned-unreachable-log', mk, summarizeMkLedger(parseEditLog(editLogs[mk])));
       delete editLogs[mk];
       removed.push(mk);
+    }
+  }
+  // 内容版本戳与 MK 的 EditLog 同生命周期，防止日志回收后孤儿版本误被复用。
+  const revisions = _.get(meta, 'EditLogContentRevisions');
+  if (revisions && typeof revisions === 'object' && !Array.isArray(revisions)) {
+    for (const mk of Object.keys(revisions)) {
+      if (!reachable.has(mk)) delete revisions[mk];
     }
   }
   return removed;
