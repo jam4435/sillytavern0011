@@ -269,46 +269,4 @@ if (Object.keys(presentCharacters).length > 0) {
 <角色数据>
 <%- toPromptYaml(presentCharacters) %>
 </角色数据>
-<% } -%>) && event && typeof event === 'object' && !Array.isArray(event))
-  && surrounding.后续事件 && typeof surrounding.后续事件 === 'object' && !Array.isArray(surrounding.后续事件)
-    ? surrounding.后续事件
-    : {};
-const currentFullLocation = normalizeFullLocationPath(variables.stat_data.user数据?.所在位置);
-const currentScope = getLocationScopePath(surrounding.当前活动区) || getLocationScopePath(currentFullLocation);
--%>
-<可用地点>
-当前: <%- currentFullLocation || '无效' %>
-活动区: <%- currentScope || '无效' %>
-<% if (reachableLocations.length > 0) { -%>
-可前往:
-<% for (const location of reachableLocations) { -%>
-  - <%- location %>
-<% } -%>
-<% } else { -%>
-可前往: 无
-<% } -%>
-规则: 路径=一级/二级/三级[/四级]；前三段相同仅表示同一活动区，不代表人物面对面同场。
-</可用地点>
-
-<%
-const allCharacters = variables.stat_data.角色数据;
-const playerLocation = variables.stat_data.user数据?.所在位置;
-const presentCharacters = {};
-if (playerLocation && allCharacters) {
-  for (const charName in allCharacters) {
-    if (!Object.prototype.hasOwnProperty.call(allCharacters, charName) || charName === '$template') continue;
-    const character = allCharacters[charName];
-    if (!isSameLocationScope(character.所在位置, playerLocation)) continue;
-    const filtered = {};
-    for (const key in character) {
-      if (key !== '初始属性' && !key.startsWith('$')) filtered[key] = character[key];
-    }
-    presentCharacters[charName] = filtered;
-  }
-}
-if (Object.keys(presentCharacters).length > 0) {
--%>
-<角色数据>
-<%- toPromptYaml(presentCharacters) %>
-</角色数据>
 <% } -%>
