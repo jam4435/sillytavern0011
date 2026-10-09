@@ -189,7 +189,7 @@ export function mergeWriteJobs(prevJob: EventJob, currentJob: EventJob): EventJo
   const transactionIds = _.uniq([...ids(previous), ...ids(current)]);
   const sourceDiagnosticIds = _.uniq([...diagnosticIds(previous), ...diagnosticIds(current)]);
   const winning = currentIsApi ? currentJob : prevJob;
-  const detail = { ...(currentIsApi ? current : previous), transactionIds, sourceDiagnosticIds };
+  const detail: Record<string, any> = { ...(currentIsApi ? current : previous), transactionIds, sourceDiagnosticIds };
   // 多事务合并时不再伪称只有最后一个 ID。
   if (transactionIds.length === 1) detail.transactionId = transactionIds[0];
   else delete detail.transactionId;
