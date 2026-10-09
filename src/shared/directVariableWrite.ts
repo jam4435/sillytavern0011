@@ -450,13 +450,18 @@ export async function writeDirectChatTransaction(
           const nextVariables = updater(variables);
           const afterStatData = readStatDataSnapshotFromUnknown(nextVariables);
           ownChanges = createVariableSnapshotDiff(beforeStatData, afterStatData);
-          try {
-            eventSnapshots = {
-              before: snapshotHistoryEventForensics(beforeStatData),
-              after: snapshotHistoryEventForensics(afterStatData),
-            };
-          } catch (error) {
-            variableTraceLogger.warn('[事件历史取证] 直接写入快照失败，跳过诊断', error);
+          if (ownChanges.some(change => {
+            const path = change.path?.[0] === 'stat_data' ? change.path.slice(1) : change.path;
+            return Array.isArray(path) && BRANCH_SENSITIVE_ROOTS.has(String(path[0]));
+          })) {
+            try {
+              eventSnapshots = {
+                before: snapshotHistoryEventForensics(beforeStatData),
+                after: snapshotHistoryEventForensics(afterStatData),
+              };
+            } catch (error) {
+              variableTraceLogger.warn('[事件历史取证] 直接写入快照失败，跳过诊断', error);
+            }
           }
           return nextVariables;
         },
