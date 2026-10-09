@@ -104,6 +104,23 @@ describe('ERA EditLog reachability cleanup', () => {
     expect(Object.keys(meta.EditLogs).sort()).toEqual(['mk-active', 'mk-alt']);
   });
 
+  it('清理孤儿 EditLog 时同时清理版本戳，保留仍可达 MK 的版本戳', () => {
+    const meta = {
+      EditLogs: {
+        'mk-active': [{ op: 'insert', path: '参与事件.事件06' }],
+        'mk-orphan': [{ op: 'delete', path: '后续事件线索.事件06' }],
+      },
+      EditLogContentRevisions: {
+        'mk-active': 'rev-live',
+        'mk-orphan': 'rev-old',
+      },
+    };
+    expect(pruneUnreachableEditLogs(meta, [], ['mk-active'])).toEqual(['mk-orphan']);
+    expect(meta.EditLogs['mk-active']).toHaveLength(1);
+    expect(meta.EditLogContentRevisions['mk-active']).toBe('rev-live');
+    expect(Object.hasOwn(meta.EditLogContentRevisions, 'mk-orphan')).toBe(false);
+  });
+
   it('conservatively keeps SelectedMks even if the host message shape is incomplete', () => {
     const meta = {
       EditLogs: {
