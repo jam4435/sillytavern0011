@@ -20,7 +20,7 @@ import { getMessageContent, isUserMessage } from '../utils/message';
 import { getEraData } from '../utils/era_data';
 import { J, parseEditLog } from '../utils/data';
 import { Logger } from '../utils/log';
-import { recordMkLedgerTransition, summarizeMkLedger } from '../utils/mkLedgerJournal';
+import { markMkRollbackPerformed, recordMkLedgerTransition, summarizeMkLedger } from '../utils/mkLedgerJournal';
 
 const logger = new Logger('core-rollback');
 
@@ -77,6 +77,7 @@ export async function rollbackByMk(MK: string, silent = false) {
       }
 
       _.set(v, STAT_DATA_PATH, stat);
+      markMkRollbackPerformed(MK);
       recordMkLedgerTransition('rollback-applied', MK, context);
       return v;
     }, CHAT_SCOPE);
