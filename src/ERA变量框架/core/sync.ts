@@ -34,9 +34,69 @@ import { rollbackByMk } from './rollback';
 import { getEraData, updateEraMetaData } from '../utils/era_data';
 import { parseEditLog } from '../utils/data';
 import { Logger } from '../utils/log';
+import { recordEraDiagnostic } from '../utils/diagnostics';
 import { ApplyVarChangeForMessage } from './crud/patcher';
 
 const logger = new Logger('core-sync');
+
+const AUDITED_EVENT_BUCKETS = ['未发生事件', '进行中事件', '已完成事件', '已失效事件', '人物事件占用'] as const;
+
+/** 仅用于阶段对比的轻量指纹；不作为历史封存哈希，也不存储事件变量内容。 */
+function hashSyncAudit(value: unknown): string {
+  const stable = (node: unknown): string => {
+    if (node === undefined) return '"__undefined__"';
+    if (node === null || typeof node !== 'object') return JSON.stringify(node) ?? String(node);
+    if (Array.isArray(node)) return `[${node.map(stable).join(',')}]`;
+    return `{${Object.entries(node).sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stable(item)}`).join(',')}}`;
+  };
+  const content = stable(value);
+  let hash = 2166136261;
+  for (let i = 0; i < content.length; i += 1) {
+    hash ^= content.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
+function recordFullSyncAudit(stage: string, selectedMks: (string | null)[]): void {
+  try {
+    const { stat, meta } = getEraData();
+    const eventSystem = stat?.事件系统;
+    const eventBuckets = Object.fromEntries(AUDITED_EVENT_BUCKETS.map(key => {
+      const value = eventSystem?.[key];
+      return [key, {
+        hash: hashSyncAudit(value),
+        count: value && typeof value === 'object' && !Array.isArray(value)
+          ? Object.keys(value).length : 0,
+      }];
+    }));
+    const logs = meta?.[LOGS_PATH] ?? {};
+    const perMessage = selectedMks.map((mk, messageId) => {
+      const actions = mk ? parseEditLog(logs[mk]) : [];
+      return {
+        messageId,
+        mk,
+        count: actions.length,
+        eventSystemCount: actions.filter(action =>
+          typeof action?.path === 'string' &&
+          (action.path === '事件系统' || action.path.startsWith('事件系统.')),
+        ).length,
+      };
+    }).filter(entry => entry.mk);
+    recordEraDiagnostic('core-sync', 'full-resync-event-state-audit', {
+      stage,
+      selectedMksCount: selectedMks.length,
+      eventSystemHash: hashSyncAudit(eventSystem),
+      eventBuckets,
+      logCounts: perMessage.slice(-32),
+      omittedLogCounts: Math.max(0, perMessage.length - 32),
+    });
+  } catch {
+    // 不允许辅助观测打断变量恢复流程。
+  }
+}
+
 
 /**
  * 获取用于变量操作的MK。如果消息是用户消息，则返回null以跳过操作。
@@ -231,6 +291,7 @@ export const resyncStateOnHistoryChange = async (forceFullResync = false) => {
   logger.debug('resyncStateOnHistoryChange', '获取到的 allMessages:', allMessages);
   const { meta: oldMetaData } = getEraData();
   const oldSelectedMks: (string | null)[] = _.cloneDeep(_.get(oldMetaData, SEL_PATH, []));
+  if (forceFullResync) recordFullSyncAudit('before-rollback', oldSelectedMks);
 
   logger.debug(
     'resyncStateOnHistoryChange',
@@ -348,6 +409,8 @@ export const resyncStateOnHistoryChange = async (forceFullResync = false) => {
     }
   }
 
+  if (forceFullResync) recordFullSyncAudit('after-rollback', oldSelectedMks);
+
   // 4. 从不匹配点开始，顺序重新应用变量修改，并构建新的 selectedMks
   logger.log('resyncStateOnHistoryChange', `从 ID ${firstRecalcId} 开始顺序重算...`);
   const newSelectedMks: (string | null)[] = oldSelectedMks.slice(0, firstRecalcId); // 继承匹配部分
@@ -359,6 +422,8 @@ export const resyncStateOnHistoryChange = async (forceFullResync = false) => {
     newSelectedMks[i] = newMk; // 使用重算后的新 message_id (即 i) 作为索引
   }
   logger.log('resyncStateOnHistoryChange', '顺序重算完成。');
+
+  if (forceFullResync) recordFullSyncAudit('after-replay', newSelectedMks);
 
   // 5. 更新 SelectedMks，并在同步成功后只清理真正不可达的 EditLog。
   await updateSelectedMksAndPruneEditLogs(allMessages, newSelectedMks);
