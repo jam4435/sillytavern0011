@@ -21,6 +21,7 @@ const CRITICAL_EVENTS = new Set([
   'full-resync-event-state-audit',
   'history-checkout-event-system-audit',
   'history-checkout-node-identity-audit',
+  'history-branch-mk-lifecycle-audit',
 ]);
 const DEFAULT_SLOW_THRESHOLD_MS = 5_000;
 const DEFAULT_WATCHDOG_INTERVAL_MS = 15_000;
