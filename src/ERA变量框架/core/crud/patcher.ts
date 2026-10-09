@@ -32,6 +32,7 @@ import { extractOrderedVariableActionBlocks } from '../../utils/string';
 import { escapeEraData, parseEditLog, parseJsonl } from '../../utils/data';
 import { Logger } from '../../utils/log';
 import { recordEraDiagnostic } from '../../utils/diagnostics';
+import { recordMkLedgerTransition, summarizeMkLedger } from '../../utils/mkLedgerJournal';
 
 const logger = new Logger('core-crud-patcher');
 
@@ -55,6 +56,32 @@ function fingerprintEventRoots(): Record<string, string> {
     }
     return [key, hash.toString(16).padStart(8, '0')];
   }));
+}
+
+/**
+ * 根据实际变量块计算版本戳；同一 MK 会在后续事件事务中继续追加变量块，
+ * 因此仅有 MK 相同不能代表内容未变。
+ */
+function actionBlockRevision(blocks: Array<{ tag: string; body: string }>): string {
+  const raw = blocks.map(block => `${block.tag}:${block.body}`).join('\u0000');
+  let hash = 2166136261;
+  for (let i = 0; i < raw.length; i += 1) {
+    hash ^= raw.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
+/** 旧账本仍反映在实际状态中的最低限度证据（只用于相同内容的重复应用）。 */
+function oldLedgerEffectsStillPresent(logs: any[], stat: Record<string, unknown>): boolean {
+  if (logs.length === 0) return false;
+  return logs.every(entry => {
+    if (!entry || typeof entry.path !== 'string' || !entry.path) return false;
+    if (entry.op === 'delete') return !_.has(stat, entry.path);
+    if (entry.op === 'insert') return _.has(stat, entry.path);
+    if (entry.op === 'update') return _.isEqual(_.get(stat, entry.path), entry.value_new);
+    return false;
+  });
 }
 
 /**
@@ -90,7 +117,16 @@ export const ApplyVarChangeForMessage = async (msg: any): Promise<string | null>
 
     const rawContent = getMessageContent(msg) || '';
     const operationBlocks = extractOrderedVariableActionBlocks(rawContent);
-    const oldEditLog = parseEditLog(getEraData().meta?.[LOGS_PATH]?.[MK]);
+    const oldMeta = getEraData().meta;
+    const oldEditLog = parseEditLog(oldMeta?.[LOGS_PATH]?.[MK]);
+    const oldRevision = oldMeta?.EditLogContentRevisions?.[MK];
+    const revision = actionBlockRevision(operationBlocks);
+    recordMkLedgerTransition('apply-before', MK, {
+      messageId,
+      revision,
+      oldRevision: typeof oldRevision === 'string' ? oldRevision : null,
+      ...summarizeMkLedger(oldEditLog),
+    });
     const beforeEventRoots = fingerprintEventRoots();
     const editLog: any[] = [];
 
@@ -134,10 +170,27 @@ export const ApplyVarChangeForMessage = async (msg: any): Promise<string | null>
     } else if (operationBlocks.length > 0 && editLog.length === 0) {
       recordEraDiagnostic('core-crud-patcher', 'action-blocks-produced-empty-editlog', logSummary);
     }
-    if (oldEditLog.length > 0 && editLog.length === 0) {
-      // 只记录事实；合法的 Swipe/回滚重算同样可能产生空日志，不能直接保留旧日志。
+    // 只有同一套变量块、旧账本的效果仍在游戏变量中且本轮完全无变化时，
+    // 才允许沿用旧账本：这是重入幂等应用，不是新一轮真正的回滚后重放。
+    // 内容改变（包括 Swipe / 重新生成 / 新 API 事务）或效果已被回滚时仍覆盖旧日志。
+    const retainLedger = oldEditLog.length > 0 &&
+      editLog.length === 0 &&
+      operationBlocks.length > 0 &&
+      oldRevision === revision &&
+      _.isEqual(beforeEventRoots, afterEventRoots) &&
+      oldLedgerEffectsStillPresent(oldEditLog, getEraData().stat ?? {});
+    const committedLog = retainLedger ? oldEditLog : editLog;
+
+    if (oldEditLog.length > 0 && committedLog.length === 0) {
       recordEraDiagnostic('core-crud-patcher', 'nonempty-editlog-overwritten-by-empty', logSummary);
     }
+    recordMkLedgerTransition(retainLedger ? 'apply-preserved-idempotent-ledger' : 'apply-before-commit', MK, {
+      messageId, revision,
+      oldLogCount: oldEditLog.length,
+      producedLogCount: editLog.length,
+      nextLogCount: committedLog.length,
+      ...summarizeMkLedger(committedLog),
+    });
 
     // 5. --- 覆盖式写入 EditLog ---
     /*
@@ -166,7 +219,7 @@ export const ApplyVarChangeForMessage = async (msg: any): Promise<string | null>
      */
     try {
       await updateEraMetaData(meta => {
-        const newArr = Array.isArray(editLog) ? editLog : parseEditLog(editLog);
+        const newArr = Array.isArray(committedLog) ? committedLog : parseEditLog(committedLog);
         logger.debug(
           'ApplyVarChangeForMessage',
           `准备为 MK=${MK} (MsgID=${messageId}) 写入 EditLog:\n${JSON.stringify(newArr, null, 2)}`,
@@ -174,12 +227,17 @@ export const ApplyVarChangeForMessage = async (msg: any): Promise<string | null>
         // 直接保存原生数组，避免在聊天 JSON 中再次把整段日志转义成 JSON 字符串。
         // parseEditLog 同时兼容旧字符串格式，因此无需强制迁移旧存档。
         _.set(meta, [LOGS_PATH, MK], _.cloneDeep(newArr));
+        // 与日志同一次 metadata 事务提交内容版本戳，避免下次重入误复用其它内容的账本。
+        _.set(meta, ['EditLogContentRevisions', MK], revision);
         /*
          * N.B. 此函数不再负责更新 SelectedMks 数组。
          * 更新 SelectedMks 的职责已移交至上层调用者 (resyncStateOnHistoryChange 或 ApplyVarChange)，
          * 以避免在 resync 循环中意外修改正在被读取的 oldSelectedMks 状态。
          */
         return meta;
+      });
+      recordMkLedgerTransition('apply-committed', MK, {
+        messageId, revision, ...summarizeMkLedger(committedLog),
       });
       logger.debug('ApplyVarChangeForMessage', `成功为 MK=${MK} 写入 EditLog。`);
     } catch (e: any) {
