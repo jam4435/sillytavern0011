@@ -1,5 +1,12 @@
 import { log, logWarning } from './era-utils.js';
 import {
+  getHistoryEventMessageContext,
+  recordHistoryEventForensics,
+  snapshotHistoryEventForensics,
+  summarizeEventTransactionOperations,
+} from '../shared/historyEventForensics';
+
+import {
   emitConfirmedEraVariableWriteDone,
   emitEraVariableWriteAndWait,
   writeDirectChatTransaction,
@@ -488,6 +495,25 @@ async function rereadTransactionState(expectedStat, effectiveOperations, reason)
   return { persisted, messageWritten, latestMessage, latestVariables };
 }
 
+function traceEventTransaction(stage, { transactionId, reason, operations, vars, stat, confirmation }) {
+  // 只观测事件相关事务；任何诊断问题都不能改变事件启动/结束流程。
+  try {
+    const paths = summarizeEventTransactionOperations(operations);
+    if (paths.length === 0) return;
+    recordHistoryEventForensics(stage, {
+      transactionId,
+      reason,
+      ...getHistoryEventMessageContext(vars),
+      confirmedMessageId: typeof confirmation?.message_id === 'number' ? confirmation.message_id : null,
+      confirmedMk: typeof confirmation?.mk === 'string' ? confirmation.mk : null,
+      operations: paths,
+      eventSnapshot: snapshotHistoryEventForensics(stat),
+    });
+  } catch (error) {
+    console.warn('[事件历史取证] ERA 事件事务观测失败', { stage, error });
+  }
+}
+
 export async function writeEraTransaction(operations, reason = 'era-transaction', options = {}) {
   const normalizedOperations = (Array.isArray(operations) ? operations : [])
     .map(normalizeTransactionOperation)
@@ -523,6 +549,9 @@ export async function writeEraTransaction(operations, reason = 'era-transaction'
     operations: effectiveOperations,
   };
 
+  traceEventTransaction('era-transaction-before', {
+    transactionId, reason, operations: effectiveOperations, vars: currentVariables, stat: beforeStatData,
+  });
   markPending(signature);
   try {
     const writeDoneDetail = await waitForTransactionWriteDone(
@@ -543,6 +572,10 @@ export async function writeEraTransaction(operations, reason = 'era-transaction'
       detail,
       beforeStatData,
       afterStatData: cloneJson(finalVariables?.stat_data || {}),
+    });
+    traceEventTransaction('era-transaction-confirmed', {
+      transactionId, reason, operations: effectiveOperations, vars: finalVariables,
+      stat: finalVariables?.stat_data, confirmation: writeDoneDetail,
     });
     markDone(signature);
     log(`ERA 事务写入完成: ${reason}`);
@@ -580,6 +613,11 @@ export async function writeEraTransaction(operations, reason = 'era-transaction'
         detail,
         beforeStatData,
         afterStatData: cloneJson(reread.latestVariables?.stat_data || {}),
+      });
+      traceEventTransaction('era-transaction-reread-confirmed', {
+        transactionId, reason, operations: effectiveOperations, vars: reread.latestVariables,
+        stat: reread.latestVariables?.stat_data,
+        confirmation: { message_id: reread.latestMessage?.message_id ?? null },
       });
       markDone(signature);
       return true;
