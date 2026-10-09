@@ -20,6 +20,7 @@ import { getMessageContent, isUserMessage } from '../utils/message';
 import { getEraData } from '../utils/era_data';
 import { J, parseEditLog } from '../utils/data';
 import { Logger } from '../utils/log';
+import { recordMkLedgerTransition, summarizeMkLedger } from '../utils/mkLedgerJournal';
 
 const logger = new Logger('core-rollback');
 
@@ -40,7 +41,13 @@ export async function rollbackByMk(MK: string, silent = false) {
 
       const raw = _.get(meta, [LOGS_PATH, MK]);
       const arr = parseEditLog(raw);
+      const context = {
+        messageId: Array.isArray(meta?.SelectedMks) ? meta.SelectedMks.indexOf(MK) : -1,
+        ...summarizeMkLedger(arr),
+      };
+      recordMkLedgerTransition('rollback-before', MK, context);
       if (!arr || !arr.length) {
+        recordMkLedgerTransition('rollback-empty-skip', MK, context);
         logger.debug('rollbackByMk', `EditLog 为空或无效，跳过回滚。`);
         return v;
       }
@@ -70,6 +77,7 @@ export async function rollbackByMk(MK: string, silent = false) {
       }
 
       _.set(v, STAT_DATA_PATH, stat);
+      recordMkLedgerTransition('rollback-applied', MK, context);
       return v;
     }, CHAT_SCOPE);
     logger.log('rollbackByMk', `回滚完成：MK=${MK}`);
