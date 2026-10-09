@@ -163,6 +163,40 @@ function mergeSyncJobs(prevJob: EventJob, currentJob: EventJob): EventJob {
 }
 
 /**
+ * API 写入携带每个事件脚本事务的确认 ID，不能像渲染类 WRITE 一样直接采用最后一个。
+ * 合并仍然只执行一次完整消息的回滚/重放，但确认信号必须覆盖本窗口全部事务。
+ */
+export function mergeWriteJobs(prevJob: EventJob, currentJob: EventJob): EventJob {
+  const previousIsApi = prevJob.type === ERA_EVENT_EMITTER.API_WRITE;
+  const currentIsApi = currentJob.type === ERA_EVENT_EMITTER.API_WRITE;
+  if (!previousIsApi && !currentIsApi) return currentJob;
+
+  const previous = _.isPlainObject(prevJob.detail) ? prevJob.detail as Record<string, any> : {};
+  const current = _.isPlainObject(currentJob.detail) ? currentJob.detail as Record<string, any> : {};
+  // 不同楼层的 API_WRITE 必须分别处理；否则最后一楼的重放无法确认前一楼的写入。
+  if (previousIsApi && currentIsApi &&
+      typeof previous.messageId === 'number' && typeof current.messageId === 'number' &&
+      previous.messageId !== current.messageId) {
+    return currentJob;
+  }
+  const ids = (value: Record<string, any>): string[] =>
+    [...(Array.isArray(value.transactionIds) ? value.transactionIds : []), value.transactionId]
+      .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+  const diagnosticIds = (value: Record<string, any>): string[] =>
+    Array.isArray(value.sourceDiagnosticIds)
+      ? value.sourceDiagnosticIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+      : [];
+  const transactionIds = _.uniq([...ids(previous), ...ids(current)]);
+  const sourceDiagnosticIds = _.uniq([...diagnosticIds(previous), ...diagnosticIds(current)]);
+  const winning = currentIsApi ? currentJob : prevJob;
+  const detail = { ...(currentIsApi ? current : previous), transactionIds, sourceDiagnosticIds };
+  // 多事务合并时不再伪称只有最后一个 ID。
+  if (transactionIds.length === 1) detail.transactionId = transactionIds[0];
+  else delete detail.transactionId;
+  return { ...winning, timestamp: currentJob.timestamp, detail };
+}
+
+/**
  * **【事件合并器】**
  * 对一批事件进行智能合并，包括处理事件对冲和合并同组可覆盖事件。
  * @param {EventJob[]} batchToProcess - 从队列中取出的一批原始事件。
@@ -235,9 +269,19 @@ export function mergeEventBatch(batchToProcess: EventJob[]): EventJob[] {
 
     // 如果满足合并条件
     if (areInSameGroup && isMergeableGroup) {
-      // 用当前事件覆盖掉结果数组中的最后一个事件；
-      // SYNC 组走专用合并，保留 manual_full_sync 强度与双方的同步请求 ID
-      finalJobs[finalJobs.length - 1] = prevGroup === 'SYNC' ? mergeSyncJobs(prevJob, currentJob) : currentJob;
+      if (prevGroup === 'WRITE' &&
+          prevJob.type === ERA_EVENT_EMITTER.API_WRITE &&
+          currentJob.type === ERA_EVENT_EMITTER.API_WRITE &&
+          typeof prevJob.detail?.messageId === 'number' &&
+          typeof currentJob.detail?.messageId === 'number' &&
+          prevJob.detail.messageId !== currentJob.detail.messageId) {
+        // 不同楼层不能合并成一个 WRITE，保留两次独立重放。
+        finalJobs.push(currentJob);
+      } else {
+        finalJobs[finalJobs.length - 1] = prevGroup === 'SYNC'
+          ? mergeSyncJobs(prevJob, currentJob)
+          : mergeWriteJobs(prevJob, currentJob);
+      }
     } else {
       // 否则，将当前事件追加到结果数组
       finalJobs.push(currentJob);
