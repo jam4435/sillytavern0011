@@ -64,6 +64,7 @@ describe('useEventListeners', () => {
         tavern_events.CHAT_CHANGED,
         'wuxia:turn-lifecycle',
         'wuxia:turn-events-settled',
+        'wuxia:event-admission-confirmed',
         'era:writeDone',
         DIRECT_VARIABLE_WRITE_DONE_EVENT,
         ERA_VARIABLE_WRITE_DONE_EVENT,
@@ -229,6 +230,35 @@ describe('useEventListeners', () => {
     });
     expect(readGameDataPureMock).toHaveBeenCalledTimes(1);
     expect(updateGameState).toHaveBeenCalledTimes(1);
+  });
+
+  it('事件事务回读确认信号立即投影，再显示入场通知，无须等待尾随事件检查', async () => {
+    const updateGameState = vi.fn();
+    renderHook(() => useEventListeners({
+      updateGameState,
+      setCurrentMaintext: vi.fn(),
+      setCurrentOptions: vi.fn(),
+    }));
+
+    await act(async () => {
+      await emitMockEvent('wuxia:turn-lifecycle', {
+        phase: 'start', roundId: 'admission-round-2', chatId: 'test-chat',
+      });
+      await emitMockEvent(ERA_VARIABLE_WRITE_DONE_EVENT, {
+        version: 1, writeId: 'moved', source: 'variable-model', operation: 'update',
+        reason: 'player-location-change', refreshHint: 'full',
+      });
+      vi.advanceTimersByTime(60);
+    });
+    expect(updateGameState).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await emitMockEvent('wuxia:event-admission-confirmed', {
+        eventNames: ['天龙第二回06-入秘洞'],
+      });
+    });
+    expect(updateGameState).toHaveBeenCalledTimes(1);
+    expect(readGameDataPureMock).toHaveBeenCalledTimes(1);
   });
 
   it('重新生成失败/取消时，回合结束信号释放被缓冲的 UI 刷新', async () => {
