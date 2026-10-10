@@ -76,7 +76,16 @@ const EventDisclosureRow: React.FC<EventDisclosureRowProps> = ({
 
       {isExpanded && (
         <div className="event-disclosure-detail" id={detailId}>
-          {getEventDescription(event) && <p className="event-disclosure-description">{getEventDescription(event)}</p>}
+          {event.clueDescription && (
+            <p className="event-disclosure-description">
+              <strong>事件线索：</strong>{event.clueDescription}
+            </p>
+          )}
+          {getEventDescription(event) && (
+            <p className="event-disclosure-description">
+              {event.clueDescription && <strong>当前进展：</strong>}{getEventDescription(event)}
+            </p>
+          )}
           {event.details && (
             <div className="event-disclosure-outcome">
               <span>结局走向</span>
