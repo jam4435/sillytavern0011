@@ -50,8 +50,11 @@ jobs:
           src/事件脚本/era-logging.test.ts
           src/武侠/utils/saveLoadManager.test.ts
           src/武侠/utils/logger.test.ts
-          src/武侠/utils/variableReader.test.ts
           src/武侠/utils/eraWriteWait.test.ts
           src/事件脚本/era-lifecycle.test.ts
+      - name: Martial art string migration regressions
+        run: >
+          pnpm exec vitest run --configLoader native --pool threads --reporter verbose
+          src/武侠/utils/variableReader.test.ts -t autoUpdateMartialArts
       - name: Build
         run: pnpm build:src:fast

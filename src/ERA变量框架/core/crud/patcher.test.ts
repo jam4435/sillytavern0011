@@ -118,6 +118,9 @@ describe('ERA 同一楼层变量块的原始次序', () => {
     const { rollbackByMk } = await import('../rollback');
     await rollbackByMk('mk-checkout-regression');
     expect(_.get(state.stat, path)).toBe('融会贯通');
+    // 清理模拟 rollback 留下的进程内见证，避免污染后续测试的重放分支。
+    const { consumeMkRollbackWitness } = await import('../../utils/mkLedgerJournal');
+    consumeMkRollbackWitness('mk-checkout-regression');
   });
 
   it('变量块改变时先撤销旧 EditLog，然后才允许替换为空日志', async () => {
