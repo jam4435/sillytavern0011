@@ -791,6 +791,42 @@ describe('useMessageHandler extra-variable decision', () => {
     expect(options.onVariableTurnSettled).toHaveBeenCalledWith(9);
   });
 
+  it('regenerate：新 swipe 的事件尚未确认时不封存，确认后才记入历史', async () => {
+    turnEventsAckResponder.stop();
+    let release!: () => void;
+    const deferred = new Promise<void>(resolve => { release = resolve; });
+    let reachedTurnCompleted!: () => void;
+    const entered = new Promise<void>(resolve => { reachedTurnCompleted = resolve; });
+    const subscription = eventOn('wuxia:turn-completed', async (payload: Record<string, unknown>) => {
+      reachedTurnCompleted();
+      await deferred;
+      await eventEmit(WUXIA_TURN_EVENTS_SETTLED_EVENT, { ...payload, status: 'success' });
+    });
+    regenerateLastAssistantSwipeMock.mockResolvedValue({
+      maintext: '重生成正文', options: [],
+      gameData: null,
+      assistantMessageId: 9,
+      assistantSwipeId: 2,
+      userInput: '上一条输入',
+      combinedPrompt: '最终提示词',
+      rawReply: '重生成正文',
+    });
+    const options = createHookOptions(createSummarySettings('inline'));
+    const { result } = renderHook(() => useMessageHandler(options));
+
+    let pending!: Promise<boolean | void>;
+    await act(async () => {
+      pending = result.current.handleRegenerateLastAssistant();
+      await entered;
+    });
+    expect(finalizeCurrentTurn).not.toHaveBeenCalled();
+    release();
+    await act(async () => { await pending; });
+    expect(finalizeCurrentTurn).toHaveBeenCalledTimes(1);
+    expect(options.onVariableTurnSettled).toHaveBeenCalledWith(9);
+    subscription.stop();
+  });
+
   it('regenerate + inline 会显式标记 skipped，且不会触发额外变量链路', async () => {
     const options = createHookOptions(createSummarySettings('inline'));
     regenerateLastAssistantSwipeMock.mockResolvedValue({
