@@ -793,6 +793,16 @@ function applyInsertByObject(target: JsonRecord, patch: JsonRecord): void {
   }
 }
 
+function applyDeleteByObject(target: JsonRecord, patch: JsonRecord): void {
+  for (const [key, value] of Object.entries(patch)) {
+    if (!isPlainObject(value) || Object.keys(value).length === 0) {
+      delete target[key];
+    } else if (isPlainObject(target[key])) {
+      applyDeleteByObject(target[key] as JsonRecord, value);
+    }
+  }
+}
+
 function applyUpdateByObject(target: JsonRecord, patch: JsonRecord): void {
   for (const [key, value] of Object.entries(patch)) {
     if (!(key in target)) {
@@ -832,6 +842,12 @@ describe('autoUpdateMartialArts', () => {
         applyInsertByObject(currentChatStatData, detail);
       } else if (request.eventName === 'era:updateByObject') {
         applyUpdateByObject(currentChatStatData, detail);
+      } else if (request.eventName === 'era:transactionByObject') {
+        const operations = detail.operations as Array<{ type: string; payload: JsonRecord }>;
+        for (const operation of operations) {
+          if (operation.type === 'delete') applyDeleteByObject(currentChatStatData, operation.payload);
+          if (operation.type === 'insert') applyInsertByObject(currentChatStatData, operation.payload);
+        }
       }
 
       return {
@@ -1017,6 +1033,90 @@ describe('autoUpdateMartialArts', () => {
     await autoUpdateMartialArts(玩家功法 as never, undefined, { 用户名: '郭靖' });
 
     expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(4);
+  });
+
+  it('字符串功法使用同一 ERA 事务先删除再插入完整对象，保留原掌握程度且后续不再重复补全', async () => {
+    vi.useFakeTimers();
+    try {
+      currentChatStatData = {
+        角色数据: { 张阿生: { 功法: { 金雁功: '融会贯通' } } },
+      };
+      const characters = clone(currentChatStatData.角色数据) as JsonRecord;
+
+      await autoUpdateMartialArts(undefined, characters as never, { 用户名: '墨逸' });
+      expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(1);
+      const request = emitSourcedEraVariableWriteAndWaitMock.mock.calls[0][0];
+      expect(request).toEqual(expect.objectContaining({
+        eventName: 'era:transactionByObject',
+        reason: 'martial-art-string-migration',
+        expectedAction: 'apiWrite',
+        expectedTransactionId: expect.any(String),
+      }));
+      expect(request.detail).toEqual({
+        transactionId: request.expectedTransactionId,
+        operations: [
+          { type: 'delete', payload: { 角色数据: { 张阿生: { 功法: { 金雁功: {} } } } } },
+          { type: 'insert', payload: { 角色数据: { 张阿生: { 功法: { 金雁功: {
+            类型: '轻功',
+            功法描述: '一门偏向轻身提纵的轻功。',
+            功法品阶: '上乘',
+            掌握程度: '融会贯通',
+            特性: {
+              初窥门径: '身法轻灵，步伐更稳。',
+              略有小成: '凌空借力，纵跃更远。',
+              融会贯通: '身随意动，可借势转折。',
+            },
+          } } } } } },
+        ],
+      });
+      const result = ((currentChatStatData.角色数据 as JsonRecord).张阿生 as JsonRecord).功法 as JsonRecord;
+      expect((result.金雁功 as JsonRecord).掌握程度).toBe('融会贯通');
+
+      await vi.advanceTimersByTimeAsync(120);
+      await autoUpdateMartialArts(
+        undefined,
+        clone(currentChatStatData.角色数据) as never,
+        { 用户名: '墨逸' },
+      );
+      expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('过期 scope 仍是字符串但聊天级变量已完成迁移时，不会再次 Delete/Insert', async () => {
+    currentChatStatData = {
+      角色数据: { 张阿生: { 功法: { 金雁功: {
+        掌握程度: '融会贯通',
+        类型: '轻功', 功法描述: '一门偏向轻身提纵的轻功。',
+        功法品阶: '上乘', 特性: {
+          初窥门径: '身法轻灵，步伐更稳。',
+          略有小成: '凌空借力，纵跃更远。',
+          融会贯通: '身随意动，可借势转折。',
+        },
+      } } } },
+    };
+    await autoUpdateMartialArts(
+      undefined,
+      { 张阿生: { 功法: { 金雁功: '融会贯通' } } } as never,
+      { 用户名: '墨逸' },
+    );
+    expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
+  });
+
+  it('未知字符串不当作初窥门径覆盖原值，也不发送无效迁移', async () => {
+    currentChatStatData = {
+      角色数据: { 张阿生: { 功法: { 金雁功: '未经确认的熟练度' } } },
+    };
+    await autoUpdateMartialArts(
+      undefined,
+      clone(currentChatStatData.角色数据) as never,
+      { 用户名: '墨逸' },
+    );
+    expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
+    expect(((currentChatStatData.角色数据 as JsonRecord).张阿生 as JsonRecord).功法).toEqual({
+      金雁功: '未经确认的熟练度',
+    });
   });
 
   it('老存档里路径完全不存在时，只会发送 insert', async () => {

@@ -85,6 +85,41 @@ describe('ERA 同一楼层变量块的原始次序', () => {
     expect(restored.事件系统.人物事件占用.段誉).toEqual(oldOccupant);
   });
 
+  it('字符串功法的 Delete → Insert 迁移保留掌握程度且生成可逆账本', async () => {
+    state.stat = { 角色数据: { 张阿生: { 功法: { 柳叶刀法: '融会贯通' } } } };
+    const completed = {
+      类型: '刀法',
+      功法描述: '从数据库补全的描述',
+      功法品阶: '传家',
+      掌握程度: '融会贯通',
+      特性: { 略有小成: '轻灵出刀' },
+    };
+    state.message = [
+      '<VariableDelete>',
+      JSON.stringify({ 角色数据: { 张阿生: { 功法: { 柳叶刀法: {} } } } }),
+      '</VariableDelete>',
+      '<VariableInsert>',
+      JSON.stringify({ 角色数据: { 张阿生: { 功法: { 柳叶刀法: completed } } } }),
+      '</VariableInsert>',
+    ].join('\n');
+
+    await ApplyVarChangeForMessage({ message_id: 2 });
+
+    const path = '角色数据.张阿生.功法.柳叶刀法';
+    expect(_.get(state.stat, path)).toEqual(completed);
+    const logs = state.meta.EditLogs['mk-checkout-regression'] as Array<Record<string, any>>;
+    expect(logs.map(log => [log.op, log.path])).toEqual([
+      ['delete', path],
+      ['insert', path],
+    ]);
+    expect(logs[0].value_old).toBe('融会贯通');
+    expect(logs[1].value_new).toEqual(completed);
+
+    const { rollbackByMk } = await import('../rollback');
+    await rollbackByMk('mk-checkout-regression');
+    expect(_.get(state.stat, path)).toBe('融会贯通');
+  });
+
   it('变量块改变时先撤销旧 EditLog，然后才允许替换为空日志', async () => {
     state.stat.事件系统.人物事件占用.段誉 = structuredClone(newOccupant);
     state.meta = {

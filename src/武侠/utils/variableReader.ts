@@ -2610,6 +2610,16 @@ interface MartialArtUpdateData {
  * 功法更新类型
  */
 type MartialArtUpdateType = 'insert' | 'update' | 'mixed' | 'none';
+type MartialArtVariableValue = SimpleMartialArt | string;
+const MARTIAL_ART_MASTERY_LEVELS = ['初窥门径', '略有小成', '融会贯通', '炉火纯青', '出神入化'];
+const isMasteryString = (value: unknown): value is string =>
+  typeof value === 'string' && MARTIAL_ART_MASTERY_LEVELS.includes(value);
+
+interface MartialArtStringMigration {
+  path: string[];
+  displayName: string;
+  cacheKey: string;
+}
 
 interface MartialArtVerificationLeaf {
   path: string[];
@@ -2836,7 +2846,7 @@ function checkMartialArtUpdateType(writePlan: MartialArtWritePlan): MartialArtUp
  * @param 功法数据 变量中的简化功法数据
  * @returns 补全后的功法数据，如果数据库中没有此功法则返回 null
  */
-function completeMartialArtFromDatabase(功法名: string, 功法数据: SimpleMartialArt): MartialArtUpdateData | null {
+function completeMartialArtFromDatabase(功法名: string, 功法数据: MartialArtVariableValue): MartialArtUpdateData | null {
   const dbData = getMartialArtData(功法名);
 
   if (!dbData) {
@@ -2845,16 +2855,17 @@ function completeMartialArtFromDatabase(功法名: string, 功法数据: SimpleM
   }
 
   // 保留变量中的掌握程度，其他从数据库补全
-  const 掌握程度 = 功法数据.掌握程度 || '初窥门径';
+  const 掌握程度 = typeof 功法数据 === 'string' ? 功法数据 : 功法数据.掌握程度 || '初窥门径';
+  // 只校验需要迁移的字符串；已有结构化功法仍按原补全行为处理。
+  if (typeof 功法数据 === 'string' && !isMasteryString(掌握程度)) return null;
 
   // 获取已解锁的特性（根据掌握程度）
   const allTraits = dbData.特性 || {};
-  const MASTERY_LEVELS = ['初窥门径', '略有小成', '融会贯通', '炉火纯青', '出神入化'];
-  const masteryIndex = MASTERY_LEVELS.indexOf(掌握程度);
+  const masteryIndex = MARTIAL_ART_MASTERY_LEVELS.indexOf(掌握程度);
   const unlockedTraits: Record<string, string> = {};
 
   for (const [traitMastery, traitDesc] of Object.entries(allTraits)) {
-    const traitMasteryIndex = MASTERY_LEVELS.indexOf(traitMastery);
+    const traitMasteryIndex = MARTIAL_ART_MASTERY_LEVELS.indexOf(traitMastery);
     // 只包含已解锁的特性
     if (traitMasteryIndex >= 0 && traitMasteryIndex <= masteryIndex) {
       unlockedTraits[traitMastery] = traitDesc;
@@ -2937,7 +2948,7 @@ function updateMartialArtCache(cacheKey: string, mastery: string, isCompleted: b
 type CharacterRecord = Record<string, CharacterData | unknown>;
 
 export interface MartialArtsCompletionScope {
-  player?: Record<string, SimpleMartialArt>;
+  player?: Record<string, MartialArtVariableValue>;
   characters?: CharacterRecord;
 }
 
@@ -2971,26 +2982,27 @@ function isPlayerCharacterEntry(characterName: string, userDataOrName?: Pick<Use
   return !!userName && characterName === userName;
 }
 
-function toSimpleMartialArts(value: unknown): Record<string, SimpleMartialArt> | undefined {
+function toSimpleMartialArts(value: unknown): Record<string, MartialArtVariableValue> | undefined {
   if (!isRecord(value)) {
     return undefined;
   }
 
-  const result: Record<string, SimpleMartialArt> = {};
+  const result: Record<string, MartialArtVariableValue> = {};
   for (const [name, art] of Object.entries(value)) {
-    if (name.startsWith('$') || !isRecord(art)) {
+    if (name.startsWith('$') || (!isPlainObject(art) && !isMasteryString(art))) {
       continue;
     }
-    result[name] = art as SimpleMartialArt;
+    result[name] = art as MartialArtVariableValue;
   }
 
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
-function martialArtSignature(art: SimpleMartialArt | undefined): string {
+function martialArtSignature(art: MartialArtVariableValue | undefined): string {
   if (!art) {
     return '';
   }
+  if (typeof art === 'string') return JSON.stringify({ mastery: art, shorthand: true });
 
   const traits = art.特性 ? Object.entries(art.特性).sort(([a], [b]) => a.localeCompare(b)) : [];
 
@@ -3005,9 +3017,10 @@ function martialArtSignature(art: SimpleMartialArt | undefined): string {
 
 function shouldQueueMartialArtForCompletion(
   功法名: string,
-  nextArt: SimpleMartialArt,
-  previousArt?: SimpleMartialArt,
+  nextArt: MartialArtVariableValue,
+  previousArt?: MartialArtVariableValue,
 ): boolean {
+  if (typeof nextArt === 'string') return true;
   if (!nextArt.类型 || !nextArt.功法品阶 || !nextArt.功法描述 || !nextArt.特性) {
     return true;
   }
@@ -3030,7 +3043,7 @@ function collectChangedMartialArts(
   const nextPlayerArts = toSimpleMartialArts(nextVariables.user数据?.功法);
   const previousPlayerArts = toSimpleMartialArts(previousVariables.user数据?.功法);
   if (nextPlayerArts) {
-    const changedPlayerArts: Record<string, SimpleMartialArt> = {};
+    const changedPlayerArts: Record<string, MartialArtVariableValue> = {};
     for (const [name, art] of Object.entries(nextPlayerArts)) {
       if (shouldQueueMartialArtForCompletion(name, art, previousPlayerArts?.[name])) {
         changedPlayerArts[name] = art;
@@ -3063,7 +3076,7 @@ function collectChangedMartialArts(
     const previousArts = isRecord(previousCharacter)
       ? toSimpleMartialArts((previousCharacter as CharacterData).功法)
       : undefined;
-    const changedArts: Record<string, SimpleMartialArt> = {};
+    const changedArts: Record<string, MartialArtVariableValue> = {};
 
     for (const [name, art] of Object.entries(nextArts)) {
       if (shouldQueueMartialArtForCompletion(name, art, previousArts?.[name])) {
@@ -3100,7 +3113,7 @@ function shouldCheckPlayerAttributes(nextUser?: UserProfile, previousUser?: User
   );
 }
 
-function martialArtSignatureMap(arts?: Record<string, SimpleMartialArt>): string {
+function martialArtSignatureMap(arts?: Record<string, MartialArtVariableValue>): string {
   if (!arts) {
     return '';
   }
@@ -3220,7 +3233,7 @@ function mergeCompletionScope(
  * @param 角色数据 角色数据对象（包含所有NPC）
  */
 export async function autoUpdateMartialArts(
-  玩家功法?: Record<string, SimpleMartialArt>,
+  玩家功法?: Record<string, MartialArtVariableValue>,
   角色数据?: Record<string, CharacterData | unknown>,
   user数据?: Pick<UserProfile, '用户名'>,
 ): Promise<void> {
@@ -3243,6 +3256,7 @@ export async function autoUpdateMartialArts(
   const insertData: MartialArtWriteData = {};
   const updateData: MartialArtWriteData = {};
   const pendingVerifications: PendingMartialArtVerification[] = [];
+  const stringMigrations: MartialArtStringMigration[] = [];
 
   let needsInsert = false;
   let needsUpdate = false;
@@ -3256,6 +3270,17 @@ export async function autoUpdateMartialArts(
       if (功法名.startsWith('$')) continue; // 跳过模板
 
       const cacheKey = getMartialArtCacheKey('玩家', 功法名);
+      if (typeof 功法数据 === 'string') {
+        if (isMasteryString(功法数据)) {
+          stringMigrations.push({
+            path: ['user数据', '功法', 功法名],
+            displayName: `玩家功法 ${功法名}`,
+            cacheKey,
+          });
+        } else dataLogger.warn(`[autoUpdateMartialArts] 跳过未知功法掌握程度: ${功法名}`);
+        continue;
+      }
+      if (!isPlainObject(功法数据)) continue;
       const completedData = completeMartialArtFromDatabase(功法名, 功法数据);
       if (!completedData) {
         continue;
@@ -3325,6 +3350,17 @@ export async function autoUpdateMartialArts(
         if (功法名.startsWith('$')) continue;
 
         const cacheKey = getMartialArtCacheKey(`角色:${角色名}`, 功法名);
+        if (typeof 功法数据 === 'string') {
+          if (isMasteryString(功法数据)) {
+            stringMigrations.push({
+              path: ['角色数据', 角色名, '功法', 功法名],
+              displayName: `角色 ${角色名} 功法 ${功法名}`,
+              cacheKey,
+            });
+          } else dataLogger.warn(`[autoUpdateMartialArts] 跳过未知功法掌握程度: ${角色名}.${功法名}`);
+          continue;
+        }
+        if (!isPlainObject(功法数据)) continue;
         const completedData = completeMartialArtFromDatabase(功法名, 功法数据);
         if (!completedData) {
           continue;
@@ -3382,7 +3418,7 @@ export async function autoUpdateMartialArts(
   }
 
   // 如果有需要处理的功法，写入变量表
-  if (needsInsert || needsUpdate) {
+  if (stringMigrations.length > 0 || needsInsert || needsUpdate) {
     dataLogger.log('[autoUpdateMartialArts] 需要处理功法数据...');
     dataLogger.log(`  - 需要 INSERT（补全缺失字段）: ${needsInsert}`);
     dataLogger.log(`  - 需要 UPDATE（刷新已有特性）: ${needsUpdate}`);
@@ -3390,6 +3426,54 @@ export async function autoUpdateMartialArts(
     isUpdatingMartialArts = true;
 
     try {
+      // 字符串功法已有叶子，普通 Insert 无法用对象覆盖。只针对最新聊天级快照里
+      // 仍是合法掌握程度字符串的路径进行迁移，避免使用过期 scope 重复删除。
+      const latestChatStat = readChatStatDataSnapshot();
+      const migrationDeletes: Record<string, unknown> = {};
+      const migrationInserts: Record<string, unknown> = {};
+      const migratedVerifications: PendingMartialArtVerification[] = [];
+      for (const candidate of stringMigrations) {
+        const current = getNestedValue(latestChatStat, candidate.path);
+        if (!isMasteryString(current)) continue;
+        const name = candidate.path[candidate.path.length - 1];
+        const completed = completeMartialArtFromDatabase(name, current);
+        if (!completed) continue;
+        setNestedValue(migrationDeletes, candidate.path, {});
+        setNestedValue(migrationInserts, candidate.path, completed);
+        migratedVerifications.push({
+          cacheKey: candidate.cacheKey,
+          displayName: candidate.displayName,
+          mastery: completed.掌握程度,
+          verificationLeaves: prefixVerificationLeaves(
+            candidate.path,
+            buildMartialArtWritePlan({}, completed).verificationLeaves,
+          ),
+        });
+      }
+
+      if (migratedVerifications.length > 0) {
+        const transactionId = `martial-art-string-migration-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        await emitSourcedEraVariableWriteAndWait({
+          source: 'frontend',
+          operation: 'replace',
+          reason: 'martial-art-string-migration',
+          eventName: 'era:transactionByObject',
+          attribution: 'background',
+          detail: {
+            transactionId,
+            operations: [
+              { type: 'delete', payload: migrationDeletes },
+              { type: 'insert', payload: migrationInserts },
+            ],
+          },
+          expectedTransactionId: transactionId,
+          expectedAction: 'apiWrite',
+          timeoutMs: 3000,
+          timeoutMessage: '字符串功法迁移已发出，但 ERA 没有确认写入完成。',
+        });
+        pendingVerifications.push(...migratedVerifications);
+      }
+
       if (needsInsert) {
         dataLogger.log('[autoUpdateMartialArts] INSERT 数据:', JSON.stringify(insertData, null, 2));
         await emitSourcedEraVariableWriteAndWait({

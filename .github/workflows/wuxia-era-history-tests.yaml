@@ -11,6 +11,8 @@ on:
       - 'src/事件脚本/era-logging.test.ts'
       - 'src/事件脚本/era-lifecycle.test.ts'
       - 'src/武侠/utils/saveLoadManager*'
+      - 'src/武侠/utils/variableReader.ts'
+      - 'src/武侠/utils/variableReader.test.ts'
       - 'src/武侠/utils/historyEventSnapshot.ts'
       - 'src/武侠/utils/logger.ts'
       - 'src/武侠/utils/logger.test.ts'
@@ -48,6 +50,7 @@ jobs:
           src/事件脚本/era-logging.test.ts
           src/武侠/utils/saveLoadManager.test.ts
           src/武侠/utils/logger.test.ts
+          src/武侠/utils/variableReader.test.ts
           src/武侠/utils/eraWriteWait.test.ts
           src/事件脚本/era-lifecycle.test.ts
       - name: Build
