@@ -33,6 +33,7 @@ import { escapeEraData, parseEditLog, parseJsonl } from '../../utils/data';
 import { Logger } from '../../utils/log';
 import { recordEraDiagnostic } from '../../utils/diagnostics';
 import { consumeMkRollbackWitness, recordMkLedgerTransition, summarizeMkLedger } from '../../utils/mkLedgerJournal';
+import { rollbackByMk } from '../rollback';
 
 const logger = new Logger('core-crud-patcher');
 
@@ -134,7 +135,28 @@ export const ApplyVarChangeForMessage = async (msg: any): Promise<string | null>
     const oldEditLog = parseEditLog(oldMeta?.[LOGS_PATH]?.[MK]);
     const oldRevision = oldMeta?.EditLogContentRevisions?.[MK];
     const revision = actionBlockRevision(operationBlocks);
-    const replayAfterRollback = consumeMkRollbackWitness(MK);
+    let replayAfterRollback = consumeMkRollbackWitness(MK);
+    // 消息追加了新的变量块（或重新生成了不同内容），必须先恢复到旧楼层执行之前
+    // 才能重新计算完整 EditLog。禁止在旧事务仍生效时直接覆盖其逆向账本。
+    if (oldEditLog.length > 0 && oldRevision !== revision && !replayAfterRollback) {
+      const stat = getEraData().stat ?? {};
+      if (!oldLedgerEffectsStillPresent(oldEditLog, stat)) {
+        recordMkLedgerTransition('revision-changed-with-unreconciled-ledger', MK, {
+          messageId, oldRevision: oldRevision ?? null, revision,
+          ...summarizeMkLedger(oldEditLog),
+        });
+        throw new Error(`MK ${MK} 的变量块已变化，但旧 EditLog 的效果未能验证；停止覆盖以保护历史回滚`);
+      }
+      recordMkLedgerTransition('revision-change-auto-rollback', MK, {
+        messageId, oldRevision: oldRevision ?? null, revision,
+        ...summarizeMkLedger(oldEditLog),
+      });
+      await rollbackByMk(MK, true);
+      replayAfterRollback = consumeMkRollbackWitness(MK);
+      if (!replayAfterRollback) {
+        throw new Error(`MK ${MK} 旧变量日志未成功撤销；拒绝改写逆向账本`);
+      }
+    }
     const candidateRoots = oldEditLog.length > 0 && oldRevision === revision
       ? ledgerTouchedRoots(oldEditLog) : [];
     const initialStat = getEraData().stat ?? {};
