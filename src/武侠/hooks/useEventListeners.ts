@@ -110,8 +110,16 @@ export function useEventListeners({
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
     let rawEraCompletionTimer: ReturnType<typeof setTimeout> | null = null;
     let pendingRawEraSignature: string | null = null;
+    let activeEventRound: { roundId: string; chatId: string } | null = null;
+    let deferredGameRefresh = false;
 
+    // 在一个回合的 ERA 与事件脚本都确认之前，不把“新地点 + 旧后续线索”
+    // 作为中间态刷新进卷轴。只缓冲 UI 投影，不修改 stat_data 或伪造参与事件。
     const refreshGameState = () => {
+      if (activeEventRound) {
+        deferredGameRefresh = true;
+        return;
+      }
       const newData = readGameDataPure();
       if (newData) {
         updateGameState(newData);
@@ -119,6 +127,10 @@ export function useEventListeners({
     };
 
     const scheduleRefresh = (delay = 0) => {
+      if (activeEventRound) {
+        deferredGameRefresh = true;
+        return;
+      }
       if (refreshTimer) {
         return;
       }
@@ -127,6 +139,19 @@ export function useEventListeners({
         refreshGameState();
       }, delay);
     };
+
+    const releaseDeferredRefresh = () => {
+      activeEventRound = null;
+      if (deferredGameRefresh) {
+        deferredGameRefresh = false;
+        scheduleRefresh();
+      }
+    };
+
+    const isMatchingEventRound = (detail: { roundId?: unknown; chatId?: unknown }) =>
+      activeEventRound !== null &&
+      detail?.roundId === activeEventRound.roundId &&
+      (!detail.chatId || detail.chatId === activeEventRound.chatId);
 
     const scheduleCompletionForHint = (reason: string, refreshHint: DirectVariableWriteRefreshHint) => {
       if (refreshHint === 'none' || refreshHint === 'event-state') {
@@ -261,6 +286,31 @@ export function useEventListeners({
 
       handleMessageUpdate(eventData, 'chat-changed');
     });
+    // 与事件脚本的回合写入屏障使用同一个 roundId。成功在事件状态确认后刷新，
+    // 失败/取消由 lifecycle.finish 兜底，避免把旧状态永远留在界面上。
+    const eventTurnLifecycleListener = eventOn('wuxia:turn-lifecycle', (detail: {
+      phase?: string; roundId?: string; chatId?: string;
+    }) => {
+      if (detail?.phase === 'start' && detail.roundId) {
+        activeEventRound = { roundId: detail.roundId, chatId: detail.chatId || '' };
+        if (refreshTimer) {
+          clearTimeout(refreshTimer);
+          refreshTimer = null;
+          deferredGameRefresh = true;
+        }
+      } else if (detail?.phase === 'finish' && isMatchingEventRound(detail)) {
+        releaseDeferredRefresh();
+      }
+    });
+    const eventTurnSettledListener = eventOn('wuxia:turn-events-settled', (detail: {
+      roundId?: string; chatId?: string; status?: string;
+    }) => {
+      if (isMatchingEventRound(detail)) {
+        // 无论确认成功或失败，都只在事件检查结束/失败后统一读取真实状态。
+        deferredGameRefresh = true;
+        releaseDeferredRefresh();
+      }
+    });
     eventLogger.log('注册 era:writeDone 监听器...');
     const writeDoneListener = eventOn('era:writeDone', handleWriteDone);
     eventLogger.log(`注册 ${DIRECT_VARIABLE_WRITE_DONE_EVENT} 监听器...`);
@@ -291,6 +341,8 @@ export function useEventListeners({
       messageUpdatedListener.stop();
       chatChangedListener.stop();
       writeDoneListener.stop();
+      eventTurnLifecycleListener.stop();
+      eventTurnSettledListener.stop();
       directWriteDoneListener.stop();
       eraVariableWriteDoneListener.stop();
       variableTraceLogger.log('[useEventListeners] 变量相关监听器已清理完成', {
