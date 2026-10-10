@@ -1055,6 +1055,28 @@
     background: transparent;
   }
 
+  // 可调透明度只影响弹窗外观；行囊与功法阅读区必须遮住聊天正文。
+  .modal-box.modal-inventory,
+  .modal-box.modal-martial_arts {
+    .modal-header {
+      background: rgba(241, 235, 223, 0.98);
+    }
+
+    .modal-content {
+      background: #f1ebdf;
+    }
+
+    .workbench-detail-pane {
+      background: #f1ebdf;
+    }
+
+    .workbench-mobile-back {
+      background: rgba(232, 222, 206, 0.85);
+      border-bottom-color: rgba(61, 48, 40, 0.2);
+      color: #1a1410;
+    }
+  }
+
   .chat-rename-dialog {
     color: var(--wuxia-ink-text);
     background:
@@ -5141,9 +5163,9 @@
       padding: 0.75rem;
     }
 
-    // 移动端滑出的详情层：近黑底会让半透明宣纸卡片发脏
+    // 行囊 / 功法阅读层由上方不透明宣纸规则统一处理。
     .workbench-detail-pane {
-      background: rgba(241, 235, 223, 0.98);
+      background: #f1ebdf;
     }
 
     // 与 _settings.scss 移动端的"背景条模拟轨道"方案保持同步
