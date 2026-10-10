@@ -9,6 +9,7 @@ import {
   buildPlayerParticipationEntry,
   cleanupInvalidParticipationEntries,
   initializeEventList,
+  persistRelativeEventRebase,
 } from './era-event-operations.js';
 import { createSerialTaskQueue, buildFollowupCounterPlan } from './era-turn-queue.js';
 import { attachEventMetadata, deriveEventRuntimeDescriptor } from './era-utils.js';
@@ -168,6 +169,26 @@ describe('completion persistence and follow-up pairs', () => {
     Object.assign(globalThis, {
       toastr: { success: vi.fn(), info: vi.fn(), warning: vi.fn(), error: vi.fn() },
     });
+  });
+
+  it('相对事件平移使用单次 ERA Delete→Insert，原条件对象可完整逆向恢复', async () => {
+    const before = clone(variables.stat_data.事件系统.未发生事件[targetName]);
+    const changed = { 类型: '时间', 年: 1219, 月: 11, 日: 2, 时: 13, 新字段: '时序平移' };
+
+    expect(await persistRelativeEventRebase({ [targetName]: changed })).toBe(true);
+    expect(variables.stat_data.事件系统.未发生事件[targetName]).toEqual(changed);
+    const calls = eventEmitMock.mock.calls.filter(([name]) => name === 'era:transactionByObject');
+    expect(calls).toHaveLength(1);
+    const operations = calls[0][1].operations;
+    expect(operations.map((op: any) => op.type)).toEqual(['delete', 'insert']);
+    expect(operations[0].payload.事件系统.未发生事件[targetName]).toEqual({});
+    expect(operations[1].payload.事件系统.未发生事件[targetName]).toEqual(changed);
+
+    // 真正的 ERA EditLog 记录 Delete.value_old=before，逆序先撤销 Insert，
+    // 再恢复 Delete.value_old，即可回到上一历史节点的精确时间条件。
+    delete variables.stat_data.事件系统.未发生事件[targetName];
+    variables.stat_data.事件系统.未发生事件[targetName] = before;
+    expect(variables.stat_data.事件系统.未发生事件[targetName]).toEqual(before);
   });
 
   it('does not materialize historical events when initializing an existing chat', async () => {
