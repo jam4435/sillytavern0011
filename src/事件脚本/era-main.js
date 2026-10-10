@@ -583,10 +583,6 @@
       );
 
     } catch (error) {
-          logError('定时参与人物入场失败，已保留本轮玩家参与判定:', error);
-        }
-      }
-    } catch (error) {
       logError('主检查函数出错:', error);
       console.trace();
     }
