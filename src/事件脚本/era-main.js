@@ -490,11 +490,11 @@
       const playerAnchoredEventsToStart = [...standaloneEarlyEventsToStart, ...rebasedFirstEventNames];
       if (playerAnchoredEventsToStart.length > 0) {
         log(`📍 玩家到场，提前启动 ${playerAnchoredEventsToStart.length} 个事件:`, playerAnchoredEventsToStart);
-        const started = await batchStartEvents(playerAnchoredEventsToStart, eventDefinitions, {
+        // 玩家在场的参与快照已经与事件启动和 NPC 入场原子提交，不能再次发起独立参与事务。
+        await batchStartEvents(playerAnchoredEventsToStart, eventDefinitions, {
           currentTime,
           earlyEventNames: playerAnchoredEventsToStart,
         });
-        if (started !== false) await playerJoinsEvents(playerAnchoredEventsToStart, eventDefinitions);
       }
 
       // 批量完成登场事件（直接从未发生 -> 已完成）
