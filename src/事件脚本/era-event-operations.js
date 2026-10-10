@@ -903,7 +903,11 @@ export async function playerJoinsEvents(eventNames, eventDefinitions) {
     if (verifiedNames.length !== eventsToJoin.length) {
       throw new Error('玩家参与事件回读未确认全部参与记录');
     }
-    await syncParticipationOutcomeStates(eventDefinitions, verified);
+    try {
+      await syncParticipationOutcomeStates(eventDefinitions, verified);
+    } catch (error) {
+      logWarning('玩家参与已确认，但结局状态派生同步失败，将由后续检查补全:', error);
+    }
     await notifyPlayerEnteredEvents(verifiedNames);
     logSuccess(`玩家已参与 ${verifiedNames.length} 个事件:`, verifiedNames);
 
