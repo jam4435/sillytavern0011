@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  PARTICIPANT_ENTRY_SOURCE,
-  buildOccupancyCleanupPatch,
   buildParticipantEntryPlan,
   getRumorScopeFromEventLocation,
   isLocationWithinRumorScope,
@@ -168,127 +166,38 @@ describe('derived rumor scope', () => {
 });
 
 describe('buildParticipantEntryPlan', () => {
-  it('moves existing participants and skips missing characters', () => {
+  it('事件开始只计算现存 NPC 的位置变更', () => {
     const plan = buildParticipantEntryPlan({
-      eventName: '荒山恶战',
-      eventData,
-      source: PARTICIPANT_ENTRY_SOURCE.TIME,
-      currentTime,
-      characters: {
-        郭靖: { 所在位置: '蒙古/克烈部' },
-      },
-      occupancy: {},
+      eventName: '荒山恶战', eventData, characters: { 郭靖: { 所在位置: '蒙古/克烈部' } },
     });
-
-    expect(plan.locationUpdates).toEqual({
-      郭靖: { 所在位置: '蒙古/大漠/荒山' },
-    });
-    expect(plan.occupancyInserts.郭靖).toMatchObject({
-      事件名: '荒山恶战',
-      地点: '蒙古/大漠/荒山',
-      来源: '时间触发',
-    });
+    expect(plan.locationUpdates).toEqual({ 郭靖: { 所在位置: '蒙古/大漠/荒山' } });
     expect(plan.missingCharacters).toEqual(['梅超风']);
+    expect(plan).not.toHaveProperty('occupancyInserts');
   });
 
-  it('keeps a fourth-level scene on the character but stores only the three-level occupancy scope', () => {
+  it('保留四级具体场景，不再另存人物锁定地点', () => {
     const plan = buildParticipantEntryPlan({
       eventName: '酒馆夜斗',
-      eventData: {
-        ...eventData,
-        事件地点: '大宋/临安府/牛家村/曲三酒馆',
-        参与人物: ['郭靖'],
-      },
-      source: PARTICIPANT_ENTRY_SOURCE.TIME,
-      currentTime,
+      eventData: { ...eventData, 事件地点: '大宋/临安府/牛家村/曲三酒馆', 参与人物: ['郭靖'] },
       characters: { 郭靖: { 所在位置: '大宋/临安府/牛家村/村西树林' } },
-      occupancy: {},
     });
-
     expect(plan.locationUpdates.郭靖).toEqual({ 所在位置: '大宋/临安府/牛家村/曲三酒馆' });
-    expect(plan.occupancyInserts.郭靖).toMatchObject({
-      事件名: '酒馆夜斗',
-      地点: '大宋/临安府/牛家村',
-    });
   });
 
-  it('is idempotent once the same event owns the participant', () => {
-    const plan = buildParticipantEntryPlan({
-      eventName: '荒山恶战',
-      eventData,
-      source: PARTICIPANT_ENTRY_SOURCE.TIME,
-      currentTime,
-      characters: {
-        郭靖: { 所在位置: '玩家后来带往别处' },
-        梅超风: { 所在位置: '蒙古/大漠/荒山' },
-      },
-      occupancy: {
-        郭靖: { 事件名: '荒山恶战' },
-        梅超风: { 事件名: '荒山恶战' },
-      },
+  it('只在同一批启动事务里为共享 NPC 仲裁', () => {
+    const claimedCharacters: Record<string, string> = {};
+    const characters = { 郭靖: { 所在位置: '蒙古/克烈部' } };
+    const first = buildParticipantEntryPlan({
+      eventName: '荒山恶战', eventData: { ...eventData, 参与人物: ['郭靖'] },
+      characters, claimedCharacters,
     });
-
-    expect(plan.locationUpdates).toEqual({});
-    expect(plan.occupancyInserts).toEqual({});
-    expect(plan.alreadyEntered).toEqual(['郭靖', '梅超风']);
-  });
-
-  it('does not let a time-triggered event steal a participant', () => {
-    const plan = buildParticipantEntryPlan({
-      eventName: '荒山恶战',
-      eventData,
-      source: PARTICIPANT_ENTRY_SOURCE.TIME,
-      currentTime,
-      characters: {
-        郭靖: { 所在位置: '蒙古/克烈部' },
-        梅超风: { 所在位置: '蒙古/大漠' },
-      },
-      occupancy: {
-        郭靖: { 事件名: '另一个事件', 来源: '玩家参与' },
-      },
+    const second = buildParticipantEntryPlan({
+      eventName: '另一个事件', eventData: { ...eventData, 参与人物: ['郭靖'] },
+      characters, claimedCharacters,
     });
-
-    expect(plan.locationUpdates).not.toHaveProperty('郭靖');
-    expect(plan.conflicts).toEqual([{ 人物: '郭靖', 当前事件: '另一个事件', 请求事件: '荒山恶战' }]);
-    expect(plan.occupancyInserts).toHaveProperty('梅超风');
-  });
-
-  it('lets player participation override prior occupancy', () => {
-    const plan = buildParticipantEntryPlan({
-      eventName: '荒山恶战',
-      eventData,
-      source: PARTICIPANT_ENTRY_SOURCE.PLAYER,
-      currentTime,
-      characters: {
-        郭靖: { 所在位置: '蒙古/克烈部' },
-        梅超风: { 所在位置: '蒙古/大漠' },
-      },
-      occupancy: {
-        郭靖: { 事件名: '另一个事件', 来源: '时间触发' },
-      },
-    });
-
-    expect(plan.occupancyDeletes).toEqual({ 郭靖: {} });
-    expect(plan.locationUpdates.郭靖).toEqual({ 所在位置: '蒙古/大漠/荒山' });
-    expect(plan.occupancyInserts.郭靖.来源).toBe('玩家参与');
-  });
-});
-
-describe('buildOccupancyCleanupPatch', () => {
-  it('only releases participants still owned by the ending event', () => {
-    expect(
-      buildOccupancyCleanupPatch(
-        {
-          郭靖: { 事件名: '荒山恶战' },
-          梅超风: { 事件名: '另一个事件' },
-          柯镇恶: { 事件名: '荒山恶战' },
-        },
-        '荒山恶战',
-      ),
-    ).toEqual({
-      郭靖: {},
-      柯镇恶: {},
-    });
+    expect(first.locationUpdates).toHaveProperty('郭靖');
+    expect(second.locationUpdates).toEqual({});
+    expect(second.conflicts).toEqual([{ 人物: '郭靖', 当前事件: '荒山恶战', 请求事件: '另一个事件' }]);
   });
 });
 

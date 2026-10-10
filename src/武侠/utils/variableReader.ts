@@ -7,6 +7,8 @@
  * - 在全局变量 iframe 中调用: 获取 全局→角色卡→脚本→聊天→0号消息楼层→中间所有消息楼层→最新消息楼层 的合并结果
  */
 
+import eventPresentationIndex from '../data/事件展示元数据.generated.json';
+
 import type {
   ActiveStatusEffect,
   ActiveStatusEffectVariableData,
@@ -214,15 +216,6 @@ interface GameVariables {
     进行中事件?: Record<string, unknown>;
     已完成事件?: Record<string, unknown>;
     已失效事件?: Record<string, unknown>;
-    人物事件占用?: Record<
-      string,
-      {
-        事件名?: string;
-        地点?: string;
-        来源?: '时间触发' | '玩家参与' | string;
-        入场时间?: { 年?: number; 月?: number; 日?: number; 时?: number };
-      }
-    >;
   };
 
   参与事件?: Record<string, unknown>;
@@ -1184,24 +1177,12 @@ function parseCalendarText(raw?: string): CalendarRecord | undefined {
   };
 }
 
-function collectEventOccupancy(
-  occupancy: NonNullable<NonNullable<GameVariables['事件系统']>['人物事件占用']>,
-  eventName: string,
-): { location?: string; involvedCharacters?: string[] } {
-  const involved: string[] = [];
-  let location: string | undefined;
-
-  for (const [characterName, record] of Object.entries(occupancy)) {
-    if (!isRecord(record) || record.事件名 !== eventName || characterName.startsWith('$')) continue;
-    involved.push(characterName);
-    if (!location && typeof record.地点 === 'string' && record.地点.trim()) {
-      location = getLocationScopePath(record.地点) || undefined;
-    }
-  }
-
+function getEventPresentationMeta(eventName: string): { location?: string; involvedCharacters?: string[] } {
+  const index = eventPresentationIndex as Record<string, { 地点?: string; 参与人物?: string[] }>;
+  const record = index[eventName];
   return {
-    location,
-    involvedCharacters: involved.length > 0 ? involved : undefined,
+    location: typeof record?.地点 === 'string' && record.地点 ? record.地点 : undefined,
+    involvedCharacters: Array.isArray(record?.参与人物) && record.参与人物.length ? record.参与人物 : undefined,
   };
 }
 
@@ -1213,7 +1194,6 @@ function collectEventOccupancy(
 function parseEvents(variables: GameVariables, worldTime?: WorldTime): GameEvent[] {
   const events: GameEvent[] = [];
   const eventSystem = variables.事件系统 || {};
-  const occupancy = eventSystem.人物事件占用 || {};
   const ongoing = eventSystem.进行中事件 || {};
   const completed = eventSystem.已完成事件 || {};
   const expired = eventSystem.已失效事件 || {};
@@ -1285,7 +1265,7 @@ function parseEvents(variables: GameVariables, worldTime?: WorldTime): GameEvent
     const record = value as Record<string, unknown>;
     const outcome = typeof record.结局 === 'string' ? record.结局.trim() : '';
     const endTime = ongoing[eventName];
-    const occupancyMeta = collectEventOccupancy(occupancy, eventName);
+    const eventMeta = getEventPresentationMeta(eventName);
     const persistedLocation =
       typeof record.地点 === 'string' && record.地点.trim() ? record.地点.trim() : undefined;
     events.push({
@@ -1297,12 +1277,12 @@ function parseEvents(variables: GameVariables, worldTime?: WorldTime): GameEvent
       details: outcome || undefined,
       timeText: isCalendarRecord(endTime) ? formatCalendarRecord(endTime) : undefined,
       remainingDays: remainingDaysUntil(endTime),
-      ...occupancyMeta,
-      location: persistedLocation || occupancyMeta.location,
+      ...eventMeta,
+      location: persistedLocation || eventMeta.location,
     });
   }
 
-  // 江湖中进行、玩家未卷入的事件：进行中事件只存结束时间，地点与人物从占用表反查
+  // 江湖中进行、玩家未卷入的事件：人物与地点从静态索引查询
   const participationKeys = new Set(Object.keys(variables.参与事件 || {}));
   for (const [eventName, endTime] of Object.entries(ongoing)) {
     if (participationKeys.has(eventName)) continue;
@@ -1314,7 +1294,7 @@ function parseEvents(variables: GameVariables, worldTime?: WorldTime): GameEvent
       description: '',
       timeText: isCalendarRecord(endTime) ? formatCalendarRecord(endTime) : undefined,
       remainingDays: remainingDaysUntil(endTime),
-      ...collectEventOccupancy(occupancy, eventName),
+      ...getEventPresentationMeta(eventName),
     });
   }
 

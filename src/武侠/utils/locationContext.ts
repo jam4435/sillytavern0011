@@ -1,3 +1,4 @@
+import eventPresentationIndex from '../data/事件展示元数据.generated.json';
 import { writeDirectChatTransaction } from '../../shared/directVariableWrite';
 import type { MapData, MapRegion } from '../types';
 import { getLocationScopePath, normalizeLocationPath, parseLocationPath } from '../../shared/locationPath.js';
@@ -274,15 +275,15 @@ export function collectEventTargetPaths(statData: Record<string, unknown>): stri
   const followupClues = isRecord(statData.后续事件线索) ? statData.后续事件线索 : {};
   const participationEvents = isRecord(statData.参与事件) ? statData.参与事件 : {};
   const eventSystem = isRecord(statData.事件系统) ? statData.事件系统 : {};
-  const participantOccupancy = isRecord(eventSystem.人物事件占用) ? eventSystem.人物事件占用 : {};
-  const activeEventNames = new Set(Object.keys(participationEvents));
-
-  for (const value of Object.values(participantOccupancy)) {
-    if (!isRecord(value) || typeof value.事件名 !== 'string' || !activeEventNames.has(value.事件名)) continue;
-    if (typeof value.地点 === 'string') {
-      const occupancyScope = getLocationScopePath(value.地点);
-      if (occupancyScope) targets.push(occupancyScope);
-    }
+  const ongoing = isRecord(eventSystem.进行中事件) ? eventSystem.进行中事件 : {};
+  const index = eventPresentationIndex as Record<string, { 地点?: string }>;
+  for (const [eventName, value] of Object.entries(participationEvents)) {
+    const location = isRecord(value) && typeof value.地点 === 'string' ? value.地点 : index[eventName]?.地点;
+    if (location) targets.push(location);
+  }
+  for (const eventName of Object.keys(ongoing)) {
+    const location = index[eventName]?.地点;
+    if (location) targets.push(location);
   }
 
   for (const value of [...Object.values(nearbyRumors), ...Object.values(discoverableEvents)]) {

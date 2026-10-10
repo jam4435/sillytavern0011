@@ -633,7 +633,6 @@ describe('getGameVariables ERA 展示投影', () => {
         },
         事件系统: {
           进行中事件: { [eventName]: { 年: 1202, 月: 3, 日: 16, 时: 17 } },
-          人物事件占用: { 段誉: { 事件名: eventName, 地点: '大理/无量山/琅嬛福地' } },
         },
         参与事件: {
           [eventName]: {
@@ -670,6 +669,7 @@ describe('getGameVariables ERA 展示投影', () => {
       location: '大理/无量山/琅嬛福地',
       timeText: '1202年3月16日17时',
       remainingDays: 0,
+      involvedCharacters: ['段誉'],
     });
     expect(matches[0].startsInDays).toBeUndefined();
   });

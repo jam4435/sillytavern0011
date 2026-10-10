@@ -108,7 +108,7 @@ describe('legacy event state reset', () => {
     expect(needsEventRuntimeStateReset(statData)).toBe(true);
     const plan = buildEventRuntimeStateResetPlan(statData);
     expect(plan.assignPayload).toMatchObject({
-      事件系统: { 未发生事件: {}, 进行中事件: {}, 已完成事件: {}, 人物事件占用: {} },
+      事件系统: { 未发生事件: {}, 进行中事件: {}, 已完成事件: {} },
       参与事件: {},
       世界事件: {},
       附近传闻: {},
@@ -116,7 +116,6 @@ describe('legacy event state reset', () => {
       后续事件线索计数: {},
       前端变量: {
         事件结局状态: {},
-        事件结算进度: {},
         事件运行时键版本: EVENT_RUNTIME_KEY_VERSION,
         其他前端状态: 1,
       },

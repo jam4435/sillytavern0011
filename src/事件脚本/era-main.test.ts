@@ -49,7 +49,6 @@ vi.mock('./era-event-operations.js', () => ({
   playerJoinsEvents: vi.fn(),
   batchEndEvents: vi.fn(),
   batchExpireEvents: vi.fn(),
-  applyTimedParticipantEntries: vi.fn(),
   persistRelativeEventRebase: vi.fn(),
   areEventPredecessorsCompleted: vi.fn(() => true),
   cleanupFollowupCluesForActiveParticipation: vi.fn(),
@@ -310,7 +309,7 @@ describe('ERA 主线初始化控制', () => {
     expect(initializeEventListMock).toHaveBeenCalledTimes(2);
   });
 
-  it('开局先登记玩家参与，再处理可能失败的定时人物入场', async () => {
+  it('已有进行中事件仅登记玩家参与，不再重复移动 NPC', async () => {
     const eventName = '射雕测试事件-开局到场';
     const eventLocation = '大宋/嘉兴府/牛家村';
     const variables = validVariables();
@@ -345,7 +344,6 @@ describe('ERA 主线初始化控制', () => {
     vi.mocked(checker.isEventDiscoverable).mockReturnValue(false);
     vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(false);
     vi.mocked(operations.playerJoinsEvents).mockClear();
-    vi.mocked(operations.applyTimedParticipantEntries).mockClear().mockRejectedValueOnce(new Error('NPC 入场写入超时'));
 
     // @ts-expect-error 测试用模块 query
     await import('./era-main.js?opening-participation-priority-test');
@@ -355,19 +353,15 @@ describe('ERA 主线初始化控制', () => {
       .at(-1)?.[1] as ((signal: { timestamp: number }) => unknown) | undefined;
     gameInitializedListener?.({ timestamp: Date.now() + 100_000 });
 
-    await vi.waitFor(() => expect(operations.applyTimedParticipantEntries).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(operations.playerJoinsEvents).toHaveBeenCalledTimes(1));
     expect(operations.playerJoinsEvents).toHaveBeenCalledWith(
       [eventName],
       expect.objectContaining({
         [eventName]: definition,
       }),
     );
-    expect(vi.mocked(operations.playerJoinsEvents).mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(operations.applyTimedParticipantEntries).mock.invocationCallOrder[0],
-    );
-    expect(logErrorMock).toHaveBeenCalledWith(
-      '定时参与人物入场失败，已保留本轮玩家参与判定:',
-      expect.objectContaining({ message: 'NPC 入场写入超时' }),
+    expect(logErrorMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('定时参与人物入场失败'), expect.anything(),
     );
   });
 
@@ -696,7 +690,6 @@ describe('ERA 主线初始化控制', () => {
       return 1;
     });
     vi.mocked(operations.playerJoinsEvents).mockClear();
-    vi.mocked(operations.applyTimedParticipantEntries).mockResolvedValue(undefined);
 
     // @ts-expect-error 测试用模块 query
     await import('./era-main.js?opening-participation-cleanup-test');
@@ -824,7 +817,6 @@ describe('ERA 主线初始化控制', () => {
       });
       return true;
     });
-    vi.mocked(operations.applyTimedParticipantEntries).mockClear().mockResolvedValue(undefined);
 
     // @ts-expect-error 测试用模块 query
     await import('./era-main.js?opening-active-participants-only-test');
@@ -834,16 +826,9 @@ describe('ERA 主线初始化控制', () => {
       .at(-1)?.[1] as ((signal: { timestamp: number }) => unknown) | undefined;
     gameInitializedListener?.({ timestamp: Date.now() + 100_000 });
 
-    await vi.waitFor(() => expect(operations.applyTimedParticipantEntries).toHaveBeenCalled());
+    await vi.waitFor(() => expect(operations.batchEndEvents).toHaveBeenCalled());
     expect(operations.batchEndEvents).toHaveBeenCalledWith([endedEvent], expect.any(Object));
-    expect(vi.mocked(operations.applyTimedParticipantEntries).mock.calls).toEqual(
-      expect.arrayContaining([[[activeEvent], expect.any(Object), variables.stat_data.世界信息.时间, variables]]),
-    );
-    expect(
-      vi
-        .mocked(operations.applyTimedParticipantEntries)
-        .mock.calls.every(([eventNames]) => eventNames.every(eventName => eventName === activeEvent)),
-    ).toBe(true);
+    expect(operations.batchStartEvents).not.toHaveBeenCalled();
   });
 
   it('当前事件结算后立即复检并启动同地点已到时的下一事件', async () => {
