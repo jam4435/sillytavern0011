@@ -231,17 +231,11 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
     return false;
   }, [view, selectedNode, selectedIsOtherBranchLeaf]);
   const checkoutPending = Boolean(journal && !journal.failure && !isHistoryCheckoutJournalExpired(journal));
-  const recoveryAvailable = Boolean(
-    journal &&
-    (journal.failure ||
-      isHistoryCheckoutJournalExpired(journal) ||
-      lastCheckout?.status === 'recovery_failed' ||
-      lastCheckout?.status === 'broken'),
-  );
+  const recoveryAvailable = Boolean(journal && (journal.failure || isHistoryCheckoutJournalExpired(journal)));
   const isWorking = workState.type === 'loading' || Boolean(journal) || isBusy || isRenamingChat;
   const recoveryActionDisabled = workState.type === 'loading' || isRenamingChat;
   const recoveryFailureText = journal?.failure
-    ? `失败阶段：${journal.failure.stage}；原始异常：${journal.failure.message}`
+    ? journal.failure.message
     : journal && isHistoryCheckoutJournalExpired(journal)
       ? '恢复窗口已超过 120 秒，未能继续自动恢复。'
       : '';
@@ -478,17 +472,26 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
       {checkoutPending && (
         <div className="history-journal-banner">
           <Loader2 className="spin" size={14} />
-          <span>分叉事务进行中：{journal?.stage}。发送与重新生成已暂时锁定。</span>
+          <span>正在恢复历史节点，发送与重新生成已暂时锁定。</span>
         </div>
       )}
       {recoveryAvailable && (
         <div className="history-journal-banner history-recovery-failure" role="alert">
           <ShieldAlert size={16} aria-hidden="true" />
           <div className="history-recovery-body">
-            <strong>上次分叉未能完成。新聊天会保留，不会自动删除。</strong>
-            <p>{recoveryFailureText || '请查看恢复诊断并选择处理方式。'}</p>
-            <details className="history-recovery-diagnostics" open>
-              <summary>完整恢复诊断</summary>
+            <strong>历史恢复失败</strong>
+            <p>{recoveryFailureText || '请重试恢复或返回来源聊天。'}</p>
+            <p>新聊天已保留；处理完成前，发送与重新生成仍会锁定。</p>
+            <div className="history-recovery-actions">
+              <button type="button" className="history-secondary-action" disabled={recoveryActionDisabled} onClick={() => void handleRetryRecovery()}>
+                <RotateCcw size={14} /> 重试恢复
+              </button>
+              <button type="button" className="history-secondary-action" disabled={recoveryActionDisabled} onClick={() => void handleReturnSource()}>
+                <Undo2 size={14} /> 返回来源聊天
+              </button>
+            </div>
+            <details className="history-recovery-diagnostics">
+              <summary>展开技术诊断</summary>
               <dl>
                 <dt>事务 ID</dt><dd>{journal?.transactionId}</dd>
                 <dt>失败阶段</dt><dd>{journal?.failure?.stage ?? journal?.stage}</dd>
@@ -505,18 +508,11 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
                 <Copy size={14} /> 复制诊断信息
               </button>
               {diagnosticCopyState && <span className="history-copy-feedback">{diagnosticCopyState}</span>}
-            </details>
-            <div className="history-recovery-actions">
-              <button type="button" className="history-secondary-action" disabled={recoveryActionDisabled} onClick={() => void handleRetryRecovery()}>
-                <RotateCcw size={14} /> 重试恢复
-              </button>
-              <button type="button" className="history-secondary-action" disabled={recoveryActionDisabled} onClick={() => void handleReturnSource()}>
-                <Undo2 size={14} /> 返回来源聊天
-              </button>
               <button type="button" className="history-secondary-action" disabled={recoveryActionDisabled} onClick={() => void handleAbandonRecovery()} title="保留分支但解除恢复锁，不代表当前变量已通过历史校验">
-                <X size={14} /> 放弃此次恢复
+                <X size={14} /> 放弃此次恢复（高级操作）
               </button>
-            </div>
+            </details>
+
           </div>
         </div>
       )}
@@ -678,15 +674,17 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
         </aside>
       </div>
 
-      <div
-        className={`history-status-line ${workState.type}`}
-        data-wuxia-automation="history-status"
-        data-wuxia-history-status={workState.type}
-      >
-        {workState.type === 'loading' && <Loader2 className="spin" size={13} />}
-        {workState.type === 'error' && <ShieldAlert size={13} />}
-        <span>{workState.message}</span>
-      </div>
+      {!(recoveryAvailable && workState.type === 'error') && (
+        <div
+          className={`history-status-line ${workState.type}`}
+          data-wuxia-automation="history-status"
+          data-wuxia-history-status={workState.type}
+        >
+          {workState.type === 'loading' && <Loader2 className="spin" size={13} />}
+          {workState.type === 'error' && <ShieldAlert size={13} />}
+          <span>{workState.message}</span>
+        </div>
+      )}
       <ChatRenameDialog
         isOpen={isRenameDialogOpen}
         mode="manual"

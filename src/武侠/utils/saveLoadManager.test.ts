@@ -1064,6 +1064,7 @@ describe('history checkout', () => {
 
     const result = await checkoutNode(target.id);
     expect(result.status).toBe('recovery_failed');
+    expect(result.error).toBe('恢复的聊天楼层与所选节点不匹配。');
     const details = readHistoryCheckoutJournal()?.failure?.details ?? '';
     expect(details).toContain('切换后的活动叶节点不是目标节点');
     expect(details).toContain(`目标节点：${target.id}`);
@@ -1384,6 +1385,7 @@ describe('history checkout', () => {
     expect(loadHistoryTree().branches[scanned.currentBranchId].status).toBe('recovery_failed');
     const failure = readHistoryCheckoutJournal()?.failure;
     expect(failure?.stage).toBe('verify');
+    expect(failure?.message).toBe('历史记录、事件状态不匹配。');
     expect(failure?.details).toContain('旧封存记录没有逐组事件指纹');
     expect(failure?.details).toContain('目标楼层：User 无 / Assistant 0 / swipe 1');
   });
@@ -1413,6 +1415,8 @@ describe('history checkout', () => {
 
     const failed = await checkoutNode(target.id);
     expect(failed.status).toBe('recovery_failed');
+    expect(failed.error).toBe('事件系统不匹配。');
+    expect(readHistoryCheckoutJournal()?.failure?.message).toBe('事件系统不匹配。');
     const detail = readHistoryCheckoutJournal()?.failure?.details ?? '';
     expect(detail).toContain('事件系统：不一致');
     expect(detail).toContain('参与事件：一致');
@@ -1470,6 +1474,7 @@ describe('history checkout', () => {
     expect(journal?.verificationTrace?.eraEventStateHash).toBe(tree.nodes[target.id].verification?.eventStateHash);
     expect(journal?.verificationTrace?.preparedEventStateHash).not.toBe(tree.nodes[target.id].verification?.eventStateHash);
     expect(journal?.verificationTrace?.changedPaths).toContain('参与事件（空 → 对象(1项)）');
+    expect(journal?.failure?.message).toBe('事件状态不匹配。');
     expect(journal?.failure?.details).toContain('ERA 完全同步后与封存一致，但运行事件脚本预检查后发生漂移');
   });
 

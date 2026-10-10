@@ -208,7 +208,7 @@ const App: React.FC = () => {
   // journal 存在即代表恢复还需要处理（包括已超时或校验失败）；不能在不确定的分支继续发送。
   const historyMutationPending = Boolean(historyCheckoutJournal) || chatRenamePending;
   const historyRestoreMessage = historyCheckoutJournal?.failure
-    ? `历史恢复失败 · ${HISTORY_CHECKOUT_STAGE_LABELS[historyCheckoutJournal.failure.stage]}：${historyCheckoutJournal.failure.message}`
+    ? `历史恢复失败：${historyCheckoutJournal.failure.message}`
     : historyCheckoutJournal
       ? isHistoryCheckoutJournalExpired(historyCheckoutJournal)
         ? '历史恢复已超时，需在存档页选择重试、返回来源聊天或放弃恢复。'
@@ -442,13 +442,17 @@ const App: React.FC = () => {
     void resumeCheckout()
       .then(result => {
         setHistoryCheckoutJournal(readHistoryCheckoutJournal());
-        if (result && result.status !== 'commit') {
-          showError(result.error || '历史分叉自动恢复失败，请打开江湖行迹谱处理。');
+        // 恢复失败由输入栏和存档页统一提示，不再重复弹出全局 Toast。
+        if (result && result.status !== 'commit' && !readHistoryCheckoutJournal()) {
+          showError('历史恢复未完成，请打开存档页处理。');
         }
       })
       .catch(error => {
         setHistoryCheckoutJournal(readHistoryCheckoutJournal());
-        showError(`历史分叉自动恢复失败：${error instanceof Error ? error.message : String(error)}`);
+        gameLogger.error('[history] 自动恢复异常:', error);
+        if (!readHistoryCheckoutJournal()) {
+          showError('历史恢复未完成，请打开存档页处理。');
+        }
       });
   }, [showError]);
 

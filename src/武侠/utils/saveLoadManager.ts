@@ -1422,10 +1422,29 @@ function markBranchStatus(
 }
 
 class HistoryVerificationError extends Error {
-  constructor(message: string, readonly diagnostics?: string) {
+  constructor(
+    message: string,
+    readonly diagnostics?: string,
+    readonly userMessage?: string,
+  ) {
     super(message);
     this.name = 'HistoryVerificationError';
   }
+}
+
+/** 保留原始异常在技术诊断中；恢复界面只显示可理解的错误。 */
+function summarizeCheckoutFailure(error: unknown): string {
+  if (error instanceof HistoryVerificationError) {
+    return error.userMessage ?? '历史节点校验未通过，请重试恢复。';
+  }
+  if (error instanceof HistoryChatUnavailableError) {
+    return '历史聊天不可用，请检查原聊天文件。';
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes('超时')) return '历史恢复超时，请重试恢复。';
+  if (message.includes('快照')) return '历史事件快照校验未通过。';
+  if (/不存在|未找到|没有找到|未切换到/.test(message)) return '未找到目标历史聊天或楼层。';
+  return '历史恢复未完成，请重试或返回原聊天。';
 }
 
 function describeCheckoutNodeMismatch(
@@ -1519,6 +1538,15 @@ function commitVerification(
           return `${key}：${expected === actual ? '一致' : '不一致'}（封存 ${expected}；恢复 ${actual}）`;
         })
       : ['旧封存记录没有逐组事件指纹，无法准确归因到某一组事件字段。'];
+    const mismatchedEventRoots = !eventSame && baseline.eventPartHashes
+      ? HISTORY_EVENT_STATE_KEYS.filter(key =>
+          baseline.eventPartHashes?.[key] !== verification.eventPartHashes?.[key],
+        )
+      : [];
+    const mismatchedNames = [
+      ...(!mksSame ? ['历史记录'] : []),
+      ...(!eventSame ? (mismatchedEventRoots.length ? mismatchedEventRoots : ['事件状态']) : []),
+    ];
     throw new HistoryVerificationError(
       `历史节点校验失败：ERA 主干或事件状态与封存记录不一致（主干${mksSame ? '一致' : '不一致'}，事件状态${eventSame ? '一致' : '不一致'}）。`,
       [
@@ -1526,6 +1554,7 @@ function commitVerification(
         `事件整体：封存 ${baseline.eventStateHash}；恢复 ${verification.eventStateHash}`,
         ...eventDetails,
       ].join('\n'),
+      `${mismatchedNames.join('、')}不匹配。`,
     );
   }
 
@@ -1745,6 +1774,7 @@ async function executeCheckout(
         throw new HistoryVerificationError(
           '切换后的活动叶节点不是目标节点。',
           describeCheckoutNodeMismatch(state, nodeId, journal),
+          '恢复的聊天楼层与所选节点不匹配。',
         );
       }
       state = commitVerification(state, nodeId, node.verification);
@@ -1774,6 +1804,7 @@ async function executeCheckout(
     return makeCheckoutResult('commit', actionKind, nodeId, state, null, postCommitChatName);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const userMessage = summarizeCheckoutFailure(error);
     const unavailableChat = error instanceof HistoryChatUnavailableError ? error : null;
     // 状态指纹不一致仍可再次完成全量同步；只有聊天本身不可访问才是不可恢复的断链。
     const broken = Boolean(unavailableChat);
@@ -1829,7 +1860,7 @@ async function executeCheckout(
           : []),
       ].join('\n');
       updateHistoryCheckoutJournal({
-        failure: { stage: journal.stage, message, occurredAt: Date.now(), details: diagnostics },
+        failure: { stage: journal.stage, message: userMessage, occurredAt: Date.now(), details: diagnostics },
       }, { touch: false });
     }
     const currentChat = unavailableChat ? null : await readCurrentChatIdentity().catch(() => null);
@@ -1859,7 +1890,7 @@ async function executeCheckout(
       );
     }
     notifyHistoryCheckoutFailure();
-    return makeCheckoutResult(broken ? 'broken' : 'recovery_failed', actionKind, nodeId, state, message);
+    return makeCheckoutResult(broken ? 'broken' : 'recovery_failed', actionKind, nodeId, state, userMessage);
   }
 }
 
