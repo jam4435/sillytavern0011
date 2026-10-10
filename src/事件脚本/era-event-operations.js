@@ -499,25 +499,23 @@ export async function persistRelativeEventRebase(deferredConditions) {
   const existing = isPlainObject(statData.事件系统?.未发生事件)
     ? statData.事件系统.未发生事件 : {};
 
+  const deleted = {};
   const inserted = {};
-  const updated = {};
   for (const [eventName, condition] of entries) {
     if (JSON.stringify(existing[eventName]) === JSON.stringify(condition)) continue;
-    if (Object.prototype.hasOwnProperty.call(existing, eventName)) {
-      updated[eventName] = cloneJson(condition);
-    } else {
-      inserted[eventName] = cloneJson(condition);
-    }
+    // 相对时间条件可能增加/删除字段，VariableEdit 只能修改已有叶子，
+    // 因此通过同一个 ERA 事务里的 Delete→Insert 原子替换该事件对象。
+    // 两步都会产生逆向日志，完整恢复原条件及其字段。
+    if (Object.prototype.hasOwnProperty.call(existing, eventName)) deleted[eventName] = {};
+    inserted[eventName] = cloneJson(condition);
   }
 
   const operations = [];
+  if (Object.keys(deleted).length > 0) {
+    operations.push({ type: 'delete', payload: { 事件系统: { 未发生事件: deleted } } });
+  }
   if (Object.keys(inserted).length > 0) {
     operations.push({ type: 'insert', payload: { 事件系统: { 未发生事件: inserted } } });
-  }
-  if (Object.keys(updated).length > 0) {
-    // VariableEdit 递归至已有叶子；禁止用 Delete/Insert 替换整个已存在事件，
-    // 否则多次平移会失去初始值，或破坏事件的额外字段。
-    operations.push({ type: 'update', payload: { 事件系统: { 未发生事件: updated } } });
   }
   if (operations.length === 0) return false;
 
