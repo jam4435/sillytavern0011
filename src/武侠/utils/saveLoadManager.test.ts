@@ -31,6 +31,7 @@ import {
   suggestForkChatName,
 } from './saveLoadManager';
 import { getAvatarSelectionStorageKey, getAvatarStorageKey } from './avatarStorage';
+import { HISTORY_EVENT_SNAPSHOT_PREFIX } from './historyEventSnapshot';
 import {
   getUniqueChatRenameSuggestion,
   renameCurrentChatAutomatically,
@@ -651,6 +652,47 @@ describe('history tree v2 scanning', () => {
 });
 
 describe('history checkout', () => {
+  it('回到第6楼前的节点时恢复六组封存事件，不继承第12楼的 direct 状态', async () => {
+    const oldState = {
+      事件系统: { 未发生事件: { '第三回01': { 年: 1202, 时: 10 } } },
+      参与事件: {},
+      世界事件: { '第二回04': { 结局: '已结束' } },
+      事件分支结果: {},
+      后续事件线索: {},
+      后续事件线索计数: {},
+    };
+    currentChat().variables.stat_data = deepClone(oldState);
+    currentChat().messages = [{ message_id: 0, role: 'assistant', message: '第三回之前' }];
+    const sealed = await finalizeCurrentTurn();
+    const targetId = sealed.currentNodeId!;
+    const verification = loadHistoryTree().nodes[targetId].verification!;
+    expect(localStorage.getItem(HISTORY_EVENT_SNAPSHOT_PREFIX + verification.eventStateHash)).not.toBeNull();
+
+    // 后续分支发生 direct 写入，但模拟 ERA 全量重算不会自动撤销。
+    currentChat().messages.push(
+      { message_id: 1, role: 'user', message: '继续' },
+      { message_id: 2, role: 'assistant', message: '进入第四回' },
+    );
+    currentChat().variables.stat_data = {
+      ...deepClone(oldState),
+      事件系统: { 未发生事件: { '第四回01': { 年: 1202, 时: 18 } } },
+      世界事件: { ...oldState.世界事件, '第三回01': { 结局: '额外完成' } },
+      后续事件线索: { '第四回02': { 地点: '万劫谷' } },
+      后续事件线索计数: { '第四回02': 1 },
+    };
+    await finalizeCurrentTurn();
+
+    const result = await checkoutNode(targetId, { forceBranch: true });
+    expect(result.status).toBe('commit');
+    expect(currentChat().variables.stat_data).toEqual(oldState);
+    const audits = JSON.parse(localStorage.getItem('era_diagnostics_v1') || '[]') as
+      Array<{ event: string; details?: { nodeId?: string } }>;
+    expect(audits.some(entry =>
+      entry.event === 'history-event-snapshot-restored' && entry.details?.nodeId === targetId,
+    )).toBe(true);
+  });
+
+
   it('最新且无后继的 sibling swipe 在原聊天切换并 commit', async () => {
     currentChat().messages = [
       { message_id: 0, role: 'assistant', swipe_id: 0, swipes: ['路线甲', '路线乙'], message: '路线甲' },
