@@ -291,6 +291,43 @@ describe('executeExtraVariableUpdate', () => {
     });
   });
 
+  it('模型在 Think 中写出未闭合的动作标签引用时仍只应用真正的动作块', async () => {
+    requestConfiguredTextMock.mockResolvedValue(`
+      <VariableThink>
+      最终路径：
+      - <VariableEdit> user数据.修为
+      - <VariableInsert> user数据.关系网.段誉
+      </VariableThink>
+      <VariableEdit>{"user数据":{"修为":120}}</VariableEdit>
+    `);
+    const result = await executeExtraVariableUpdate({
+      settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+      assistantMessageId: 28,
+      latestRawReply: '正文内容',
+    });
+
+    expect(result.appended).toBe(true);
+    expect(result.actionBlockCount).toBe(1);
+    expect(result.appendedBlocks).toContain('VariableInsert user数据.关系网.段誉');
+    expect(result.appendedBlocks).not.toContain('<VariableInsert> user数据.关系网.段誉');
+    expect(requestConfiguredTextMock).toHaveBeenCalledTimes(1);
+    expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('动作块真的未闭合时仍拒绝写入而非默默跳过', async () => {
+    requestConfiguredTextMock.mockResolvedValue(
+      '<VariableThink>准备更新</VariableThink><VariableInsert>{"user数据":{"修为":120}}',
+    );
+
+    await expect(executeExtraVariableUpdate({
+      settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+      assistantMessageId: 28,
+      latestRawReply: '正文内容',
+    })).rejects.toThrow('VariableInsert 有 1 个标签未闭合');
+    expect(setChatMessagesMock).not.toHaveBeenCalled();
+    expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
+  });
+
   it('追加变量块时使用 refresh:none，并以严格目标参数等待 ERA 完成', async () => {
     const onProgress = vi.fn();
     const settings = {
