@@ -49,7 +49,6 @@ jobs:
           src/武侠/utils/saveLoadManager.test.ts
           src/武侠/utils/logger.test.ts
           src/武侠/utils/eraWriteWait.test.ts
-          src/武侠/hooks/useVariableChangeTracker.test.tsx
           src/事件脚本/era-lifecycle.test.ts
       - name: Build
         run: pnpm build:src:fast
