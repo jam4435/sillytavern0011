@@ -484,32 +484,46 @@ export async function initializeEventList(eventDefinitions, options = {}) {
   return result;
 }
 
+/**
+ * 后续事件相对平移属于可回溯的剧情状态，必须写入当前楼的 ERA EditLog。
+ * 显示顺序由读取方 sortUnstartedEventsByTrigger() 负责，不能为了排序
+ * direct replace 整个“未发生事件”，否则历史分支无法撤销后续楼层的修改。
+ */
 export async function persistRelativeEventRebase(deferredConditions) {
   const entries = Object.entries(deferredConditions || {});
   if (entries.length === 0) return false;
 
-  let changed = false;
-  await writeDirectChatTransaction(
-    variables => {
-      const statData = variables?.stat_data;
-      if (!statData) throw new Error('无法写入相对事件时间：缺少 stat_data');
-      statData.事件系统 = isPlainObject(statData.事件系统) ? statData.事件系统 : {};
-      const existing = isPlainObject(statData.事件系统.未发生事件) ? statData.事件系统.未发生事件 : {};
-      const next = { ...existing };
+  const variables = await getVariables({ type: 'chat' });
+  const statData = variables?.stat_data;
+  if (!statData) throw new Error('无法写入相对事件时间：缺少 stat_data');
+  const existing = isPlainObject(statData.事件系统?.未发生事件)
+    ? statData.事件系统.未发生事件 : {};
 
-      // 先移除再按实际触发顺序重建，保证变量展示顺序与触发顺序一致。
-      for (const [eventName] of entries) delete next[eventName];
-      for (const [eventName, condition] of entries) next[eventName] = cloneJson(condition);
-      const ordered = sortUnstartedEventsByTrigger(next);
-      changed = JSON.stringify(existing) !== JSON.stringify(ordered);
-      statData.事件系统.未发生事件 = ordered;
-      return variables;
-    },
-    `rebase-relative-events-${entries.length}`,
-    { operation: 'replace', refreshHint: 'event-state' },
-  );
+  const inserted = {};
+  const updated = {};
+  for (const [eventName, condition] of entries) {
+    if (JSON.stringify(existing[eventName]) === JSON.stringify(condition)) continue;
+    if (Object.prototype.hasOwnProperty.call(existing, eventName)) {
+      updated[eventName] = cloneJson(condition);
+    } else {
+      inserted[eventName] = cloneJson(condition);
+    }
+  }
 
-  return changed;
+  const operations = [];
+  if (Object.keys(inserted).length > 0) {
+    operations.push({ type: 'insert', payload: { 事件系统: { 未发生事件: inserted } } });
+  }
+  if (Object.keys(updated).length > 0) {
+    // VariableEdit 递归至已有叶子；禁止用 Delete/Insert 替换整个已存在事件，
+    // 否则多次平移会失去初始值，或破坏事件的额外字段。
+    operations.push({ type: 'update', payload: { 事件系统: { 未发生事件: updated } } });
+  }
+  if (operations.length === 0) return false;
+
+  const committed = await writeEraTransaction(operations, `rebase-relative-events-${entries.length}`);
+  if (!committed) throw new Error('ERA 相对事件时间平移事务未确认，不得视为已落库');
+  return true;
 }
 
 // 开局初始化已统一走上方的单事务规划器；旧的多写入实现已移除。
