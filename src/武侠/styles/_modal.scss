@@ -134,6 +134,16 @@
   }
 }
 
+// 行囊 / 功法是独立滚动的双栏工作台，提供真正的可用内容宽度作为断点。
+.modal-box.modal-inventory,
+.modal-box.modal-martial_arts {
+  .modal-content {
+    min-height: 0;
+    overflow: hidden;
+    container: workbench-content / inline-size;
+  }
+}
+
 .avatar-preview-overlay {
   z-index: 70;
 }
