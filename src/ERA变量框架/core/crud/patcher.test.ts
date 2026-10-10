@@ -149,6 +149,17 @@ describe('ERA 同一楼层变量块的原始次序', () => {
     expect(rollbackByMk).toHaveBeenCalledWith('mk-checkout-regression', true);
   });
 
+  it('内容版本未变但原日志的变量效果已偏离时也拒绝覆盖', async () => {
+    state.stat = { 事件系统: { 人物事件占用: {} } };
+    state.message = insertNew;
+    await ApplyVarChangeForMessage({ message_id: 6 });
+    const previous = structuredClone(state.meta.EditLogs['mk-checkout-regression']);
+    // 外部 direct 更新让同一 MK 的原 insert 效果不再对应当前状态。
+    state.stat.事件系统.人物事件占用.段誉 = { 事件名: '其他事件' };
+    await expect(ApplyVarChangeForMessage({ message_id: 6 })).rejects.toThrow('未能验证');
+    expect(state.meta.EditLogs['mk-checkout-regression']).toEqual(previous);
+  });
+
   it('同一 MK 同内容在原效果尚存在时重复处理，不把可撤销的 Insert 账本覆盖成空', async () => {
     state.stat = { 事件系统: { 人物事件占用: {} } };
     state.message = insertNew;
@@ -222,6 +233,9 @@ describe('ERA 同一楼层变量块的原始次序', () => {
       else if (entry.op === 'delete') _.set(state.stat, entry.path, structuredClone(entry.value_old));
     }
     expect(state.stat.事件系统.人物事件占用.段誉).toEqual(oldOccupant);
+    // 完整同步已经真实撤销过此楼：由 rollbackByMk 提供一次性见证。
+    const { markMkRollbackPerformed } = await import('../../utils/mkLedgerJournal');
+    markMkRollbackPerformed('mk-checkout-regression');
 
     await ApplyVarChangeForMessage({ message_id: 6 });
     expect((state.meta.EditLogs['mk-checkout-regression'] as any[]).map(entry => entry.op))
