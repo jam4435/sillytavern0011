@@ -1,6 +1,6 @@
 /**
  * 分类日志工具
- * 生产环境自动禁用所有日志，开发环境可按类别控制
+ * 普通分类日志在生产环境关闭；变量追踪详细日志由运行时开关控制
  */
 
 export type LogCategory = 'init' | 'message' | 'event' | 'game' | 'api' | 'ui' | 'data';
@@ -138,14 +138,30 @@ export function createLogger(category: LogCategory): Logger {
   };
 }
 
-export function createForcedLogger(prefix: string): Logger {
+// 仅控制普通控制台追踪日志，运行时即时生效；警告和错误不会被此开关屏蔽。
+function isForcedLogVerbose(storageKey?: string): boolean {
+  if (!storageKey) return true;
+  try {
+    return globalThis.localStorage?.getItem(storageKey) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function createForcedLogger(prefix: string, verboseStorageKey?: string): Logger {
   const runtimePrefix = `${prefix}#${RUNTIME_ID}`;
   return {
-    log: (...args: unknown[]) => console.log(runtimePrefix, ...args),
+    log: (...args: unknown[]) => {
+      if (isForcedLogVerbose(verboseStorageKey)) console.log(runtimePrefix, ...args);
+    },
     error: (...args: unknown[]) => console.error(runtimePrefix, ...args),
     warn: (...args: unknown[]) => console.warn(runtimePrefix, ...args),
-    group: (label: string) => console.group(`${runtimePrefix} ${label}`),
-    groupEnd: () => console.groupEnd(),
+    group: (label: string) => {
+      if (isForcedLogVerbose(verboseStorageKey)) console.group(`${runtimePrefix} ${label}`);
+    },
+    groupEnd: () => {
+      if (isForcedLogVerbose(verboseStorageKey)) console.groupEnd();
+    },
   };
 }
 
@@ -157,8 +173,8 @@ export const gameLogger = createLogger('game');
 export const apiLogger = createLogger('api');
 export const uiLogger = createLogger('ui');
 export const dataLogger = createLogger('data');
-export const variableTraceLogger = createForcedLogger('[wuxia-variable-trace]');
-export const variableBarLogger = createForcedLogger('[wuxia-variable-bar]');
+export const variableTraceLogger = createForcedLogger('[wuxia-variable-trace]', 'wuxia_variable_trace_debug');
+export const variableBarLogger = createForcedLogger('[wuxia-variable-bar]', 'wuxia_variable_bar_debug');
 
 // 简单的全局日志器（用于不需要分类的场景）
 const globalLoggerEnabled = getDebugOverride('game');

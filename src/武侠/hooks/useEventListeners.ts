@@ -275,7 +275,7 @@ export function useEventListeners({
 
     return () => {
       eventLogger.log('🛑 取消事件监听器');
-      variableTraceLogger.warn('[useEventListeners] 变量相关监听器即将清理', {
+      variableTraceLogger.log('[useEventListeners] 变量相关监听器即将清理', {
         ...getRuntimeDebugInfo(),
         currentChatId: lastKnownChatIdRef.current,
       });
@@ -293,7 +293,7 @@ export function useEventListeners({
       writeDoneListener.stop();
       directWriteDoneListener.stop();
       eraVariableWriteDoneListener.stop();
-      variableTraceLogger.warn('[useEventListeners] 变量相关监听器已清理完成', {
+      variableTraceLogger.log('[useEventListeners] 变量相关监听器已清理完成', {
         ...getRuntimeDebugInfo(),
         currentChatId: lastKnownChatIdRef.current,
       });
