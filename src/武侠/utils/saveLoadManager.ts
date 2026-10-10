@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { recordEraDiagnostic } from '../../ERA变量框架/utils/diagnostics';
 import { recordHistoryBranchMkAudit } from '../../shared/historyBranchMkAudit';
 import { recordHistoryEventForensics, snapshotHistoryEventForensics } from '../../shared/historyEventForensics';
+import { captureHistoryEventRoots, HISTORY_EVENT_ROOTS, loadHistoryEventSnapshot, saveHistoryEventSnapshot } from './historyEventSnapshot';
 import {
   clearHistoryCheckoutJournal,
   clearHistoryCheckoutReturnIntent,
@@ -688,6 +689,24 @@ export async function finalizeCurrentTurn(options: FinalizeHistoryTurnOptions = 
   const node = tree.nodes[scanned.currentNodeId];
   if (!node) return scanned;
   const sealedVerification = readCurrentVerification();
+  // 按内容指纹只保存一份事件根；多节点若状态一致可共享快照。
+  // 不把体积较大的原值塞进历史树元数据，避免每次扫描复制全部事件内容。
+  try {
+    const sealedStat = getVariables({ type: 'chat' })?.stat_data ?? {};
+    const roots = captureHistoryEventRoots(isRecord(sealedStat) ? sealedStat : {});
+    if (stableHistoryHash(roots) !== sealedVerification.eventStateHash) {
+      throw new Error('事件快照与封存指纹不一致');
+    }
+    saveHistoryEventSnapshot(sealedVerification.eventStateHash, roots);
+  } catch (error) {
+    // 当前开局允许继续，但该节点将无法使用快照修复非 ERA 的事件漂移。
+    recordEraDiagnostic('wuxia-history-checkout', 'history-event-snapshot-save-failed', {
+      nodeId: node.id,
+      eventStateHash: sealedVerification.eventStateHash,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    console.warn('[历史节点] 事件基准快照封存失败，历史检出可能无法修复 direct 写入', error);
+  }
   tree.nodes[node.id] = {
     ...node,
     location: options.location ?? node.location,
@@ -1240,13 +1259,71 @@ function recordCheckoutEventSystemAudit(stage: string, journal: HistoryCheckoutJ
   }
 }
 
+
+/**
+ * ERA 历史同步后：仅当 MK 主干已正确恢复，才将无法由 ERA EditLog 回滚的
+ * 初始化、历史调度 direct 写入部分校准到节点封存的事件最终状态。
+ * 旧节点没有封存快照时维持原校验失败，不伪造可用历史。
+ */
+async function restoreSealedEventBaseline(journal: HistoryCheckoutJournal | null): Promise<void> {
+  if (!journal?.targetNodeId) return;
+  const node = loadHistoryTree().nodes[journal.targetNodeId];
+  const baseline = node?.verification;
+  if (!baseline) return;
+
+  const current = readCurrentVerification();
+  if (current.selectedMksHash !== baseline.selectedMksHash ||
+      current.eventStateHash === baseline.eventStateHash) return;
+
+  const roots = loadHistoryEventSnapshot(baseline.eventStateHash);
+  if (!roots) {
+    recordEraDiagnostic('wuxia-history-checkout', 'history-event-snapshot-missing', {
+      transactionId: journal.transactionId,
+      nodeId: journal.targetNodeId,
+      expectedEventStateHash: baseline.eventStateHash,
+    });
+    return;
+  }
+  if (stableHistoryHash(roots) !== baseline.eventStateHash) {
+    throw new Error('历史事件基准快照校验失败，拒绝载入不可信快照');
+  }
+
+  const beforeRoots = readCheckoutEventRoots();
+  await updateVariablesWith(variables => {
+    const stat = isRecord(variables?.stat_data) ? variables.stat_data : {};
+    for (const key of HISTORY_EVENT_ROOTS) {
+      const value = roots[key];
+      if (value === null) delete stat[key];
+      else stat[key] = structuredClone(value);
+    }
+    variables.stat_data = stat;
+    return variables;
+  }, { type: 'chat' });
+  const restored = readCurrentVerification();
+  recordEraDiagnostic('wuxia-history-checkout', 'history-event-snapshot-restored', {
+    transactionId: journal.transactionId,
+    nodeId: journal.targetNodeId,
+    beforeEventStateHash: current.eventStateHash,
+    afterEventStateHash: restored.eventStateHash,
+    changedPaths: describeChangedEventPaths(beforeRoots, readCheckoutEventRoots()),
+  });
+  if (restored.eventStateHash !== baseline.eventStateHash ||
+      restored.selectedMksHash !== baseline.selectedMksHash) {
+    throw new Error('事件基准快照恢复后校验仍不一致');
+  }
+}
+
 async function runFullHistorySync(prepareVerification = false): Promise<void> {
   const traceJournal = prepareVerification ? readHistoryCheckoutJournal() : null;
   if (prepareVerification) recordCheckoutEventSystemAudit('before-full-sync', traceJournal);
   await waitForEraFullResync();
   if (prepareVerification) recordCheckoutEventSystemAudit('after-full-sync', traceJournal);
   if (prepareVerification) {
+    // 保留纯 ERA 重放后的证据，之后的事件基准恢复不得伪装成 ERA 自己回滚成功。
     const journal = readHistoryCheckoutJournal();
+    const rawAfterEra = readCurrentVerification();
+    await restoreSealedEventBaseline(journal);
+    recordCheckoutEventSystemAudit('after-snapshot-restore', journal);
     const afterEra = readCurrentVerification();
     const rootsAfterEra = readCheckoutEventRoots();
     await eventEmit(WUXIA_HISTORY_PREPARE_VERIFICATION_EVENT, {
@@ -1258,8 +1335,8 @@ async function runFullHistorySync(prepareVerification = false): Promise<void> {
     // 只持久化诊断哈希与变更路径，不额外保存游戏变量或污染分支状态。
     updateHistoryCheckoutJournal({
       verificationTrace: {
-        eraSelectedMksHash: afterEra.selectedMksHash,
-        eraEventStateHash: afterEra.eventStateHash,
+        eraSelectedMksHash: rawAfterEra.selectedMksHash,
+        eraEventStateHash: rawAfterEra.eventStateHash,
         preparedSelectedMksHash: afterPrepare.selectedMksHash,
         preparedEventStateHash: afterPrepare.eventStateHash,
         changedPaths: describeChangedEventPaths(rootsAfterEra, rootsAfterPrepare),
