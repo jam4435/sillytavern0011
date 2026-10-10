@@ -2738,6 +2738,7 @@
 
 .workbench-detail-title {
   margin: 0;
+  overflow-wrap: anywhere;
   color: #f5f5f4;
   font-family: var(--font-serif);
   font-size: 1.6rem;
@@ -2925,9 +2926,8 @@
   cursor: not-allowed;
 }
 
-// 与弹窗全屏断点（$breakpoint-md=640px）对齐：641-768px 区间弹窗仍带 2rem 边距，
-// 若在此区间切换滑出层，会出现悬浮的无边框深色矩形
-@media (max-width: $breakpoint-md) {
+// 统一保留窄宽度下的列表 → 详情滑出交互（不能仅根据 viewport 判断）。
+@mixin compact-workbench-layout {
   .inventory-workbench,
   .workbench-panel {
     display: block;
@@ -3028,6 +3028,17 @@
     grid-template-columns: 1fr;
     gap: 0.3rem;
   }
+}
+
+// 非模态场景与不支持容器查询的浏览器仍可使用原移动端断点。
+@media (max-width: $breakpoint-md) {
+  @include compact-workbench-layout;
+}
+
+// 弹窗有边框和内边距，实际可用宽度可能远小于 iframe / 浏览器视口。
+// 只有容器足够宽时才允许显示左右双栏，避免标题被压到逐字换行。
+@container workbench-content (max-width: 760px) {
+  @include compact-workbench-layout;
 }
 
 // =========================================
