@@ -31,6 +31,42 @@ describe('parseDeclaredVariableChanges', () => {
     ]);
   });
 
+  it('思考区内引用操作标签不会污染动作计数与解析', () => {
+    const parsed = parseDeclaredVariableChanges(`
+      <VariableThink>
+      最终路径：
+      - <VariableEdit> 世界信息.时间
+      - <VariableInsert> user数据.关系网.段誉
+      - <VariableInsert> 角色数据.段誉.关系网.墨逸
+      </VariableThink>
+      <VariableEdit>{"世界信息":{"时间":{"分":10}}}</VariableEdit>
+      <VariableInsert>{"user数据":{"关系网":{"段誉":"初识结交/60"}},"角色数据":{"段誉":{"关系网":{"墨逸":"初识感激/65"}}}}</VariableInsert>
+    `);
+    expect(parsed.parseErrors).toEqual([]);
+    expect(parsed.thoughts).toHaveLength(1);
+    expect(parsed.thoughts[0].text).not.toContain('<VariableInsert>');
+    expect(parsed.declaredChanges).toHaveLength(3);
+    expect(parsed.declaredChanges.map(change => change.path)).toEqual([
+      ['世界信息', '时间', '分'],
+      ['user数据', '关系网', '段誉'],
+      ['角色数据', '段誉', '关系网', '墨逸'],
+    ]);
+  });
+
+  it('JSON 字符串中的 XML 标签不会被识别为结构边界', () => {
+    const parsed = parseDeclaredVariableChanges(
+      '<VariableEdit>{"user数据":{"状态":"含有 <VariableInsert> 与 </VariableEdit> 的原样字符串"}}</VariableEdit>',
+    );
+    expect(parsed.parseErrors).toEqual([]);
+    expect(parsed.declaredChanges).toEqual([
+      expect.objectContaining({
+        action: 'edit',
+        path: ['user数据', '状态'],
+        value: '含有 <VariableInsert> 与 </VariableEdit> 的原样字符串',
+      }),
+    ]);
+  });
+
   it('未闭合的变量标签会明确报告解析错误', () => {
     const parsed = parseDeclaredVariableChanges(
       '<VariableEdit>{"user数据":{"修为":120}}',
