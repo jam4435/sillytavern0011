@@ -278,6 +278,13 @@ export function useEventListeners({
       }
 
       if (didKnownChatChange) {
+        // 历史分叉或切换聊天时，旧聊天的 roundId 不能阻塞新聊天的 UI 投影。
+        activeEventRound = null;
+        deferredGameRefresh = false;
+        if (refreshTimer) {
+          clearTimeout(refreshTimer);
+          refreshTimer = null;
+        }
         eventLogger.log(`[CHAT_CHANGED] 聊天已切换: ${previousChatId} -> ${nextChatId}`);
         onChatChanged?.();
       } else {
