@@ -29,6 +29,7 @@ import {
 import { isTimeForEvent, isTimeAfterEventEnd, isEventStartLocationSatisfied } from './era-event-checker.js';
 import { writeEraTransaction } from './era-write-helper.js';
 import { buildParticipantEntryPlan } from './era-participant-entry.js';
+import { isSameLocationScope } from '../shared/locationPath.js';
 import {
   getEventSummary,
   buildWorldEventRecord,
@@ -555,6 +556,18 @@ export function buildEventStartParticipantOperations(eventNames, eventDefinition
   return operations;
 }
 
+function notifyPlayerEnteredEvents(eventNames) {
+  if (eventNames.length === 0) return;
+  notifyEvent({
+    kind: 'player-entered-event',
+    level: 'warning',
+    message: eventNames.length === 1
+      ? `⚠️ 你已到达事件地点: ${eventNames[0]}！你的行为可能会改变事件的结局。`
+      : `⚠️ 你已到达 ${eventNames.length} 个事件地点！你的行为可能会改变事件的结局。`,
+    eventNames,
+  });
+}
+
 // ==================== 批量开始事件 ====================
 export async function batchStartEvents(eventNames, eventDefinitions, options = {}) {
   if (eventNames.length === 0) return;
@@ -587,26 +600,51 @@ export async function batchStartEvents(eventNames, eventDefinitions, options = {
     };
 
     const startVars = await getVariables({ type: 'chat' });
+    const startStat = startVars?.stat_data || {};
+    const playerLocation = startStat.user数据?.所在位置;
+    const startTime = options.currentTime || startStat.世界信息?.时间 || {};
+    // 已在事件地点的玩家，与进行中状态、NPC 首次入场一同落库。
+    // 已参与的旧记录不覆盖；玩家稍后抵达既有进行中事件仍由 playerJoinsEvents 处理。
+    const joiningNames = [...new Set(eventNames)].filter(name =>
+      eventDefinitions[name] &&
+      !hasParticipationEntry(startStat.参与事件, name) &&
+      isSameLocationScope(playerLocation, eventDefinitions[name].事件地点),
+    );
+    const participationPatch = Object.fromEntries(joiningNames.map(name => [
+      name,
+      buildPlayerParticipationEntry(name, eventDefinitions[name], startTime, 进行中事件对象[name]),
+    ]));
     const npcOperations = buildEventStartParticipantOperations(
-      eventNames, eventDefinitions, startVars?.stat_data?.角色数据,
+      eventNames, eventDefinitions, startStat.角色数据,
     );
-    const committed = await writeEraTransaction(
-      [{ type: 'insert', payload: insertPayload },
-        ...npcOperations,
-        { type: 'delete', payload: deletePayload }],
-      `batch-start-${eventNames.length}`,
-    );
-    if (!committed) throw new Error('事件启动和人物入场未确认原子提交');
-    log('✅ 批量开始事件事务完成');
+    const operations = [
+      { type: 'insert', payload: insertPayload },
+      ...npcOperations,
+      ...(joiningNames.length > 0
+        ? [{ type: 'insert', payload: { 参与事件: participationPatch } }]
+        : []),
+      { type: 'delete', payload: deletePayload },
+    ];
+    const committed = await writeEraTransaction(operations, `batch-start-${eventNames.length}`);
+    if (!committed) throw new Error('事件启动、人物入场及玩家参与未确认原子提交');
 
-    // 验证操作后的状态
+    // 真实 stat_data 是唯一真相；确认所有目标状态后才对外发通知。
     const verifyVars = await getVariables({ type: 'chat' });
+    const verifyStat = verifyVars?.stat_data || {};
+    const started = eventNames.every(name =>
+      Object.prototype.hasOwnProperty.call(verifyStat.事件系统?.进行中事件 || {}, name) &&
+      !Object.prototype.hasOwnProperty.call(verifyStat.事件系统?.未发生事件 || {}, name),
+    );
+    const joined = joiningNames.every(name => hasParticipationEntry(verifyStat.参与事件, name));
+    if (!started || !joined) {
+      throw new Error('事件启动事务确认后回读不一致，禁止提前显示参与通知');
+    }
     if (isDebugEnabled()) {
       debugGroupCollapsed('🔍 批量开始后的事件系统状态');
-      console.log(JSON.parse(JSON.stringify(verifyVars?.stat_data?.事件系统 || {})));
+      console.log(JSON.parse(JSON.stringify(verifyStat.事件系统 || {})));
       debugGroupEnd();
     }
-
+    log('✅ 批量开始事件事务完成');
     logSuccess(`批量开始了 ${eventNames.length} 个事件:`, eventNames);
 
     // 显示通知（限制数量避免刷屏）
@@ -629,13 +667,15 @@ export async function batchStartEvents(eventNames, eventDefinitions, options = {
         durationMs: 3000,
       });
     }
+    // 开始与参与都是已确认状态，两个通知此时都不能抢跑。
+    notifyPlayerEnteredEvents(joiningNames);
     return true;
   } catch (error) {
     logError(`批量开始事件失败`, error);
     return false;
+  } finally {
+    debugGroupEnd();
   }
-
-  debugGroupEnd();
 }
 
 export async function batchExpireEvents(eventNames, eventDefinitions) {
@@ -825,22 +865,6 @@ export async function playerJoinsEvents(eventNames, eventDefinitions) {
       return [];
     }
 
-    if (eventsToJoin.length === 1) {
-      notifyEvent({
-        kind: 'player-entered-event',
-        level: 'warning',
-        message: `⚠️ 你已到达事件地点: ${eventsToJoin[0]}！你的行为可能会改变事件的结局。`,
-        eventNames: eventsToJoin,
-      });
-    } else {
-      notifyEvent({
-        kind: 'player-entered-event',
-        level: 'warning',
-        message: `⚠️ 你已到达 ${eventsToJoin.length} 个事件地点！你的行为可能会改变事件的结局。`,
-        eventNames: eventsToJoin,
-      });
-    }
-
     const participationPatch = Object.fromEntries(
       eventsToJoin.map(eventName => {
         const eventData = eventDefinitions[eventName];
@@ -851,15 +875,24 @@ export async function playerJoinsEvents(eventNames, eventDefinitions) {
       }),
     );
 
-    await writeEraTransaction(
+    const committed = await writeEraTransaction(
       [{ type: 'insert', payload: { 参与事件: participationPatch } }],
       `player-joins-events-${eventsToJoin.length}`,
     );
-    await syncParticipationOutcomeStates(eventDefinitions);
-    logSuccess(`玩家已参与 ${eventsToJoin.length} 个事件:`, eventsToJoin);
+    if (!committed) throw new Error('玩家参与事件事务未确认提交');
+    const verified = await getVariables({ type: 'chat' });
+    const verifiedNames = eventsToJoin.filter(name =>
+      hasParticipationEntry(verified?.stat_data?.参与事件, name),
+    );
+    if (verifiedNames.length !== eventsToJoin.length) {
+      throw new Error('玩家参与事件回读未确认全部参与记录');
+    }
+    await syncParticipationOutcomeStates(eventDefinitions, verified);
+    notifyPlayerEnteredEvents(verifiedNames);
+    logSuccess(`玩家已参与 ${verifiedNames.length} 个事件:`, verifiedNames);
 
     debugGroupEnd();
-    return eventsToJoin;
+    return verifiedNames;
   } catch (error) {
     logError('玩家参与事件失败', error);
     debugGroupEnd();
