@@ -514,7 +514,8 @@ describe('ERA 主线初始化控制', () => {
       currentTime: variables.stat_data.世界信息.时间,
       earlyEventNames: [firstEvent],
     });
-    expect(operations.playerJoinsEvents).toHaveBeenCalledWith([firstEvent], definitions);
+    // 在场玩家的参与记录由 batchStartEvents 同一 ERA 事务写入，不再二次参与。
+    expect(operations.playerJoinsEvents).not.toHaveBeenCalled();
     expect(vi.mocked(operations.batchStartEvents).mock.calls.flatMap(([eventNames]) => eventNames)).not.toContain(
       secondEvent,
     );
