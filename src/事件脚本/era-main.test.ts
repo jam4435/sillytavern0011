@@ -84,6 +84,7 @@ vi.mock('./era-event-scheduler.js', () => ({
     deferredConditions: {},
   })),
   getManifestEventCandidateKeys: vi.fn(() => []),
+  selectEarliestDiscoverableEventPerRegion: vi.fn(() => []),
   sortUnstartedEventsByTrigger: vi.fn(value => value),
 }));
 
