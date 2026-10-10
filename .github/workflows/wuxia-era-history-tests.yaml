@@ -8,6 +8,7 @@ on:
       - 'src/事件脚本/era-event-operations.js'
       - 'src/事件脚本/era-main.js'
       - 'src/事件脚本/era-main.test.ts'
+      - 'src/事件脚本/era-event-admission.test.ts'
       - 'src/事件脚本/era-write-helper.js'
       - 'src/事件脚本/era-write-helper.test.ts'
       - 'src/shared/turnEventSettlement*'
@@ -22,6 +23,7 @@ on:
       - 'src/武侠/utils/logger.ts'
       - 'src/武侠/utils/logger.test.ts'
       - 'src/武侠/hooks/useEventListeners.ts'
+      - 'src/武侠/hooks/useEventListeners.test.tsx'
       - '.github/workflows/wuxia-era-history-tests.yaml'
   workflow_dispatch:
 
@@ -59,6 +61,15 @@ jobs:
           src/事件脚本/era-lifecycle.test.ts
           src/事件脚本/era-write-helper.test.ts
           src/shared/turnEventSettlement.test.ts
+      - name: Event admission atomicity and UI projection regressions
+        run: >
+          pnpm exec vitest run --configLoader native --pool threads --reporter verbose
+          src/事件脚本/era-event-admission.test.ts
+          src/武侠/hooks/useEventListeners.test.tsx
+      - name: Event admission scheduler regressions
+        run: >
+          pnpm exec vitest run --configLoader native --pool threads --reporter verbose
+          src/事件脚本/era-main.test.ts -t '已有进行中事件|同一三级地点|回合事件结算'
       - name: Turn settlement event-runtime regressions
         run: >
           pnpm exec vitest run --configLoader native --pool threads --reporter verbose
