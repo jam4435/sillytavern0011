@@ -533,18 +533,26 @@ export async function persistRelativeEventRebase(deferredConditions) {
 
 /** 事件开启和 NPC 入场使用相同 ERA 事务，永不在后续检查重新传送。 */
 export function buildEventStartParticipantOperations(eventNames, eventDefinitions, characters) {
-  const claimedCharacters = {}, locationUpdates = {};
+  const claimedCharacters = {}, locationUpdates = {}, locationInserts = {};
   for (const eventName of [...new Set(eventNames)]) {
     const data = eventDefinitions[eventName];
     if (!data || isDebutEvent(data)) continue;
     const plan = buildParticipantEntryPlan({ eventName, eventData: data, characters, claimedCharacters });
     for (const name of plan.missingCharacters) logWarning(`事件 ${eventName} NPC ${name} 尚未登场`);
     for (const conflict of plan.conflicts) logWarning(`NPC ${conflict.人物} 同批已进入 ${conflict.当前事件}，不重复移动`);
-    Object.assign(locationUpdates, plan.locationUpdates);
+    for (const [name, patch] of Object.entries(plan.locationUpdates)) {
+      const character = characters?.[name];
+      if (character && Object.prototype.hasOwnProperty.call(character, '所在位置')) {
+        locationUpdates[name] = patch;
+      } else {
+        locationInserts[name] = patch;
+      }
+    }
   }
-  return Object.keys(locationUpdates).length
-    ? [{ type: 'update', payload: { 角色数据: locationUpdates } }]
-    : [];
+  const operations = [];
+  if (Object.keys(locationInserts).length) operations.push({ type: 'insert', payload: { 角色数据: locationInserts } });
+  if (Object.keys(locationUpdates).length) operations.push({ type: 'update', payload: { 角色数据: locationUpdates } });
+  return operations;
 }
 
 // ==================== 批量开始事件 ====================
@@ -875,6 +883,30 @@ function buildSettlementBranchSnapshot(eventName, eventData, statData) {
   return normalizeBranchMarkers(eventData?.分支标记);
 }
 
+/** 有分支标记时保留结算预备快照；普通事件无标记则跳过额外 ERA 事务。 */
+async function prepareSettlementBranchSnapshots(eventNames, definitions, statData) {
+  const existing = statData?.前端变量?.事件结算进度 || {};
+  const patch = {};
+  for (const eventName of eventNames) {
+    if (isPlainObject(existing[eventName]?.分支标记) &&
+        Object.keys(existing[eventName].分支标记).length > 0) continue;
+    const markers = buildSettlementBranchSnapshot(eventName, definitions[eventName], statData);
+    if (Object.keys(markers).length > 0) patch[eventName] = { 分支标记: markers };
+  }
+  if (Object.keys(patch).length === 0) return statData;
+  const committed = await writeEraTransaction(
+    [{ type: 'insert', payload: { 前端变量: { 事件结算进度: patch } } }],
+    `prepare-event-settlement-${Object.keys(patch).length}`,
+  );
+  if (!committed) throw new Error('事件结算分支快照未确认提交');
+  const fresh = (await getVariables({ type: 'chat' }))?.stat_data || {};
+  for (const [eventName, frozen] of Object.entries(patch)) {
+    if (JSON.stringify(fresh.前端变量?.事件结算进度?.[eventName]?.分支标记) !==
+        JSON.stringify(frozen.分支标记)) throw new Error('分支快照回读不一致');
+  }
+  return fresh;
+}
+
 // ==================== 批量结束事件并应用差分 ====================
 export async function batchEndEvents(eventNames, eventDefinitions, options = {}) {
   if (eventNames.length === 0) return true;
@@ -884,7 +916,7 @@ export async function batchEndEvents(eventNames, eventDefinitions, options = {})
   try {
     await syncParticipationOutcomeStates(eventDefinitions);
     const currentVars = await getVariables({ type: 'chat' });
-    const statData = currentVars.stat_data;
+    const statData = await prepareSettlementBranchSnapshots(eventNames, eventDefinitions, currentVars.stat_data);
     const 参与事件 = statData.参与事件 || {};
 
     const 合并后的差分 = {
@@ -914,7 +946,9 @@ export async function batchEndEvents(eventNames, eventDefinitions, options = {})
       const participationEntry = hasParticipationEntry(参与事件, eventName)
         ? getParticipationEntry(参与事件, eventName)
         : null;
-      const frozenMarkers = buildSettlementBranchSnapshot(eventName, eventData, statData);
+      const frozenMarkers = isPlainObject(statData?.前端变量?.事件结算进度?.[eventName]?.分支标记)
+        ? normalizeBranchMarkers(statData.前端变量.事件结算进度[eventName].分支标记)
+        : buildSettlementBranchSnapshot(eventName, eventData, statData);
       if (Object.keys(frozenMarkers).length > 0) branchResults[eventName] = cloneJson(frozenMarkers);
 
       for (const actionKey of EVENT_DIFF_ACTIONS) {
@@ -972,6 +1006,10 @@ export async function batchEndEvents(eventNames, eventDefinitions, options = {})
         .map(eventName => [eventName, {}]),
     );
 
+    const settlementProgressDeletes = Object.fromEntries(
+      eventNames.filter(name => isPlainObject(statData.前端变量?.事件结算进度?.[name]))
+        .map(name => [name, {}]),
+    );
     const settlementOperations = [];
     for (const actionKey of EVENT_DIFF_ACTIONS) {
       if (Object.keys(合并后的差分[actionKey]).length > 0) {
@@ -1032,6 +1070,11 @@ export async function batchEndEvents(eventNames, eventDefinitions, options = {})
       });
     }
 
+    if (Object.keys(settlementProgressDeletes).length > 0) {
+      settlementOperations.push({
+        type: 'delete', payload: { 前端变量: { 事件结算进度: settlementProgressDeletes } },
+      });
+    }
     const committed = await writeEraTransaction(settlementOperations, `batch-end-events-${eventNames.length}`);
     if (!committed) {
       throw new Error('事件结算 ERA 事务未能确认提交');
@@ -1049,6 +1092,7 @@ export async function batchEndEvents(eventNames, eventDefinitions, options = {})
         (!options.deleteUnstarted ||
           !Object.prototype.hasOwnProperty.call(finalVerifyStat.事件系统?.未发生事件 || {}, eventName)) &&
         !hasParticipationEntry(finalVerifyStat.参与事件, eventName) &&
+        !Object.prototype.hasOwnProperty.call(finalVerifyStat.前端变量?.事件结算进度 || {}, eventName) &&
         archiveReady &&
         (!branchResults[eventName] ||
           JSON.stringify(finalVerifyStat.事件分支结果?.[eventName]) === JSON.stringify(branchResults[eventName]))

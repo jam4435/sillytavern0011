@@ -8,7 +8,7 @@ import {
   normalizeLocationPath,
   normalizeParticipantEventDefinition,
 } from './era-participant-entry.js';
-import { buildPlayerParticipationEntry } from './era-event-operations.js';
+import { buildEventStartParticipantOperations, buildPlayerParticipationEntry } from './era-event-operations.js';
 import { EVENT_KIND, buildInvalidParticipationDeletePatch, isParticipationEntry } from './era-utils.js';
 
 const currentTime = { 年: 1210, 月: 8, 日: 8, 时: 7 };
@@ -198,6 +198,18 @@ describe('buildParticipantEntryPlan', () => {
     expect(first.locationUpdates).toHaveProperty('郭靖');
     expect(second.locationUpdates).toEqual({});
     expect(second.conflicts).toEqual([{ 人物: '郭靖', 当前事件: '荒山恶战', 请求事件: '另一个事件' }]);
+  });
+});
+
+describe('NPC event start operations', () => {
+  it('地点叶子缺失使用 Insert，已有地点使用 Update', () => {
+    const ops = buildEventStartParticipantOperations(['荒山恶战'], {
+      荒山恶战: { ...eventData, 参与人物: ['郭靖', '梅超风'] },
+    }, { 郭靖: { 所在位置: '蒙古/克烈部' }, 梅超风: { 状态: '健康' } });
+    expect(ops).toEqual([
+      { type: 'insert', payload: { 角色数据: { 梅超风: { 所在位置: '蒙古/大漠/荒山' } } } },
+      { type: 'update', payload: { 角色数据: { 郭靖: { 所在位置: '蒙古/大漠/荒山' } } } },
+    ]);
   });
 });
 

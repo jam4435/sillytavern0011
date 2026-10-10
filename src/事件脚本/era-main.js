@@ -146,11 +146,12 @@
     const eventSystem = statData?.事件系统 || {};
     const activeKeys = Object.keys(eventSystem.进行中事件 || {});
     const participationKeys = Object.keys(statData?.参与事件 || {});
+    const pendingKeys = Object.keys(statData?.前端变量?.事件结算进度 || {});
     const knownCompletedKeys = new Set([
       ...Object.keys(eventSystem.已完成事件 || {}),
       ...(Array.isArray(checkpoint?.completedRuntimeKeys) ? checkpoint.completedRuntimeKeys : []),
     ]);
-    const fullKeys = new Set([...activeKeys, ...participationKeys]);
+    const fullKeys = new Set([...activeKeys, ...participationKeys, ...pendingKeys]);
     const futureWindowEnd = currentHour + 10 * 24;
     const currentWindowStart = currentHour - 10 * 24;
 
@@ -286,6 +287,14 @@
         return;
       }
       await syncParticipationOutcomeStates(eventDefinitions, variables);
+
+      // 仅实际分支事件可留有失败待重试的预备快照。
+      const pendingSettlementEvents = Object.keys(variables?.stat_data?.前端变量?.事件结算进度 || {})
+        .filter(eventName => eventDefinitions[eventName]);
+      if (pendingSettlementEvents.length > 0) {
+        await batchEndEvents(pendingSettlementEvents, eventDefinitions);
+        variables = await getVariables({ type: 'chat' });
+      }
 
       // 输出完整的世界信息和事件系统
       if (isDebugEnabled()) {
@@ -978,6 +987,7 @@
         EVENT_SYSTEM_BUCKETS.every(key => isEmptyObject(eventSystemForCheckpoint[key])) &&
         isEmptyObject(statForCheckpoint.参与事件 || {}) &&
         isEmptyObject(statForCheckpoint.世界事件 || {}) &&
+        isEmptyObject(statForCheckpoint.前端变量?.事件结算进度 || {}) &&
         Object.keys(statForCheckpoint.角色数据 || {}).length === 0;
       const checkpoint = canApplyOpeningCheckpoint
         ? await loadEventCheckpointAtOrBefore(statForCheckpoint.世界信息.时间)

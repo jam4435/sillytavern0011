@@ -379,6 +379,8 @@ export interface FrontendVariableData {
   可选任务?: FactionTaskPoolMap;
   事件线索档案?: Record<string, EventClueArchiveEntry>;
   事件结局状态?: Record<string, EventOutcomeStatus>;
+  /** 仅实际包含分支标记的事件在结算失败重试时使用 */
+  事件结算进度?: Record<string, { 分支标记: Record<string, 0 | 1> }>;
   事件调度状态?: {
     schemaVersion?: number;
     manifestHash?: string;
