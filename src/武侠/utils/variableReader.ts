@@ -1236,46 +1236,24 @@ function parseEvents(variables: GameVariables, worldTime?: WorldTime): GameEvent
     return remaining >= 0 ? remaining : undefined;
   };
 
-  // 同一事件可能同时从“可发现事件 / 附近传闻 / 后续线索”进入前端。
-  // 先确定实际会展示的后续线索，再按事件原始键执行稳定优先级：
-  // 后续线索 > 附近传闻 > 全域预告。低优先级条目不进入 GameState.events，
-  // 这样事件页、江湖事簿和数量统计都会保持一致。
-  const persistentClueEntries = Object.entries(persistentClues).filter(([eventName, value]) => {
-    return (
-      !Object.prototype.hasOwnProperty.call(ongoing, eventName) &&
-      !Object.prototype.hasOwnProperty.call(completed, eventName) &&
-      !Object.prototype.hasOwnProperty.call(expired, eventName) &&
-      isRecord(value)
-    );
-  });
-  const persistentClueNames = new Set(persistentClueEntries.map(([eventName]) => eventName));
-
+  // 先保留各来源候选，统一在投影末端归并。进行中的事件可以借用线索背景，
+  // 但不允许再额外出现一条“后续线索”；已结算/失效事件则不显示遗留预告。
+  const persistentClueEntries = Object.entries(persistentClues).filter(([, value]) => isRecord(value));
   const legacyFollowupEntries = Object.entries(variables.后续事件线索 || {})
     .map(([eventName, value]) => {
-      if (persistentClueNames.has(eventName)) return null;
       const description = formatEventValue(value);
       return description.trim() && description !== '{}' ? { eventName, description } : null;
     })
-    .filter(
-      (entry): entry is { eventName: string; description: string } => entry !== null,
-    );
-
-  const followupNames = new Set([
-    ...persistentClueNames,
-    ...legacyFollowupEntries.map(entry => entry.eventName),
-  ]);
+    .filter((entry): entry is { eventName: string; description: string } => entry !== null);
 
   const nearbyRumors = Object.entries(variables.附近传闻 || {})
     .map(([eventName, value]) => {
       const raw = typeof value === 'string' ? value : formatEventValue(value);
       return raw.trim() ? { eventName, raw } : null;
     })
-    .filter((entry): entry is { eventName: string; raw: string } => entry !== null)
-    .filter(entry => !followupNames.has(entry.eventName));
-  const nearbyNames = new Set(nearbyRumors.map(entry => entry.eventName));
+    .filter((entry): entry is { eventName: string; raw: string } => entry !== null);
 
   for (const [eventName, value] of Object.entries(variables.前端变量?.可发现事件 || {})) {
-    if (followupNames.has(eventName) || nearbyNames.has(eventName)) continue;
     const raw = typeof value === 'string' ? value : formatEventValue(value);
     if (!raw.trim()) continue;
     const meta = parseRumorMeta(raw);
@@ -1373,7 +1351,51 @@ function parseEvents(variables: GameVariables, worldTime?: WorldTime): GameEvent
     });
   }
 
-  return events;
+  // 同一事件可能同时来自参与/进行中、长期/旧版后续线索、附近传闻与全域预告。
+  // 展示状态以真实进行中为准；线索只补充背景、缺失地点，不覆盖当前进展和结束时间。
+  const resolvedNames = new Set([...Object.keys(completed), ...Object.keys(expired)].map(getDisplayEventName));
+  const groups = new Map<string, GameEvent[]>();
+  for (const event of events) {
+    const key = getDisplayEventName(event.title);
+    if (event.type !== 'ACTIVE' && resolvedNames.has(key)) continue;
+    const group = groups.get(key);
+    if (group) group.push(event);
+    else groups.set(key, [event]);
+  }
+
+  const priority = (event: GameEvent): number => {
+    if (event.type === 'ACTIVE') return event.category === 'participation' ? 5 : 4;
+    if (event.type === 'AFTERMATH') return event.id.startsWith('followup_persistent_') ? 3 : 2;
+    return event.clueKind === 'nearby' ? 1 : 0;
+  };
+
+  return Array.from(groups.values(), group => {
+    const candidates = group
+      .map((event, index) => ({ event, index }))
+      .sort((left, right) => priority(right.event) - priority(left.event) || left.index - right.index)
+      .map(({ event }) => event);
+    const primary = candidates[0];
+    const location = primary.location || candidates.find(event => event.location)?.location;
+    if (primary.type === 'ACTIVE') {
+      const currentDescription = primary.description.trim();
+      const clue = candidates.find(event =>
+        event.type !== 'ACTIVE' &&
+        event.description.trim() &&
+        !currentDescription.includes(event.description.trim()),
+      );
+      return {
+        ...primary,
+        location,
+        clueDescription: clue?.description.trim(),
+      };
+    }
+
+    return {
+      ...primary,
+      description: primary.description.trim() || candidates.find(event => event.description.trim())?.description || '',
+      location,
+    };
+  });
 }
 
 /**
