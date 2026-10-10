@@ -30,6 +30,8 @@ import { runWithAutoAdvanceFailureRetry } from './autoAdvanceRetry';
 import { runWith429Retry } from './rateLimitRetry';
 import {
   parseDeclaredVariableChanges,
+  sanitizeVariableThinkText,
+  scanVariableBlocks,
   readCurrentStatDataSnapshot,
   stableStringify,
   type VariableDeclaredChange,
@@ -135,7 +137,6 @@ type MessageWriteVerification = {
 let extraVariableUpdateBusy = false;
 let extraVariableUpdateReserved = false;
 
-const VARIABLE_BLOCK_REGEX = /<(VariableThink|VariableInsert|VariableEdit|VariableDelete)>\s*([\s\S]*?)\s*<\/\1>/gi;
 const ERA_VARIABLE_BLOCK_STRIP_REGEX = /\s*<Variable(Think|Insert|Edit|Delete)>\s*[\s\S]*?<\/Variable\1>\s*/gi;
 const VARIABLE_BLOCK_TAGS = ['VariableThink', 'VariableInsert', 'VariableEdit', 'VariableDelete'] as const;
 const ACTION_BLOCK_TAGS = new Set(['VariableInsert', 'VariableEdit', 'VariableDelete']);
@@ -306,7 +307,7 @@ function serializeVariableBlocks(
   thoughts: Array<{ text: string }>,
   changes: VariableDeclaredChange[],
 ): string {
-  const blocks = thoughts.map(thought => `<VariableThink>\n${thought.text}\n</VariableThink>`);
+  const blocks = thoughts.map(thought => `<VariableThink>\n${sanitizeVariableThinkText(thought.text)}\n</VariableThink>`);
   for (const blockTag of ['VariableEdit', 'VariableInsert', 'VariableDelete'] as const) {
     const grouped = changes.filter(change => change.blockTag === blockTag);
     if (!grouped?.length) continue;
@@ -452,23 +453,12 @@ async function waitForDeclaredChangesPersisted(
 }
 
 export function assertValidTurnVariableBlocks(blocksText: string): boolean {
-  const hasActionOpeningTag = /<Variable(?:Insert|Edit|Delete)>/.test(blocksText);
-  if (!hasActionOpeningTag) {
+  const scanned = scanVariableBlocks(blocksText);
+  if (scanned.errors.length > 0) {
+    throw new Error(`本回合变量标签无法完整解析：${scanned.errors.join('；')}`);
+  }
+  if (!scanned.blocks.some(block => ACTION_BLOCK_TAGS.has(block.tag))) {
     return false;
-  }
-
-  for (const blockTag of VARIABLE_BLOCK_TAGS.slice(1)) {
-    const openingCount = blocksText.match(new RegExp(`<${blockTag}>`, 'gi'))?.length ?? 0;
-    const closingCount = blocksText.match(new RegExp(`</${blockTag}>`, 'gi'))?.length ?? 0;
-    if (openingCount !== closingCount) {
-      throw new Error(`本回合包含未闭合的 ${blockTag} 标签，无法确认 ERA 提交。`);
-    }
-  }
-
-  const completeActionBlocks =
-    blocksText.match(/<(VariableInsert|VariableEdit|VariableDelete)>\s*[\s\S]*?<\/\1>/g) ?? [];
-  if (completeActionBlocks.length === 0) {
-    throw new Error('本回合包含未闭合的变量动作标签，无法确认 ERA 提交。');
   }
 
   const declaredState = parseDeclaredVariableChanges(blocksText);
@@ -1423,24 +1413,20 @@ function extractValidVariableBlocks(rawResponse: string): {
   blocksText: string;
   actionBlockCount: number;
 } {
-  const blocks: string[] = [];
-  let actionBlockCount = 0;
-
-  for (const blockTag of VARIABLE_BLOCK_TAGS) {
-    const openingCount = rawResponse.match(new RegExp(`<${blockTag}>`, 'gi'))?.length ?? 0;
-    const closingCount = rawResponse.match(new RegExp(`</${blockTag}>`, 'gi'))?.length ?? 0;
-    if (openingCount !== closingCount) {
-      throw new Error(`额外变量模型返回未闭合的 ${blockTag} 标签。`);
-    }
+  const scanned = scanVariableBlocks(rawResponse);
+  if (scanned.errors.length > 0) {
+    throw new Error(`额外变量模型返回的变量标签结构错误：${scanned.errors.join('；')}`);
   }
 
-  VARIABLE_BLOCK_REGEX.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = VARIABLE_BLOCK_REGEX.exec(rawResponse)) !== null) {
-    const blockTag = match[1] as 'VariableThink' | 'VariableInsert' | 'VariableEdit' | 'VariableDelete';
-    let body = stripCodeFence(match[2] || '');
+  const blocks: string[] = [];
+  let actionBlockCount = 0;
+  for (const block of scanned.blocks) {
+    const blockTag = block.tag;
+    let body = stripCodeFence(block.body);
 
-    if (ACTION_BLOCK_TAGS.has(blockTag)) {
+    if (blockTag === 'VariableThink') {
+      body = sanitizeVariableThinkText(body);
+    } else if (ACTION_BLOCK_TAGS.has(blockTag)) {
       if (!body) {
         throw new Error(`${blockTag} 为空，无法写入变量。`);
       }
@@ -1460,10 +1446,7 @@ function extractValidVariableBlocks(rawResponse: string): {
     blocks.push(`<${blockTag}>\n${body}\n</${blockTag}>`);
   }
 
-  return {
-    blocksText: blocks.join('\n').trim(),
-    actionBlockCount,
-  };
+  return { blocksText: blocks.join('\n').trim(), actionBlockCount };
 }
 
 export type WorldTimeReplyValidationResult = {
@@ -1735,11 +1718,14 @@ export async function validateOrRepairInlineWorldTimeReply({
 }
 
 function assertVariableBlockTagsPreserved(originalResponse: string, repairedResponse: string): void {
+  const original = scanVariableBlocks(originalResponse);
+  const repaired = scanVariableBlocks(repairedResponse);
+  if (original.errors.length > 0 || repaired.errors.length > 0) {
+    throw new Error(`格式修复返回包含不完整变量标签：${[...original.errors, ...repaired.errors].join('；')}`);
+  }
   const changedTags = VARIABLE_BLOCK_TAGS.filter(blockTag => {
-    const pattern = new RegExp(`<${blockTag}>`, 'gi');
-    const originalCount = originalResponse.match(pattern)?.length ?? 0;
-    const repairedCount = repairedResponse.match(pattern)?.length ?? 0;
-    return originalCount !== repairedCount;
+    const count = (blocks: typeof original.blocks) => blocks.filter(block => block.tag === blockTag).length;
+    return count(original.blocks) !== count(repaired.blocks);
   });
   if (changedTags.length > 0) {
     throw new Error(`格式修复改变了变量块类型或数量：${changedTags.join('、')}，已拒绝修复结果。`);
