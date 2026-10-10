@@ -805,7 +805,9 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
     // 1. 应用 insert 差分（添加人物变量）
     if (Object.keys(登场事件差分.insert).length > 0) {
       debugGroup('🔄 应用登场事件人物差分');
-      log(`[INSERT] 合并后的差分:`, JSON.parse(JSON.stringify(登场事件差分.insert)));
+      if (isDebugEnabled()) {
+        log(`[INSERT] 合并后的差分:`, JSON.parse(JSON.stringify(登场事件差分.insert)));
+      }
       const insertPayload = { 角色数据: 登场事件差分.insert };
 
       log(`🚀 [INSERT] 发送 era:insertByObject 指令`);

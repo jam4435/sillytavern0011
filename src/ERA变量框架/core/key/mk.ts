@@ -156,7 +156,7 @@ export function readMessageKey(msg: any): string {
  */
 export async function ensureMessageKey(msg: any): Promise<{ mk: string; isNew: boolean }> {
   if (!msg || typeof msg.message_id !== 'number' || !msg.role) {
-    logger.warn('ensureMessageKey', `无效的消息对象结构，无法确保Key。msg=${JSON.stringify(msg)}`);
+    logger.warn('ensureMessageKey', '无效的消息对象结构，无法确保Key。');
     return { mk: '', isNew: false };
   }
 
@@ -197,7 +197,7 @@ export const ensureMkForLatestMessage = async (): Promise<{
   try {
     const msg = getChatMessages(-1, { include_swipes: true })?.[0];
     // 保留此日志，因为它对于调试事件触发时的消息状态至关重要。
-    logger.debug('ensureMkForLatestMessage', `获取到的最新消息对象 (msg): ${JSON.stringify(msg)}`);
+    logger.debug('ensureMkForLatestMessage', () => `获取到的最新消息对象 (msg): ${JSON.stringify(msg)}`);
 
     if (!msg || typeof msg.message_id !== 'number') {
       logger.warn('ensureMkForLatestMessage', '无法读取最新消息或其ID，退出');

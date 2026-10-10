@@ -109,10 +109,10 @@ export async function applyEditAtLevel(
       valOld = _.get(statData, subPath);
       logger.debug(
         'applyEditAtLevel',
-        `[旧值查找] 追溯未找到历史值，从当前 stat_data 中获取到旧值: ${JSON.stringify(valOld)}`,
+        () => `[旧值查找] 追溯未找到历史值，从当前 stat_data 中获取到旧值: ${JSON.stringify(valOld)}`,
       );
     } else {
-      logger.debug('applyEditAtLevel', `[旧值查找] 追溯成功，找到历史旧值: ${JSON.stringify(valOld)}`);
+      logger.debug('applyEditAtLevel', () => `[旧值查找] 追溯成功，找到历史旧值: ${JSON.stringify(valOld)}`);
     }
 
     const cleaned = sanitizeArrays(valNew); // 清理新值
@@ -157,7 +157,7 @@ export async function processEditBlocks(allEdits: any[], editLog: any[], message
       if (!_.isPlainObject(editRoot) || _.isEmpty(editRoot)) continue;
       try {
         await updateEraStatData(async stat => {
-          logger.debug('processEditBlocks', `处理 editRoot: ${JSON.stringify(editRoot)}`);
+          logger.debug('processEditBlocks', () => `处理 editRoot: ${JSON.stringify(editRoot)}`);
           // 从根路径 '' 开始统一递归入口，保持逻辑一致性。
           await applyEditAtLevel(stat, '', editRoot, editLog, messageId, intraMessageState);
           return stat;

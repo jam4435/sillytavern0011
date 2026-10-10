@@ -20,7 +20,7 @@ export function resolveTemplate(inheritedContent: any, parentNodeData: any): any
 
   logger.debug(
     'resolveTemplate',
-    `解析出的模板内容:\n    - 继承: ${JSON.stringify(inheritedContent)}\n    - 父节点变量: ${JSON.stringify(
+    () => `解析出的模板内容:\n    - 继承: ${JSON.stringify(inheritedContent)}\n    - 父节点变量: ${JSON.stringify(
       varsContent,
     )}`,
   );
@@ -30,7 +30,7 @@ export function resolveTemplate(inheritedContent: any, parentNodeData: any): any
   mergedContent = mergeReplaceArray(mergedContent, inheritedContent);
   mergedContent = mergeReplaceArray(mergedContent, varsContent);
 
-  logger.debug('resolveTemplate', `合并后的最终模板内容: ${JSON.stringify(mergedContent)}`);
+  logger.debug('resolveTemplate', () => `合并后的最终模板内容: ${JSON.stringify(mergedContent)}`);
 
   if (_.isEmpty(mergedContent)) {
     return null;
@@ -72,24 +72,24 @@ export function getInheritedTemplateContent(parentTplContent: any, key: string):
   if (_.isPlainObject(prototypeContent) && _.isPlainObject(specificContent)) {
     logger.debug(
       'getInheritedTemplateContent',
-      `为子节点 "${key}" 同时找到原型和特异性内容。\n      - 原型: ${JSON.stringify(
+      () => `为子节点 "${key}" 同时找到原型和特异性内容。\n      - 原型: ${JSON.stringify(
         prototypeContent,
       )}\n      - 特异性: ${JSON.stringify(specificContent)}`,
     );
     // 直接使用 mergeReplaceArray 进行合并
     const merged = mergeReplaceArray(_.cloneDeep(prototypeContent), specificContent);
-    logger.debug('getInheritedTemplateContent', `  - 合并后: ${JSON.stringify(merged)}`);
+    logger.debug('getInheritedTemplateContent', () => `  - 合并后: ${JSON.stringify(merged)}`);
     return merged;
   } else if (_.isPlainObject(specificContent)) {
     logger.debug(
       'getInheritedTemplateContent',
-      `为子节点 "${key}" 只找到特异性内容: ${JSON.stringify(specificContent)}`,
+      () => `为子节点 "${key}" 只找到特异性内容: ${JSON.stringify(specificContent)}`,
     );
     return specificContent;
   } else if (_.isPlainObject(prototypeContent)) {
     logger.debug(
       'getInheritedTemplateContent',
-      `为子节点 "${key}" 只找到原型内容: ${JSON.stringify(prototypeContent)}`,
+      () => `为子节点 "${key}" 只找到原型内容: ${JSON.stringify(prototypeContent)}`,
     );
     return prototypeContent;
   }
@@ -110,7 +110,7 @@ export function getInheritedTemplateContent(parentTplContent: any, key: string):
 export function applyTemplateToPatch(tplContent: any, patchObj: any): any {
   logger.debug(
     'applyTemplateToPatch',
-    `[进入] 模板内容: ${JSON.stringify(tplContent)}, 补丁: ${JSON.stringify(patchObj)}`,
+    () => `[进入] 模板内容: ${JSON.stringify(tplContent)}, 补丁: ${JSON.stringify(patchObj)}`,
   );
 
   if (!_.isPlainObject(patchObj)) {
@@ -130,6 +130,6 @@ export function applyTemplateToPatch(tplContent: any, patchObj: any): any {
 
   // 如果补丁非空，将模板内容作为默认值与补丁合并
   const composed = mergeReplaceArray(_.cloneDeep(tplContent), patchObj);
-  logger.debug('applyTemplateToPatch', `合并模板与补丁后的结果: ${JSON.stringify(composed)}`);
+  logger.debug('applyTemplateToPatch', () => `合并模板与补丁后的结果: ${JSON.stringify(composed)}`);
   return composed;
 }

@@ -316,7 +316,7 @@ export const resyncStateOnHistoryChange = async (forceFullResync = false) => {
   const branchAuditLabel = forceFullResync ? 'era-full-resync' : 'era-auto-resync';
   recordHistoryBranchMkAudit(`${branchAuditLabel}-before`);
   if (forceFullResync) {
-    logger.warn('resyncStateOnHistoryChange', '强制完全重算模式已启动！');
+    logger.log('resyncStateOnHistoryChange', '强制完全重算模式已启动！');
   } else {
     logger.log('resyncStateOnHistoryChange', '聊天记录变更，启动状态同步...');
   }

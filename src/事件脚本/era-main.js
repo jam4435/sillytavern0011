@@ -967,12 +967,12 @@
       // 预检查：确保 stat_data 已初始化
       let preCheckVars = await getVariables({ type: 'chat' });
       if (!preCheckVars || !preCheckVars.stat_data) {
-        logWarning('⏳ stat_data 尚未初始化，等待前端创建角色后自动重试...');
+        log('⏳ stat_data 尚未初始化，等待前端创建角色后自动重试...');
         return false;
       }
 
       if (!preCheckVars.stat_data.世界信息 || !preCheckVars.stat_data.世界信息.时间) {
-        logWarning('⏳ 世界信息或时间数据尚未初始化，等待前端创建角色后自动重试...');
+        log('⏳ 世界信息或时间数据尚未初始化，等待前端创建角色后自动重试...');
         return false;
       }
 

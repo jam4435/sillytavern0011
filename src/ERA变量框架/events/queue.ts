@@ -149,7 +149,7 @@ async function processQueue() {
   logger.debug(
     'processQueue',
     '事件收集窗口关闭，准备处理的队列内容:',
-    JSON.stringify(eventQueue.map(e => e.type)),
+    () => JSON.stringify(eventQueue.map(e => e.type)),
   );
 
   // 【循环处理】

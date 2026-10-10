@@ -50,9 +50,9 @@ export function applyInsertAtLevel(
   // --- 1. 确定当前层级的模板内容 ---
   // 调用 resolveTemplate，它现在直接使用传入的 parentData
   const localTplContent = resolveTemplate(inheritedContent, parentData);
-  logger.debug('applyInsertAtLevel', `[入口] basePath: "${basePath || 'root'}"`, {
+  logger.debug('applyInsertAtLevel', `[入口] basePath: "${basePath || 'root'}"`, () => ({
     statData: _.cloneDeep(statData),
-  });
+  }));
 
   // --- 2. 检查路径存在性，决定执行策略 ---
   const currentNodeInVars = basePath ? _.get(statData, basePath) : statData;
@@ -69,7 +69,7 @@ export function applyInsertAtLevel(
     const composed = applyTemplateToPatch(localTplContent, patchObj);
 
     const finalValue = sanitizeArrays(composed); // 清理数组中的 null 等无效值。
-    logger.debug('applyInsertAtLevel', `最终插入数据 at ${basePath}:\n${JSON.stringify(finalValue, null, 2)}`);
+    logger.debug('applyInsertAtLevel', () => `最终插入数据 at ${basePath}:\n${JSON.stringify(finalValue, null, 2)}`);
     _.set(statData, basePath, finalValue); // 执行插入。
     editLog.push({ op: 'insert', path: basePath, value_new: _.cloneDeep(finalValue) });
     logger.debug('applyInsertAtLevel', `原子性插入到新路径: ${basePath}`);
@@ -81,7 +81,7 @@ export function applyInsertAtLevel(
   if (_.isPlainObject(currentNodeInVars) && _.isPlainObject(patchObj)) {
     logger.debug(
       'applyInsertAtLevel',
-      `[递归补充] at path: "${basePath || 'root'}"
+      () => `[递归补充] at path: "${basePath || 'root'}"
       - 当前层级模板 (localTplContent): ${JSON.stringify(localTplContent)}`,
     );
     for (const key of Object.keys(patchObj)) {
@@ -91,7 +91,7 @@ export function applyInsertAtLevel(
       const subInheritedContent = getInheritedTemplateContent(localTplContent, key);
       logger.debug(
         'applyInsertAtLevel',
-        `  - 准备递归子节点: "${key}"
+        () => `  - 准备递归子节点: "${key}"
       - 将传递给子节点的模板 (subInheritedContent): ${JSON.stringify(subInheritedContent)}`,
       );
       // 将当前节点数据 currentNodeInVars 作为下一层的 parentData 传递下去
@@ -121,7 +121,7 @@ export function applyInsertAtLevel(
 export async function processInsertBlocks(allInserts: any[], editLog: any[]) {
   if (allInserts.length > 0) {
     await updateEraStatData(async stat => {
-      logger.debug('processInsertBlocks', '[初始状态] 进入 processInsertBlocks 时的 statData:', _.cloneDeep(stat));
+      logger.debug('processInsertBlocks', '[初始状态] 进入 processInsertBlocks 时的 statData:', () => _.cloneDeep(stat));
       return stat;
     });
     /*
@@ -134,7 +134,7 @@ export async function processInsertBlocks(allInserts: any[], editLog: any[]) {
       if (!_.isPlainObject(insertRoot) || _.isEmpty(insertRoot)) continue;
       try {
         await updateEraStatData(stat => {
-          logger.debug('processInsertBlocks', `处理 insertRoot: ${JSON.stringify(insertRoot)}`);
+          logger.debug('processInsertBlocks', () => `处理 insertRoot: ${JSON.stringify(insertRoot)}`);
           // 从根路径 '' 开始统一递归入口，顶层调用时，父节点为 null
           applyInsertAtLevel(stat, '', insertRoot, editLog, null, null);
           return stat;
