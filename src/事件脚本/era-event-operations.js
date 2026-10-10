@@ -645,6 +645,15 @@ export async function batchStartEvents(eventNames, eventDefinitions, options = {
       debugGroupEnd();
     }
     log('✅ 批量开始事件事务完成');
+    // 参与快照已在开始事务中提交；结局状态是可派生展示字段，
+    // 不允许其写入失败反向否定已确认的事件开始主事务。
+    if (joiningNames.length > 0) {
+      try {
+        await syncParticipationOutcomeStates(eventDefinitions, verifyVars);
+      } catch (error) {
+        logWarning('事件已参与，但结局状态派生同步失败，将由下轮检查补全:', error);
+      }
+    }
     logSuccess(`批量开始了 ${eventNames.length} 个事件:`, eventNames);
 
     // 显示通知（限制数量避免刷屏）
