@@ -132,7 +132,6 @@ describe('completion persistence and follow-up pairs', () => {
           未发生事件: { [targetName]: targetDefinition.触发条件 },
           进行中事件: { [sourceName]: clone(actualEndTime) },
           已完成事件: {},
-          人物事件占用: {},
         },
         参与事件: {},
         世界事件: {},
@@ -171,6 +170,25 @@ describe('completion persistence and follow-up pairs', () => {
     });
   });
 
+  it('事件启动、NPC 一次性入场和未发生清理仅产生一次 ERA 事务', async () => {
+    variables.stat_data.角色数据 = { 郭靖: { 所在位置: '大宋/临安府/牛家村' } };
+    variables.stat_data.事件系统.未发生事件[sourceName] = clone(eventDefinition.触发条件);
+    delete variables.stat_data.事件系统.进行中事件[sourceName];
+
+    const started = await batchStartEvents([sourceName], { [sourceName]: eventDefinition }, {
+      currentTime: { 年: 1219, 月: 10, 日: 10, 时: 9 },
+    });
+    expect(started).toBe(true);
+    expect(variables.stat_data.事件系统.进行中事件[sourceName]).toEqual(eventDefinition.事件结束时间);
+    expect(variables.stat_data.事件系统.未发生事件[sourceName]).toBeUndefined();
+    expect(variables.stat_data.角色数据.郭靖.所在位置).toBe('大宋/张家口/大酒店');
+    expect(variables.stat_data.事件系统.人物事件占用).toBeUndefined();
+
+    const transactions = eventEmitMock.mock.calls.filter(([name]) => name === 'era:transactionByObject');
+    expect(transactions).toHaveLength(1);
+    expect(transactions[0][1].operations.map((op: any) => op.type)).toEqual(['insert', 'update', 'delete']);
+  });
+
   it('相对事件平移使用单次 ERA Delete→Insert，原条件对象可完整逆向恢复', async () => {
     const before = clone(variables.stat_data.事件系统.未发生事件[targetName]);
     const changed = { 类型: '时间', 年: 1219, 月: 11, 日: 2, 时: 13, 新字段: '时序平移' };
@@ -197,7 +215,6 @@ describe('completion persistence and follow-up pairs', () => {
       未发生事件: {},
       进行中事件: {},
       已完成事件: {},
-      人物事件占用: {},
     };
     const expiredDefinition = attachEventMetadata(
       {
@@ -248,7 +265,6 @@ describe('completion persistence and follow-up pairs', () => {
       未发生事件: {},
       进行中事件: {},
       已完成事件: {},
-      人物事件占用: {},
     };
     let commitCount = 0;
     vi.mocked(globalThis.updateVariablesWith).mockImplementation(updater => {
@@ -298,7 +314,6 @@ describe('completion persistence and follow-up pairs', () => {
       进行中事件: {},
       已完成事件: {},
       已失效事件: {},
-      人物事件占用: {},
     };
 
     await initializeEventList({ [encounterName]: encounterDefinition }, { rootBootstrap: true });
@@ -312,7 +327,6 @@ describe('completion persistence and follow-up pairs', () => {
       进行中事件: {},
       已完成事件: {},
       已失效事件: {},
-      人物事件占用: {},
     };
 
     await initializeEventList({ [encounterName]: encounterDefinition }, { rootBootstrap: true });
@@ -331,7 +345,6 @@ describe('completion persistence and follow-up pairs', () => {
       未发生事件: {},
       进行中事件: {},
       已完成事件: {},
-      人物事件占用: {},
     };
     const expiredDefinition = attachEventMetadata(
       {
@@ -365,7 +378,6 @@ describe('completion persistence and follow-up pairs', () => {
       进行中事件: {},
       已完成事件: {},
       已失效事件: {},
-      人物事件占用: {},
     };
     const conditionalDefinition = {
       ...eventDefinition,
@@ -387,7 +399,6 @@ describe('completion persistence and follow-up pairs', () => {
       未发生事件: {},
       进行中事件: {},
       已完成事件: {},
-      人物事件占用: {},
     };
     const historicalDefinition = attachEventMetadata(
       {
