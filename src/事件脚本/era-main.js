@@ -35,7 +35,6 @@
     playerJoinsEvents,
     batchEndEvents,
     batchExpireEvents,
-    applyTimedParticipantEntries,
     persistRelativeEventRebase,
     cleanupFollowupCluesForActiveParticipation,
     cleanupFrontendEventClueArchiveByState,
@@ -147,12 +146,11 @@
     const eventSystem = statData?.事件系统 || {};
     const activeKeys = Object.keys(eventSystem.进行中事件 || {});
     const participationKeys = Object.keys(statData?.参与事件 || {});
-    const pendingKeys = Object.keys(statData?.前端变量?.事件结算进度 || {});
     const knownCompletedKeys = new Set([
       ...Object.keys(eventSystem.已完成事件 || {}),
       ...(Array.isArray(checkpoint?.completedRuntimeKeys) ? checkpoint.completedRuntimeKeys : []),
     ]);
-    const fullKeys = new Set([...activeKeys, ...participationKeys, ...pendingKeys]);
+    const fullKeys = new Set([...activeKeys, ...participationKeys]);
     const futureWindowEnd = currentHour + 10 * 24;
     const currentWindowStart = currentHour - 10 * 24;
 
@@ -288,15 +286,6 @@
         return;
       }
       await syncParticipationOutcomeStates(eventDefinitions, variables);
-
-      const pendingSettlementEvents = Object.keys(variables?.stat_data?.前端变量?.事件结算进度 || {}).filter(
-        eventName => eventDefinitions[eventName],
-      );
-      if (pendingSettlementEvents.length > 0) {
-        logWarning(`发现 ${pendingSettlementEvents.length} 个未完成结算，优先重试:`, pendingSettlementEvents);
-        await batchEndEvents(pendingSettlementEvents, eventDefinitions);
-        variables = await getVariables({ type: 'chat' });
-      }
 
       // 输出完整的世界信息和事件系统
       if (isDebugEnabled()) {
@@ -441,7 +430,7 @@
 
       if (playerScopeIsOccupied) {
         // 已有前台事件占用该三级地点时，新的到点事件也先留在未发生状态，
-        // 避免人物占用在事件真正结束前被下一事件覆盖。
+        // 避免同一地点多个事件在同一时间窗口抢占剧情。
         admissionBlockedEventNames = new Set(sameScopeCandidates);
       } else if (committedDueNames.length > 0) {
         // 已经平移并落库的触发时间是一项调度承诺：到点后必须优先启动，
@@ -489,11 +478,11 @@
       const playerAnchoredEventsToStart = [...standaloneEarlyEventsToStart, ...rebasedFirstEventNames];
       if (playerAnchoredEventsToStart.length > 0) {
         log(`📍 玩家到场，提前启动 ${playerAnchoredEventsToStart.length} 个事件:`, playerAnchoredEventsToStart);
-        await batchStartEvents(playerAnchoredEventsToStart, eventDefinitions, {
+        const started = await batchStartEvents(playerAnchoredEventsToStart, eventDefinitions, {
           currentTime,
           earlyEventNames: playerAnchoredEventsToStart,
         });
-        await playerJoinsEvents(playerAnchoredEventsToStart, eventDefinitions);
+        if (started !== false) await playerJoinsEvents(playerAnchoredEventsToStart, eventDefinitions);
       }
 
       // 批量完成登场事件（直接从未发生 -> 已完成）
@@ -541,7 +530,7 @@
           log(`⏹️ 发现 ${eventsToEnd.length} 个事件需要结束:`, eventsToEnd);
           const committed = await batchEndEvents(eventsToEnd, eventDefinitions);
           if (committed) {
-            // 本轮 admission 发生在事件结算之前；同地点的下一事件可能刚因人物占用而被挡住。
+            // 本轮 admission 发生在事件结算之前；同地点后续事件可能仍被活动事件挡住。
             // 复用 runScheduledCheck 的既有 do/while，在同一个串行任务内回读结算后状态并立即复检。
             pendingCheckReason ||= 'post-event-settlement';
             log(`🔁 事件结算已提交，安排尾随复检以接驳后续事件: ${eventsToEnd.join(', ')}`);
@@ -593,18 +582,7 @@
         最新参与事件,
       );
 
-      // 玩家到场判断必须优先于 NPC 自动入场。NPC 位置写入可能较慢或确认失败，
-      // 但不能因此把开局参与事件推迟到下一回合；玩家参与也应优先取得人物占用权。
-      if (仍在进行事件.length > 0) {
-        const participantVariables = await getVariables({ type: 'chat' });
-        try {
-          await applyTimedParticipantEntries(
-            仍在进行事件,
-            eventDefinitions,
-            participantVariables.stat_data.世界信息.时间,
-            participantVariables,
-          );
-        } catch (error) {
+    } catch (error) {
           logError('定时参与人物入场失败，已保留本轮玩家参与判定:', error);
         }
       }
@@ -1004,7 +982,6 @@
         EVENT_SYSTEM_BUCKETS.every(key => isEmptyObject(eventSystemForCheckpoint[key])) &&
         isEmptyObject(statForCheckpoint.参与事件 || {}) &&
         isEmptyObject(statForCheckpoint.世界事件 || {}) &&
-        isEmptyObject(statForCheckpoint.前端变量?.事件结算进度 || {}) &&
         Object.keys(statForCheckpoint.角色数据 || {}).length === 0;
       const checkpoint = canApplyOpeningCheckpoint
         ? await loadEventCheckpointAtOrBefore(statForCheckpoint.世界信息.时间)

@@ -28,11 +28,7 @@ import {
 
 import { isTimeForEvent, isTimeAfterEventEnd, isEventStartLocationSatisfied } from './era-event-checker.js';
 import { writeEraTransaction } from './era-write-helper.js';
-import {
-  PARTICIPANT_ENTRY_SOURCE,
-  buildOccupancyCleanupPatch,
-  buildParticipantEntryPlan,
-} from './era-participant-entry.js';
+import { buildParticipantEntryPlan } from './era-participant-entry.js';
 import {
   getEventSummary,
   buildWorldEventRecord,
@@ -52,7 +48,6 @@ import {
 } from './era-event-schema.js';
 
 const EVENT_DIFF_ACTIONS = ['insert', 'update', 'delete'];
-const EVENT_SETTLEMENT_PROGRESS_KEY = '事件结算进度';
 const followupReferenceIndexCache = new WeakMap();
 
 function isPlainObject(value) {
@@ -355,9 +350,6 @@ export async function initializeEventList(eventDefinitions, options = {}) {
       statData.事件系统.进行中事件 = isPlainObject(statData.事件系统.进行中事件) ? statData.事件系统.进行中事件 : {};
       statData.事件系统.已完成事件 = isPlainObject(statData.事件系统.已完成事件) ? statData.事件系统.已完成事件 : {};
       statData.事件系统.已失效事件 = isPlainObject(statData.事件系统.已失效事件) ? statData.事件系统.已失效事件 : {};
-      statData.事件系统.人物事件占用 = isPlainObject(statData.事件系统.人物事件占用)
-        ? statData.事件系统.人物事件占用
-        : {};
       statData.世界事件 = isPlainObject(statData.世界事件) ? statData.世界事件 : {};
       statData.前端变量 = isPlainObject(statData.前端变量) ? statData.前端变量 : {};
 
@@ -403,6 +395,7 @@ export async function initializeEventList(eventDefinitions, options = {}) {
         statData.事件系统.未发生事件 = {};
       }
 
+      const justStartedEvents = [];
       for (const eventName of newEvents) {
         const eventData = eventDefinitions[eventName];
         const endTime = getEndTime(eventData);
@@ -426,6 +419,7 @@ export async function initializeEventList(eventDefinitions, options = {}) {
         if (!expired && due && locationSatisfied && !isDebutEvent(eventData)) {
           const actualEndTime = buildActualEventWindow(eventData, currentTime, false).endTime;
           statData.事件系统.进行中事件[eventName] = cloneJson(actualEndTime);
+          justStartedEvents.push(eventName);
           continue;
         }
 
@@ -440,6 +434,17 @@ export async function initializeEventList(eventDefinitions, options = {}) {
         }
       }
 
+      // 仅根开局初次启动的事件执行入场，已存在的事件不重放人物移动。
+      const rootClaims = {};
+      for (const eventName of justStartedEvents) {
+        const plan = buildParticipantEntryPlan({
+          eventName, eventData: eventDefinitions[eventName],
+          characters: statData.角色数据, claimedCharacters: rootClaims,
+        });
+        for (const [name, patch] of Object.entries(plan.locationUpdates)) {
+          Object.assign(statData.角色数据[name], patch);
+        }
+      }
       if (sparseFuture) {
         statData.前端变量.事件调度状态 = {
           schemaVersion: 1,
@@ -526,146 +531,20 @@ export async function persistRelativeEventRebase(deferredConditions) {
 
 // 开局初始化已统一走上方的单事务规划器；旧的多写入实现已移除。
 
-export async function applyParticipantEntry(eventName, eventData, source) {
-  const result = await applyParticipantEntries([eventName], { [eventName]: eventData }, source);
-  return result.plans[eventName] || { entered: 0, skipped: 0 };
-}
-
-export async function applyParticipantEntries(eventNames, eventDefinitions, source, options = {}) {
-  const uniqueEventNames = [...new Set(eventNames)].filter(eventName => {
-    const eventData = eventDefinitions[eventName];
-    return eventData && !isDebutEvent(eventData);
-  });
-
-  if (uniqueEventNames.length === 0) {
-    return {
-      entered: 0,
-      skipped: 0,
-      plans: {},
-      locationUpdates: {},
-      occupancyDeletes: {},
-      occupancyInserts: {},
-    };
+/** 事件开启和 NPC 入场使用相同 ERA 事务，永不在后续检查重新传送。 */
+export function buildEventStartParticipantOperations(eventNames, eventDefinitions, characters) {
+  const claimedCharacters = {}, locationUpdates = {};
+  for (const eventName of [...new Set(eventNames)]) {
+    const data = eventDefinitions[eventName];
+    if (!data || isDebutEvent(data)) continue;
+    const plan = buildParticipantEntryPlan({ eventName, eventData: data, characters, claimedCharacters });
+    for (const name of plan.missingCharacters) logWarning(`事件 ${eventName} NPC ${name} 尚未登场`);
+    for (const conflict of plan.conflicts) logWarning(`NPC ${conflict.人物} 同批已进入 ${conflict.当前事件}，不重复移动`);
+    Object.assign(locationUpdates, plan.locationUpdates);
   }
-
-  const currentVars = options.currentVars || (await getVariables({ type: 'chat' }));
-  const statData = currentVars?.stat_data || {};
-  const currentTime = options.currentTime || statData.世界信息?.时间 || {};
-  const simulatedCharacters = { ...(isPlainObject(statData.角色数据) ? statData.角色数据 : {}) };
-  const simulatedOccupancy = {
-    ...(isPlainObject(statData.事件系统?.人物事件占用) ? statData.事件系统.人物事件占用 : {}),
-  };
-
-  const mergedLocationUpdates = {};
-  const mergedOccupancyDeletes = {};
-  const mergedOccupancyInserts = {};
-  const plans = {};
-
-  for (const eventName of uniqueEventNames) {
-    const eventData = eventDefinitions[eventName];
-    const plan = buildParticipantEntryPlan({
-      eventName,
-      eventData,
-      source,
-      currentTime,
-      characters: simulatedCharacters,
-      occupancy: simulatedOccupancy,
-    });
-
-    for (const characterName of plan.missingCharacters) {
-      logWarning(`事件 ${eventName} 的参与人物 ${characterName} 尚未登场，跳过自动入场`);
-    }
-
-    for (const conflict of plan.conflicts) {
-      logWarning(
-        `人物 ${conflict.人物} 已被事件 ${conflict.当前事件} 占用，时间触发事件 ${conflict.请求事件} 不覆盖其位置`,
-      );
-    }
-
-    Object.assign(mergedLocationUpdates, plan.locationUpdates);
-    Object.assign(mergedOccupancyDeletes, plan.occupancyDeletes);
-    Object.assign(mergedOccupancyInserts, plan.occupancyInserts);
-
-    for (const characterName of Object.keys(plan.locationUpdates)) {
-      simulatedCharacters[characterName] = {
-        ...(isPlainObject(simulatedCharacters[characterName]) ? simulatedCharacters[characterName] : {}),
-        ...plan.locationUpdates[characterName],
-      };
-    }
-    for (const characterName of Object.keys(plan.occupancyDeletes)) {
-      delete simulatedOccupancy[characterName];
-    }
-    for (const [characterName, occupancyValue] of Object.entries(plan.occupancyInserts)) {
-      simulatedOccupancy[characterName] = occupancyValue;
-    }
-
-    const entered = Object.keys(plan.occupancyInserts).length;
-    plans[eventName] = {
-      entered,
-      skipped: plan.missingCharacters.length + plan.conflicts.length + plan.alreadyEntered.length,
-      ...plan,
-    };
-  }
-
-  const transactionOperations = [];
-  if (Object.keys(mergedLocationUpdates).length > 0) {
-    transactionOperations.push({
-      type: 'update',
-      payload: { 角色数据: mergedLocationUpdates },
-    });
-  }
-  if (Object.keys(mergedOccupancyDeletes).length > 0) {
-    transactionOperations.push({
-      type: 'delete',
-      payload: { 事件系统: { 人物事件占用: mergedOccupancyDeletes } },
-    });
-  }
-  if (Object.keys(mergedOccupancyInserts).length > 0) {
-    transactionOperations.push({
-      type: 'insert',
-      payload: { 事件系统: { 人物事件占用: mergedOccupancyInserts } },
-    });
-  }
-
-  if (!options.deferWrite && transactionOperations.length > 0) {
-    await writeEraTransaction(transactionOperations, `participant-entry-${source}-${uniqueEventNames.length}events`);
-  }
-
-  const entered = Object.values(plans).reduce((total, plan) => total + plan.entered, 0);
-  const skipped = Object.values(plans).reduce((total, plan) => total + plan.skipped, 0);
-  if (entered > 0) {
-    logSuccess(`已按${source}批量完成 ${entered} 名参与人物入场 (${uniqueEventNames.length} 个事件)`);
-  }
-
-  return {
-    entered,
-    skipped,
-    plans,
-    locationUpdates: mergedLocationUpdates,
-    occupancyDeletes: mergedOccupancyDeletes,
-    occupancyInserts: mergedOccupancyInserts,
-    transactionOperations,
-  };
-}
-
-export async function applyTimedParticipantEntries(eventNames, eventDefinitions, currentTime, currentVars) {
-  const eligibleEventNames = [];
-
-  for (const eventName of eventNames) {
-    const eventData = eventDefinitions[eventName];
-    const endTime = getEndTime(eventData);
-
-    if (!eventData || isDebutEvent(eventData) || (endTime && isTimeAfterEventEnd(currentTime, endTime))) {
-      continue;
-    }
-
-    eligibleEventNames.push(eventName);
-  }
-
-  return applyParticipantEntries(eligibleEventNames, eventDefinitions, PARTICIPANT_ENTRY_SOURCE.TIME, {
-    currentTime,
-    currentVars,
-  });
+  return Object.keys(locationUpdates).length
+    ? [{ type: 'update', payload: { 角色数据: locationUpdates } }]
+    : [];
 }
 
 // ==================== 批量开始事件 ====================
@@ -699,14 +578,17 @@ export async function batchStartEvents(eventNames, eventDefinitions, options = {
       },
     };
 
-    log('🚀 在同一 ERA 事务中开始事件并删除未发生状态');
-    await writeEraTransaction(
-      [
-        { type: 'insert', payload: insertPayload },
-        { type: 'delete', payload: deletePayload },
-      ],
+    const startVars = await getVariables({ type: 'chat' });
+    const npcOperations = buildEventStartParticipantOperations(
+      eventNames, eventDefinitions, startVars?.stat_data?.角色数据,
+    );
+    const committed = await writeEraTransaction(
+      [{ type: 'insert', payload: insertPayload },
+        ...npcOperations,
+        { type: 'delete', payload: deletePayload }],
       `batch-start-${eventNames.length}`,
     );
+    if (!committed) throw new Error('事件启动和人物入场未确认原子提交');
     log('✅ 批量开始事件事务完成');
 
     // 验证操作后的状态
@@ -739,8 +621,10 @@ export async function batchStartEvents(eventNames, eventDefinitions, options = {
         durationMs: 3000,
       });
     }
+    return true;
   } catch (error) {
     logError(`批量开始事件失败`, error);
+    return false;
   }
 
   debugGroupEnd();
@@ -949,17 +833,6 @@ export async function playerJoinsEvents(eventNames, eventDefinitions) {
       });
     }
 
-    const participantPlan = await applyParticipantEntries(
-      eventsToJoin,
-      eventDefinitions,
-      PARTICIPANT_ENTRY_SOURCE.PLAYER,
-      {
-        currentVars,
-        currentTime,
-        deferWrite: true,
-      },
-    );
-
     const participationPatch = Object.fromEntries(
       eventsToJoin.map(eventName => {
         const eventData = eventDefinitions[eventName];
@@ -971,7 +844,7 @@ export async function playerJoinsEvents(eventNames, eventDefinitions) {
     );
 
     await writeEraTransaction(
-      [...participantPlan.transactionOperations, { type: 'insert', payload: { 参与事件: participationPatch } }],
+      [{ type: 'insert', payload: { 参与事件: participationPatch } }],
       `player-joins-events-${eventsToJoin.length}`,
     );
     await syncParticipationOutcomeStates(eventDefinitions);
@@ -1002,36 +875,6 @@ function buildSettlementBranchSnapshot(eventName, eventData, statData) {
   return normalizeBranchMarkers(eventData?.分支标记);
 }
 
-async function prepareSettlementSnapshots(eventNames, eventDefinitions, statData) {
-  const existingProgress = statData?.前端变量?.[EVENT_SETTLEMENT_PROGRESS_KEY] || {};
-  const progressPatch = {};
-
-  for (const eventName of eventNames) {
-    if (isPlainObject(existingProgress[eventName]) && isPlainObject(existingProgress[eventName].分支标记)) {
-      continue;
-    }
-    progressPatch[eventName] = {
-      分支标记: buildSettlementBranchSnapshot(eventName, eventDefinitions[eventName], statData),
-    };
-  }
-
-  if (Object.keys(progressPatch).length > 0) {
-    const committed = await writeEraTransaction(
-      [{ type: 'insert', payload: { 前端变量: { [EVENT_SETTLEMENT_PROGRESS_KEY]: progressPatch } } }],
-      `prepare-event-settlement-${eventNames.length}`,
-    );
-    if (!committed) throw new Error('事件结算预备事务未能确认提交');
-  }
-
-  const preparedVariables = await getVariables({ type: 'chat' });
-  const preparedStat = preparedVariables?.stat_data || {};
-  const preparedProgress = preparedStat?.前端变量?.[EVENT_SETTLEMENT_PROGRESS_KEY] || {};
-  if (!eventNames.every(eventName => isPlainObject(preparedProgress[eventName]?.分支标记))) {
-    throw new Error('事件结算分支标记快照校验失败');
-  }
-  return preparedStat;
-}
-
 // ==================== 批量结束事件并应用差分 ====================
 export async function batchEndEvents(eventNames, eventDefinitions, options = {}) {
   if (eventNames.length === 0) return true;
@@ -1041,7 +884,7 @@ export async function batchEndEvents(eventNames, eventDefinitions, options = {})
   try {
     await syncParticipationOutcomeStates(eventDefinitions);
     const currentVars = await getVariables({ type: 'chat' });
-    const statData = await prepareSettlementSnapshots(eventNames, eventDefinitions, currentVars.stat_data);
+    const statData = currentVars.stat_data;
     const 参与事件 = statData.参与事件 || {};
 
     const 合并后的差分 = {
@@ -1053,7 +896,6 @@ export async function batchEndEvents(eventNames, eventDefinitions, options = {})
     const 进行中删除对象 = {};
     const 未发生删除对象 = {};
     const 参与删除对象 = {};
-    const 占用删除对象 = {};
     const participationByEvent = {};
     const branchResults = {};
 
@@ -1072,9 +914,7 @@ export async function batchEndEvents(eventNames, eventDefinitions, options = {})
       const participationEntry = hasParticipationEntry(参与事件, eventName)
         ? getParticipationEntry(参与事件, eventName)
         : null;
-      const frozenMarkers = normalizeBranchMarkers(
-        statData?.前端变量?.[EVENT_SETTLEMENT_PROGRESS_KEY]?.[eventName]?.分支标记,
-      );
+      const frozenMarkers = buildSettlementBranchSnapshot(eventName, eventData, statData);
       if (Object.keys(frozenMarkers).length > 0) branchResults[eventName] = cloneJson(frozenMarkers);
 
       for (const actionKey of EVENT_DIFF_ACTIONS) {
@@ -1103,7 +943,6 @@ export async function batchEndEvents(eventNames, eventDefinitions, options = {})
       if (playerParticipated) {
         Object.assign(参与删除对象, buildParticipationDeletePatch(参与事件, eventName));
       }
-      Object.assign(占用删除对象, buildOccupancyCleanupPatch(statData?.事件系统?.人物事件占用 || {}, eventName));
     }
 
     const finalFollowups = buildFollowupPayloads(eventNames, eventDefinitions, statData);
@@ -1132,7 +971,6 @@ export async function batchEndEvents(eventNames, eventDefinitions, options = {})
         )
         .map(eventName => [eventName, {}]),
     );
-    const settlementProgressDeletes = Object.fromEntries(eventNames.map(eventName => [eventName, {}]));
 
     const settlementOperations = [];
     for (const actionKey of EVENT_DIFF_ACTIONS) {
@@ -1174,12 +1012,6 @@ export async function batchEndEvents(eventNames, eventDefinitions, options = {})
     if (Object.keys(参与删除对象).length > 0) {
       settlementOperations.push({ type: 'delete', payload: { 参与事件: 参与删除对象 } });
     }
-    if (Object.keys(占用删除对象).length > 0) {
-      settlementOperations.push({
-        type: 'delete',
-        payload: { 事件系统: { 人物事件占用: 占用删除对象 } },
-      });
-    }
     if (Object.keys(followupPayload).length > 0 || Object.keys(followupCountPayload).length > 0) {
       settlementOperations.push({
         type: 'insert',
@@ -1199,10 +1031,6 @@ export async function batchEndEvents(eventNames, eventDefinitions, options = {})
         },
       });
     }
-    settlementOperations.push({
-      type: 'delete',
-      payload: { 前端变量: { [EVENT_SETTLEMENT_PROGRESS_KEY]: settlementProgressDeletes } },
-    });
 
     const committed = await writeEraTransaction(settlementOperations, `batch-end-events-${eventNames.length}`);
     if (!committed) {
@@ -1215,21 +1043,13 @@ export async function batchEndEvents(eventNames, eventDefinitions, options = {})
       const eventData = eventDefinitions[eventName];
       const archiveReady =
         !isOrdinaryWorldEvent(eventData) || isWorldEventRecord(finalVerifyStat.世界事件?.[eventName]);
-      const occupancyCleared = Object.values(finalVerifyStat.事件系统?.人物事件占用 || {}).every(
-        occupancyValue => occupancyValue?.事件名 !== eventName,
-      );
       return (
         Object.prototype.hasOwnProperty.call(finalVerifyStat.事件系统?.已完成事件 || {}, eventName) &&
         !Object.prototype.hasOwnProperty.call(finalVerifyStat.事件系统?.进行中事件 || {}, eventName) &&
         (!options.deleteUnstarted ||
           !Object.prototype.hasOwnProperty.call(finalVerifyStat.事件系统?.未发生事件 || {}, eventName)) &&
         !hasParticipationEntry(finalVerifyStat.参与事件, eventName) &&
-        !Object.prototype.hasOwnProperty.call(
-          finalVerifyStat.前端变量?.[EVENT_SETTLEMENT_PROGRESS_KEY] || {},
-          eventName,
-        ) &&
         archiveReady &&
-        occupancyCleared &&
         (!branchResults[eventName] ||
           JSON.stringify(finalVerifyStat.事件分支结果?.[eventName]) === JSON.stringify(branchResults[eventName]))
       );

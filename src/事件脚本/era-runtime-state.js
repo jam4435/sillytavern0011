@@ -1,7 +1,7 @@
 import { EVENT_RUNTIME_KEY_VERSION, logSuccess, logWarning } from './era-utils.js';
 import { writeDirectAssign, writeDirectDelete } from './era-write-helper.js';
 
-const EVENT_SYSTEM_BUCKETS = ['未发生事件', '进行中事件', '已完成事件', '已失效事件', '人物事件占用'];
+const EVENT_SYSTEM_BUCKETS = ['未发生事件', '进行中事件', '已完成事件', '已失效事件'];
 const EVENT_STATE_ROOTS = ['参与事件', '世界事件', '事件分支结果', '附近传闻', '后续事件线索', '后续事件线索计数'];
 
 function isPlainObject(value) {
@@ -15,6 +15,7 @@ export function needsEventRuntimeStateReset(statData) {
 export function buildEventRuntimeStateResetPlan(statData) {
   const currentEventSystem = isPlainObject(statData?.事件系统) ? statData.事件系统 : {};
   const currentFrontendVariables = isPlainObject(statData?.前端变量) ? statData.前端变量 : {};
+  const { 事件结算进度: _oldProgress, ...retainedFrontendVariables } = currentFrontendVariables;
   const characterData = isPlainObject(statData?.角色数据) ? statData.角色数据 : {};
 
   const eventSystem = Object.fromEntries(EVENT_SYSTEM_BUCKETS.map(bucket => [bucket, {}]));
@@ -26,9 +27,8 @@ export function buildEventRuntimeStateResetPlan(statData) {
     事件系统: eventSystem,
     ...Object.fromEntries(EVENT_STATE_ROOTS.map(root => [root, {}])),
     前端变量: {
-      ...currentFrontendVariables,
+      ...retainedFrontendVariables,
       事件结局状态: {},
-      事件结算进度: {},
       可发现事件: {},
       事件运行时键版本: EVENT_RUNTIME_KEY_VERSION,
     },
