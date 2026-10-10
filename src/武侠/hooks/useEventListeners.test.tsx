@@ -315,6 +315,42 @@ describe('useEventListeners', () => {
     expect(setCurrentOptions).toHaveBeenCalledWith(['选项']);
   });
 
+  it('历史分叉切换到新聊天立即解除旧回合缓冲，迟到确认不能污染新聊天', async () => {
+    const updateGameState = vi.fn();
+    const onChatChanged = vi.fn();
+    renderHook(() => useEventListeners({
+      updateGameState,
+      setCurrentMaintext: vi.fn(),
+      setCurrentOptions: vi.fn(),
+      onChatChanged,
+    }));
+
+    await act(async () => {
+      await emitMockEvent('wuxia:turn-lifecycle', {
+        phase: 'start', roundId: 'old-branch-round', chatId: 'test-chat',
+      });
+      await emitMockEvent('era:writeDone', { actions: { apiWrite: true } });
+      vi.advanceTimersByTime(60);
+    });
+    expect(updateGameState).not.toHaveBeenCalled();
+
+    getSillyTavernMock().SillyTavern.getCurrentChatId.mockReturnValue('branched-chat');
+    await act(async () => {
+      await emitMockEvent(String(tavern_events.CHAT_CHANGED), 'branched-chat');
+      vi.advanceTimersByTime(60);
+    });
+    expect(onChatChanged).toHaveBeenCalledTimes(1);
+    expect(updateGameState).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await emitMockEvent('wuxia:turn-events-settled', {
+        roundId: 'old-branch-round', chatId: 'test-chat', status: 'success',
+      });
+      vi.advanceTimersByTime(10);
+    });
+    expect(updateGameState).toHaveBeenCalledTimes(1);
+  });
+
   it('聊天 ID 真的变化时才清空当前回合追踪', async () => {
     const onChatChanged = vi.fn();
 
