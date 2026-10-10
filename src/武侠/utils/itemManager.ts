@@ -76,7 +76,9 @@ function getFrontendVariables(): FrontendVariableData | undefined {
 }
 
 function cloneItem(item: InventoryItemVariableData): InventoryItemVariableData {
-  return JSON.parse(JSON.stringify(item)) as InventoryItemVariableData;
+  const result = JSON.parse(JSON.stringify(item)) as InventoryItemVariableData & { 使用状态?: string };
+  delete result.使用状态;
+  return result;
 }
 
 function isEquipment(item?: InventoryItemVariableData): boolean {
@@ -351,25 +353,9 @@ export async function equipInventoryItem(itemName: string): Promise<EquipInvento
   const rollback: EquipmentRollbackData = {
     slot,
     previousItemName: currentEquippedItem,
-    previousItem: currentEquippedItem ? user数据.包裹?.[currentEquippedItem] && cloneItem(user数据.包裹[currentEquippedItem]) : undefined,
     newItemName: itemName,
-    newItem: cloneItem(item),
     equipmentSlotExisted: Boolean(user数据.装备栏 && Object.prototype.hasOwnProperty.call(user数据.装备栏, slot)),
   };
-
-  const packagePatch: Record<string, InventoryItemVariableData> = {
-    [itemName]: {
-      ...cloneItem(item),
-      使用状态: '装备中',
-    },
-  };
-
-  if (currentEquippedItem && currentEquippedItem !== itemName && user数据.包裹?.[currentEquippedItem]) {
-    packagePatch[currentEquippedItem] = {
-      ...cloneItem(user数据.包裹[currentEquippedItem]),
-      使用状态: '',
-    };
-  }
 
   await writeUserDataPatch(
     {
@@ -377,12 +363,6 @@ export async function equipInventoryItem(itemName: string): Promise<EquipInvento
     },
     'item-write-equip-slot',
     rollback.equipmentSlotExisted ? 'update' : 'insert',
-  );
-  await writeUserDataPatch(
-    {
-      包裹: packagePatch,
-    },
-    'item-write-equip-status',
   );
 
   gameLogger.log(`[itemManager] 装备物品: ${itemName} -> ${slot}`);
@@ -411,19 +391,6 @@ export async function restoreEquipmentState(rollback: EquipmentRollbackData): Pr
     );
   }
 
-  const packagePatch: Record<string, InventoryItemVariableData> = {
-    [rollback.newItemName]: cloneItem(rollback.newItem),
-  };
-  if (rollback.previousItemName && rollback.previousItem) {
-    packagePatch[rollback.previousItemName] = cloneItem(rollback.previousItem);
-  }
-
-  await writeUserDataPatch(
-    {
-      包裹: packagePatch,
-    },
-    'item-write-equip-restore-status',
-  );
   gameLogger.log(`[itemManager] 恢复装备状态: ${rollback.newItemName}`);
 }
 

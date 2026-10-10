@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
-import { decrementStatusEffectTurns, restoreItemCount, useMedicineItem } from './itemManager';
+import { decrementStatusEffectTurns, equipInventoryItem, restoreEquipmentState, restoreItemCount, useMedicineItem } from './itemManager';
 
 vi.mock('../../shared/directVariableWrite', () => ({
   emitSourcedEraVariableWriteAndWait: vi.fn(),
@@ -52,7 +52,6 @@ describe('itemManager', () => {
       数量: 1,
       部位: '护甲',
       属性修正: { 根骨: 15 },
-      使用状态: '装备中',
     });
 
     expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledWith(expect.objectContaining({
@@ -68,13 +67,35 @@ describe('itemManager', () => {
                 数量: 1,
                 部位: '护甲',
                 属性修正: { 根骨: 15 },
-                使用状态: '装备中',
-              },
+                        },
             },
           },
         },
       },
     }));
+  });
+
+  it('装备与撤销只写装备栏，不再写包裹冗余状态', async () => {
+    vi.mocked(globalThis.getAllVariables).mockReturnValue({
+      stat_data: { user数据: {
+        装备栏: { 武器: '木剑' },
+        包裹: {
+          木剑: { 类型: '装备', 部位: '武器', 数量: 1 },
+          倚天剑: { 类型: '装备', 部位: '武器', 数量: 1 },
+        },
+      } },
+    });
+    const result = await equipInventoryItem('倚天剑');
+    expect(result).not.toBeNull();
+    expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(1);
+    expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: { stat_data: { user数据: { 装备栏: { 武器: '倚天剑' } } } } }),
+    );
+    await restoreEquipmentState(result!.rollback);
+    expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenCalledTimes(2);
+    expect(emitSourcedEraVariableWriteAndWaitMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ detail: { stat_data: { user数据: { 装备栏: { 武器: '木剑' } } } } }),
+    );
   });
 
   it('临时增幅药品会扣数量并创建状态效果', async () => {

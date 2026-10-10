@@ -379,7 +379,6 @@ export interface FrontendVariableData {
   可选任务?: FactionTaskPoolMap;
   事件线索档案?: Record<string, EventClueArchiveEntry>;
   事件结局状态?: Record<string, EventOutcomeStatus>;
-  事件结算进度?: Record<string, { 分支标记?: Record<string, 0 | 1> }>;
   事件调度状态?: {
     schemaVersion?: number;
     manifestHash?: string;
@@ -402,7 +401,6 @@ export interface InventoryItemVariableData {
   功效类型?: string;
   部位?: string;
   属性修正?: InventoryAttributeModifierMap;
-  使用状态?: string;
   持续时间?: string | number;
 }
 
@@ -462,7 +460,7 @@ export interface GameEvent {
   remainingDays?: number;
   /** 后续线索剩余可追回合数 */
   remainingTurns?: number;
-  /** 卷入该事件的人物（来自事件系统.人物事件占用） */
+  /** 静态事件定义的参与人物，不代表人物此刻仍在现场 */
   involvedCharacters?: string[];
 }
 
@@ -823,7 +821,6 @@ export interface OriginItemInfo {
   功效类型?: string;
   部位?: string;
   属性修正?: InventoryAttributeModifierMap;
-  使用状态?: string;
   持续时间?: string | number;
 }
 
@@ -1033,9 +1030,7 @@ export interface ResourceDeltaMap {
 export interface EquipmentRollbackData {
   slot: string;
   previousItemName?: string;
-  previousItem?: InventoryItemVariableData;
   newItemName: string;
-  newItem: InventoryItemVariableData;
   equipmentSlotExisted: boolean;
 }
 

@@ -977,8 +977,7 @@ function parseEquipInfo(
 ): InventoryItem['equipInfo'] | undefined {
   const slot = typeof item.部位 === 'string' ? item.部位.trim() : '';
   const isEquipped = Boolean(slot && equipmentSlots[slot] === itemName);
-  const itemStatus = typeof item.使用状态 === 'string' ? item.使用状态.trim() : '';
-  const status = isEquipped ? '装备中' : itemStatus;
+  const status = isEquipped ? '装备中' : '';
   const modifiers = normalizeAttributeModifiers(item.属性修正);
 
   if (!slot && !status && !modifiers && !isEquipped) {
