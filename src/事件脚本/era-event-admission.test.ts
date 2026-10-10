@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { eventEmitMock } from '../武侠/test/setup';
 
 const { transactionMock, notifyMock, syncMock } = vi.hoisted(() => ({
   transactionMock: vi.fn(),
@@ -11,6 +12,7 @@ vi.mock('./era-utils.js', () => ({
   debugGroup: vi.fn(), debugGroupCollapsed: vi.fn(), debugGroupEnd: vi.fn(),
   isDebugEnabled: () => false,
   isDebutEvent: () => false,
+  EVENT_KIND: { ORDINARY: 'ordinary', ENCOUNTER: 'encounter' },
   hasParticipationEntry: (participation: Record<string, unknown> | undefined, name: string) => {
     const entry = participation?.[name] as Record<string, unknown> | undefined;
     return !!entry && typeof entry.描述 === 'string' && typeof entry.结局 === 'string' &&
@@ -98,6 +100,7 @@ describe('事件开始 / 玩家入场 ERA 单事务', () => {
   beforeEach(() => {
     transactionMock.mockReset();
     notifyMock.mockReset();
+    eventEmitMock.mockClear();
     syncMock.mockReset().mockResolvedValue(undefined);
     variables = {
       stat_data: {
@@ -136,6 +139,7 @@ describe('事件开始 / 玩家入场 ERA 单事务', () => {
     expect(variables.stat_data.参与事件[first]).toBeDefined();
     expect(notifyMock.mock.calls.map(([notice]) => notice.kind))
       .toEqual(['event-started', 'player-entered-event']);
+    expect(eventEmitMock.mock.calls.some(([name]) => name === 'wuxia:event-admission-confirmed')).toBe(true);
   });
 
   it('玩家尚未到场时事件可以启动，但不提前写参与快照或参与通知', async () => {
