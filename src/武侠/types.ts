@@ -445,6 +445,8 @@ export interface GameEvent {
   title: string;
   type: 'RUMOR' | 'ACTIVE' | 'AFTERMATH';
   description: string;
+  /** 当前事件额外保留的线索背景；不改变进行中状态、预计结束时间与进展 */
+  clueDescription?: string;
   details?: string;
   /** ACTIVE 细分：participation=玩家参与中，world=江湖中进行、玩家未卷入 */
   category?: 'participation' | 'world';
