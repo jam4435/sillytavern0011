@@ -556,8 +556,15 @@ export function buildEventStartParticipantOperations(eventNames, eventDefinition
   return operations;
 }
 
-function notifyPlayerEnteredEvents(eventNames) {
+async function notifyPlayerEnteredEvents(eventNames) {
   if (eventNames.length === 0) return;
+  // 事务回读确认后先提示前端立即刷新真实事件投影，再展示入场通知。
+  // 展示事件的监听失败不能反过来使已经提交的事件事务失败。
+  try {
+    await eventEmit('wuxia:event-admission-confirmed', { eventNames });
+  } catch (error) {
+    logWarning('参与已确认，但前端即时刷新信号未送达，等待正常写入完成事件兜底:', error);
+  }
   notifyEvent({
     kind: 'player-entered-event',
     level: 'warning',
@@ -677,7 +684,7 @@ export async function batchStartEvents(eventNames, eventDefinitions, options = {
       });
     }
     // 开始与参与都是已确认状态，两个通知此时都不能抢跑。
-    notifyPlayerEnteredEvents(joiningNames);
+    await notifyPlayerEnteredEvents(joiningNames);
     return true;
   } catch (error) {
     logError(`批量开始事件失败`, error);
@@ -897,7 +904,7 @@ export async function playerJoinsEvents(eventNames, eventDefinitions) {
       throw new Error('玩家参与事件回读未确认全部参与记录');
     }
     await syncParticipationOutcomeStates(eventDefinitions, verified);
-    notifyPlayerEnteredEvents(verifiedNames);
+    await notifyPlayerEnteredEvents(verifiedNames);
     logSuccess(`玩家已参与 ${verifiedNames.length} 个事件:`, verifiedNames);
 
     debugGroupEnd();
