@@ -315,9 +315,8 @@ describe('ERA 主线初始化控制', () => {
     async outcome => {
       const eventName = '天龙事件-异步结算竞态';
       const vars = validVariables();
-      vars.stat_data.事件系统.进行中事件 = {
-        [eventName]: { 年: 1199, 月: 8, 日: 15, 时: 10 },
-      };
+      // 初始非 root 稳定检查不应撞上此测试特意延迟的结束事务。
+      vars.stat_data.事件系统.进行中事件 = {};
       getVariablesMock.mockReturnValue(vars);
       initializeEventListMock.mockResolvedValue(undefined);
 
@@ -335,7 +334,7 @@ describe('ERA 主线初始化控制', () => {
           参与人物: [], insert: {}, update: {}, delete: {},
         },
       });
-      vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(true);
+      vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(false);
       let release!: () => void;
       const gate = new Promise<void>(resolve => { release = resolve; });
       vi.mocked(ops.batchEndEvents).mockImplementation(async () => {
@@ -354,11 +353,12 @@ describe('ERA 主线初始化控制', () => {
         // @ts-expect-error 测试用模块 query
         await import('./era-main.js?turn-settlement-failed');
       }
-      const initListener = eventOnMock.mock.calls
-        .filter(([name]) => name === 'GameInitialized')
-        .at(-1)?.[1] as ((signal: { timestamp: number }) => unknown) | undefined;
-      initListener?.({ timestamp: Date.now() + 300_000 });
       await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() =>
+        expect(eventOnMock.mock.calls.some(([name]) => name === 'wuxia:turn-completed')).toBe(true),
+      );
+      vars.stat_data.事件系统.进行中事件[eventName] = { 年: 1199, 月: 8, 日: 15, 时: 10 };
+      vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(true);
 
       const confirmations: Array<{ roundId: string; status: string; messageId: number }> = [];
       const subscription = eventOn('wuxia:turn-events-settled', (detail: {
