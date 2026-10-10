@@ -1381,7 +1381,7 @@ describe('history checkout', () => {
       .filter(entry => entry.event === 'history-checkout-event-system-audit' && entry.details?.nodeId === target.id)
       .slice(-3);
     expect(audits.map(entry => entry.details?.stage)).toEqual([
-      'before-full-sync', 'after-full-sync', 'after-event-prepare',
+      'after-full-sync', 'after-snapshot-restore', 'after-event-prepare',
     ]);
     for (const entry of audits) {
       expect(entry.details?.eraLogInventory).toEqual(expect.objectContaining({
