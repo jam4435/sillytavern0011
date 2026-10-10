@@ -77,7 +77,7 @@ jobs:
       - name: Turn history seal ordering regression
         run: >
           pnpm exec vitest run --configLoader native --pool threads --reporter verbose
-          src/武侠/hooks/useMessageHandler.test.tsx -t '事件结算尚未确认时不能封存历史'
+          src/武侠/hooks/useMessageHandler.test.tsx -t '事件结算尚未确认时不能封存历史|新 swipe 的事件尚未确认'
       - name: Martial art string migration regressions
         run: >
           pnpm exec vitest run --configLoader native --pool threads --reporter verbose
