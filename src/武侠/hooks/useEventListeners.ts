@@ -318,6 +318,12 @@ export function useEventListeners({
         releaseDeferredRefresh();
       }
     });
+    const eventAdmissionConfirmedListener = eventOn('wuxia:event-admission-confirmed', () => {
+      // 这一信号只能在事务 + stat_data 回读确认后由事件脚本发送。
+      // 允许它越过本回合的一般刷新缓冲，让卷轴和“进入事件”弹窗同一轮展示。
+      const committedData = readGameDataPure();
+      if (committedData) updateGameState(committedData);
+    });
     eventLogger.log('注册 era:writeDone 监听器...');
     const writeDoneListener = eventOn('era:writeDone', handleWriteDone);
     eventLogger.log(`注册 ${DIRECT_VARIABLE_WRITE_DONE_EVENT} 监听器...`);
@@ -350,6 +356,7 @@ export function useEventListeners({
       writeDoneListener.stop();
       eventTurnLifecycleListener.stop();
       eventTurnSettledListener.stop();
+      eventAdmissionConfirmedListener.stop();
       directWriteDoneListener.stop();
       eraVariableWriteDoneListener.stop();
       variableTraceLogger.log('[useEventListeners] 变量相关监听器已清理完成', {
