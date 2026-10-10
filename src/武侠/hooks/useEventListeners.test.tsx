@@ -62,6 +62,8 @@ describe('useEventListeners', () => {
       tavern_events.MESSAGE_SWIPED,
       tavern_events.MESSAGE_UPDATED,
         tavern_events.CHAT_CHANGED,
+        'wuxia:turn-lifecycle',
+        'wuxia:turn-events-settled',
         'era:writeDone',
         DIRECT_VARIABLE_WRITE_DONE_EVENT,
         ERA_VARIABLE_WRITE_DONE_EVENT,
@@ -188,6 +190,71 @@ describe('useEventListeners', () => {
 
     expect(scheduleGameDataCompletionMock).not.toHaveBeenCalled();
     expect(readGameDataPureMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('新地点的变量写入先暂存投影，事件结算确认后才一次性刷新卷轴', async () => {
+    const updateGameState = vi.fn();
+    renderHook(() => useEventListeners({
+      updateGameState,
+      setCurrentMaintext: vi.fn(),
+      setCurrentOptions: vi.fn(),
+    }));
+
+    await act(async () => {
+      await emitMockEvent('wuxia:turn-lifecycle', {
+        phase: 'start', roundId: 'admission-round-1', chatId: 'test-chat',
+      });
+      await emitMockEvent(ERA_VARIABLE_WRITE_DONE_EVENT, {
+        version: 1, writeId: 'move', source: 'variable-model', operation: 'update',
+        reason: 'player-move', refreshHint: 'full',
+      });
+      vi.advanceTimersByTime(100);
+    });
+    expect(updateGameState).not.toHaveBeenCalled();
+    expect(readGameDataPureMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await emitMockEvent('wuxia:turn-events-settled', {
+        roundId: 'other-round', chatId: 'test-chat', status: 'success',
+      });
+      vi.advanceTimersByTime(1);
+    });
+    expect(updateGameState).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await emitMockEvent('wuxia:turn-events-settled', {
+        roundId: 'admission-round-1', chatId: 'test-chat', status: 'success',
+      });
+      vi.advanceTimersByTime(1);
+    });
+    expect(readGameDataPureMock).toHaveBeenCalledTimes(1);
+    expect(updateGameState).toHaveBeenCalledTimes(1);
+  });
+
+  it('重新生成失败/取消时，回合结束信号释放被缓冲的 UI 刷新', async () => {
+    const updateGameState = vi.fn();
+    renderHook(() => useEventListeners({
+      updateGameState,
+      setCurrentMaintext: vi.fn(),
+      setCurrentOptions: vi.fn(),
+    }));
+
+    await act(async () => {
+      await emitMockEvent('wuxia:turn-lifecycle', {
+        phase: 'start', roundId: 'regenerate-1', chatId: 'test-chat',
+      });
+      await emitMockEvent('era:writeDone', { actions: { resync: true } });
+      vi.advanceTimersByTime(60);
+    });
+    expect(updateGameState).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await emitMockEvent('wuxia:turn-lifecycle', {
+        phase: 'finish', roundId: 'regenerate-1', chatId: 'test-chat',
+      });
+      vi.advanceTimersByTime(60);
+    });
+    expect(updateGameState).toHaveBeenCalledTimes(1);
   });
 
   it('同一 ERA 写入的 raw 与 sourced 完成通知只执行一次 fullScan', async () => {
