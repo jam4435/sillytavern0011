@@ -95,6 +95,8 @@ export async function rollbackByMk(MK: string, silent = false) {
     logger.log('rollbackByMk', `回滚完成：MK=${MK}`);
   } catch (e: any) {
     logger.error('rollbackByMk', `回滚异常：MK=${MK} → ${e?.message || e}`, e);
+    // 上游必须知道回滚失败；否则继续 Apply 会覆盖仍在生效的旧 EditLog。
+    throw e;
   }
 }
 
