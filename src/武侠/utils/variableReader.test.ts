@@ -618,6 +618,138 @@ describe('getGameVariables ERA 展示投影', () => {
       startsInDays: 5,
     });
   });
+
+  it('第二回06进行中时合并长期线索、旧线索、附近传闻和全域预告，不再计作两条事件', () => {
+    const eventName = '天龙第二回06-段誉入秘洞痴拜神仙姐姐玉像';
+    const clue = '玉像前蒲团藏有玄机，深入洞窟或可发现机缘。';
+    const rumor = '石门之后洞天幽深。 [1202年3月16日15时40分/大理/无量山/琅嬛福地]';
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        世界信息: { 时间: { 年: 1202, 月: 3, 日: 16, 时: 16 } },
+        user数据: {
+          用户名: '玩家', 性别: '男', 境界: '不入流',
+          所在位置: '大理/无量山/剑湖谷底',
+          初始属性: { 臂力: 10, 根骨: 10, 机敏: 10, 悟性: 10, 洞察: 10 },
+        },
+        事件系统: {
+          进行中事件: { [eventName]: { 年: 1202, 月: 3, 日: 16, 时: 17 } },
+          人物事件占用: { 段誉: { 事件名: eventName, 地点: '大理/无量山/琅嬛福地' } },
+        },
+        参与事件: {
+          [eventName]: {
+            描述: '段誉正在玉像前叩拜。',
+            结局: '尚未发现蒲团中的秘籍。',
+            地点: '大理/无量山/琅嬛福地',
+            insert: {}, update: {}, delete: {},
+          },
+        },
+        前端变量: {
+          事件线索档案: {
+            [`${eventName}.json`]: {
+              线索: clue,
+              地点: '大理/无量山/琅嬛福地',
+              开始时间: { 年: 1202, 月: 3, 日: 16, 时: 15 },
+            },
+          },
+          可发现事件: { [eventName]: rumor },
+        },
+        后续事件线索: { [eventName]: '这是一条旧版短期线索，不应覆盖长期线索。' },
+        附近传闻: { [eventName]: rumor },
+      },
+    });
+
+    const state = readGameDataSync();
+    const matches = state?.events?.filter(event => event.title.includes('段誉入秘洞')) || [];
+    expect(matches).toHaveLength(1);
+    expect(matches[0]).toMatchObject({
+      type: 'ACTIVE',
+      category: 'participation',
+      description: '段誉正在玉像前叩拜。',
+      clueDescription: clue,
+      details: '尚未发现蒲团中的秘籍。',
+      location: '大理/无量山/琅嬛福地',
+      timeText: '1202年3月16日17时',
+      remainingDays: 0,
+    });
+    expect(matches[0].startsInDays).toBeUndefined();
+  });
+
+  it('只有进行中事件时，从旧版后续线索补充背景并从传闻补充缺失地点', () => {
+    const eventName = '天龙第二回06-段誉入秘洞痴拜神仙姐姐玉像';
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        事件系统: { 进行中事件: { [eventName]: { 年: 1202, 月: 3, 日: 16, 时: 17 } } },
+        后续事件线索: { [eventName]: '古洞深处隐约藏着一段秘密。' },
+        附近传闻: {
+          [eventName]: '谷底石门可以通往秘洞。 [1202年3月16日15时/大理/无量山/琅嬛福地]',
+        },
+      },
+    });
+
+    const matches = readGameDataSync()?.events?.filter(event => event.title.includes('段誉入秘洞')) || [];
+    expect(matches).toHaveLength(1);
+    expect(matches[0]).toMatchObject({
+      type: 'ACTIVE',
+      category: 'world',
+      description: '',
+      clueDescription: '古洞深处隐约藏着一段秘密。',
+      location: '大理/无量山/琅嬛福地',
+      timeText: '1202年3月16日17时',
+    });
+  });
+
+  it('仅有有效参与记录但进行中索引缺失时，仍将后续线索合并到当前事件', () => {
+    const eventName = '天龙第二回06-段誉入秘洞痴拜神仙姐姐玉像';
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        参与事件: {
+          [eventName]: {
+            描述: '段誉已进入秘洞。',
+            结局: '尚未结束。',
+            insert: {}, update: {}, delete: {},
+          },
+        },
+        前端变量: {
+          事件线索档案: { [eventName]: { 线索: '秘洞中供奉着神仙姐姐玉像。', 地点: '大理/无量山/琅嬛福地' } },
+        },
+      },
+    });
+
+    const matches = readGameDataSync()?.events?.filter(event => event.title.includes('段誉入秘洞')) || [];
+    expect(matches).toHaveLength(1);
+    expect(matches[0]).toMatchObject({
+      type: 'ACTIVE',
+      category: 'participation',
+      description: '段誉已进入秘洞。',
+      clueDescription: '秘洞中供奉着神仙姐姐玉像。',
+      location: '大理/无量山/琅嬛福地',
+    });
+  });
+
+  it('已完成或已失效事件的旧后续线索和传闻不能重复出现', () => {
+    const completedName = '天龙第二回06-段誉入秘洞痴拜神仙姐姐玉像';
+    const expiredName = '天龙第二回07-段誉蒲团得绝学启程奔万劫谷';
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        事件系统: {
+          已完成事件: { [completedName]: 1 },
+          已失效事件: { [expiredName]: 1 },
+        },
+        后续事件线索: {
+          [completedName]: '过期线索 A',
+          [expiredName]: '过期线索 B',
+        },
+        前端变量: {
+          可发现事件: { [completedName]: '过期风闻 A', [expiredName]: '过期风闻 B' },
+        },
+        附近传闻: { [completedName]: '过期传闻 A', [expiredName]: '过期传闻 B' },
+      },
+    });
+
+    const events = readGameDataSync()?.events || [];
+    expect(events.some(event => event.title.includes('段誉入秘洞'))).toBe(false);
+    expect(events.some(event => event.title.includes('段誉蒲团得绝学'))).toBe(false);
+  });
 });
 
 const 金雁功数据库 = {
