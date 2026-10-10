@@ -88,6 +88,12 @@ describe('writeEraTransaction', () => {
     await vi.advanceTimersByTimeAsync(10);
     await expect(firstWrite).resolves.toBe(true);
 
+    const firstForensics = JSON.parse(localStorage.getItem(HISTORY_EVENT_FORENSICS_STORAGE_KEY) || '[]');
+    expect(firstForensics.map((entry: any) => entry.details?.stage)).toContain('era-transaction-unconfirmed');
+    expect(firstForensics.map((entry: any) => entry.details?.stage)).toContain('era-transaction-reread-result');
+    expect(firstForensics.find((entry: any) => entry.details?.stage === 'era-transaction-unconfirmed')?.details)
+      .toMatchObject({ isTimeout: true, transactionId: expect.any(String), signatureHash: expect.any(String) });
+
     expect(globalThis.getChatMessages).toHaveBeenCalledWith(-1, { include_swipes: true });
     expect(eventEmitMock.mock.calls.some(([name]) => name === 'manual_sync')).toBe(true);
     const initialTransactionCount = eventEmitMock.mock.calls.filter(
@@ -105,6 +111,9 @@ describe('writeEraTransaction', () => {
     expect(eventEmitMock.mock.calls.filter(([name]) => name === 'era:transactionByObject')).toHaveLength(
       initialTransactionCount,
     );
+    const duplicateDiagnostics = JSON.parse(localStorage.getItem(HISTORY_EVENT_FORENSICS_STORAGE_KEY) || '[]');
+    expect(duplicateDiagnostics.find((entry: any) => entry.details?.stage === 'era-transaction-duplicate-suppressed')?.details)
+      .toMatchObject({ duplicateState: 'recently-confirmed', signatureHash: expect.any(String) });
 
     await vi.advanceTimersByTimeAsync(RECENT_SIGNATURE_TTL_FOR_TEST);
     eventOn('era:transactionByObject', async ({ transactionId }: any) => {

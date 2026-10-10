@@ -89,6 +89,8 @@ import {
   validateOrRepairInlineWorldTimeReply,
 } from '../utils/extraVariableUpdateManager';
 import { observeEraWriteDone } from '../utils/eraWriteWait';
+import { finalizeCurrentTurn } from '../utils/saveLoadManager';
+import { WUXIA_TURN_EVENTS_SETTLED_EVENT } from '../../shared/turnEventSettlement';
 import { regenerateLastAssistantSwipe } from '../utils/messageActions';
 
 type ChatRole = 'system' | 'assistant' | 'user';
@@ -148,6 +150,7 @@ describe('useMessageHandler extra-variable decision', () => {
   let messages: MockChatMessage[];
   let nextMessageId: number;
   let turnLockAckResponder: EventOnReturn;
+  let turnEventsAckResponder: EventOnReturn;
 
   beforeEach(() => {
     messages = [];
@@ -200,6 +203,10 @@ describe('useMessageHandler extra-variable decision', () => {
     regenerateLastAssistantSwipeMock.mockReset();
     globals.eventEmit.mockClear();
     localStorage.clear();
+    vi.mocked(finalizeCurrentTurn).mockClear();
+    turnEventsAckResponder = eventOn('wuxia:turn-completed', async (payload: Record<string, unknown>) => {
+      await eventEmit(WUXIA_TURN_EVENTS_SETTLED_EVENT, { ...payload, status: 'success' });
+    });
     turnLockAckResponder = eventOn('wuxia:turn-lifecycle', async (payload: Record<string, unknown>) => {
       if (payload.phase !== 'start') return;
       await eventEmit('wuxia:turn-lock-ack', {
@@ -282,6 +289,31 @@ describe('useMessageHandler extra-variable decision', () => {
     });
 
     expect(options.onAssistantDisplayCommit).toHaveBeenCalledWith(2, 0);
+  });
+
+  it('send：事件结算尚未确认时不能封存历史，收到本回合确认后才封存', async () => {
+    turnEventsAckResponder.stop();
+    let notifyEntered!: () => void;
+    const entered = new Promise<void>(resolve => { notifyEntered = resolve; });
+    let release!: () => void;
+    const deferred = new Promise<void>(resolve => { release = resolve; });
+    eventOn('wuxia:turn-completed', async (payload: Record<string, unknown>) => {
+      notifyEntered();
+      await deferred;
+      await eventEmit(WUXIA_TURN_EVENTS_SETTLED_EVENT, { ...payload, status: 'success' });
+    });
+    const options = createHookOptions(createSummarySettings('inline'));
+    const { result } = renderHook(() => useMessageHandler(options));
+    let sending!: Promise<unknown>;
+    await act(async () => {
+      sending = result.current.handleSendMessage('等待结算后封存');
+      await entered;
+    });
+    expect(finalizeCurrentTurn).not.toHaveBeenCalled();
+    release();
+    await act(async () => { await sending; });
+    expect(finalizeCurrentTurn).toHaveBeenCalledTimes(1);
+    expect(options.onVariableTurnSettled).toHaveBeenCalledWith(2);
   });
 
   it('真实玩家发送只把未拼接指令的原始输入写入 user 楼层元数据', async () => {

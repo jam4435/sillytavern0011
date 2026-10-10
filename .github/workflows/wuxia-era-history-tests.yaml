@@ -7,6 +7,11 @@ on:
       - 'src/ERA变量框架/**'
       - 'src/事件脚本/era-event-operations.js'
       - 'src/事件脚本/era-main.js'
+      - 'src/事件脚本/era-main.test.ts'
+      - 'src/事件脚本/era-write-helper.js'
+      - 'src/事件脚本/era-write-helper.test.ts'
+      - 'src/shared/turnEventSettlement*'
+      - 'src/武侠/hooks/useMessageHandler*'
       - 'src/事件脚本/era-utils.js'
       - 'src/事件脚本/era-logging.test.ts'
       - 'src/事件脚本/era-lifecycle.test.ts'
@@ -52,6 +57,10 @@ jobs:
           src/武侠/utils/logger.test.ts
           src/武侠/utils/eraWriteWait.test.ts
           src/事件脚本/era-lifecycle.test.ts
+          src/事件脚本/era-main.test.ts
+          src/事件脚本/era-write-helper.test.ts
+          src/shared/turnEventSettlement.test.ts
+          src/武侠/hooks/useMessageHandler.test.tsx
       - name: Martial art string migration regressions
         run: >
           pnpm exec vitest run --configLoader native --pool threads --reporter verbose

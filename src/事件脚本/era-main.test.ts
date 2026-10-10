@@ -309,6 +309,76 @@ describe('ERA 主线初始化控制', () => {
     expect(initializeEventListMock).toHaveBeenCalledTimes(2);
   });
 
+  it.each(['success', 'failed'] as const)(
+    '回合事件结算 %s 时，仅在串行结算确认后发出明确的历史封存握手',
+    async outcome => {
+      const eventName = '天龙事件-异步结算竞态';
+      const vars = validVariables();
+      vars.stat_data.事件系统.进行中事件 = {
+        [eventName]: { 年: 1199, 月: 8, 日: 15, 时: 10 },
+      };
+      getVariablesMock.mockReturnValue(vars);
+      initializeEventListMock.mockResolvedValue(undefined);
+
+      const loader = await import('./era-event-loader.js');
+      const checker = await import('./era-event-checker.js');
+      const ops = await import('./era-event-operations.js');
+      vi.mocked(loader.loadEventManifest).mockResolvedValue({
+        events: [{ runtimeKey: eventName }], indexes: { byTrigger: [], byDiscovery: [] },
+      } as never);
+      vi.mocked(loader.loadEventDefinitions).mockResolvedValue({
+        [eventName]: {
+          触发条件: { 类型: '时间', 年: 1199, 月: 8, 日: 15, 时: 9 },
+          事件结束时间: { 年: 1199, 月: 8, 日: 15, 时: 10 },
+          事件地点: '大宋/牛家村',
+          参与人物: [], insert: {}, update: {}, delete: {},
+        },
+      });
+      vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(true);
+      let release!: () => void;
+      const gate = new Promise<void>(resolve => { release = resolve; });
+      vi.mocked(ops.batchEndEvents).mockImplementation(async () => {
+        await gate;
+        if (outcome === 'failed') return false;
+        delete vars.stat_data.事件系统.进行中事件[eventName];
+        vars.stat_data.事件系统.已完成事件[eventName] = 1;
+        return true;
+      });
+
+      // Vite 以 query 隔离事件脚本单例的串行队列。
+      if (outcome === 'success') {
+        // @ts-expect-error 测试用模块 query
+        await import('./era-main.js?turn-settlement-success');
+      } else {
+        // @ts-expect-error 测试用模块 query
+        await import('./era-main.js?turn-settlement-failed');
+      }
+      const initListener = eventOnMock.mock.calls
+        .filter(([name]) => name === 'GameInitialized')
+        .at(-1)?.[1] as ((signal: { timestamp: number }) => unknown) | undefined;
+      initListener?.({ timestamp: Date.now() + 300_000 });
+      await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(1));
+
+      const confirmations: Array<{ roundId: string; status: string; messageId: number }> = [];
+      const subscription = eventOn('wuxia:turn-events-settled', (detail: {
+        roundId: string; status: string; messageId: number;
+      }) => { confirmations.push(detail); });
+      const handler = eventOnMock.mock.calls
+        .filter(([name]) => name === 'wuxia:turn-completed')
+        .at(-1)?.[1] as ((identity: { roundId: string; chatId: string; messageId: number }) => Promise<void>);
+
+      const pending = handler({ roundId: 'round-seal-1', chatId: 'test-chat', messageId: 2 });
+      await vi.waitFor(() => expect(ops.batchEndEvents).toHaveBeenCalledTimes(1));
+      expect(confirmations).toHaveLength(0);
+      release();
+      await pending;
+      expect(confirmations).toEqual([expect.objectContaining({
+        roundId: 'round-seal-1', messageId: 2, status: outcome,
+      })]);
+      subscription.stop();
+    },
+  );
+
   it('已有进行中事件仅登记玩家参与，不再重复移动 NPC', async () => {
     const eventName = '射雕测试事件-开局到场';
     const eventLocation = '大宋/嘉兴府/牛家村';

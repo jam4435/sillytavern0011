@@ -29,6 +29,7 @@ import { acquireWuxiaTurnLock, releaseWuxiaTurnLock } from '../utils/turnLock';
 import { runWith429Retry } from '../utils/rateLimitRetry';
 import { MAX_AUTO_ADVANCE_FAILURE_RETRIES, runWithAutoAdvanceFailureRetry } from '../utils/autoAdvanceRetry';
 import { finalizeCurrentTurn } from '../utils/saveLoadManager';
+import { completeTurnEventsAndWait } from '../../shared/turnEventSettlement';
 import { WUXIA_INPUT_HISTORY_DATA_KEY } from '../utils/inputHistory';
 import { maybeArchiveConversationSummaries } from '../utils/narrativeMemoryManager';
 import type { LatestDebugRoundPatch } from './useDebugLogs';
@@ -83,7 +84,6 @@ interface UseMessageHandlerOptions {
 
 const OPTION_BLOCK_REGEX = /\s*<option>\s*[\s\S]*?<\/option>\s*/gi;
 const COMPLETE_VARIABLE_ACTION_BLOCK_REGEX = /<(VariableInsert|VariableEdit|VariableDelete)>\s*[\s\S]*?<\/\1>/;
-const WUXIA_TURN_COMPLETED_EVENT = 'wuxia:turn-completed';
 
 const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -917,16 +917,20 @@ export function useMessageHandler({
           // → 通知事件脚本扣减线索倒计时（替代 MESSAGE_SENT 的发送即扣）。
           const completedMessageId = assistantMessage.message_id;
           if (completedMessageId !== null && Number.isInteger(completedMessageId)) {
-            await eventEmit(WUXIA_TURN_COMPLETED_EVENT, {
-              messageId: completedMessageId,
-              chatId: turnChatId,
-              roundId: debugRoundId,
-            });
+            let eventsSettled = false;
             try {
+              await completeTurnEventsAndWait({
+                messageId: completedMessageId,
+                chatId: turnChatId,
+                roundId: debugRoundId,
+              });
+              eventsSettled = true;
               await finalizeHistoryNodeAfterEvents();
             } catch (error) {
-              messageLogger.error('回合已完成，但自动历史节点封存失败:', error);
-              showError(`回合已完成，但自动历史节点封存失败：${getErrorMessage(error)}`);
+              messageLogger.error('回合已完成，但事件稳定确认或历史封存失败:', error);
+              showError(eventsSettled
+                ? `回合已完成，但自动历史节点封存失败：${getErrorMessage(error)}`
+                : `回合已完成，但事件结算尚未确认，未封存历史节点：${getErrorMessage(error)}`);
             }
             onVariableTurnSettled?.(completedMessageId);
           }
@@ -1221,16 +1225,20 @@ export function useMessageHandler({
       // → 通知事件脚本扣减线索倒计时。regenerate 的 messageId 不变，事件脚本按 messageId 去重，
       // 因此同一楼层多次 regenerate 只扣一次。
       if (targetAssistantMessageId !== null && Number.isInteger(targetAssistantMessageId)) {
-        await eventEmit(WUXIA_TURN_COMPLETED_EVENT, {
-          messageId: targetAssistantMessageId,
-          chatId: turnChatId,
-          roundId: debugRoundId,
-        });
+        let eventsSettled = false;
         try {
+          await completeTurnEventsAndWait({
+            messageId: targetAssistantMessageId,
+            chatId: turnChatId,
+            roundId: debugRoundId,
+          });
+          eventsSettled = true;
           await finalizeHistoryNodeAfterEvents();
         } catch (error) {
-          messageLogger.error('重新生成已完成，但自动历史节点封存失败:', error);
-          showError(`重新生成已完成，但自动历史节点封存失败：${getErrorMessage(error)}`);
+          messageLogger.error('重新生成已完成，但事件稳定确认或历史封存失败:', error);
+          showError(eventsSettled
+            ? `重新生成已完成，但自动历史节点封存失败：${getErrorMessage(error)}`
+            : `重新生成已完成，但事件结算尚未确认，未封存历史节点：${getErrorMessage(error)}`);
         }
         onVariableTurnSettled?.(targetAssistantMessageId);
       }

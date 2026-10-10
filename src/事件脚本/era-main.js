@@ -292,7 +292,10 @@
       const pendingSettlementEvents = Object.keys(variables?.stat_data?.前端变量?.事件结算进度 || {})
         .filter(eventName => eventDefinitions[eventName]);
       if (pendingSettlementEvents.length > 0) {
-        await batchEndEvents(pendingSettlementEvents, eventDefinitions);
+        const settled = await batchEndEvents(pendingSettlementEvents, eventDefinitions);
+        if (!settled && options.requireConfirmedSettlement) {
+          throw new Error('事件结算进度补交未确认，不能封存历史节点');
+        }
         variables = await getVariables({ type: 'chat' });
       }
 
@@ -538,6 +541,10 @@
         } else {
           log(`⏹️ 发现 ${eventsToEnd.length} 个事件需要结束:`, eventsToEnd);
           const committed = await batchEndEvents(eventsToEnd, eventDefinitions);
+          if (!committed && options.requireConfirmedSettlement) {
+            // 只在要封存历史的回合完成路径严格要求结算成功；其他后台检查沿用原容错策略。
+            throw new Error(`事件结算尚未确认提交: ${eventsToEnd.join(', ')}`);
+          }
           if (committed) {
             // 本轮 admission 发生在事件结算之前；同地点后续事件可能仍被活动事件挡住。
             // 复用 runScheduledCheck 的既有 do/while，在同一个串行任务内回读结算后状态并立即复检。
@@ -594,6 +601,7 @@
     } catch (error) {
       logError('主检查函数出错:', error);
       console.trace();
+      if (options.requireConfirmedSettlement) throw error;
     }
 
     debugGroupEnd();
@@ -694,7 +702,7 @@
   }
 
   // ==================== 处理后续事件线索计数器 ====================
-  async function processFollowupCounters({ decrementCounters = true, reason = 'manual', eligibleCounterKeys } = {}) {
+  async function processFollowupCounters({ decrementCounters = true, reason = 'manual', eligibleCounterKeys, requireConfirmedSettlement = false } = {}) {
     debugGroup('🔢 处理后续事件线索计数器');
 
     try {
@@ -734,11 +742,13 @@
         });
       }
       if (counterOperations.length > 0) {
-        await writeEraTransaction(counterOperations, `followup-counter-turn-${reason}`);
+        const committed = await writeEraTransaction(counterOperations, `followup-counter-turn-${reason}`);
+        if (!committed && requireConfirmedSettlement) throw new Error('后续线索计数事务未确认');
         logSuccess(`✅ 后续线索事务完成：更新 ${Object.keys(updates).length} 个，删除 ${expiredKeys.length} 个`);
       }
     } catch (error) {
       logError('处理后续事件线索计数器失败:', error);
+      if (requireConfirmedSettlement) throw error;
     }
 
     debugGroupEnd();
@@ -1268,19 +1278,49 @@
       `✅ 检测到武侠回合成功完成 (roundId=${roundId}, messageId=${messageId}, chatId=${chatId})，` +
         `解除屏障并串行结算事件${deferredCheck.requested ? `（待检查原因: ${deferredCheck.reason}）` : ''}`,
     );
-    await enqueueEventWork(`turn-completed:${messageId}`, async () => {
-      await runScheduledCheck('wuxia-turn-completed');
-      if (shouldDecrementCounters) {
-        await processFollowupCounters({
-          decrementCounters: true,
-          reason: 'wuxia-turn-completed',
-          eligibleCounterKeys,
-        });
-        lastCountedMessageId = messageId;
-      } else {
-        log(`🔁 assistant 楼层 ${messageId} 已扣减过线索，仅执行本轮事件稳定检查`);
-      }
-    });
+    try {
+      if (!isInitialized) throw new Error('事件系统尚未初始化，无法确认回合事件稳定');
+      await enqueueEventWork(`turn-completed:${messageId}`, async () => {
+        await runScheduledCheck('wuxia-turn-completed', { requireConfirmedSettlement: true });
+        if (shouldDecrementCounters) {
+          await processFollowupCounters({
+            decrementCounters: true,
+            reason: 'wuxia-turn-completed',
+            eligibleCounterKeys,
+            requireConfirmedSettlement: true,
+          });
+          lastCountedMessageId = messageId;
+        } else {
+          log(`🔁 assistant 楼层 ${messageId} 已扣减过线索，仅执行本轮事件稳定检查`);
+        }
+        // 本轮 ERA 写入可能通过 writeDone 排了 100ms 的尾随检查。
+        // 在同一串行任务内消化它们，不能抢先回复“已稳定”，也不能靠固定延迟。
+        for (let pass = 0; pass < 8 && (checkEventsTimer || pendingCheckReason); pass++) {
+          if (checkEventsTimer) {
+            clearTimeout(checkEventsTimer);
+            checkEventsTimer = null;
+          }
+          const followupReason = pendingCheckReason || 'turn-write-done';
+          pendingCheckReason = null;
+          await runScheduledCheck(`turn-settlement-drain:${followupReason}`, {
+            requireConfirmedSettlement: true,
+          });
+        }
+        if (checkEventsTimer || pendingCheckReason) {
+          throw new Error('事件尾随检查未稳定，禁止封存本回合历史节点');
+        }
+      });
+      // 显式确认须晚于本轮事件串行队列及 ERA 结算回读；不能用事件派发返回代替。
+      await eventEmit('wuxia:turn-events-settled', {
+        messageId, chatId, roundId, status: 'success',
+      });
+    } catch (error) {
+      logError('回合事件处理未稳定，禁止前端封存该楼历史节点', error);
+      await eventEmit('wuxia:turn-events-settled', {
+        messageId, chatId, roundId, status: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   });
 
   eventOn('era:writeDone', async detail => {

@@ -536,7 +536,18 @@ export async function writeEraTransaction(operations, reason = 'era-transaction'
     operations: effectiveOperations,
   });
   const signature = `era-transaction:${transactionSignature}`;
+  const signatureHash = hashStableString(transactionSignature);
   if (isDuplicateSignature(signature)) {
+    recordHistoryEventForensics('era-transaction-duplicate-suppressed', {
+      ...getHistoryEventMessageContext(currentVariables),
+      reason,
+      signatureHash,
+      duplicateState: pendingSignatures.has(signature) ? 'in-flight' : 'recently-confirmed',
+      recentConfirmedAgeMs: recentSignatures.has(signature)
+        ? Date.now() - recentSignatures.get(signature)
+        : null,
+      operationCount: effectiveOperations.length,
+    });
     log(`跳过重复 ERA 事务: ${reason}`);
     return false;
   }
@@ -553,6 +564,7 @@ export async function writeEraTransaction(operations, reason = 'era-transaction'
     transactionId, reason, operations: effectiveOperations, vars: currentVariables, stat: beforeStatData,
   });
   markPending(signature);
+  const startedAt = Date.now();
   try {
     const writeDoneDetail = await waitForTransactionWriteDone(
       transactionId,
@@ -581,6 +593,15 @@ export async function writeEraTransaction(operations, reason = 'era-transaction'
     log(`ERA 事务写入完成: ${reason}`);
     return true;
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    recordHistoryEventForensics('era-transaction-unconfirmed', {
+      ...getHistoryEventMessageContext(currentVariables),
+      transactionId, reason, signatureHash,
+      elapsedMs: Date.now() - startedAt,
+      isTimeout: /超时|timeout/i.test(errorMessage),
+      error: errorMessage,
+      operationCount: effectiveOperations.length,
+    });
     logWarning(`ERA 事务结果未知，开始回读消息与最终变量: ${reason}`, error);
     let reread = await rereadTransactionState(expectedStat, effectiveOperations, reason);
     if (reread.persisted || reread.messageWritten) {
@@ -598,6 +619,14 @@ export async function writeEraTransaction(operations, reason = 'era-transaction'
       }
     }
 
+    recordHistoryEventForensics('era-transaction-reread-result', {
+      ...getHistoryEventMessageContext(reread.latestVariables),
+      transactionId, reason, signatureHash,
+      elapsedMs: Date.now() - startedAt,
+      persisted: reread.persisted,
+      messageWritten: reread.messageWritten,
+      outcome: reread.persisted ? 'confirmed-by-reread' : reread.messageWritten ? 'message-only' : 'unconfirmed',
+    });
     if (reread.persisted) {
       await emitConfirmedEraVariableWriteDone({
         source: 'event-script',
