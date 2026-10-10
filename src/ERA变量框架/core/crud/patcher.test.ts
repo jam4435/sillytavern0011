@@ -22,6 +22,18 @@ vi.mock('../../utils/era_data', () => ({
     state.meta = (await updater(state.meta)) as typeof state.meta;
   }),
 }));
+vi.mock('../rollback', () => ({
+  rollbackByMk: vi.fn(async (mk: string) => {
+    const logs = state.meta.EditLogs[mk] as any[] ?? [];
+    for (const entry of [...logs].reverse()) {
+      if (entry.op === 'insert') _.unset(state.stat, entry.path);
+      else if (entry.value_old === undefined) _.unset(state.stat, entry.path);
+      else _.set(state.stat, entry.path, _.cloneDeep(entry.value_old));
+    }
+    const { markMkRollbackPerformed } = await import('../../utils/mkLedgerJournal');
+    if (logs.length > 0) markMkRollbackPerformed(mk);
+  }),
+}));
 vi.mock('./update', () => ({ processEditBlocks: vi.fn() }));
 vi.mock('../../utils/diagnostics', () => ({ recordEraDiagnostic: vi.fn() }));
 vi.mock('../../utils/log', () => ({
@@ -73,7 +85,7 @@ describe('ERA 同一楼层变量块的原始次序', () => {
     expect(restored.事件系统.人物事件占用.段誉).toEqual(oldOccupant);
   });
 
-  it('二次处理时覆盖非空日志为 [] 必须留下可查询的诊断，而不是擅自保留旧日志', async () => {
+  it('变量块改变时先撤销旧 EditLog，然后才允许替换为空日志', async () => {
     state.stat.事件系统.人物事件占用.段誉 = structuredClone(newOccupant);
     state.meta = {
       EditLogs: {
@@ -89,12 +101,52 @@ describe('ERA 同一楼层变量块的原始次序', () => {
     await ApplyVarChangeForMessage({ message_id: 12 });
 
     expect(state.meta.EditLogs['mk-checkout-regression']).toEqual([]);
+    const { rollbackByMk } = await import('../rollback');
+    expect(rollbackByMk).toHaveBeenCalledWith('mk-checkout-regression', true);
+    expect(state.stat.事件系统.人物事件占用.段誉.事件名).toBe('第06事件');
     const { recordEraDiagnostic } = await import('../../utils/diagnostics');
     expect(recordEraDiagnostic).toHaveBeenCalledWith(
       'core-crud-patcher',
       'nonempty-editlog-overwritten-by-empty',
       expect.objectContaining({ messageId: 12, oldLogCount: 1, newLogCount: 0 }),
     );
+  });
+
+  it('不同 revision 但旧效果已偏离时拒绝覆盖原账本', async () => {
+    state.meta = {
+      EditLogs: {
+        'mk-checkout-regression': [{
+          op: 'insert',
+          path: '事件系统.人物事件占用.段誉',
+          value_new: newOccupant,
+        }],
+      },
+    };
+    state.stat.事件系统.人物事件占用.段誉 = { 事件名: '未知事件' };
+    state.message = '重新生成的内容没有动作';
+
+    await expect(ApplyVarChangeForMessage({ message_id: 6 })).rejects.toThrow('未能验证');
+    expect(state.meta.EditLogs['mk-checkout-regression']).toHaveLength(1);
+    const { rollbackByMk } = await import('../rollback');
+    expect(rollbackByMk).not.toHaveBeenCalled();
+  });
+
+  it('旧 MK 版本变化时先回滚再重放整楼，删除日志里的旧值仍是原始状态', async () => {
+    state.stat = { 事件系统: { 人物事件占用: {} } };
+    state.message = insertNew;
+    await ApplyVarChangeForMessage({ message_id: 6 });
+
+    state.message = `${deleteOld}\n${insertNew}`;
+    await ApplyVarChangeForMessage({ message_id: 6 });
+
+    const log = state.meta.EditLogs['mk-checkout-regression'] as any[];
+    // 旧的 insert 必须在新 Delete→Insert 之前撤销；不能把第 07 事件当成旧值。
+    expect(log).toEqual([expect.objectContaining({
+      op: 'insert', path: '事件系统.人物事件占用.段誉',
+      value_new: newOccupant,
+    })]);
+    const { rollbackByMk } = await import('../rollback');
+    expect(rollbackByMk).toHaveBeenCalledWith('mk-checkout-regression', true);
   });
 
   it('同一 MK 同内容在原效果尚存在时重复处理，不把可撤销的 Insert 账本覆盖成空', async () => {
