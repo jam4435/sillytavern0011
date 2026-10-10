@@ -170,8 +170,92 @@ export interface VariableChangeSummary {
 }
 
 const HIDDEN_VARIABLE_KEYS = new Set(['$meta', '$template']);
-const VARIABLE_BLOCK_REGEX = /<(VariableThink|VariableInsert|VariableEdit|VariableDelete)>\s*([\s\S]*?)\s*<\/\1>/gi;
 const VARIABLE_BLOCK_TAGS = ['VariableThink', 'VariableInsert', 'VariableEdit', 'VariableDelete'] as const;
+export type VariableBlockTag = (typeof VARIABLE_BLOCK_TAGS)[number];
+
+export type ScannedVariableBlock = {
+  tag: VariableBlockTag;
+  body: string;
+};
+
+/**
+ * 识别真正的顶层变量块，而不是统计全文的 XML 标签数量。
+ * Think 内容是普通文字；动作 JSON 字符串中的标签也不是结构边界。
+ * 实际动作缺少闭合、嵌套或出现多余闭合标签仍然必须报错。
+ */
+export function scanVariableBlocks(text: string): {
+  blocks: ScannedVariableBlock[];
+  errors: string[];
+} {
+  const blocks: ScannedVariableBlock[] = [];
+  const errors: string[] = [];
+  const tagRegex = /<\/?(VariableThink|VariableInsert|VariableEdit|VariableDelete)>/gi;
+  let active: { tag: VariableBlockTag; bodyStart: number } | null = null;
+  let insideJsonString = false;
+  let escaped = false;
+  let scannedUntil = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = tagRegex.exec(text)) !== null) {
+    const tag = match[1] as VariableBlockTag;
+    const closing = match[0].startsWith('</');
+
+    // XML 字符序列可以合法出现在 JSON 字符串值里。
+    if (active && active.tag !== 'VariableThink') {
+      for (let index = scannedUntil; index < match.index; index += 1) {
+        const character = text[index];
+        if (!insideJsonString) {
+          if (character === '"') insideJsonString = true;
+        } else if (escaped) {
+          escaped = false;
+        } else if (character === '\\') {
+          escaped = true;
+        } else if (character === '"') {
+          insideJsonString = false;
+        }
+      }
+    }
+    scannedUntil = tagRegex.lastIndex;
+
+    if (!active) {
+      if (closing) {
+        errors.push(`${tag} 有 1 个多余闭合标签。`);
+      } else {
+        active = { tag, bodyStart: scannedUntil };
+        insideJsonString = false;
+        escaped = false;
+      }
+      continue;
+    }
+
+    if (active.tag === 'VariableThink') {
+      // Think 内提到的 <VariableInsert> 等只作为文本，不创建动作块。
+      if (closing && tag === 'VariableThink') {
+        blocks.push({ tag: active.tag, body: text.slice(active.bodyStart, match.index) });
+        active = null;
+      }
+      continue;
+    }
+
+    if (insideJsonString) continue;
+    if (closing && tag === active.tag) {
+      blocks.push({ tag: active.tag, body: text.slice(active.bodyStart, match.index) });
+      active = null;
+      insideJsonString = false;
+      escaped = false;
+    } else {
+      errors.push(`${active.tag} 在闭合前出现 ${closing ? `</${tag}>` : `<${tag}>`} 标签。`);
+    }
+  }
+
+  if (active) errors.push(`${active.tag} 有 1 个标签未闭合。`);
+  return { blocks, errors };
+}
+
+/** 规范化后不向 ERA 传入 Think 内冒充 XML 结构的操作标签引用。 */
+export function sanitizeVariableThinkText(text: string): string {
+  return text.replace(/<\/?(VariableThink|VariableInsert|VariableEdit|VariableDelete)>/gi, (_match, tag: string) => tag);
+}
 export const MAX_STORED_VARIABLE_CHANGES = 100;
 
 const ACTION_BY_BLOCK_TAG: Record<'VariableInsert' | 'VariableEdit' | 'VariableDelete', VariableChangeAction> = {
@@ -474,25 +558,21 @@ export function parseDeclaredVariableChanges(rawReply: string): ParsedDeclaredVa
   const counters = { total: 0 };
 
   if (!rawReply.trim()) {
-    return {
-      declaredChanges,
-      thoughts,
-      parseErrors,
-      omittedDeclaredCount: 0,
-    };
+    return { declaredChanges, thoughts, parseErrors, omittedDeclaredCount: 0 };
   }
 
-  VARIABLE_BLOCK_REGEX.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = VARIABLE_BLOCK_REGEX.exec(rawReply)) !== null) {
-    const blockTag = match[1] as 'VariableThink' | 'VariableInsert' | 'VariableEdit' | 'VariableDelete';
-    const blockBody = stripCodeFence(match[2] || '');
+  const scanned = scanVariableBlocks(rawReply);
+  parseErrors.push(...scanned.errors);
+  for (const block of scanned.blocks) {
+    const blockTag = block.tag;
+    const blockBody = stripCodeFence(block.body);
 
     if (blockTag === 'VariableThink') {
+      const text = sanitizeVariableThinkText(blockBody);
       thoughts.push({
         id: `think:${thoughts.length + 1}`,
-        text: blockBody,
-        preview: formatVariablePreview(blockBody, 160),
+        text,
+        preview: formatVariablePreview(text, 160),
       });
       continue;
     }
@@ -512,16 +592,6 @@ export function parseDeclaredVariableChanges(rawReply: string): ParsedDeclaredVa
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       parseErrors.push(`${blockTag} JSON 解析失败：${message}`);
-    }
-  }
-
-  for (const blockTag of VARIABLE_BLOCK_TAGS) {
-    const openCount = rawReply.match(new RegExp(`<${blockTag}>`, 'gi'))?.length ?? 0;
-    const closeCount = rawReply.match(new RegExp(`<\\/${blockTag}>`, 'gi'))?.length ?? 0;
-    if (openCount > closeCount) {
-      parseErrors.push(`${blockTag} 有 ${openCount - closeCount} 个标签未闭合。`);
-    } else if (closeCount > openCount) {
-      parseErrors.push(`${blockTag} 有 ${closeCount - openCount} 个多余闭合标签。`);
     }
   }
 
