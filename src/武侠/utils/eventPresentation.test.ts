@@ -30,8 +30,8 @@ describe('eventPresentation', () => {
   it('maps existing event semantics to the player-facing labels', () => {
     expect(getEventSemanticLabel(event({ type: 'ACTIVE', category: 'participation' }))).toBe('亲历');
     expect(getEventSemanticLabel(event({ type: 'ACTIVE', category: 'world' }))).toBe('江湖');
-    expect(getEventSemanticLabel(event({ type: 'RUMOR' }))).toBe('风闻');
-    expect(getEventSemanticLabel(event({ type: 'AFTERMATH' }))).toBe('后续');
+    expect(getEventSemanticLabel(event({ type: 'RUMOR' }))).toBe('江湖风闻');
+    expect(getEventSemanticLabel(event({ type: 'AFTERMATH' }))).toBe('后续线索');
   });
 
   it('puts the event name before its source reference and removes the separator', () => {
