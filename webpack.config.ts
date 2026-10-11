@@ -677,19 +677,6 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
           return callback();
         }
 
-        // 自动化桥与 CLI 共用同一 Socket.IO 版本；桥脚本必须能在无外网环境下运行。
-        if (
-          [
-            'socket.io-client',
-            'socket.io-parser',
-            'engine.io-client',
-            'engine.io-parser',
-            '@socket.io/component-emitter',
-          ].includes(request)
-        ) {
-          return callback();
-        }
-
         if (
           request.startsWith('-') ||
           request.startsWith('.') ||
