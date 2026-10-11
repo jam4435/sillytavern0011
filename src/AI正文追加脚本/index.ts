@@ -5,12 +5,22 @@
  * 当前 user 楼层已经建立，但模型提示词尚未组装；修改原生 context.chat
  * 的上一条 assistant + 当前 user 后，等待 context.saveChat()。
  */
-import { appendToAssistantBody, DEFAULT_APPEND_MARKER, splitMarkedInput } from './logic';
+import { appendToAssistantBody, DEFAULT_APPEND_MARKER, splitMarkedInput, type MarkerPosition } from './logic';
 
 const PREFIX = 'assistant-inline-append';
 const STORAGE_KEY = 'assistant_inline_append_settings_v1';
 
-type Config = { enabled: boolean; marker: string };
+type Config = {
+  enabled: boolean;
+  /** 识别当前 User 输入中的标记，例如 1: */
+  marker: string;
+  /** 在上一条 AI 原始文本中精确寻找的定位标记；为空则保持默认的正文尾部追加。 */
+  targetMarker: string;
+  /** 定位标记之前或之后。 */
+  markerPosition: MarkerPosition;
+  /** 每次在提取的追加文本开头原样加上固定前缀。 */
+  fixedPrefix: string;
+};
 type Message = {
   mes: string;
   is_user?: boolean;
@@ -58,9 +68,15 @@ function readConfig(): Config {
       enabled: v.enabled !== false,
       marker: typeof v.marker === 'string' && v.marker.trim() && !/[\r\n]/.test(v.marker)
         ? v.marker.trim().slice(0, 32) : DEFAULT_APPEND_MARKER,
+      targetMarker: typeof v.targetMarker === 'string' ? v.targetMarker.slice(0, 256) : '',
+      markerPosition: v.markerPosition === 'after' ? 'after' : 'before',
+      fixedPrefix: typeof v.fixedPrefix === 'string' ? v.fixedPrefix.slice(0, 500) : '',
     };
   } catch {
-    return { enabled: true, marker: DEFAULT_APPEND_MARKER };
+    return {
+      enabled: true, marker: DEFAULT_APPEND_MARKER, targetMarker: '',
+      markerPosition: 'before', fixedPrefix: '',
+    };
   }
 }
 function saveConfig(): void {
@@ -123,7 +139,11 @@ async function onMessageSent(messageId: number): Promise<void> {
   let saved = false;
   try {
     const active = getActive(assistant);
-    const next = appendToAssistantBody(active.text, parsed.appendText);
+    const next = appendToAssistantBody(active.text, parsed.appendText, {
+      targetMarker: config.targetMarker,
+      markerPosition: config.markerPosition,
+      fixedPrefix: config.fixedPrefix,
+    });
     if (context()?.chat !== ctx.chat || identity(ctx) !== chatId ||
         ctx.chat[messageId] !== user || ctx.chat[messageId - 1] !== assistant) {
       throw new Error('聊天或楼层发生变动，取消此次修改。');
@@ -205,6 +225,8 @@ function mountPanel(): void {
     '#assistant-inline-append-panel pre{margin:0;padding:12px;white-space:pre-wrap;word-break:break-word;background:#0003;font-size:13px;line-height:1.7}',
     '#assistant-inline-append-panel p{margin:0;font-size:13px;line-height:1.7;opacity:.85}',
     '#assistant-inline-append-panel button{background:#7773;color:inherit;border:1px solid var(--SmartThemeBorderColor,#777);padding:4px 9px;border-radius:6px;cursor:pointer}',
+    '#assistant-inline-append-panel textarea,#assistant-inline-append-panel select{width:100%;box-sizing:border-box;color:inherit;background:var(--SmartThemeBlurTintColor,#222);border:1px solid var(--SmartThemeBorderColor,#666);padding:9px 10px;border-radius:6px;font:inherit}',
+    '#assistant-inline-append-panel .field small{font-size:12px;line-height:1.55;opacity:.78}',
   ].join('\n');
   doc.head.appendChild(style);
 
@@ -237,33 +259,119 @@ function mountPanel(): void {
   enabled.append(checkbox, doc.createTextNode('启用行首标记自动追加'));
   const field = element('div');
   field.className = 'field';
-  const label = element('label', '行首标记');
+  const label = element('label', '输入标记（当前 User 消息）');
   label.htmlFor = PREFIX + '-marker';
   const input = element('input');
   input.type = 'text';
   input.id = PREFIX + '-marker';
   input.maxLength = 32;
   input.value = config.marker;
+
+  const targetField = element('div');
+  targetField.className = 'field';
+  const targetLabel = element('label', 'AI 正文定位标记（精确匹配）');
+  targetLabel.htmlFor = PREFIX + '-target';
+  const target = element('input');
+  target.id = PREFIX + '-target';
+  target.type = 'text';
+  target.maxLength = 256;
+  target.placeholder = '例如 </content>；留空则默认追加在正文末尾';
+  target.value = config.targetMarker;
+  targetField.append(
+    targetLabel,
+    target,
+    element('small', '在上一条 AI 原始消息中查找标记的第一次出现；找不到时保留本轮原文发送，不修改历史。'),
+  );
+
+  const positionField = element('div');
+  positionField.className = 'field';
+  const positionLabel = element('label', '追加位置（相对于 AI 定位标记）');
+  positionLabel.htmlFor = PREFIX + '-position';
+  const position = element('select');
+  position.id = PREFIX + '-position';
+  const before = element('option', '放在标记前面');
+  before.value = 'before';
+  const after = element('option', '放在标记后面');
+  after.value = 'after';
+  position.append(before, after);
+  position.value = config.markerPosition;
+  position.disabled = !config.targetMarker;
+  positionField.append(positionLabel, position);
+
+  const prefixField = element('div');
+  prefixField.className = 'field';
+  const prefixLabel = element('label', '固定前缀（只添加到 AI 的追加文字）');
+  prefixLabel.htmlFor = PREFIX + '-fixed-prefix';
+  const fixedPrefix = element('textarea');
+  fixedPrefix.id = PREFIX + '-fixed-prefix';
+  fixedPrefix.rows = 3;
+  fixedPrefix.maxLength = 500;
+  fixedPrefix.placeholder = '例如 【补充叙述】 或 [旁白] ';
+  fixedPrefix.value = config.fixedPrefix;
+  prefixField.append(
+    prefixLabel,
+    fixedPrefix,
+    element('small', '前缀会原样放在所有标记行提取结果之前，可包含空格或换行，不会添加到 User 消息。'),
+  );
+
   const preview = element('pre');
   preview.id = PREFIX + '-preview';
-  preview.textContent = config.marker + '这里是添加到上一条 AI 正文的内容。\n我继续采取行动。';
+  function renderPreview(): void {
+    const placement = config.targetMarker
+      ? '定位标记 ' + JSON.stringify(config.targetMarker) +
+        (config.markerPosition === 'before' ? ' 的前面' : ' 的后面')
+      : '正文末尾（受保护系统尾块之前）';
+    preview.textContent =
+      '输入：\n' + config.marker + '补充的文字\n我继续行动。\n\n' +
+      '插入位置：' + placement + '\n\n' +
+      '写入 AI 的内容：\n' + config.fixedPrefix + '补充的文字\n\n' +
+      '正常发送的 User：\n我继续行动。';
+  }
   input.addEventListener('change', () => {
     const value = input.value.trim();
     if (!value || /[\r\n]/.test(value)) {
       input.value = config.marker;
-      warn('标记不能为空或包含换行。');
+      warn('输入标记不能为空或包含换行。');
       return;
     }
     config.marker = value;
-    preview.textContent = value + '这里是添加到上一条 AI 正文的内容。\n我继续采取行动。';
+    renderPreview();
+    saveConfig();
+  });
+  target.addEventListener('change', () => {
+    if (target.value && !target.value.trim()) {
+      target.value = config.targetMarker;
+      warn('定位标记不能只有空格；清空输入框可以恢复默认位置。');
+      return;
+    }
+    config.targetMarker = target.value;
+    position.disabled = !config.targetMarker;
+    renderPreview();
+    saveConfig();
+  });
+  position.addEventListener('change', () => {
+    config.markerPosition = position.value === 'after' ? 'after' : 'before';
+    renderPreview();
+    saveConfig();
+  });
+  fixedPrefix.addEventListener('change', () => {
+    config.fixedPrefix = fixedPrefix.value;
+    renderPreview();
     saveConfig();
   });
   field.append(label, input);
+  renderPreview();
   body.append(
-    enabled, field, element('strong', '示例'), preview,
-    element('p', '标记行追加到上一条 AI 正文；其它行保留为正常 User 输入。标记行可以有多条。'),
-    element('p', '采用酒馆原生 MESSAGE_SENT 和 saveChat，不接管 Enter / 发送按钮，不依赖武侠卡。'),
-    element('p', '只支持“正常 User 文本 + 标记文本”同时存在的输入；只有标记文本时按原文发送。'),
+    enabled,
+    field,
+    targetField,
+    positionField,
+    prefixField,
+    element('strong', '处理示例'),
+    preview,
+    element('p', '输入标记用于从当前 User 提取内容；定位标记只用于寻找上一条 AI 消息中的插入位置。'),
+    element('p', '固定前缀 → 追加文字 → 按目标位置插入；其余 User 内容正常发送。'),
+    element('p', '使用酒馆原生 MESSAGE_SENT 和 saveChat；只有追加文本而没有正常 User 内容时仍按原文发送。'),
   );
   panel.append(header, body);
   layer.appendChild(panel);
