@@ -125,3 +125,12 @@ export function getNewlyCompletedPersonalEvents(
   const previousTitles = new Set(before.map(entry => entry.title));
   return after.filter(entry => entry.personal && !previousTitles.has(entry.title));
 }
+
+/** 仅在有效且匹配的楼层显示本回合临时归档；空状态必须返回空数组。 */
+export function getVisibleCompletedEvents(
+  completed: { messageId: number; events: ChronicleEntry[] } | null,
+  displayedMessageId: number | undefined,
+): ChronicleEntry[] {
+  if (!completed || displayedMessageId === undefined) return [];
+  return completed.messageId === displayedMessageId ? completed.events : [];
+}
