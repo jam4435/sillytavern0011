@@ -77,6 +77,22 @@ export const MARTIAL_ART_ALIAS_TO_CANONICAL = new Map([
   ['逍遥心法', '北冥神功'],
 ]);
 
+// These mappings are useful leads for an audit, but are not evidence that the
+// runtime's exact-name lookup will work.  In particular, they either collapse
+// a broad category into one technique or make a substantive canonical choice.
+export const MARTIAL_ART_ALIASES_REQUIRING_SEMANTIC_REVIEW = new Set([
+  '太祖长拳',
+  '少林七十二绝技',
+  '少林神功',
+  '逆行经脉之法',
+  '慕容氏家传掌法',
+  '全真教武功',
+  '古墓派武功',
+  '桃花岛基础武学',
+  '桃花岛武学',
+  '逍遥心法',
+]);
+
 const GENERIC_CHARACTER_ALIASES = new Set(['书生', '渔夫', '农夫']);
 const GENERIC_ART_PHRASES = new Set([
   '武功',
