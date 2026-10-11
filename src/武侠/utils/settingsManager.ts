@@ -305,10 +305,11 @@ export const ERA_BASE_REGEX_RULE: RegexRule = {
   originScope: 'manual',
 };
 
-/** 过滤审计思维链正则 - 移除 <event_audit> 与 <transition_audit> */
+/** 过滤审计思维链正则 - 兼容旧标签，并隐藏新的 <card_thinking> */
+const LEGACY_EVENT_AUDIT_PATTERN = '/<(?:event_audit|transition_audit)>[\\s\\S]*?<\\/(?:event_audit|transition_audit)>/gi';
 export const EVENT_AUDIT_REGEX_RULE: RegexRule = {
   id: 'wuxia-filter-event-audit',
-  pattern: '/<(?:event_audit|transition_audit)>[\\s\\S]*?<\\/(?:event_audit|transition_audit)>/gi',
+  pattern: '/<(?:event_audit|transition_audit|card_thinking)>[\\s\\S]*?<\\/(?:event_audit|transition_audit|card_thinking)>/gi',
   replacement: '',
   enabled: true,
   description: '过滤审计思维链',
@@ -685,7 +686,14 @@ function normalizeLocalRegexRules(rules: Partial<RegexRule>[] | undefined): Rege
   normalizedRules.forEach(rule => {
     // 已保存的旧内置正则只在仍是原默认模式时同步升级；保留用户的开关和自定义规则。
     const nextRule =
-      rule.id === EVENT_STAGE_TAG_REGEX_RULE.id &&
+      rule.id === EVENT_AUDIT_REGEX_RULE.id &&
+      rule.pattern === LEGACY_EVENT_AUDIT_PATTERN &&
+      rule.replacement === ''
+        ? {
+            ...rule,
+            pattern: EVENT_AUDIT_REGEX_RULE.pattern,
+          }
+        : rule.id === EVENT_STAGE_TAG_REGEX_RULE.id &&
       rule.pattern === LEGACY_EVENT_STAGE_TAG_PATTERN &&
       rule.replacement === ''
         ? {
