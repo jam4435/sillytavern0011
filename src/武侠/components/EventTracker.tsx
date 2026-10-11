@@ -125,7 +125,7 @@ const EventTracker: React.FC<EventTrackerProps> = ({ events, completedEvents = [
                     <div className="event-tracker-entry-detail" id={detailId}>
                       <p>{entry.summary}</p>
                       <span className="event-meta-row">
-                        {entry.timeText && <span className="event-meta-badge">完成时间 {entry.timeText}</span>}
+                        {entry.timeText && <span className="event-meta-badge">事件时间 {entry.timeText}</span>}
                         {entry.location && <span className="event-meta-badge">{entry.location}</span>}
                       </span>
                     </div>
