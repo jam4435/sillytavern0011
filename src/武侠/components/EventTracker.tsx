@@ -58,6 +58,12 @@ const EventTracker: React.FC<EventTrackerProps> = ({ events, completedEvents = [
   const hiddenCount = Math.max(0, events.length - trackedEvents.length);
   const totalCount = events.length + completedEvents.length;
 
+  // 05→06 可能复用参与事件投影 ID。只在新增完成回顾时自动展开一次，之后仍允许手动切换。
+  const newestCompletedTitle = completedEvents[0]?.title;
+  useEffect(() => {
+    if (newestCompletedTitle) setExpandedEventId(`completed_${newestCompletedTitle}`);
+  }, [newestCompletedTitle]);
+
   useEffect(() => {
     setExpandedEventId(current => {
       if (current && (trackedEvents.some(event => event.id === current)
