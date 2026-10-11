@@ -404,15 +404,21 @@
       }
 
       if (eventsToExpire.length > 0) {
-        await batchExpireEvents(eventsToExpire, eventDefinitions);
+        const committed = await batchExpireEvents(eventsToExpire, eventDefinitions);
+        if (!committed && options.requireConfirmedSettlement) {
+          throw new Error(`失效事件归档未确认提交: ${eventsToExpire.join(', ')}`);
+        }
       }
 
       if (historicalEventsToComplete.length > 0) {
         log(`📚 发现 ${historicalEventsToComplete.length} 个已错过完整时间窗的历史事件，直接补做终态结算:`, historicalEventsToComplete);
-        await batchEndEvents(historicalEventsToComplete, eventDefinitions, {
+        const committed = await batchEndEvents(historicalEventsToComplete, eventDefinitions, {
           deleteUnstarted: true,
           silent: true,
         });
+        if (!committed && options.requireConfirmedSettlement) {
+          throw new Error(`历史事件补结算未确认提交: ${historicalEventsToComplete.join(', ')}`);
+        }
       }
 
       // 同一三级地点在同一检查周期命中的事件只启动最早一个。其余事件不进入
@@ -479,10 +485,13 @@
       // 批量触发普通事件
       if (ordinaryEventsToStart.length > 0) {
         log(`📋 发现 ${ordinaryEventsToStart.length} 个普通事件需要触发:`, ordinaryEventsToStart);
-        await batchStartEvents(ordinaryEventsToStart, eventDefinitions, {
+        const committed = await batchStartEvents(ordinaryEventsToStart, eventDefinitions, {
           currentTime,
           earlyEventNames: runtimeRebasedOrdinaryNames,
         });
+        if (!committed && options.requireConfirmedSettlement) {
+          throw new Error(`事件启动未确认提交: ${ordinaryEventsToStart.join(', ')}`);
+        }
       } else {
         log('没有普通事件需要触发');
       }
@@ -491,16 +500,22 @@
       if (playerAnchoredEventsToStart.length > 0) {
         log(`📍 玩家到场，提前启动 ${playerAnchoredEventsToStart.length} 个事件:`, playerAnchoredEventsToStart);
         // 玩家在场的参与快照已经与事件启动和 NPC 入场原子提交，不能再次发起独立参与事务。
-        await batchStartEvents(playerAnchoredEventsToStart, eventDefinitions, {
+        const committed = await batchStartEvents(playerAnchoredEventsToStart, eventDefinitions, {
           currentTime,
           earlyEventNames: playerAnchoredEventsToStart,
         });
+        if (!committed && options.requireConfirmedSettlement) {
+          throw new Error(`到场事件启动未确认提交: ${playerAnchoredEventsToStart.join(', ')}`);
+        }
       }
 
       // 批量完成登场事件（直接从未发生 -> 已完成）
       if (debutEventsToComplete.length > 0) {
         log(`🎭 发现 ${debutEventsToComplete.length} 个登场事件需要直接完成:`, debutEventsToComplete);
-        await batchCompleteDebutEvents(debutEventsToComplete, eventDefinitions);
+        const committed = await batchCompleteDebutEvents(debutEventsToComplete, eventDefinitions);
+        if (!committed && options.requireConfirmedSettlement) {
+          throw new Error(`人物登场事件未确认提交: ${debutEventsToComplete.join(', ')}`);
+        }
       }
       debugGroupEnd();
 
@@ -1249,6 +1264,12 @@
       log('⚠️ wuxia:turn-completed 缺少有效 roundId，跳过事件检查');
       return;
     }
+    // 聊天切换会清空回合屏障；必须在无屏障时也拒绝旧聊天的迟到信号。
+    const currentChatId = String(SillyTavern?.getCurrentChatId?.() ?? '');
+    if (!chatId || !currentChatId || chatId !== currentChatId) {
+      logWarning(`忽略非当前聊天的回合完成信号: roundId=${roundId}, chatId=${chatId}, current=${currentChatId}`);
+      return;
+    }
     if (completedTurnRoundIds.has(roundId)) {
       log(`🔁 回合已完成过 (roundId=${roundId})，跳过重复完成信号`);
       return;
@@ -1281,6 +1302,10 @@
     try {
       if (!isInitialized) throw new Error('事件系统尚未初始化，无法确认回合事件稳定');
       await enqueueEventWork(`turn-completed:${messageId}`, async () => {
+        // 回合确认可能在串行队列中等待；执行前再次核对聊天身份。
+        if (String(SillyTavern?.getCurrentChatId?.() ?? '') !== chatId) {
+          throw new Error('聊天已切换，拒绝在新聊天中结算旧回合');
+        }
         await runScheduledCheck('wuxia-turn-completed', { requireConfirmedSettlement: true });
         if (shouldDecrementCounters) {
           await processFollowupCounters({

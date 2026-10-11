@@ -122,8 +122,8 @@ export function createLogger(category: LogCategory): Logger {
   if (!enabled) {
     return {
       log: noop,
-      error: noop,
-      warn: noop,
+      error: (...args: unknown[]) => console.error(prefix, ...args),
+      warn: (...args: unknown[]) => console.warn(prefix, ...args),
       group: noop,
       groupEnd: noop,
     };
@@ -180,8 +180,8 @@ export const variableBarLogger = createForcedLogger('[wuxia-variable-bar]', 'wux
 const globalLoggerEnabled = getDebugOverride('game');
 export const logger: Logger = {
   log: globalLoggerEnabled ? console.log.bind(console) : noop,
-  error: globalLoggerEnabled ? console.error.bind(console) : noop,
-  warn: globalLoggerEnabled ? console.warn.bind(console) : noop,
+  error: (...args: unknown[]) => console.error(...args),
+  warn: (...args: unknown[]) => console.warn(...args),
   group: globalLoggerEnabled ? console.group.bind(console) : noop,
   groupEnd: globalLoggerEnabled ? console.groupEnd.bind(console) : noop,
 };

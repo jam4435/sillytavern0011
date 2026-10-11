@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createForcedLogger, variableBarLogger, variableTraceLogger } from './logger';
+import { createForcedLogger, createLogger, logger, variableBarLogger, variableTraceLogger } from './logger';
 
 describe('武侠前端变量追踪日志开关', () => {
   beforeEach(() => {
@@ -63,4 +63,19 @@ describe('武侠前端变量追踪日志开关', () => {
     logger.log('existing behavior');
     expect(console.log).toHaveBeenCalledTimes(1);
   });
+
+  it('普通分类静默仍输出真正的错误和警告，不恢复冗余追踪', () => {
+    const normal = createLogger('message');
+    normal.log('verbose output');
+    normal.group('debug');
+    normal.warn('unexpected turn');
+    normal.error('settlement failed');
+    logger.warn('global warning');
+    logger.error('global error');
+    expect(console.log).not.toHaveBeenCalled();
+    expect(console.group).not.toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalledTimes(2);
+    expect(console.error).toHaveBeenCalledTimes(2);
+  });
+
 });
