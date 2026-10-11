@@ -1,4 +1,4 @@
-import type { GameEvent } from '../types';
+import type { ChronicleEntry, GameEvent } from '../types';
 
 const EVENT_TIME_PREFIX_PATTERN =
   /^\s*(?:时间[：:]\s*)?\d{1,4}年\d{1,2}月\d{1,2}日\d{1,2}时(?:\d{1,2}分)?\s*(?:到|至|[-—–→])\s*(?:(?:\d{1,4}年)?\d{1,2}月\d{1,2}日)?\s*\d{1,2}时(?:\d{1,2}分)?\s*[，,、。:：]\s*/;
@@ -112,4 +112,16 @@ export function sortEventsForDisplay(events: GameEvent[]): GameEvent[] {
 
 export function getTrackerEvents(events: GameEvent[], limit = 3): GameEvent[] {
   return sortEventsForDisplay(events).slice(0, limit);
+}
+
+/**
+ * 仅计算本回合新增的亲历归档，用于聊天卷轴短暂回顾；不参与事件状态机。
+ * 事件标题带有回目编号，在当前展示投影内可稳定区分不同事件。
+ */
+export function getNewlyCompletedPersonalEvents(
+  before: readonly ChronicleEntry[],
+  after: readonly ChronicleEntry[],
+): ChronicleEntry[] {
+  const previousTitles = new Set(before.map(entry => entry.title));
+  return after.filter(entry => entry.personal && !previousTitles.has(entry.title));
 }
