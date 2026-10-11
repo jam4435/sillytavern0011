@@ -3,12 +3,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { parse as parseYaml } from 'yaml';
 import { getSingleConditionTimeAnchor, isPureTimeTrigger } from '../src/事件脚本/era-event-schema.js';
 import { looksLikeEventEntryName, parseCanonicalEventKey } from '../src/shared/eventKey.js';
 import { totalHoursToWuxiaCalendarTime, wuxiaCalendarTimeToTotalHours } from '../src/shared/wuxiaCalendar.js';
 import {
   createCompletionCandidatesDocument,
+  createFourCategoryMartialArtsAuditDocument,
   createMartialArtsAuditDocument,
   materializeCharacterMartialArts,
 } from './lib/wuxia-character-martial-arts.mjs';
@@ -98,6 +101,49 @@ function writeJson(filePath, value) {
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
 }
 
+function createReviewSummary(audit, fourCategoryAudit, metadata) {
+  const rows = Object.entries(fourCategoryAudit.统计)
+    .map(([name, value]) => `| ${name} | ${value} |`)
+    .join('\n');
+  return `# NPC 功法完整审计（只读）\n\n` +
+    `本报告只重放具有唯一确定生效时间的世界书事件。条件事件（${audit.统计.跳过条件或无确定时间事件数} 个）未纳入终局快照，因此不表示所有玩家分支。\n\n` +
+    `## 可复现输入\n\n` +
+    `- Git 提交：\`${metadata.gitCommit ?? '不可用'}\`\n` +
+    `- 功法库 SHA-256：\`${metadata.databaseSha256}\`\n` +
+    `- 世界书源 SHA-256：\`${metadata.eventSourceSha256}\`\n` +
+    `- 重跑：\`node scripts/audit-wuxia-character-martial-arts.mjs --output-dir plans/武侠角色功法审计-严格审计\`\n\n` +
+    `输出不包含墙钟生成时间；相同代码提交与输入应产生相同 JSON。\n\n` +
+    `## 结果\n\n| 项目 | 数量 |\n| --- | ---: |\n${rows}\n\n` +
+    `## 审核口径\n\n` +
+    `- \`NPC功法四类专项审计.json\` 是四类结论与逐项事件来源的主文件。\n` +
+    `- “功法名称不一致”严格比较世界书原始变量键与正式数据库名称；审计别名仅是候选，不能掩盖前端精确查询失败。\n` +
+    `- “真正漏掉的代表武学”只接受世界书中人物主动施展的直接证据；不根据人物身份、境界、兵器或功法描述自动补写。\n` +
+    `- \`角色功法总表.json\` 保留完整重放状态和全部人物功法变更；\`尚不能确定的人工审核项目\`列出无直接证据的空功法 NPC。\n`;
+}
+
+function sha256(value) {
+  return crypto.createHash('sha256').update(value).digest('hex');
+}
+
+function currentCommit() {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+  } catch {
+    return null;
+  }
+}
+
+function directoryContentHash(directory) {
+  const digest = crypto.createHash('sha256');
+  for (const filePath of walkYamlFiles(directory).sort()) {
+    digest.update(path.relative(directory, filePath).split(path.sep).join('/'));
+    digest.update('\0');
+    digest.update(fs.readFileSync(filePath));
+    digest.update('\0');
+  }
+  return digest.digest('hex');
+}
+
 function relativeFromRoot(filePath) {
   return path.relative(root, filePath).split(path.sep).join('/');
 }
@@ -110,11 +156,14 @@ function main() {
   const metadata = {
     sourceRoot: relativeFromRoot(options.eventDir),
     databasePath: relativeFromRoot(options.databasePath),
-    generatedAt: new Date().toISOString(),
     eventCount: events.length,
+    gitCommit: currentCommit(),
+    databaseSha256: sha256(fs.readFileSync(options.databasePath)),
+    eventSourceSha256: directoryContentHash(options.eventDir),
   };
   const audit = createMartialArtsAuditDocument(materialized, database, metadata);
   const candidates = createCompletionCandidatesDocument(materialized, database, metadata);
+  const fourCategoryAudit = createFourCategoryMartialArtsAuditDocument(materialized, database, metadata);
   const sectLineages = createSectLineageDocument(materialized, database, metadata);
   const sectAssignments = createSectAssignmentCandidatesDocument(materialized, sectLineages, metadata);
   const sectValidationErrors = validateSectReviewDocuments(sectLineages, sectAssignments, database, materialized);
@@ -124,14 +173,20 @@ function main() {
   fs.mkdirSync(options.outputDir, { recursive: true });
   const auditPath = path.join(options.outputDir, '角色功法总表.json');
   const candidatesPath = path.join(options.outputDir, '角色功法补全候选.json');
+  const fourCategoryPath = path.join(options.outputDir, 'NPC功法四类专项审计.json');
+  const summaryPath = path.join(options.outputDir, '审计摘要.md');
   const sectLineagesPath = path.join(options.outputDir, '门派功法谱系.json');
   const sectAssignmentsPath = path.join(options.outputDir, '门派角色功法分配候选.json');
   writeJson(auditPath, audit);
   writeJson(candidatesPath, candidates);
+  writeJson(fourCategoryPath, fourCategoryAudit);
+  fs.writeFileSync(summaryPath, createReviewSummary(audit, fourCategoryAudit, metadata));
   writeJson(sectLineagesPath, sectLineages);
   writeJson(sectAssignmentsPath, sectAssignments);
   console.log(`角色功法总表: ${relativeFromRoot(auditPath)} (${audit.统计.角色数} 个角色)`);
   console.log(`功法补全候选: ${relativeFromRoot(candidatesPath)} (${candidates.统计.候选角色数} 个角色)`);
+  console.log(`NPC功法四类专项审计: ${relativeFromRoot(fourCategoryPath)} (${fourCategoryAudit.统计.NPC总数} 个 NPC)`);
+  console.log(`审计摘要: ${relativeFromRoot(summaryPath)}`);
   console.log(`门派功法谱系: ${relativeFromRoot(sectLineagesPath)} (${sectLineages.统计.门派或体系数} 个体系)`);
   console.log(`门派角色分配候选: ${relativeFromRoot(sectAssignmentsPath)} (${sectAssignments.统计.候选角色数} 个角色)`);
   console.log(`确定性重放事件: ${materialized.deterministicEvents.length}/${events.length}`);

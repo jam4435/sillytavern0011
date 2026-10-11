@@ -4,6 +4,7 @@ import {
   canonicalCharacterName,
   canonicalMartialArtName,
   createCompletionCandidatesDocument,
+  createFourCategoryMartialArtsAuditDocument,
   createMartialArtsAuditDocument,
   isActiveUseSentence,
   materializeCharacterMartialArts,
@@ -173,6 +174,39 @@ describe('wuxia character martial arts audit', () => {
     expect(candidateA.建议功法.map(item => item.功法)).toContain('测试剑法');
     expect(candidateA.建议功法.map(item => item.功法)).not.toContain('敌方掌法');
     expect(candidateA.建议功法.map(item => item.功法)).not.toContain('了测试剑法');
+  });
+
+  it('四类专项审计保留严格原始名称匹配和可审核来源', () => {
+    const materialized = materializeCharacterMartialArts([
+      event(
+        '测试第一回00-人物登场',
+        1,
+        {
+          事件详情: '萧远山使出测试掌法击退敌人。',
+          insert: {
+            萧远山: { 境界: '绝顶-初期', 身份: { 高手: '江湖名宿' }, 功法: {} },
+            甲: { 境界: '二流-初期', 功法: { 落英神剑掌: { 掌握程度: '略有小成' }, 游泳: { 掌握程度: '初窥门径' } } },
+            段誉: { 境界: '不通武艺', 功法: {} },
+          },
+          参与人物: ['萧远山'],
+        },
+        'debut',
+      ),
+    ]);
+    const database = {
+      功法: [
+        { 功法名称: '测试掌法', 功法描述: '一门掌法' },
+        { 功法名称: '落英神剑掌法', 功法描述: '一门掌法' },
+      ],
+    };
+    const report = createFourCategoryMartialArtsAuditDocument(materialized, database);
+    const mismatch = report.功法名称不一致.find(item => item.人物 === '甲');
+    expect(mismatch.数据库精确命中).toBe(false);
+    expect(mismatch.审计别名命中).toBe(true);
+    expect(mismatch.事件来源[0].事件).toBe('测试第一回00-人物登场');
+    expect(report.非武学项目混入.some(item => item.原始功法名称 === '游泳')).toBe(true);
+    expect(report.真正漏掉的代表武学[0].人物).toBe('萧远山');
+    expect(report.合理没有武功.some(item => item.人物 === '段誉')).toBe(true);
   });
 
   it('生成门派谱系时遵守层级上限、指定传人与关系排除规则', () => {

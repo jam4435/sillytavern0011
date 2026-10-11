@@ -512,6 +512,10 @@ export function createMartialArtsAuditDocument(materialized, martialArtsDatabase
       功法别名映射: Object.fromEntries(MARTIAL_ART_ALIAS_TO_CANONICAL),
       条件事件处理: '不纳入确定性终局快照，单独计数',
       生成时间: metadata.generatedAt,
+      Git提交: metadata.gitCommit ?? null,
+      功法库SHA256: metadata.databaseSha256 ?? null,
+      世界书源SHA256: metadata.eventSourceSha256 ?? null,
+      可重复生成: '输出不写入墙钟时间；相同提交与相同输入应得到相同 JSON。',
     },
     统计: {
       源事件数: metadata.eventCount,
@@ -536,6 +540,175 @@ export function createMartialArtsAuditDocument(materialized, martialArtsDatabase
       原因: event.conditional ? '条件事件无唯一确定结算时点' : '缺少确定生效时间',
     })),
     角色列表: characters,
+  };
+}
+
+function strictNameMatch(rawName, databaseNames) {
+  const auditAlias = canonicalMartialArtName(rawName);
+  const exact = databaseNames.has(rawName);
+  const aliasHit = rawName !== auditAlias && databaseNames.has(auditAlias);
+  const requiresSemanticReview = aliasHit && MARTIAL_ART_ALIASES_REQUIRING_SEMANTIC_REVIEW.has(rawName);
+  return {
+    原始名称: rawName,
+    数据库精确命中: exact,
+    审计别名候选: rawName === auditAlias ? null : auditAlias,
+    审计别名命中: aliasHit,
+    语义待核查: requiresSemanticReview,
+    运行时结论: exact ? '精确命中' : aliasHit ? '运行时不匹配，审计别名可指向候选' : '数据库未精确收录',
+  };
+}
+
+function compactChangeSources(artRecord) {
+  return artRecord.完整变更记录.map(change => ({
+    事件: change.事件,
+    原文件: change.原文件,
+    时间: change.生效时间,
+    操作: change.操作,
+    原始角色键: change.原始角色键,
+    原始功法名称: change.源功法名,
+  }));
+}
+
+const REASONABLE_EMPTY_CHARACTER_RULES = new Map([
+  ['段誉', '当前阶段设定为尚未习武；不可仅因空功法认定遗漏。'],
+  ['王语嫣', '主要定位为武学见识与辨析，不以实战功法作为必备字段。'],
+  ['钟灵', '主要战力线索为闪电貂，空功法本身不足以认定遗漏。'],
+]);
+
+/**
+ * Produces a conservative, review-oriented report.  It deliberately does not
+ * turn broad identity/realm guesses into "missing martial arts" findings.
+ */
+export function createFourCategoryMartialArtsAuditDocument(materialized, martialArtsDatabase, metadata = {}) {
+  const total = createMartialArtsAuditDocument(materialized, martialArtsDatabase, metadata);
+  const completion = createCompletionCandidatesDocument(materialized, martialArtsDatabase, metadata);
+  const databaseNames = new Set((martialArtsDatabase.功法 || []).map(item => item.功法名称));
+  const nameMismatches = [];
+  const nonMartialItems = [];
+  const reasonableEmpty = [];
+  const missingRepresentativeArts = [];
+  const manualReview = [];
+
+  for (const character of total.角色列表) {
+    const allArtRecords = [...character.功法记录, ...character.生活与杂学专长, ...character.误挂装备或道具];
+    for (const artRecord of allArtRecords) {
+      const source = compactChangeSources(artRecord);
+      for (const rawName of artRecord.源功法名) {
+        const match = strictNameMatch(rawName, databaseNames);
+        const item = {
+          人物: character.角色,
+          原始人物键: character.原始角色键,
+          原始功法名称: rawName,
+          审计归并名称: artRecord.功法,
+          当前存在: artRecord.当前存在,
+          ...match,
+          事件来源: source.filter(change => change.原始功法名称 === rawName),
+          判断依据: match.数据库精确命中
+            ? '前端精确名称查询可直接命中正式功法库。'
+            : match.审计别名命中
+              ? '仅审计别名可指向数据库候选；前端精确名称查询仍会失败。'
+              : '正式功法库没有该原始名称的精确记录。',
+          置信度: match.数据库精确命中 ? '确定' : match.审计别名命中 ? '确定（运行时不匹配）' : '确定（未收录）',
+          需要人工审核: !match.数据库精确命中,
+        };
+        if (artRecord.类别 !== '战斗功法') {
+          nonMartialItems.push({
+            ...item,
+            问题类别: '非武学项目混入',
+            非武学类别: artRecord.类别,
+            判断依据: `当前审计分类为${artRecord.类别}；应保留事实记录，但不作为独立战斗功法进行数据库缺失统计。`,
+            置信度: '确定',
+          });
+        } else if (!match.数据库精确命中) {
+          nameMismatches.push({ ...item, 问题类别: '功法名称不一致' });
+        }
+      }
+    }
+
+    if (character.功法记录.some(record => record.当前存在)) continue;
+    const directCandidate = completion.候选角色.find(item => item.角色 === character.角色);
+    const directSuggestions = (directCandidate?.建议功法 || []).filter(
+      suggestion =>
+        !suggestion.是否原创 &&
+        suggestion.置信度?.等级 === '高' &&
+        suggestion.来源类型 === '世界书明示功法',
+    );
+    if (directSuggestions.length > 0) {
+      missingRepresentativeArts.push({
+        问题类别: '真正漏掉的代表武学',
+        人物: character.角色,
+        原始人物键: character.原始角色键,
+        当前境界: character.人物信息.境界,
+        当前身份: character.人物信息.身份,
+        代表武学证据: directSuggestions,
+        判断依据: '人物当前没有战斗功法，且世界书事件明确记载其主动施展该功法；不使用功法描述、境界、门派或兵器的推测。',
+        置信度: '高',
+        需要人工审核: true,
+      });
+    } else if (REASONABLE_EMPTY_CHARACTER_RULES.has(character.角色)) {
+      reasonableEmpty.push({
+        问题类别: '合理没有武功',
+        人物: character.角色,
+        原始人物键: character.原始角色键,
+        当前境界: character.人物信息.境界,
+        当前身份: character.人物信息.身份,
+        判断依据: REASONABLE_EMPTY_CHARACTER_RULES.get(character.角色),
+        置信度: '中（角色定位规则，仍须按具体时间线复核）',
+        需要人工审核: true,
+      });
+    } else if (/^(?:凡人|不入流|未入流|不通武艺|不会武功|不懂武功|无|无武功)$/.test(character.人物信息.境界 || '')) {
+      reasonableEmpty.push({
+        问题类别: '合理没有武功',
+        人物: character.角色,
+        原始人物键: character.原始角色键,
+        当前境界: character.人物信息.境界,
+        当前身份: character.人物信息.身份,
+        判断依据: '最终状态明确标注为凡人、不入流或不通武艺，且无直接代表武学证据。',
+        置信度: '高',
+        需要人工审核: false,
+      });
+    } else {
+      manualReview.push({
+        人物: character.角色,
+        原始人物键: character.原始角色键,
+        当前境界: character.人物信息.境界,
+        当前身份: character.人物信息.身份,
+        判断依据: '当前无战斗功法，但没有世界书主动施展的直接证据；功法库描述中的人物提及、境界或身份均不足以自动补写。',
+        需要人工审核: true,
+      });
+    }
+  }
+
+  const sortByPerson = (left, right) => left.人物.localeCompare(right.人物, 'zh-CN') || left.原始功法名称?.localeCompare(right.原始功法名称 || '', 'zh-CN');
+  for (const items of [nameMismatches, nonMartialItems, reasonableEmpty, missingRepresentativeArts, manualReview]) items.sort(sortByPerson);
+  return {
+    schemaVersion: 2,
+    生成信息: {
+      ...total.生成信息,
+      审计范围: '仅重放具有唯一确定生效时间的世界书事件；条件事件不代表所有玩家分支状态。',
+      严格匹配口径: '数据库精确命中只比较原始功法变量键与正式功法名称。审计别名仅作人工审核候选，绝不视为运行时命中。',
+      缺漏口径: '只将世界书主动施展或功法库明确人物归属的高置信非原创证据列为真正漏掉的代表武学。',
+    },
+    统计: {
+      NPC总数: total.统计.角色数,
+      真正漏掉的代表武学: missingRepresentativeArts.length,
+      功法名称不一致: nameMismatches.length,
+      合理没有武功: reasonableEmpty.length,
+      非武学项目混入: nonMartialItems.length,
+      需人工审核的空功法人物: manualReview.length,
+    },
+    全体NPC状态: total.角色列表.map(character => ({
+      人物: character.角色,
+      原始人物键: character.原始角色键,
+      当前境界: character.人物信息.境界,
+      当前战斗功法数: character.功法记录.filter(record => record.当前存在).length,
+      当前非武学项目数: character.生活与杂学专长.filter(record => record.当前存在).length + character.误挂装备或道具.filter(record => record.当前存在).length,
+    })),
+    真正漏掉的代表武学: missingRepresentativeArts,
+    功法名称不一致: nameMismatches,
+    合理没有武功: reasonableEmpty,
+    非武学项目混入: nonMartialItems,
+    尚不能确定的人工审核项目: manualReview,
   };
 }
 
