@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useMemo, useState } from 'react';
-import type { GameEvent } from '../types';
+import type { ChronicleEntry, GameEvent } from '../types';
 import {
   getEventCountdownLabel,
   getEventDescription,
@@ -16,6 +16,8 @@ export const EVENT_TRACKER_COLLAPSED_STORAGE_KEY = 'wuxia_event_tracker_collapse
 
 export interface EventTrackerProps {
   events: GameEvent[];
+  /** 当前回合新归档的亲历事件：仅聊天 HUD 临时展示，非进行中状态。 */
+  completedEvents?: ChronicleEntry[];
   currentLocation?: string;
   onTravelTo?: (location: string) => void;
   onOpenAll: () => void;
@@ -45,21 +47,26 @@ function persistCollapsedState(isCollapsed: boolean): void {
   }
 }
 
-const EventTracker: React.FC<EventTrackerProps> = ({ events, currentLocation, onTravelTo, onOpenAll }) => {
+const EventTracker: React.FC<EventTrackerProps> = ({ events, completedEvents = [], currentLocation, onTravelTo, onOpenAll }) => {
   const [isCollapsed, setIsCollapsed] = useState(getInitialCollapsedState);
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const trackerBodyId = useId().replace(/:/g, '');
-  const trackedEvents = useMemo(() => getTrackerEvents(events), [events]);
+  const trackedEvents = useMemo(
+    () => getTrackerEvents(events, Math.max(1, 3 - completedEvents.length)),
+    [events, completedEvents.length],
+  );
   const hiddenCount = Math.max(0, events.length - trackedEvents.length);
+  const totalCount = events.length + completedEvents.length;
 
   useEffect(() => {
     setExpandedEventId(current => {
-      if (current && trackedEvents.some(event => event.id === current)) return current;
-      return trackedEvents[0]?.id ?? null;
+      if (current && (trackedEvents.some(event => event.id === current)
+        || completedEvents.some(event => `completed_${event.title}` === current))) return current;
+      return completedEvents[0] ? `completed_${completedEvents[0].title}` : trackedEvents[0]?.id ?? null;
     });
-  }, [trackedEvents]);
+  }, [trackedEvents, completedEvents]);
 
-  if (events.length === 0) return null;
+  if (totalCount === 0) return null;
 
   const toggleTracker = () => {
     setIsCollapsed(previous => {
@@ -82,8 +89,8 @@ const EventTracker: React.FC<EventTrackerProps> = ({ events, currentLocation, on
         <span className="event-tracker-title-brush">
           <span className="event-tracker-title">江湖事簿</span>
         </span>
-        <span className="event-tracker-count" aria-label={`共有 ${events.length} 件未结事件`}>
-          {events.length}
+        <span className="event-tracker-count" aria-label={`共有 ${events.length} 件未结事件，${completedEvents.length} 件本回合已完成事件`}>
+          {totalCount}
         </span>
         <span className="event-tracker-chevron" aria-hidden="true">
           {isCollapsed ? <Icons.ChevronDown size={17} /> : <Icons.ChevronUp size={17} />}
@@ -93,6 +100,39 @@ const EventTracker: React.FC<EventTrackerProps> = ({ events, currentLocation, on
       {!isCollapsed && (
         <div className="event-tracker-body" id={trackerBodyId}>
           <div className="event-tracker-list">
+            {completedEvents.map(entry => {
+              const id = `completed_${entry.title}`;
+              const isExpanded = expandedEventId === id;
+              const detailId = `${trackerBodyId}-${id}`;
+              const titleParts = getEventTitleParts(entry.title);
+              return (
+                <section className={`event-tracker-entry event-kind-completed${isExpanded ? ' is-expanded' : ''}`} key={id}>
+                  <button
+                    type="button"
+                    className="event-tracker-entry-heading"
+                    aria-label={`${titleParts.name}（已完成）`}
+                    aria-expanded={isExpanded}
+                    aria-controls={detailId}
+                    onClick={() => setExpandedEventId(current => current === id ? null : id)}
+                  >
+                    <span className="event-tracker-entry-title-group">
+                      <span className="event-tracker-entry-kicker">已完成</span>
+                      <span className="event-tracker-entry-title">{titleParts.name}</span>
+                    </span>
+                    {titleParts.reference && <span className="event-tracker-entry-reference">{titleParts.reference}</span>}
+                  </button>
+                  {isExpanded && (
+                    <div className="event-tracker-entry-detail" id={detailId}>
+                      <p>{entry.summary}</p>
+                      <span className="event-meta-row">
+                        {entry.timeText && <span className="event-meta-badge">完成时间 {entry.timeText}</span>}
+                        {entry.location && <span className="event-meta-badge">{entry.location}</span>}
+                      </span>
+                    </div>
+                  )}
+                </section>
+              );
+            })}
             {trackedEvents.map(event => {
               const isExpanded = expandedEventId === event.id;
               const detailId = `${trackerBodyId}-event-${event.id}`;
