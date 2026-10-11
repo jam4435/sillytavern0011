@@ -694,15 +694,15 @@ function normalizeLocalRegexRules(rules: Partial<RegexRule>[] | undefined): Rege
             pattern: EVENT_AUDIT_REGEX_RULE.pattern,
           }
         : rule.id === EVENT_STAGE_TAG_REGEX_RULE.id &&
-      rule.pattern === LEGACY_EVENT_STAGE_TAG_PATTERN &&
-      rule.replacement === ''
-        ? {
-            ...rule,
-            pattern: EVENT_STAGE_TAG_REGEX_RULE.pattern,
-            description:
-              rule.description === '过滤事件进度标签' ? EVENT_STAGE_TAG_REGEX_RULE.description : rule.description,
-          }
-        : rule;
+            rule.pattern === LEGACY_EVENT_STAGE_TAG_PATTERN &&
+            rule.replacement === ''
+          ? {
+              ...rule,
+              pattern: EVENT_STAGE_TAG_REGEX_RULE.pattern,
+              description:
+                rule.description === '过滤事件进度标签' ? EVENT_STAGE_TAG_REGEX_RULE.description : rule.description,
+            }
+          : rule;
     if (existingIds.has(nextRule.id)) {
       return;
     }
