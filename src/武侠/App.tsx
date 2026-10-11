@@ -9,6 +9,7 @@ import CommandQueuePopover from './components/CommandQueuePopover';
 import FullscreenButton from './components/FullscreenButton';
 import GameContent from './components/GameContent';
 import EventTracker from './components/EventTracker';
+import { getNewlyCompletedPersonalEvents } from './utils/eventPresentation';
 import EventNotificationStack from './components/EventNotificationStack';
 import { Icons } from './components/Icons';
 import TurnLayerEditorModal, { type TurnLayerEditorSaveOutcome } from './components/TurnLayerEditorModal';
@@ -44,7 +45,7 @@ import {
 } from './hooks';
 import { readLatestDebugRoundSnapshot } from './hooks/useDebugLogs';
 import { shouldDeferSetupEventNotifications } from './hooks/usePageFlow';
-import { ActivePanel, type FactionTask, InventoryItem, type MeridianNodeId, type MeridianUpgradeQuote } from './types';
+import { ActivePanel, type ChronicleEntry, type FactionTask, InventoryItem, type MeridianNodeId, type MeridianUpgradeQuote } from './types';
 import { claimFactionTaskReward } from './utils/factionManager';
 import { acceptFactionTaskOption, generateFactionTaskOptions } from './utils/factionTaskGenerator';
 import { getRandomOpeningLine, initializeNewGameSession, type NewGameFormData } from './utils/gameInitializer';
@@ -252,6 +253,16 @@ const App: React.FC = () => {
   const [displayedTurnSnapshot, setDisplayedTurnSnapshot] = useState<EditableTurnSnapshot | null>(null);
   const [mapDraftDestination, setMapDraftDestination] = useState<string | null>(null);
   const [assistantDisplayCommitKey, setAssistantDisplayCommitKey] = useState<string | null>(null);
+  // 只在当前 iframe 内回顾本回合刚归档的亲历事件，不保存到 stat_data 或浏览器存储。
+  const [recentlyCompletedEvents, setRecentlyCompletedEvents] = useState<{
+    messageId: number;
+    events: ChronicleEntry[];
+  } | null>(null);
+  const eventChronicleAtRoundStartRef = useRef<{
+    roundId: string;
+    chatId: string;
+    chronicle: ChronicleEntry[];
+  } | null>(null);
 
   useEffect(() => {
     const dock = bottomActionDockRef.current;
@@ -285,6 +296,8 @@ const App: React.FC = () => {
   }, [currentPage]);
 
   const handleAssistantDisplayCommit = useCallback((assistantMessageId: number, assistantSwipeId: number) => {
+    // 同一楼层重新生成时，旧 swipe 的“已完成”标记立即失效，待新结算重新判定。
+    setRecentlyCompletedEvents(current => current?.messageId === assistantMessageId ? null : current);
     setAssistantDisplayCommitKey(`${assistantMessageId}:${assistantSwipeId}`);
     try {
       setDisplayedTurnSnapshot(readEditableTurnSnapshot(assistantMessageId));
@@ -349,6 +362,8 @@ const App: React.FC = () => {
   );
 
   const handleAppChatChanged = useCallback(() => {
+    eventChronicleAtRoundStartRef.current = null;
+    setRecentlyCompletedEvents(null);
     clearVariableChanges();
     setInputPrefill(null);
     setIsCommandQueueOpen(false);
@@ -490,6 +505,37 @@ const App: React.FC = () => {
     return () => listener.stop();
   }, []);
 
+  const handleEventRoundStart = useCallback((detail: { roundId: string; chatId?: string }) => {
+    const data = readGameDataPure();
+    eventChronicleAtRoundStartRef.current = data
+      ? { roundId: detail.roundId, chatId: detail.chatId || '', chronicle: data.chronicle }
+      : null;
+  }, []);
+
+  const handleEventRoundSettled = useCallback((detail: {
+    roundId: string;
+    chatId: string;
+    messageId: number;
+    status: 'success' | 'failed';
+  }) => {
+    const baseline = eventChronicleAtRoundStartRef.current;
+    if (!baseline || baseline.roundId !== detail.roundId || baseline.chatId !== detail.chatId) return;
+    eventChronicleAtRoundStartRef.current = null;
+    if (detail.status !== 'success') return;
+
+    const after = readGameDataPure();
+    if (!after) return;
+    const completed = getNewlyCompletedPersonalEvents(baseline.chronicle, after.chronicle);
+    // 一次有效结算覆盖上一回合的临时回顾；没有新完成事件就直接清空。
+    setRecentlyCompletedEvents(completed.length > 0 ? { messageId: detail.messageId, events: completed } : null);
+  }, []);
+
+  useEffect(() => {
+    if (!historyMutationPending) return;
+    eventChronicleAtRoundStartRef.current = null;
+    setRecentlyCompletedEvents(null);
+  }, [historyMutationPending]);
+
   // 使用事件监听 hook
   useEventListeners({
     updateGameState,
@@ -501,6 +547,8 @@ const App: React.FC = () => {
     onEraWriteDone: handleEraWriteDone,
     onDirectVariableWriteDone: handleDirectVariableWriteDone,
     onEraVariableWriteDone: handleEraVariableWriteDone,
+    onEventRoundStart: handleEventRoundStart,
+    onEventRoundSettled: handleEventRoundSettled,
   });
 
   // 使用自动总结检测 hook
@@ -2043,6 +2091,8 @@ const App: React.FC = () => {
 
             <EventTracker
               events={gameState.events}
+              completedEvents={recentlyCompletedEvents?.messageId === displayedTurnSnapshot?.assistant.messageId
+                ? recentlyCompletedEvents.events : []}
               currentLocation={gameState.currentLocation}
               onTravelTo={handleEventTravelTo}
               onOpenAll={() => setActivePanel(ActivePanel.EVENTS)}

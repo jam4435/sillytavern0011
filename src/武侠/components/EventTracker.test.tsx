@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { GameEvent } from '../types';
+import type { ChronicleEntry, GameEvent } from '../types';
 import EventTracker, { EVENT_TRACKER_COLLAPSED_STORAGE_KEY } from './EventTracker';
 
 const events: GameEvent[] = [
@@ -66,6 +66,42 @@ describe('EventTracker', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('保留本回合刚完成的05于卷轴顶部，同时显示接续的06，下回合清空后移除', () => {
+    const finished: ChronicleEntry = {
+      id: 'chronicle05',
+      title: '天龙第二回05-段誉坠崖幸存',
+      timeText: '1202年3月16日15时',
+      sortDays: 0,
+      location: '大理/无量山/剑湖谷底',
+      summary: '段誉得见无量玉壁，05已经结束。',
+      personal: true,
+    };
+    const next: GameEvent = {
+      id: 'event06',
+      title: '天龙第二回06-段誉入秘洞',
+      type: 'ACTIVE',
+      category: 'participation',
+      description: '段誉向玉像叩拜。',
+    };
+
+    // 原05与后续06可以复用相同投影 id，新增“已完成”仍须自动展开05。
+    const previous = { ...next, title: finished.title };
+    const { rerender } = render(<EventTracker events={[previous]} onOpenAll={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '展开江湖事簿' }));
+    rerender(<EventTracker events={[next]} completedEvents={[finished]} onOpenAll={vi.fn()} />);
+    expect(screen.getByRole('button', { name: '段誉坠崖幸存（已完成）' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('已完成')).toBeInTheDocument();
+    expect(screen.getByText('段誉坠崖幸存')).toBeInTheDocument();
+    expect(screen.getByText('段誉得见无量玉壁，05已经结束。')).toBeInTheDocument();
+    expect(screen.getByText('段誉入秘洞')).toBeInTheDocument();
+    expect(screen.getByLabelText('共有 1 件未结事件，1 件本回合已完成事件')).toHaveTextContent('2');
+    expect(screen.getByText('大理/无量山/剑湖谷底')).not.toHaveAttribute('type', 'button');
+
+    rerender(<EventTracker events={[next]} completedEvents={[]} onOpenAll={vi.fn()} />);
+    expect(screen.queryByText('已完成')).not.toBeInTheDocument();
+    expect(screen.getByText('段誉入秘洞')).toBeInTheDocument();
   });
 
   it('hides itself when there are no unclosed events', () => {
