@@ -715,7 +715,7 @@ export async function batchExpireEvents(eventNames, eventDefinitions) {
 
 // ==================== 批量完成登场事件（从未发生直接到已完成）====================
 export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
-  if (eventNames.length === 0) return;
+  if (eventNames.length === 0) return true;
 
   debugGroup(`🎭 批量完成登场事件 (${eventNames.length}个)`);
 
@@ -781,11 +781,18 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
     }
     debutOperations.push({ type: 'insert', payload: completedPayload }, { type: 'delete', payload: deletePayload });
     log('🚀 在同一 ERA 事务中应用登场差分、完成状态与未发生清理');
-    await writeEraTransaction(debutOperations, `batch-complete-debut-${eventNames.length}`);
-    log('✅ 登场事件事务完成');
+    const committed = await writeEraTransaction(debutOperations, `batch-complete-debut-${eventNames.length}`);
+    if (!committed) throw new Error('人物登场事件事务未确认提交');
 
-    // 验证操作后的状态
+    // 只读确认与人物数据属于同一事务；不对失败写入做补偿或重试。
     const verifyVars = await getVariables({ type: 'chat' });
+    const verifyStat = verifyVars?.stat_data || {};
+    const completed = eventNames.every(name =>
+      Object.prototype.hasOwnProperty.call(verifyStat.事件系统?.已完成事件 || {}, name) &&
+      !Object.prototype.hasOwnProperty.call(verifyStat.事件系统?.未发生事件 || {}, name),
+    );
+    if (!completed) throw new Error('登场事件事务确认后回读不一致，禁止成功通知');
+    log('✅ 登场事件事务完成');
     if (isDebugEnabled()) {
       debugGroupCollapsed('🔍 登场事件完成后的事件系统状态');
       console.log(JSON.parse(JSON.stringify(verifyVars?.stat_data?.事件系统 || {})));
@@ -814,8 +821,10 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
         durationMs: 3000,
       });
     }
+    return true;
   } catch (error) {
     logError(`批量完成登场事件失败`, error);
+    return false;
   }
 
   debugGroupEnd();
