@@ -565,6 +565,27 @@ describe('settingsManager ui theme', () => {
       expect(result.trim()).toBe('风雪漫天，丘处机长剑出鞘。');
     });
 
+    it('hides <card_thinking> without hiding the narrative or event record', () => {
+      const input = [
+        '<card_thinking>',
+        '01｜否｜玩家输入是正常尝试',
+        '02｜是｜已纠正未经确认的结果',
+        '</card_thinking>',
+        '段誉拾起绸帛。',
+        '<事件记录>',
+        '天龙第二回07-段誉蒲团得绝学启程奔万劫谷',
+        '发现绸帛|研读功法',
+        '已完成|进行中',
+        '</事件记录>',
+      ].join('\n');
+
+      const result = applyRegexRules(input, [EVENT_AUDIT_REGEX_RULE]);
+      expect(result).not.toContain('<card_thinking>');
+      expect(result).not.toContain('01｜否｜');
+      expect(result).toContain('段誉拾起绸帛。');
+      expect(result).toContain('<事件记录>');
+    });
+
     it('filters out event stage short tags like <射雕第一回04>', () => {
       const input = `风雪漫天，丘处机长剑出鞘。
 <射雕第一回04>
@@ -595,6 +616,44 @@ describe('settingsManager ui theme', () => {
       expect(result).toContain('<事件记录说明>此处是剧情文字，不是事件进度。</事件记录说明>');
       expect(result).not.toContain('<事件记录>');
       expect(result).not.toContain('<射雕第一回04>');
+    });
+
+    it('upgrades unchanged legacy audit regex to support card_thinking without changing the enabled flag', () => {
+      window.localStorage.setItem(
+        'wuxia_display_settings',
+        JSON.stringify({
+          localRegexRules: [
+            {
+              id: EVENT_AUDIT_REGEX_RULE.id,
+              pattern: '/<(?:event_audit|transition_audit)>[\\s\\S]*?<\\/(?:event_audit|transition_audit)>/gi',
+              replacement: '',
+              enabled: false,
+              description: '过滤审计思维链',
+              originScope: 'manual',
+            },
+          ],
+        }),
+      );
+
+      const loadedRule = loadSettings().localRegexRules.find(rule => rule.id === EVENT_AUDIT_REGEX_RULE.id);
+      expect(loadedRule?.pattern).toBe(EVENT_AUDIT_REGEX_RULE.pattern);
+      expect(loadedRule?.enabled).toBe(false);
+    });
+
+    it('preserves manually customized audit regex patterns', () => {
+      const customPattern = '/<自定义审查>[\\s\\S]*?<\\/自定义审查>/gi';
+      window.localStorage.setItem(
+        'wuxia_display_settings',
+        JSON.stringify({
+          localRegexRules: [
+            { ...EVENT_AUDIT_REGEX_RULE, pattern: customPattern, description: '定制审查正则' },
+          ],
+        }),
+      );
+
+      const loadedRule = loadSettings().localRegexRules.find(rule => rule.id === EVENT_AUDIT_REGEX_RULE.id);
+      expect(loadedRule?.pattern).toBe(customPattern);
+      expect(loadedRule?.description).toBe('定制审查正则');
     });
 
     it('upgrades the saved legacy built-in event regex without losing its disabled state', () => {
