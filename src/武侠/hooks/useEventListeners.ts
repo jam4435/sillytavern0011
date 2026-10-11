@@ -5,6 +5,7 @@ import {
   type DirectVariableWriteRefreshHint,
 } from '../../shared/directVariableWrite';
 import { GameState } from '../types';
+import type { WuxiaTurnEventSettlement } from '../../shared/turnEventSettlement';
 import {
   getLastMessageContent,
   parseOptions,
@@ -25,6 +26,8 @@ interface UseEventListenersOptions {
   onEraWriteDone?: (detail: unknown) => void;
   onDirectVariableWriteDone?: (detail: unknown) => void;
   onEraVariableWriteDone?: (detail: unknown) => void;
+  onEventRoundStart?: (detail: { roundId: string; chatId?: string }) => void;
+  onEventRoundSettled?: (detail: WuxiaTurnEventSettlement) => void;
 }
 
 const UNKNOWN_CHAT_ID = 'unknown';
@@ -98,6 +101,8 @@ export function useEventListeners({
   onEraWriteDone,
   onDirectVariableWriteDone,
   onEraVariableWriteDone,
+  onEventRoundStart,
+  onEventRoundSettled,
 }: UseEventListenersOptions) {
   const lastKnownChatIdRef = useRef(readCurrentChatId());
 
@@ -300,6 +305,7 @@ export function useEventListeners({
     }) => {
       if (detail?.phase === 'start' && detail.roundId) {
         activeEventRound = { roundId: detail.roundId, chatId: detail.chatId || '' };
+        onEventRoundStart?.({ roundId: detail.roundId, chatId: detail.chatId });
         if (refreshTimer) {
           clearTimeout(refreshTimer);
           refreshTimer = null;
@@ -309,10 +315,9 @@ export function useEventListeners({
         releaseDeferredRefresh();
       }
     });
-    const eventTurnSettledListener = eventOn('wuxia:turn-events-settled', (detail: {
-      roundId?: string; chatId?: string; status?: string;
-    }) => {
+    const eventTurnSettledListener = eventOn('wuxia:turn-events-settled', (detail: WuxiaTurnEventSettlement) => {
       if (isMatchingEventRound(detail)) {
+        onEventRoundSettled?.(detail);
         // 无论确认成功或失败，都只在事件检查结束/失败后统一读取真实状态。
         deferredGameRefresh = true;
         releaseDeferredRefresh();
@@ -374,5 +379,7 @@ export function useEventListeners({
     onEraWriteDone,
     onDirectVariableWriteDone,
     onEraVariableWriteDone,
+    onEventRoundStart,
+    onEventRoundSettled,
   ]);
 }
