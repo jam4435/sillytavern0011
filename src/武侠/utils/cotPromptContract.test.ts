@@ -50,6 +50,8 @@ describe('武侠 COT 条件审查契约', () => {
     }
     expect(output).not.toMatch(/^08\./m);
     expect(output).not.toContain('04. 读取<后续事件线索>');
+    expect(output).not.toContain('自由探索边界：');
+    expect(output).not.toContain('接驳边界：');
     expect(output).toContain('<card_thinking>');
   });
 
@@ -60,6 +62,8 @@ describe('武侠 COT 条件审查契约', () => {
     expect(output).toContain('05. 是否存在玩家尚未参与目标事件');
     expect(output).not.toMatch(/^06\./m);
     expect(output).toContain('当前没有参与事件，不得生成<事件记录>');
+    expect(output).toContain('接驳边界：线索不等于已参与目标事件');
+    expect(output).not.toContain('自由探索边界：');
   });
 
   it('自由探索和只有 $template 的参与事件均只保留 01～03', () => {
@@ -70,6 +74,8 @@ describe('武侠 COT 条件审查契约', () => {
       expect(output).toContain('03. 读取正文当前状态');
       expect(output).not.toMatch(/^04\./m);
       expect(output).not.toContain('<事件记录规则>');
+      expect(output).toContain('自由探索边界：仅围绕玩家本轮行动');
+      expect(output).not.toContain('接驳边界：');
     }
   });
 });
