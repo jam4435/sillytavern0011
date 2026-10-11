@@ -9,7 +9,7 @@ import CommandQueuePopover from './components/CommandQueuePopover';
 import FullscreenButton from './components/FullscreenButton';
 import GameContent from './components/GameContent';
 import EventTracker from './components/EventTracker';
-import { getNewlyCompletedPersonalEvents } from './utils/eventPresentation';
+import { getNewlyCompletedPersonalEvents, getVisibleCompletedEvents } from './utils/eventPresentation';
 import EventNotificationStack from './components/EventNotificationStack';
 import { Icons } from './components/Icons';
 import TurnLayerEditorModal, { type TurnLayerEditorSaveOutcome } from './components/TurnLayerEditorModal';
@@ -2091,8 +2091,7 @@ const App: React.FC = () => {
 
             <EventTracker
               events={gameState.events}
-              completedEvents={recentlyCompletedEvents?.messageId === displayedTurnSnapshot?.assistant.messageId
-                ? recentlyCompletedEvents.events : []}
+              completedEvents={getVisibleCompletedEvents(recentlyCompletedEvents, displayedTurnSnapshot?.assistant.messageId)}
               currentLocation={gameState.currentLocation}
               onTravelTo={handleEventTravelTo}
               onOpenAll={() => setActivePanel(ActivePanel.EVENTS)}
