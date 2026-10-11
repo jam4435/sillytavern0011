@@ -125,6 +125,7 @@ describe('ERA 主线初始化控制', () => {
     eventEmitMock.mockClear();
     readHistoryCheckoutJournalMock.mockReset().mockReturnValue(null);
     getVariablesMock.mockReset().mockReturnValue(validVariables());
+    vi.mocked(SillyTavern.getCurrentChatId).mockReturnValue('test-chat');
     Object.assign(globalThis, {
       waitGlobalInitialized: vi.fn(() => new Promise(() => {})),
       toastr: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
@@ -1139,7 +1140,7 @@ describe('ERA 主线初始化控制', () => {
     expect(writeDoneListener).toBeTypeOf('function');
     expect(completedListener).toBeTypeOf('function');
 
-    lifecycleListener?.({ phase: 'start', roundId: 'round-barrier-1', chatId: 'chat-1' });
+    lifecycleListener?.({ phase: 'start', roundId: 'round-barrier-1', chatId: 'test-chat' });
     await messageSentListener?.({});
 
     variables.stat_data.世界信息.时间 = { 年: 1199, 月: 8, 日: 15, 时: 13 };
@@ -1161,7 +1162,7 @@ describe('ERA 主线初始化控制', () => {
 
     await completedListener?.({
       messageId: 28,
-      chatId: 'chat-1',
+      chatId: 'test-chat',
       roundId: 'round-barrier-1',
     });
 
@@ -1170,4 +1171,111 @@ describe('ERA 主线初始化控制', () => {
     expect(endingObservedAtSettlement).toBe('玩家改写后的结局');
     expect(updateObservedAtSettlement).toEqual({ 郭靖: { 状态: '玩家改写后的状态' } });
   });
+
+  it('事件启动提交失败时严格握手返回 failed，不能封存回合', async () => {
+    const eventName = '天龙测试-启动未确认';
+    const vars = validVariables();
+    const condition = { 类型: '时间', 年: 1199, 月: 8, 日: 15, 时: 11 };
+    vars.stat_data.事件系统.未发生事件[eventName] = condition;
+    getVariablesMock.mockReturnValue(vars);
+    initializeEventListMock.mockResolvedValue(undefined);
+    const loader = await import('./era-event-loader.js');
+    const checker = await import('./era-event-checker.js');
+    const scheduler = await import('./era-event-scheduler.js');
+    const ops = await import('./era-event-operations.js');
+    const definition = {
+      事件地点: '大宋/嘉兴府/牛家村', 触发条件: condition,
+      事件结束时间: { 年: 1199, 月: 8, 日: 15, 时: 15 },
+      参与人物: [], insert: {}, update: {}, delete: {},
+    };
+    vi.mocked(loader.loadEventManifest).mockResolvedValue({
+      events: [{ runtimeKey: eventName }], indexes: { byTrigger: [], byDiscovery: [] },
+    } as never);
+    vi.mocked(loader.loadEventDefinitions).mockResolvedValue({ [eventName]: definition });
+    vi.mocked(checker.isTimeForEvent).mockReturnValue(false);
+    vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(false);
+    vi.mocked(ops.batchStartEvents).mockResolvedValue(false);
+    // @ts-expect-error 测试用模块 query
+    await import('./era-main.js?strict-start-failure-regression-test');
+    await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(1));
+    vi.mocked(scheduler.getManifestEventCandidateKeys).mockReturnValue([eventName]);
+    vi.mocked(checker.isTimeForEvent).mockReturnValue(true);
+    const complete = eventOnMock.mock.calls
+      .filter(([name]) => name === 'wuxia:turn-completed').at(-1)?.[1] as
+      ((detail: { messageId: number; roundId: string; chatId: string }) => Promise<void>);
+    await complete({ messageId: 35, roundId: 'start-failure-35', chatId: 'test-chat' });
+    expect(ops.batchStartEvents).toHaveBeenCalledWith([eventName], expect.any(Object), expect.any(Object));
+    expect(eventEmitMock).toHaveBeenCalledWith('wuxia:turn-events-settled', expect.objectContaining({
+      messageId: 35, status: 'failed', error: expect.stringContaining('事件启动'),
+    }));
+    expect(vars.stat_data.事件系统.未发生事件[eventName]).toEqual(condition);
+  });
+
+  it('切换聊天后无屏障的旧回合完成信号会被拒绝', async () => {
+    initializeEventListMock.mockResolvedValue(undefined);
+    // @ts-expect-error 测试用模块 query
+    await import('./era-main.js?stale-chat-turn-rejected-test');
+    await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(1));
+    const complete = eventOnMock.mock.calls
+      .filter(([name]) => name === 'wuxia:turn-completed').at(-1)?.[1] as
+      ((detail: { messageId: number; roundId: string; chatId: string }) => Promise<void>);
+    eventEmitMock.mockClear();
+    await complete({ messageId: 20, roundId: 'old-round', chatId: 'previous-chat' });
+    expect(eventEmitMock.mock.calls.filter(([name]) => name === 'wuxia:turn-events-settled')).toHaveLength(0);
+  });
+
+  it('诊断：同一 messageId 的重新生成在 ERA 回滚计数后仍会被旧去重标记跳过', async () => {
+    const vars = validVariables() as ReturnType<typeof validVariables> & {
+      stat_data: ReturnType<typeof validVariables>['stat_data'] & {
+        后续事件线索计数: Record<string, number>; 后续事件线索: Record<string, string>;
+      };
+    };
+    vars.stat_data.后续事件线索计数 = { 事件06: 3 };
+    vars.stat_data.后续事件线索 = { 事件06: '前往秘洞' };
+    getVariablesMock.mockReturnValue(vars);
+    initializeEventListMock.mockResolvedValue(undefined);
+    // 独立诊断只关注计数；清理此前测试留下的到点事件与清单 mock。
+    const loader = await import('./era-event-loader.js');
+    const checker = await import('./era-event-checker.js');
+    const scheduler = await import('./era-event-scheduler.js');
+    vi.mocked(loader.loadEventManifest).mockResolvedValue({
+      events: [], indexes: { byTrigger: [], byDiscovery: [] },
+    } as never);
+    vi.mocked(loader.loadEventDefinitions).mockResolvedValue({});
+    vi.mocked(scheduler.getManifestEventCandidateKeys).mockReturnValue([]);
+    vi.mocked(checker.isTimeForEvent).mockReturnValue(false);
+    vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(false);
+    const queue = await import('./era-turn-queue.js');
+    const writer = await import('./era-write-helper.js');
+    vi.mocked(queue.buildFollowupCounterPlan).mockImplementation((counters, eligibleKeys) => {
+      const updates: Record<string, number> = {};
+      for (const [key, value] of Object.entries(counters || {})) {
+        if (eligibleKeys instanceof Set && !eligibleKeys.has(key)) continue;
+        updates[key] = Number(value) - 1;
+      }
+      return { updates, expiredKeys: [], retainedKeys: [] };
+    });
+    vi.mocked(writer.writeEraTransaction).mockImplementation(async (operations: any[]) => {
+      for (const op of operations) Object.assign(vars.stat_data.后续事件线索计数, op.payload?.后续事件线索计数 || {});
+      return true;
+    });
+    // @ts-expect-error 测试用模块 query
+    await import('./era-main.js?regeneration-counter-diagnostic-test');
+    await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(1));
+    const find = (name: string) => eventOnMock.mock.calls
+      .filter(([eventName]) => eventName === name).at(-1)?.[1] as ((detail: any) => Promise<void>);
+    const send = find(tavern_events.MESSAGE_SENT), finish = find('wuxia:turn-completed');
+    await send({});
+    await finish({ messageId: 41, roundId: 'first-41', chatId: 'test-chat' });
+    expect(vars.stat_data.后续事件线索计数.事件06).toBe(2);
+    expect(writer.writeEraTransaction).toHaveBeenCalledTimes(1);
+    // 仅模拟原 swipe 的 ERA 计数变更被回滚；不修改产品去重策略。
+    vars.stat_data.后续事件线索计数.事件06 = 3;
+    await send({});
+    await finish({ messageId: 41, roundId: 'regenerated-41', chatId: 'test-chat' });
+    // 已确认的当前行为诊断，不代表正确目标值；修复需另行研究账本来源。
+    expect(vars.stat_data.后续事件线索计数.事件06).toBe(3);
+    expect(writer.writeEraTransaction).toHaveBeenCalledTimes(1);
+  });
+
 });

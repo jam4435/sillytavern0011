@@ -916,6 +916,7 @@ export function useMessageHandler({
           // 回合成功完成（文本已生成、助手楼层已写入、extra 模式下 ERA 写入已确认）
           // → 通知事件脚本扣减线索倒计时（替代 MESSAGE_SENT 的发送即扣）。
           const completedMessageId = assistantMessage.message_id;
+          let turnFinalizationFailed = false;
           if (completedMessageId !== null && Number.isInteger(completedMessageId)) {
             let eventsSettled = false;
             try {
@@ -927,6 +928,7 @@ export function useMessageHandler({
               eventsSettled = true;
               await finalizeHistoryNodeAfterEvents();
             } catch (error) {
+              turnFinalizationFailed = true;
               messageLogger.error('回合已完成，但事件稳定确认或历史封存失败:', error);
               showError(eventsSettled
                 ? `回合已完成，但自动历史节点封存失败：${getErrorMessage(error)}`
@@ -935,7 +937,7 @@ export function useMessageHandler({
             onVariableTurnSettled?.(completedMessageId);
           }
 
-          dismissToast();
+          if (!turnFinalizationFailed) dismissToast();
           return rawResultText;
         } else {
           // ========== 错误处理: AI 回复为空 ==========
@@ -1224,6 +1226,7 @@ export function useMessageHandler({
       // 回合成功完成（重新生成成功，助手楼层新 swipe 已写入、ERA 已确认）
       // → 通知事件脚本扣减线索倒计时。regenerate 的 messageId 不变，事件脚本按 messageId 去重，
       // 因此同一楼层多次 regenerate 只扣一次。
+      let turnFinalizationFailed = false;
       if (targetAssistantMessageId !== null && Number.isInteger(targetAssistantMessageId)) {
         let eventsSettled = false;
         try {
@@ -1235,6 +1238,7 @@ export function useMessageHandler({
           eventsSettled = true;
           await finalizeHistoryNodeAfterEvents();
         } catch (error) {
+          turnFinalizationFailed = true;
           messageLogger.error('重新生成已完成，但事件稳定确认或历史封存失败:', error);
           showError(eventsSettled
             ? `重新生成已完成，但自动历史节点封存失败：${getErrorMessage(error)}`
@@ -1243,7 +1247,7 @@ export function useMessageHandler({
         onVariableTurnSettled?.(targetAssistantMessageId);
       }
 
-      dismissToast();
+      if (!turnFinalizationFailed) dismissToast();
       return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

@@ -574,6 +574,17 @@ export async function writeEraTransaction(operations, reason = 'era-transaction'
       options.timeoutMessage ?? `ERA 事务写入完成信号超时: ${reason}`,
     );
     const finalVariables = await getVariables({ type: 'chat' });
+    // 仅诊断 ACK 后的实际字段差异：此阶段不改变确认结果，也不触发补偿事务。
+    if (!transactionExpectationMatches(finalVariables?.stat_data || {}, expectedStat, effectiveOperations)) {
+      recordHistoryEventForensics('era-transaction-ack-readback-mismatch', {
+        ...getHistoryEventMessageContext(finalVariables),
+        transactionId,
+        reason,
+        signatureHash,
+        operationCount: effectiveOperations.length,
+      });
+      logWarning(`ERA 事务 ACK 已收到，但即时回读与预期不一致（只读诊断）: ${reason}`);
+    }
     await emitConfirmedEraVariableWriteDone({
       source: 'event-script',
       operation: 'replace',
