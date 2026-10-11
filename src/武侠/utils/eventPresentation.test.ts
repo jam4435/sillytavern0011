@@ -7,6 +7,7 @@ import {
   getEventTitleParts,
   getTrackerEvents,
   getNewlyCompletedPersonalEvents,
+  getVisibleCompletedEvents,
   isEventUrgent,
   sortEventsForDisplay,
 } from './eventPresentation';
@@ -91,5 +92,22 @@ describe('eventPresentation', () => {
     expect(getNewlyCompletedPersonalEvents(before, after)).toEqual([finished]);
     expect(getNewlyCompletedPersonalEvents(after, after)).toEqual([]);
     expect(getNewlyCompletedPersonalEvents([], [worldOnly])).toEqual([]);
+  });
+
+  it('临时已完成卡片仅在真实楼层匹配时显示，初始双空状态不导致白屏', () => {
+    const finished: ChronicleEntry = {
+      id: 'finished-05',
+      title: '天龙第二回05-段誉失足坠崖',
+      timeText: '1202年3月16日15时',
+      sortDays: 0,
+      personal: true,
+    };
+    const recent = { messageId: 46, events: [finished] };
+
+    expect(getVisibleCompletedEvents(null, undefined)).toEqual([]);
+    expect(getVisibleCompletedEvents(null, 46)).toEqual([]);
+    expect(getVisibleCompletedEvents(recent, undefined)).toEqual([]);
+    expect(getVisibleCompletedEvents(recent, 45)).toEqual([]);
+    expect(getVisibleCompletedEvents(recent, 46)).toBe(recent.events);
   });
 });
