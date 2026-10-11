@@ -180,8 +180,8 @@ export const variableBarLogger = createForcedLogger('[wuxia-variable-bar]', 'wux
 const globalLoggerEnabled = getDebugOverride('game');
 export const logger: Logger = {
   log: globalLoggerEnabled ? console.log.bind(console) : noop,
-  error: console.error.bind(console),
-  warn: console.warn.bind(console),
+  error: (...args: unknown[]) => console.error(...args),
+  warn: (...args: unknown[]) => console.warn(...args),
   group: globalLoggerEnabled ? console.group.bind(console) : noop,
   groupEnd: globalLoggerEnabled ? console.groupEnd.bind(console) : noop,
 };
