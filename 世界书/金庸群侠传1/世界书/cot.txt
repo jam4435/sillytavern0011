@@ -75,5 +75,5 @@ const cot有事件接驳 = !cot有参与事件 && cotIsNonEmptyRecord(cot原始�
 <% } else { -%>
 3. 当前没有参与事件，不得生成<事件记录>。
 <% } -%>
-<合理性审查>、<事件记录规则>及本<thinking>仅是提示规则，不要原样复制到回复；实际输出的审查标签是<card_thinking>。
+<合理性审查>、已按条件注入的规则及本<thinking>仅是提示规则，不要原样复制到回复；实际输出的审查标签是<card_thinking>。
 </thinking>
