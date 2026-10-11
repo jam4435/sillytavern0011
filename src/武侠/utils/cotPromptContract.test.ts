@@ -33,9 +33,9 @@ function renderCot(参与事件: unknown, 后续事件线索: unknown): string {
 describe('武侠 COT 条件审查契约', () => {
   it('引用实际正文模型上下文而不是不存在的输入与变量模型标签', () => {
     expect(cotSource).toContain('本轮最新的 User 消息');
-    expect(cotSource).toContain('不是一个名为<user输入>的 XML 标签');
+    expect(cotSource).not.toContain('<user输入>');
     expect(cotSource).toContain('<时间>、<玩家>、<角色数据>、<可用地点>');
-    expect(cotSource).toContain('额外变量模型专用的<variable>');
+    expect(cotSource).not.toContain('<variable>');
     expect(cotSource).toContain('<合理性审查>');
     expect(cotSource).toContain('<card_thinking>');
   });
