@@ -1234,6 +1234,17 @@ describe('ERA 主线初始化控制', () => {
     vars.stat_data.后续事件线索 = { 事件06: '前往秘洞' };
     getVariablesMock.mockReturnValue(vars);
     initializeEventListMock.mockResolvedValue(undefined);
+    // 独立诊断只关注计数；清理此前测试留下的到点事件与清单 mock。
+    const loader = await import('./era-event-loader.js');
+    const checker = await import('./era-event-checker.js');
+    const scheduler = await import('./era-event-scheduler.js');
+    vi.mocked(loader.loadEventManifest).mockResolvedValue({
+      events: [], indexes: { byTrigger: [], byDiscovery: [] },
+    } as never);
+    vi.mocked(loader.loadEventDefinitions).mockResolvedValue({});
+    vi.mocked(scheduler.getManifestEventCandidateKeys).mockReturnValue([]);
+    vi.mocked(checker.isTimeForEvent).mockReturnValue(false);
+    vi.mocked(checker.isTimeAfterEventEnd).mockReturnValue(false);
     const queue = await import('./era-turn-queue.js');
     const writer = await import('./era-write-helper.js');
     vi.mocked(queue.buildFollowupCounterPlan).mockImplementation((counters, eligibleKeys) => {
