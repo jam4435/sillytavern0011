@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { GameEvent } from '../types';
+import type { ChronicleEntry, GameEvent } from '../types';
 import {
   getEventDescription,
   getEventCountdownLabel,
   getEventSemanticLabel,
   getEventTitleParts,
   getTrackerEvents,
+  getNewlyCompletedPersonalEvents,
   isEventUrgent,
   sortEventsForDisplay,
 } from './eventPresentation';
@@ -70,5 +71,25 @@ describe('eventPresentation', () => {
       'rumor',
     ]);
     expect(getTrackerEvents(input).map(item => item.id)).toEqual(['personal-a', 'personal-b', 'urgent-world']);
+  });
+
+  it('只回顾本轮新增的亲历归档，不混入既有史册或未参与的背景事件', () => {
+    const archive = (title: string, personal: boolean): ChronicleEntry => ({
+      id: title,
+      title,
+      timeText: '1202年3月16日16时',
+      sortDays: 0,
+      summary: '事件已结算。',
+      personal,
+    });
+    const old = archive('天龙第二回04-钟灵赠信物', true);
+    const finished = archive('天龙第二回05-段誉失足坠崖', true);
+    const worldOnly = archive('天龙第二回06-天下异动', false);
+    const before = [old];
+    const after = [worldOnly, finished, old];
+
+    expect(getNewlyCompletedPersonalEvents(before, after)).toEqual([finished]);
+    expect(getNewlyCompletedPersonalEvents(after, after)).toEqual([]);
+    expect(getNewlyCompletedPersonalEvents([], [worldOnly])).toEqual([]);
   });
 });
