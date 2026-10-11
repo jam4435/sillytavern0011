@@ -515,6 +515,7 @@ export function createMartialArtsAuditDocument(materialized, martialArtsDatabase
       Git提交: metadata.gitCommit ?? null,
       功法库SHA256: metadata.databaseSha256 ?? null,
       世界书源SHA256: metadata.eventSourceSha256 ?? null,
+      审计工具SHA256: metadata.auditToolSha256 ?? null,
       可重复生成: '输出不写入墙钟时间；相同提交与相同输入应得到相同 JSON。',
     },
     统计: {
@@ -575,6 +576,8 @@ const REASONABLE_EMPTY_CHARACTER_RULES = new Map([
   ['钟灵', '主要战力线索为闪电貂，空功法本身不足以认定遗漏。'],
 ]);
 
+const CHARACTER_IDENTITY_REVIEW_PAIRS = [{ 名称一: '乔峰', 名称二: '萧峰', 关系: '原著改名关系，不能仅凭名称自动合并运行时状态' }];
+
 /**
  * Produces a conservative, review-oriented report.  It deliberately does not
  * turn broad identity/realm guesses into "missing martial arts" findings.
@@ -588,6 +591,31 @@ export function createFourCategoryMartialArtsAuditDocument(materialized, martial
   const reasonableEmpty = [];
   const missingRepresentativeArts = [];
   const manualReview = [];
+  const identityReviews = CHARACTER_IDENTITY_REVIEW_PAIRS.map(pair => {
+    const left = materialized.records.get(pair.名称一);
+    const right = materialized.records.get(pair.名称二);
+    const leftState = materialized.state[pair.名称一] || null;
+    const rightState = materialized.state[pair.名称二] || null;
+    const eventsFor = record =>
+      record
+        ? [...record.involvedEvents.values()]
+            .sort(compareEffectOrder)
+            .map(event => ({ 事件: event.runtimeKey, 原文件: event.sourceName, 时间: cloneJson(event.effectTime) }))
+        : [];
+    const bothPresent = Boolean(left && right);
+    return {
+      ...pair,
+      名称一是否出现: Boolean(left),
+      名称二是否出现: Boolean(right),
+      名称一涉及事件: eventsFor(left),
+      名称二涉及事件: eventsFor(right),
+      最终状态一致: bothPresent ? compareJson(leftState, rightState) : null,
+      结论: bothPresent
+        ? '两个原始键都在确定性重放中出现，且最终状态不同；本审计保持为两个运行时记录，不自动合并，需由世界书明确提供迁移/删除链后再处理。'
+        : '当前确定性事件只出现其中一个原始键，不进行自动别名归并。',
+      需要人工审核: true,
+    };
+  });
 
   for (const character of total.角色列表) {
     const allArtRecords = [...character.功法记录, ...character.生活与杂学专长, ...character.误挂装备或道具];
@@ -696,6 +724,7 @@ export function createFourCategoryMartialArtsAuditDocument(materialized, martial
       合理没有武功: reasonableEmpty.length,
       非武学项目混入: nonMartialItems.length,
       需人工审核的空功法人物: manualReview.length,
+      人物身份归一待核查: identityReviews.length,
     },
     全体NPC状态: total.角色列表.map(character => ({
       人物: character.角色,
@@ -709,6 +738,7 @@ export function createFourCategoryMartialArtsAuditDocument(materialized, martial
     合理没有武功: reasonableEmpty,
     非武学项目混入: nonMartialItems,
     尚不能确定的人工审核项目: manualReview,
+    人物身份归一核查: identityReviews,
   };
 }
 

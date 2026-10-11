@@ -111,6 +111,7 @@ function createReviewSummary(audit, fourCategoryAudit, metadata) {
     `- Git 提交：\`${metadata.gitCommit ?? '不可用'}\`\n` +
     `- 功法库 SHA-256：\`${metadata.databaseSha256}\`\n` +
     `- 世界书源 SHA-256：\`${metadata.eventSourceSha256}\`\n` +
+    `- 审计工具 SHA-256：\`${metadata.auditToolSha256}\`\n` +
     `- 重跑：\`node scripts/audit-wuxia-character-martial-arts.mjs --output-dir plans/武侠角色功法审计-严格审计\`\n\n` +
     `输出不包含墙钟生成时间；相同代码提交与输入应产生相同 JSON。\n\n` +
     `## 结果\n\n| 项目 | 数量 |\n| --- | ---: |\n${rows}\n\n` +
@@ -160,6 +161,11 @@ function main() {
     gitCommit: currentCommit(),
     databaseSha256: sha256(fs.readFileSync(options.databasePath)),
     eventSourceSha256: directoryContentHash(options.eventDir),
+    auditToolSha256: sha256(
+      `${fs.readFileSync(new URL('./audit-wuxia-character-martial-arts.mjs', import.meta.url))}\0${fs.readFileSync(
+        new URL('./lib/wuxia-character-martial-arts.mjs', import.meta.url),
+      )}`,
+    ),
   };
   const audit = createMartialArtsAuditDocument(materialized, database, metadata);
   const candidates = createCompletionCandidatesDocument(materialized, database, metadata);
