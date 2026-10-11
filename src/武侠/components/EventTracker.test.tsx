@@ -86,10 +86,12 @@ describe('EventTracker', () => {
       description: '段誉向玉像叩拜。',
     };
 
-    const { rerender } = render(
-      <EventTracker events={[next]} completedEvents={[finished]} onOpenAll={vi.fn()} />,
-    );
+    // 原05与后续06可以复用相同投影 id，新增“已完成”仍须自动展开05。
+    const previous = { ...next, title: finished.title };
+    const { rerender } = render(<EventTracker events={[previous]} onOpenAll={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: '展开江湖事簿' }));
+    rerender(<EventTracker events={[next]} completedEvents={[finished]} onOpenAll={vi.fn()} />);
+    expect(screen.getByRole('button', { name: '段誉坠崖幸存（已完成）' })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('已完成')).toBeInTheDocument();
     expect(screen.getByText('段誉坠崖幸存')).toBeInTheDocument();
     expect(screen.getByText('段誉得见无量玉壁，05已经结束。')).toBeInTheDocument();
