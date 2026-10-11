@@ -951,4 +951,28 @@ describe('useMessageHandler extra-variable decision', () => {
     });
     expect(options.showError).toHaveBeenCalledWith('重新生成失败：prepare failed');
   });
+
+  it('发送和重生的事件结算失败均保留错误提示，不触发成功收尾清除', async () => {
+    turnEventsAckResponder.stop();
+    eventOn('wuxia:turn-completed', async (payload: Record<string, unknown>) => {
+      await eventEmit(WUXIA_TURN_EVENTS_SETTLED_EVENT, { ...payload, status: 'failed', error: '事件事务未确认' });
+    });
+    const options = createHookOptions(createSummarySettings('inline'));
+    const { result } = renderHook(() => useMessageHandler(options));
+    await act(async () => { await result.current.handleSendMessage('失败消息'); });
+    expect(options.showError).toHaveBeenCalledWith(expect.stringContaining('事件事务未确认'));
+    expect(options.dismissToast).not.toHaveBeenCalled();
+    expect(finalizeCurrentTurn).not.toHaveBeenCalled();
+
+    regenerateLastAssistantSwipeMock.mockResolvedValue({
+      maintext: '重生成正文', options: [], gameData: null, assistantMessageId: 9,
+      assistantSwipeId: 1, userInput: '上一轮输入', combinedPrompt: '最终输入', rawReply: '重生成正文',
+    });
+    options.showError.mockClear();
+    await act(async () => { await result.current.handleRegenerateLastAssistant(); });
+    expect(options.showError).toHaveBeenCalledWith(expect.stringContaining('事件事务未确认'));
+    expect(options.dismissToast).not.toHaveBeenCalled();
+    expect(finalizeCurrentTurn).not.toHaveBeenCalled();
+  });
+
 });

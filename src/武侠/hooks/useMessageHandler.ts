@@ -916,9 +916,9 @@ export function useMessageHandler({
           // 回合成功完成（文本已生成、助手楼层已写入、extra 模式下 ERA 写入已确认）
           // → 通知事件脚本扣减线索倒计时（替代 MESSAGE_SENT 的发送即扣）。
           const completedMessageId = assistantMessage.message_id;
+          let turnFinalizationFailed = false;
           if (completedMessageId !== null && Number.isInteger(completedMessageId)) {
             let eventsSettled = false;
-            let turnFinalizationFailed = false;
             try {
               await completeTurnEventsAndWait({
                 messageId: completedMessageId,
@@ -1226,9 +1226,9 @@ export function useMessageHandler({
       // 回合成功完成（重新生成成功，助手楼层新 swipe 已写入、ERA 已确认）
       // → 通知事件脚本扣减线索倒计时。regenerate 的 messageId 不变，事件脚本按 messageId 去重，
       // 因此同一楼层多次 regenerate 只扣一次。
+      let turnFinalizationFailed = false;
       if (targetAssistantMessageId !== null && Number.isInteger(targetAssistantMessageId)) {
         let eventsSettled = false;
-        let turnFinalizationFailed = false;
         try {
           await completeTurnEventsAndWait({
             messageId: targetAssistantMessageId,

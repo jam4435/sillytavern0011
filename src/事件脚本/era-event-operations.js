@@ -825,9 +825,9 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
   } catch (error) {
     logError(`批量完成登场事件失败`, error);
     return false;
+  } finally {
+    debugGroupEnd();
   }
-
-  debugGroupEnd();
 }
 
 function buildPlayerParticipationDescription(eventName, eventData, actualEndTime) {

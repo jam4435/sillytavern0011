@@ -180,4 +180,22 @@ describe('writeEraTransaction', () => {
     expect(eventEmitMock.mock.calls.some(([name]) => name === 'manual_sync')).toBe(true);
     expect(eventEmitMock.mock.calls.filter(([name]) => name === 'era:transactionByObject')).toHaveLength(1);
   });
+
+  it('ACK 回读不一致仅记录诊断，不改变已确认结果或自动重试', async () => {
+    eventOn('era:transactionByObject', async ({ transactionId }: any) => {
+      await eventEmit('era:writeDone', { transactionId, transactionIds: [transactionId], actions: { apiWrite: true } });
+    });
+    await expect(writeEraTransaction([
+      { type: 'insert', payload: { 事件系统: { 进行中事件: { 诊断事件: { 年: 3 } } } } },
+    ], 'ack-readback-diagnostic-only')).resolves.toBe(true);
+    const entries = JSON.parse(localStorage.getItem(HISTORY_EVENT_FORENSICS_STORAGE_KEY) || '[]');
+    expect(entries).toEqual(expect.arrayContaining([
+      expect.objectContaining({ details: expect.objectContaining({
+        stage: 'era-transaction-ack-readback-mismatch', reason: 'ack-readback-diagnostic-only',
+      }) }),
+    ]));
+    expect(eventEmitMock.mock.calls.filter(([name]) => name === 'era:transactionByObject')).toHaveLength(1);
+    expect(eventEmitMock.mock.calls.filter(([name]) => name === 'manual_sync')).toHaveLength(0);
+  });
+
 });

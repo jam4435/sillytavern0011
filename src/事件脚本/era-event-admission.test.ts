@@ -45,7 +45,7 @@ vi.mock('./era-notifications.js', () => ({ notifyEvent: notifyMock }));
 vi.mock('./era-event-scheduler.js', () => ({ sortUnstartedEventsByTrigger: (v: unknown) => v }));
 vi.mock('../shared/directVariableWrite', () => ({ writeDirectChatTransaction: vi.fn() }));
 
-import { batchStartEvents, playerJoinsEvents } from './era-event-operations.js';
+import { batchStartEvents, batchCompleteDebutEvents, playerJoinsEvents } from './era-event-operations.js';
 
 type RecordValue = Record<string, any>;
 type Operation = { type: 'insert' | 'update' | 'delete'; payload: RecordValue };
@@ -220,4 +220,21 @@ describe('事件开始 / 玩家入场 ERA 单事务', () => {
     expect(transactionMock.mock.calls[0][0].some((op: Operation) => op.payload.参与事件)).toBe(false);
     expect(notifyMock.mock.calls.map(([notice]) => notice.kind)).toEqual(['event-started']);
   });
+
+  it('登场事件成功后确认终态并通知，未提交或终态缺失时拒绝成功通知', async () => {
+    await expect(batchCompleteDebutEvents([first], definitions)).resolves.toBe(true);
+    expect(variables.stat_data.事件系统.已完成事件[first]).toBe(0);
+    expect(variables.stat_data.事件系统.未发生事件[first]).toBeUndefined();
+    expect(notifyMock.mock.calls.map(([notice]) => notice.kind)).toEqual(['debut-event-completed']);
+    notifyMock.mockClear();
+    variables.stat_data.事件系统.未发生事件[first] = TIME;
+    delete variables.stat_data.事件系统.已完成事件[first];
+    transactionMock.mockReset().mockResolvedValueOnce(false);
+    await expect(batchCompleteDebutEvents([first], definitions)).resolves.toBe(false);
+    expect(notifyMock).not.toHaveBeenCalled();
+    transactionMock.mockReset().mockResolvedValueOnce(true);
+    await expect(batchCompleteDebutEvents([first], definitions)).resolves.toBe(false);
+    expect(notifyMock).not.toHaveBeenCalled();
+  });
+
 });
