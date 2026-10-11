@@ -474,7 +474,7 @@ export interface ChronicleEntry {
   year?: number;
   /** 完整时间文本 */
   timeText: string;
-  /** 12 月×30 天简化历法总天数，用于排序 */
+  /** 12 月×30 天简化历法总天数（含时分的小数部分），用于精确排序 */
   sortDays: number;
   location?: string;
   /** 归档概要：参与事件为实际结局，未参与为原定概要 */

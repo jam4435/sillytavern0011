@@ -55,7 +55,7 @@ import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableW
 import { isHistoryCheckoutPending } from '../../shared/historyCheckoutJournal';
 import { isChatRenamePending } from '../../shared/chatRenameJournal';
 import { getLocationScopePath, isSameLocationScope } from '../../shared/locationPath.js';
-import { wuxiaCalendarDateToTotalDays } from '../../shared/wuxiaCalendar.js';
+import { wuxiaCalendarDateToTotalDays, wuxiaCalendarTimeToTotalMinutes } from '../../shared/wuxiaCalendar.js';
 import { dataLogger } from './logger';
 import { applyCurrentPresetModuleFilter } from './settingsManager';
 import { buildMeridianProjection, deriveMeridianModifiers } from './meridianSystem';
@@ -1126,14 +1126,14 @@ function filterParticipationEvents(record: Record<string, unknown> | undefined):
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
-type CalendarRecord = { 年?: number; 月?: number; 日?: number; 时?: number };
+type CalendarRecord = { 年?: number; 月?: number; 日?: number; 时?: number; 分?: number };
 
 function isCalendarRecord(value: unknown): value is CalendarRecord {
   return isRecord(value) && ('年' in value || '月' in value || '日' in value);
 }
 
 function formatCalendarRecord(time: CalendarRecord): string {
-  return `${time.年 ?? '?'}年${time.月 ?? '?'}月${time.日 ?? '?'}日${time.时 === undefined ? '' : `${time.时}时`}`;
+  return `${time.年 ?? '?'}年${time.月 ?? '?'}月${time.日 ?? '?'}日${time.时 === undefined ? '' : `${time.时}时${time.分 === undefined ? '' : `${String(time.分).padStart(2, '0')}分`}`}`;
 }
 
 // 与事件脚本一致的 12 月×30 天简化历法换算。
@@ -1401,7 +1401,7 @@ function parseChronicle(variables: GameVariables): ChronicleEntry[] {
       title: getDisplayEventName(eventName),
       year: time?.年,
       timeText: time ? formatCalendarRecord(time) : '年代不详',
-      sortDays: time ? toCalendarDays(time) : 0,
+      sortDays: time ? wuxiaCalendarTimeToTotalMinutes(time) / (24 * 60) : 0,
       location,
       summary,
       outcomeStatus,
@@ -1409,7 +1409,7 @@ function parseChronicle(variables: GameVariables): ChronicleEntry[] {
     });
   }
 
-  // 最近的事排最前；同日按标题稳定排序
+  // 最近的事排最前（精确到分）；同一时分按标题稳定排序
   entries.sort((a, b) => b.sortDays - a.sortDays || a.title.localeCompare(b.title, 'zh'));
   return entries;
 }
