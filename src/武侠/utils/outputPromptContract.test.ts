@@ -195,6 +195,43 @@ describe('武侠输出提示词契约', () => {
     expect(worldBackgroundSource).toContain('陆地神仙：江湖对极少数传奇人物的尊称，并非真正仙人');
   });
 
+  it('可前往地点按一级/二级输出紧凑 YAML，去重且保留不同层级的完整含义', () => {
+    const render = compilePromptRenderer(promptSource);
+    const surround = {
+      当前活动区: '大理/无量山/山脚废农舍',
+      附近地点: [
+        '大理/无量山/断魂崖',
+        '大理/无量山/后山森林',
+        '大理/无量山/断魂崖',
+        '大理/万劫谷/谷外古道',
+        '大理/云南/无量山',
+      ],
+      目标事件地点: ['大理/无量山/山脚废农舍/舍外'],
+      地图移动目的地: ['大理/大理城/镇南王府/正厅'],
+    };
+    const variables = {
+      stat_data: {
+        世界信息: { 时间: { 年: 1202, 月: 3, 日: 19, 时: 11, 分: 30 } },
+        user数据: { 所在位置: '大理/无量山/山脚废农舍/屋内' },
+        角色数据: {},
+        前端变量: { 周围地点: surround },
+      },
+    };
+    const output = render(variables, path =>
+      path === 'stat_data.前端变量.周围地点' ? surround : undefined,
+    );
+    const location = output.match(/<可用地点>([\s\S]*?)<\/可用地点>/)?.[1] || '';
+    expect(location).toContain('可前往:');
+    expect(location).toContain('  大理:');
+    expect(location).toContain('    无量山: [断魂崖, 后山森林, 山脚废农舍/舍外]');
+    expect(location).toContain('    万劫谷: [谷外古道]');
+    expect(location).toContain('    云南: [无量山]');
+    expect(location).toContain('    大理城: [镇南王府/正厅]');
+    expect(location).not.toContain('  - 大理/无量山/断魂崖');
+    expect(location).toContain('移动时须拼回完整一级/二级/三级[/四级]路径');
+    expect((location.match(/断魂崖/g) || []).length).toBe(1);
+  });
+
   it('可执行渲染只读历史、分事件快照和分组地点白名单', () => {
     const render = compilePromptRenderer(`${worldHistoryPromptSource}\n${promptSource}`);
     const eventKey = '射雕第七回02-初遇黄蓉';
