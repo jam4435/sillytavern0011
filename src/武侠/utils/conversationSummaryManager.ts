@@ -526,6 +526,9 @@ export interface ConversationSummaryPromptTraceSnapshot {
   mode: ConversationSummaryMode;
   summaryTag: string;
   recentReplies: number;
+  fullReplyCount: number;
+  summaryOnlyCount: number;
+  olderFullReplyMessageIds: number[];
   items: ConversationSummaryPromptTraceItem[];
 }
 
@@ -690,6 +693,10 @@ function captureConversationSummaryPromptTrace(
       : CONVERSATION_SUMMARY_TAG;
   const chapterCoveredIds = collectChapterCoveredAssistantIds(coverage, summaryTag);
   const finalPromptMessages = new Set(chat);
+  const recentHistoryIds = new Set(
+    coverage.history.filter(message => message.role === 'assistant').slice(-clampRecentReplies(settings.summarySettings.conversationSummaryRecentReplies))
+      .map(message => message.message_id),
+  );
 
   const items = coverage.history
     .filter(message => message.role === 'assistant')
@@ -702,7 +709,7 @@ function captureConversationSummaryPromptTrace(
 
       if (chapterCoveredIds.has(message.message_id)) {
         contextState = 'chapter_memory';
-      } else if (promptMessage && finalPromptMessages.has(promptMessage)) {
+      } else if (promptMessage && finalPromptMessages.has(promptMessage) && isMatchingHistoryPromptText(message, promptMessage)) {
         const finalText = getSendingMessageText(promptMessage).trim();
         contextPreview = finalText.slice(0, 260);
         if (!finalText) {
@@ -728,6 +735,10 @@ function captureConversationSummaryPromptTrace(
     mode,
     summaryTag,
     recentReplies: clampRecentReplies(settings.summarySettings.conversationSummaryRecentReplies),
+    fullReplyCount: items.filter(item => item.contextState === 'full').length,
+    summaryOnlyCount: items.filter(item => item.contextState === 'summary_only').length,
+    olderFullReplyMessageIds: items.filter(item => item.contextState === 'full' && !recentHistoryIds.has(item.messageId))
+      .map(item => item.messageId),
     items,
   };
 
