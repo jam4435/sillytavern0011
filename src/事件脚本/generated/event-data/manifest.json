@@ -6653,7 +6653,7 @@
       "intro": null,
       "summary": null,
       "participants": [],
-      "hash": "7ee811f7caeb3e716e9d525cc9a2f4f3a4e7cc282546e5677f764b5c56fd20de",
+      "hash": "7ea8dfad1ef16635b850e0053d6d07782bf9b16f10257d36c61756502de77bdd",
       "shardId": "shard-0004"
     },
     {
@@ -18535,7 +18535,7 @@
       "intro": null,
       "summary": null,
       "participants": [],
-      "hash": "7132abc220be38604c40aab555505959e47bfbb95364e5c96a73d72faae18af7",
+      "hash": "10912006a4efa262fc8fe777f1a925b83b31e06c5b2e366573f14796ed48945e",
       "shardId": "shard-0010"
     },
     {
@@ -38107,7 +38107,7 @@
       "followups": {
         "神雕第二十三回06-杨过木棒独战武氏兄弟": "杨过的话未能完全说服武氏兄弟，武修文出言挑衅，杨过以木棒独战二武"
       },
-      "hash": "21ec68f04625c843283e6c6a961a65b64060376b95d21404894a15d9fd917e1e",
+      "hash": "7e2b6cf849145315459ce5774c8f76a8f1e1053fa805aa3b581801eafff04789",
       "shardId": "shard-0019"
     },
     {
@@ -42018,7 +42018,7 @@
       "followups": {
         "神雕第三十三回02-小王将军述说神雕侠救父诛奸": "围炉夜话继续，四川口音的客人开始讲述神雕侠的侠义事迹。"
       },
-      "hash": "7740f3fb377b0e4a84fb56bbdabfc663c9bfa471ceeb596248284bb31406234b",
+      "hash": "f7117caccbf2b233acc7f8671e08b1b978b6a2064e49a278de0226583b3830e4",
       "shardId": "shard-0021"
     },
     {
@@ -45660,7 +45660,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "天龙第十七回08-乔峰含悲突围潜入菩提院",
       "lastRuntimeKey": "天龙第二十三回05-乔峰破窗逼问带头大哥",
-      "byteLength": 140206
+      "byteLength": 140296
     },
     {
       "id": "shard-0005",
@@ -45708,7 +45708,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "射雕第六回02-密谋除汗",
       "lastRuntimeKey": "射雕第十三回04-穆念慈夜闯归云庄",
-      "byteLength": 141710
+      "byteLength": 141753
     },
     {
       "id": "shard-0011",
@@ -45780,7 +45780,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "神雕第十八回12-公孙止审女挥剑杀女杨过同坠深渊",
       "lastRuntimeKey": "神雕第二十四回05-小龙女花园闻秘",
-      "byteLength": 271029
+      "byteLength": 271145
     },
     {
       "id": "shard-0020",
@@ -45796,7 +45796,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "神雕第三十回05-一灯赠药四人相认赶赴绝情谷周伯通现身",
       "lastRuntimeKey": "神雕第三十五回02-杨过赠三枚金针予郭襄",
-      "byteLength": 258042
+      "byteLength": 258147
     },
     {
       "id": "shard-0022",
@@ -60102,5 +60102,5 @@
     ]
   },
   "unresolvedReferences": [],
-  "contentHash": "82dda74a20d8bb735fd7b814d8bd486f9f57cfc2d97ddd65fa3fa964e4c08f63"
+  "contentHash": "333dc7b011158ccbde87a8704fb91b631c744708a3daeab2ef3a5d9483c4b315"
 }
