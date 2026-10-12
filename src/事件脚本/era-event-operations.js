@@ -29,6 +29,7 @@ import {
 import { isTimeForEvent, isTimeAfterEventEnd, isEventStartLocationSatisfied } from './era-event-checker.js';
 import { writeEraTransaction } from './era-write-helper.js';
 import { buildParticipantEntryPlan } from './era-participant-entry.js';
+import { buildDebutShellRecoveryPatch, isDebutShellRecoveryApplied } from './era-debut-shell.js';
 import { isSameLocationScope } from '../shared/locationPath.js';
 import {
   getEventSummary,
@@ -720,6 +721,7 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
   debugGroup(`🎭 批量完成登场事件 (${eventNames.length}个)`);
 
   try {
+    const beforeDebut = (await getVariables({ type: 'chat' }))?.stat_data || {};
     // 收集所有需要应用的 insert 差分
     const 登场事件差分 = {
       insert: {},
@@ -775,9 +777,16 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
         未发生事件: 未发生删除对象,
       },
     };
+    // ERA Insert 不覆盖 $template 提前生成的空字符串/零属性。
+    // 仅对识别出的模板空壳使用已有的 update 机制补齐默认叶子；不触碰非默认值、位置或经历。
+    const shellRecovery = buildDebutShellRecoveryPatch(beforeDebut.角色数据, 登场事件差分.insert);
     const debutOperations = [];
     if (Object.keys(登场事件差分.insert).length > 0) {
       debutOperations.push({ type: 'insert', payload: { 角色数据: 登场事件差分.insert } });
+    }
+    if (Object.keys(shellRecovery).length > 0) {
+      debutOperations.push({ type: 'update', payload: { 角色数据: shellRecovery } });
+      logWarning('正式登场检测到 ERA 模板空壳，追加精确叶子补全:', Object.keys(shellRecovery));
     }
     debutOperations.push({ type: 'insert', payload: completedPayload }, { type: 'delete', payload: deletePayload });
     log('🚀 在同一 ERA 事务中应用登场差分、完成状态与未发生清理');
@@ -791,7 +800,9 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
       Object.prototype.hasOwnProperty.call(verifyStat.事件系统?.已完成事件 || {}, name) &&
       !Object.prototype.hasOwnProperty.call(verifyStat.事件系统?.未发生事件 || {}, name),
     );
-    if (!completed) throw new Error('登场事件事务确认后回读不一致，禁止成功通知');
+    if (!completed || !isDebutShellRecoveryApplied(verifyStat.角色数据, shellRecovery)) {
+      throw new Error('登场事件事务回读未通过（事件终态或模板空壳补全不一致），禁止成功通知');
+    }
     log('✅ 登场事件事务完成');
     if (isDebugEnabled()) {
       debugGroupCollapsed('🔍 登场事件完成后的事件系统状态');
