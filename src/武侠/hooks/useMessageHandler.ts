@@ -1137,6 +1137,7 @@ export function useMessageHandler({
 
     let extraVariableUpdateReservation: ExtraVariableUpdateReservation | null = null;
     let targetAssistantMessageId: number | null = null;
+    let generationEraMacroSnapshot: string | null = null;
     const turnChatId = readCurrentChatIdForTurn();
     let turnLockRequestStarted = false;
 
@@ -1147,10 +1148,11 @@ export function useMessageHandler({
       const result = await regenerateLastAssistantSwipe({
         ...request,
         onCombinedPrompt: prompt => {
+          generationEraMacroSnapshot = expandCurrentChatEraMacrosForDebug(prompt);
           patchLatestDebugRound({
             main: {
               combinedPrompt: prompt,
-              expandedCombinedPrompt: expandCurrentChatEraMacrosForDebug(prompt),
+              expandedCombinedPrompt: generationEraMacroSnapshot,
             },
           });
         },
@@ -1175,9 +1177,8 @@ export function useMessageHandler({
         main: {
           userInput: result.userInput || '重新生成最新回复',
           combinedPrompt: result.combinedPrompt || result.userInput || '重新生成最新回复',
-          expandedCombinedPrompt: expandCurrentChatEraMacrosForDebug(
-            result.combinedPrompt || result.userInput || '重新生成最新回复',
-          ),
+          // 回调中已记录生成时的快照；不得使用模型返回后的新变量回填。
+          expandedCombinedPrompt: generationEraMacroSnapshot ?? result.combinedPrompt ?? result.userInput ?? '重新生成最新回复',
           output: result.rawReply,
           status: 'success',
           finishedAt: Date.now(),
