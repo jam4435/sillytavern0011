@@ -221,6 +221,71 @@ describe('事件开始 / 玩家入场 ERA 单事务', () => {
     expect(notifyMock.mock.calls.map(([notice]) => notice.kind)).toEqual(['event-started']);
   });
 
+  it('NPC 先被经历插入生成模板空壳后，正式登场在同笔事务中补全默认值，保留真实位置和经历', async () => {
+    const debutName = '天龙第六回00-人物登场';
+    variables.stat_data.事件系统.未发生事件[debutName] = TIME;
+    variables.stat_data.角色数据.风波恶 = {
+      性别: '', 外貌: '', 性格: '', 境界: '',
+      初始属性: { 臂力: 0, 根骨: 0, 机敏: 0, 悟性: 0, 洞察: 0 },
+      出生年份: 0, 状态: '',
+      所在位置: '大理/无量山/山脚废农舍/屋内',
+      身份: {}, 功法: {}, 重要物品: {},
+      人物经历: { 第六回02: '已有经历，不可丢失' },
+      关系网: {},
+    };
+    const eventData = {
+      事件类型: '登场事件',
+      insert: {
+        风波恶: {
+          性别: '男', 外貌: '武人', 性格: '好斗', 境界: '二流-中期',
+          初始属性: { 臂力: 11, 根骨: 10, 机敏: 15, 悟性: 7, 洞察: 5 },
+          出生年份: 1168, 状态: '健康',
+          所在位置: '大理/无量山/山脚废农舍/舍外',
+          身份: { 姑苏慕容氏家臣: '玄霜庄庄主' },
+          功法: { 劈风刀法: { 掌握程度: '融会贯通' } },
+          重要物品: {}, 人物经历: {}, 关系网: {},
+        },
+      },
+    };
+
+    await expect(batchCompleteDebutEvents([debutName], { [debutName]: eventData })).resolves.toBe(true);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    const [operations] = transactionMock.mock.calls[0] as [Operation[]];
+    expect(operations.map(op => op.type)).toEqual(['insert', 'update', 'insert', 'delete']);
+    expect(operations[1].payload.角色数据.风波恶).not.toHaveProperty('所在位置');
+    expect(variables.stat_data.角色数据.风波恶).toMatchObject({
+      性别: '男', 境界: '二流-中期', 初始属性: { 臂力: 11, 机敏: 15 },
+      功法: { 劈风刀法: { 掌握程度: '融会贯通' } },
+      身份: { 姑苏慕容氏家臣: '玄霜庄庄主' },
+      人物经历: { 第六回02: '已有经历，不可丢失' },
+      所在位置: '大理/无量山/山脚废农舍/屋内',
+    });
+    expect(variables.stat_data.事件系统.已完成事件[debutName]).toBe(0);
+  });
+
+  it('NPC 空壳补全未成功回读时禁止登场完成通知', async () => {
+    const name = '天龙第六回00-人物登场';
+    variables.stat_data.事件系统.未发生事件[name] = TIME;
+    variables.stat_data.角色数据.风波恶 = {
+      性别: '', 境界: '', 出生年份: 0,
+      初始属性: { 臂力: 0, 根骨: 0, 机敏: 0, 悟性: 0, 洞察: 0 },
+    };
+    // 模拟提交端只写入事件终态，没有落地人物修复。
+    transactionMock.mockImplementationOnce(async (operations: Operation[]) => {
+      for (const op of operations) {
+        if (!op.payload.角色数据) applyPatch(variables.stat_data, op.payload, op.type);
+      }
+      return true;
+    });
+    await expect(batchCompleteDebutEvents([name], {
+      [name]: { insert: { 风波恶: {
+        性别: '男', 境界: '二流-中期', 出生年份: 1168,
+        初始属性: { 臂力: 11, 根骨: 10, 机敏: 15, 悟性: 7, 洞察: 5 },
+      } } },
+    })).resolves.toBe(false);
+    expect(notifyMock).not.toHaveBeenCalled();
+  });
+
   it('登场事件成功后确认终态并通知，未提交或终态缺失时拒绝成功通知', async () => {
     await expect(batchCompleteDebutEvents([first], definitions)).resolves.toBe(true);
     expect(variables.stat_data.事件系统.已完成事件[first]).toBe(0);
