@@ -341,6 +341,24 @@ function extractSummaryTagContent(text: string, tagValue: string): string {
 }
 
 /**
+ * Prompt 中可能预置 few-shot，或因上下文窗口只带入部分真实楼层。
+ * 反向角色对齐只能提供候选引用，还需校验实际正文片段，避免误把示例当成历史 Assistant 压缩。
+ */
+function isMatchingHistoryPromptText(
+  historyMessage: PromptHistoryMessage,
+  promptMessage: SillyTavern.SendingMessage,
+): boolean {
+  const actual = getSendingMessageText(promptMessage).trim();
+  const stored = getActiveHistoryMessageText(historyMessage).trim();
+  if (!actual || !stored) return false;
+  if (stored === actual || stored.includes(actual)) return true;
+  const stripped = applyEraBaseRegexRule(stored).trim();
+  if (stripped === actual || stripped.includes(actual)) return true;
+  const snippet = actual.slice(0, Math.min(40, actual.length));
+  return snippet.length >= 16 && (stored.includes(snippet) || stripped.includes(snippet));
+}
+
+/**
  * card / preset 统一在最终 prompt 压缩上下文；不改写真实聊天楼层。
  * 根据真实 Assistant 历史计数，而不是每两条消息视为一个回合。
  * 缺少有效摘要的旧回复必须保留原文，交给补完工作台处理。
@@ -353,7 +371,7 @@ export function filterConversationSummaryContextFromPrompt(
   promptRefs?: Map<number, SillyTavern.SendingMessage>,
 ): number {
   const keepReplies = clampRecentReplies(recentReplies);
-  const originalIndices = new Map(chat.map((message, index) => [message, index]));
+  const originalIndices = new Map<SillyTavern.SendingMessage, number>(chat.map((message, index) => [message, index]));
   const assistantIndices = chat
     .map((message, index) => (message.role === 'assistant' ? index : -1))
     .filter(index => index >= 0);
@@ -369,7 +387,8 @@ export function filterConversationSummaryContextFromPrompt(
       const entry = dialogueHistory[index];
       if (entry.role !== 'assistant') continue;
       const promptMessage = promptRefs.get(entry.message_id);
-      const assistantIndex = promptMessage && originalIndices.get(promptMessage);
+      if (!promptMessage || !isMatchingHistoryPromptText(entry, promptMessage)) continue;
+      const assistantIndex = originalIndices.get(promptMessage);
       if (assistantIndex === undefined || chat[assistantIndex].role !== 'assistant') continue;
 
       let userIndex: number | undefined;
@@ -378,7 +397,12 @@ export function filterConversationSummaryContextFromPrompt(
         if (dialogueHistory[previous].role !== 'user') continue;
         const userMessage = promptRefs.get(dialogueHistory[previous].message_id);
         const matchedUserIndex = userMessage && originalIndices.get(userMessage);
-        if (matchedUserIndex !== undefined && chat[matchedUserIndex].role === 'user') {
+        if (
+          matchedUserIndex !== undefined
+          && chat[matchedUserIndex].role === 'user'
+          && userMessage
+          && isMatchingHistoryPromptText(dialogueHistory[previous], userMessage)
+        ) {
           userIndex = matchedUserIndex;
         }
         break;
