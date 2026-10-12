@@ -766,6 +766,11 @@ function splitEvidenceText(event) {
 }
 
 export function isActiveUseSentence(sentence, aliases, artName) {
+  // “以空手夺白刃手法抢刀” describes a generic disarming action in
+  // the novel, not evidence that Yelü Yan learned the database's
+  // specifically attributed Quanzhen technique. Preserve the event prose.
+  if (artName === '空手夺白刃' && /空手夺白刃(?:的)?手法/.test(sentence) && !/[《“‘]空手夺白刃/.test(sentence))
+    return false;
   const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   // Some event prose says “古墓派美女拳法” although the exact database key is “美女拳法”.
   const art = `(?:古墓派)?${escapeRegExp(artName)}`;
