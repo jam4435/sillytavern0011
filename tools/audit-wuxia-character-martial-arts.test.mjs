@@ -389,6 +389,22 @@ describe('wuxia character martial arts audit', () => {
     expect(rodEvent.insert.潇湘子.重要物品.毒烟哭丧棒).toContain('兵器装置');
   });
 
+  it('薛慕华只在阿朱疗伤之后获得白世镜传授的七招，不提前入登场功法', () => {
+    const root = path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书');
+    const intro = parseYaml(readFileSync(path.join(root, '天龙第十八回00-人物登场.yaml'), 'utf8'));
+    const after = parseYaml(readFileSync(path.join(root, '天龙第十九回03-乔峰探庄得知阿朱伤愈离去.yaml'), 'utf8'));
+    const db = JSON.parse(readFileSync(path.join(process.cwd(), 'src', '武侠', 'data', '_合并后功法.json'), 'utf8'));
+    const skill = after.insert?.薛慕华?.功法?.缠丝擒拿手;
+    expect(intro.insert.薛慕华.功法.百家杂手).toBeTruthy();
+    expect(intro.insert.薛慕华.功法.缠丝擒拿手).toBeUndefined();
+    expect(skill?.掌握程度).toMatch(/^初窥门径/);
+    expect(skill.掌握程度).toContain('七招');
+    expect(skill.掌握程度).toContain('未掌握全套');
+    expect(db.功法.some(art => art.功法名称 === '缠丝擒拿手')).toBe(true);
+    expect(after.触发条件.年).toBeGreaterThanOrEqual(intro.触发条件.年);
+    expect(after.触发条件.月).toBeGreaterThanOrEqual(intro.触发条件.月);
+  });
+
   it('生成门派谱系时遵守层级上限、指定传人与关系排除规则', () => {
     const materialized = materializeCharacterMartialArts([
       event(
