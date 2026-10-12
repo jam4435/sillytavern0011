@@ -333,6 +333,37 @@ describe('wuxia character martial arts audit', () => {
     }
   });
 
+  it('第三批四位 NPC 的原创武学已入正式库、登场变量精确命中且来源注明合理补全', () => {
+    const root = path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书');
+    const source = JSON.parse(readFileSync(path.join(process.cwd(), 'src', '武侠', 'data', '_合并后功法.json'), 'utf8'));
+    const db = new Map(source.功法.map(item => [item.功法名称, item]));
+    const entries = [
+      ['射雕第七回00-人物登场.yaml', '彭连虎', '千手连环拳', '拳掌'],
+      ['射雕第七回00-人物登场.yaml', '侯通海', '黄河三股叉法', '枪戟'],
+      ['神雕第十六回00-人物登场.yaml', '潇湘子', '湘西哭丧棒法', '棍锤'],
+      ['天龙第十八回00-人物登场.yaml', '薛慕华', '百家杂手', '拳掌'],
+    ];
+    expect(new Set(source.功法.map(item => item.功法名称)).size).toBe(source.功法.length);
+    expect(source.功法).toHaveLength(488);
+    for (const [file, person, art, type] of entries) {
+      const eventData = parseYaml(readFileSync(path.join(root, file), 'utf8'));
+      const skill = eventData.insert?.[person]?.功法?.[art];
+      expect(skill, `${file} → ${person} → ${art}`).toBeTruthy();
+      expect(typeof skill.掌握程度).toBe('string');
+      const definition = db.get(art);
+      expect(definition?.类型).toBe(type);
+      expect(definition?.来源类型).toBe('合理补全');
+      expect(definition?.来源说明).toBeTruthy();
+      expect(definition?.战斗系数?.属性列表?.length).toBeGreaterThan(0);
+      expect(definition?.修炼限制).toBeTruthy();
+    }
+    const shaolin = parseYaml(readFileSync(path.join(root, '天龙第十八回00-人物登场.yaml'), 'utf8'));
+    expect(shaolin.insert.薛慕华.功法.金匮针法).toBeTruthy();
+    expect(shaolin.insert.薛慕华.功法.本草医道).toBeTruthy();
+    const rodEvent = parseYaml(readFileSync(path.join(root, '神雕第十六回00-人物登场.yaml'), 'utf8'));
+    expect(rodEvent.insert.潇湘子.重要物品.毒烟哭丧棒).toContain('兵器装置');
+  });
+
   it('生成门派谱系时遵守层级上限、指定传人与关系排除规则', () => {
     const materialized = materializeCharacterMartialArts([
       event(
