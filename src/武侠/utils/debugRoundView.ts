@@ -1,5 +1,7 @@
 import type { DebugVariableApplyStatus, ExtendedDebugStageStatus, LatestDebugRound } from '../hooks/useDebugLogs';
 
+export type DebugMacroViewMode = 'expanded' | 'raw';
+
 const normalizeDebugText = (value: string | undefined): string => (value || '').trim();
 
 const buildRetry429Lines = (stage: LatestDebugRound['main'] | LatestDebugRound['variable']): string[] => {
@@ -126,7 +128,7 @@ export function shouldShowVariableDebug(debugRound: LatestDebugRound | null): bo
   );
 }
 
-export function buildMainInputDebugContent(debugRound: LatestDebugRound): string {
+export function buildMainInputDebugContent(debugRound: LatestDebugRound, macroView: DebugMacroViewMode = 'expanded'): string {
   const sections = [
     '【用户输入】',
     debugRound.main.userInput || '(空)',
@@ -134,7 +136,11 @@ export function buildMainInputDebugContent(debugRound: LatestDebugRound): string
     ...buildRetry429Lines(debugRound.main),
     ...buildAutoAdvanceFailureRetryLines(debugRound.main),
   ];
-  const combinedPrompt = normalizeDebugText(debugRound.main.combinedPrompt);
+  const combinedPrompt = normalizeDebugText(
+    macroView === 'expanded'
+      ? debugRound.main.expandedCombinedPrompt || debugRound.main.combinedPrompt
+      : debugRound.main.combinedPrompt,
+  );
 
   sections.push('【最终送模提示词】');
   sections.push(combinedPrompt || '(未捕获到最终送模提示词)');
@@ -155,10 +161,10 @@ export function buildMainOutputDebugContent(debugRound: LatestDebugRound): strin
     .join('\n');
 }
 
-export function buildVariableInputDebugContent(debugRound: LatestDebugRound): string {
+export function buildVariableInputDebugContent(debugRound: LatestDebugRound, macroView: DebugMacroViewMode = 'expanded'): string {
   const { variable } = debugRound;
   if (normalizeDebugText(variable.input)) {
-    return variable.input;
+    return macroView === 'expanded' ? variable.expandedInput || variable.input : variable.input;
   }
   if (variable.trigger || variable.modeSnapshot || variable.skipReason || variable.status === 'skipped') {
     return [
@@ -229,13 +235,13 @@ export function buildVariableOutputDebugContent(debugRound: LatestDebugRound): s
 }
 
 /** 按调试页现有呈现内容完整复制最近一轮的四项数据。 */
-export function buildDebugRoundCopyText(debugRound: LatestDebugRound): string {
+export function buildDebugRoundCopyText(debugRound: LatestDebugRound, macroView: DebugMacroViewMode = 'expanded'): string {
   const variableLogged = shouldShowVariableDebug(debugRound);
   const notRunText = '(本轮未进行额外变量更新)';
   const sections: Array<[string, string]> = [
-    ['正文输入', buildMainInputDebugContent(debugRound)],
+    ['正文输入', buildMainInputDebugContent(debugRound, macroView)],
     ['正文输出', buildMainOutputDebugContent(debugRound)],
-    ['变量输入', variableLogged ? buildVariableInputDebugContent(debugRound) : notRunText],
+    ['变量输入', variableLogged ? buildVariableInputDebugContent(debugRound, macroView) : notRunText],
     ['变量输出', variableLogged ? buildVariableOutputDebugContent(debugRound) : notRunText],
   ];
 
