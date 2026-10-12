@@ -4539,7 +4539,7 @@
       "intro": null,
       "summary": null,
       "participants": [],
-      "hash": "b36f55a38cb41b0f36599d7c8c784ed2d581fb098f80180918db170f3a62250f",
+      "hash": "a54db2aeb443eefa1f8626e3a3a32846c7c35cb36fd23808ad060bd0c1a7e49d",
       "shardId": "shard-0003"
     },
     {
@@ -6774,7 +6774,7 @@
       "followups": {
         "天龙第十九回04-乔峰决意北上赶赴雁门关绝壁": "得知阿朱安然脱险后，乔峰再无后顾之忧，当即动身北上赶赴雁门关查探当年父母惨案之石壁绝迹。"
       },
-      "hash": "573c828101c247b93d3d9a31d3bb78cc5f1ddaac3cab947678f5bbbf966f3d86",
+      "hash": "8fe6c92e8461abf8d1b1719a59c1d5d13e3da47279755ced8b6762d41f6e6bc9",
       "shardId": "shard-0004"
     },
     {
@@ -12985,7 +12985,7 @@
       "intro": null,
       "summary": null,
       "participants": [],
-      "hash": "9512d7907368bc97a826252e06f586842518f9685450f632da1efe0b115ae3c7",
+      "hash": "c57a65c05434669fce62f39200e7aa45177fac81f1a7222cce813ffb12166153",
       "shardId": "shard-0007"
     },
     {
@@ -23109,7 +23109,7 @@
       "intro": null,
       "summary": null,
       "participants": [],
-      "hash": "97a62077315fbc9f94e059935e93f7e68a989937b53e1de4658512931ebb5444",
+      "hash": "62013f495241ff0b51ea62f4057c04d361b81b8d0362018fb8e9c670139322da",
       "shardId": "shard-0012"
     },
     {
@@ -24707,7 +24707,7 @@
       "followups": {
         "射雕第二十八回02-破解武穆遗书之秘": "郭靖黄蓉在岳阳楼再遇裘千仞（裘千丈），引出铁掌山之约。"
       },
-      "hash": "0956515e3128c86ed72fe31175cd404d1c0e85ccbf17a2fc0d466b7520467bac",
+      "hash": "a4e22471a72f961123a57671292d94b9d4a1c3b835378da8dd3e9cde3440bacf",
       "shardId": "shard-0013"
     },
     {
@@ -32156,7 +32156,7 @@
       "discoveryHour": 10753881,
       "location": "大宋/终南山/潼关道",
       "intro": "迎亲队伍刚到前方高坡，三名丐帮弟子忽然拦住去路，声称要查验新娘；杨过若不出手，二人的伪装随时会被拆穿。",
-      "summary": "陆无双以美女拳法击退三名丐帮弟子，她的行踪与所涉旧案却也更快传回丐帮。",
+      "summary": "杨过使出古墓派美女拳法击退三名丐帮弟子；陆无双在旁报出拳式招名，她的行踪与所涉旧案也更快传回丐帮。",
       "participants": [
         "杨过",
         "陆无双"
@@ -32164,7 +32164,7 @@
       "followups": {
         "神雕第九回03-客店扮道士避李莫愁": "二更时分杨过放走迎亲人众，与陆无双在市镇找客店歇脚"
       },
-      "hash": "f3454e1ce7b1ea630b18aafad6b3f99a73c1618b65a69c84df3de3a97ab7ab74",
+      "hash": "32a0b4703fbac2176079a5a343b6a65a74561b2c7949501631899cc824d8de41",
       "shardId": "shard-0016"
     },
     {
@@ -33020,7 +33020,7 @@
       "intro": null,
       "summary": null,
       "participants": [],
-      "hash": "268762353418752790d9cae7c97a150ad80f7d69aa1d3b2c1a72764ee649755a",
+      "hash": "68d5c261f43c9f748e06b6b01cf29a2d6a9e9c25cfb274304a54822ce8207c03",
       "shardId": "shard-0017"
     },
     {
@@ -45652,7 +45652,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "天龙第十一回03-太湖荷荡闻歌初逢绿衣少女",
       "lastRuntimeKey": "天龙第十七回07-少林众僧结罗汉大阵围攻",
-      "byteLength": 163328
+      "byteLength": 164002
     },
     {
       "id": "shard-0004",
@@ -45660,7 +45660,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "天龙第十七回08-乔峰含悲突围潜入菩提院",
       "lastRuntimeKey": "天龙第二十三回05-乔峰破窗逼问带头大哥",
-      "byteLength": 140343
+      "byteLength": 140487
     },
     {
       "id": "shard-0005",
@@ -45684,7 +45684,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "天龙第三十五回06-大笑悲叹二宗同归于尽冰崖",
       "lastRuntimeKey": "天龙第四十一回03-萧远山自述潜伏复仇揭杀戮真相",
-      "byteLength": 148935
+      "byteLength": 148379
     },
     {
       "id": "shard-0008",
@@ -45724,7 +45724,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "射雕第二十一回05-临危授命",
       "lastRuntimeKey": "射雕第三十二回00-人物登场",
-      "byteLength": 127186
+      "byteLength": 127189
     },
     {
       "id": "shard-0013",
@@ -45732,7 +45732,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "射雕第二十六回02-傻姑身世揭晓",
       "lastRuntimeKey": "射雕第三十五回02-大雾脱险",
-      "byteLength": 134583
+      "byteLength": 134717
     },
     {
       "id": "shard-0014",
@@ -45756,7 +45756,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "神雕第五回06-小龙女为孙婆婆复仇斗郝丘",
       "lastRuntimeKey": "神雕第九回07-龙驹寨耶律家夜遇刺客",
-      "byteLength": 202806
+      "byteLength": 202848
     },
     {
       "id": "shard-0017",
@@ -45764,7 +45764,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "神雕第十回01-耶律齐显神技释完颜萍",
       "lastRuntimeKey": "神雕第十四回09-小龙女深夜不辞而别杨过狂追寻师",
-      "byteLength": 287474
+      "byteLength": 287630
     },
     {
       "id": "shard-0018",
@@ -60102,5 +60102,5 @@
     ]
   },
   "unresolvedReferences": [],
-  "contentHash": "326ff66800b48adebbde79f0731be55dcdda7cab8541ddf1229d448102097dba"
+  "contentHash": "f2985ed85af195125503bf0a794ec87fb511cf6c0c3a75f3d4a41c0fb95bfd75"
 }
