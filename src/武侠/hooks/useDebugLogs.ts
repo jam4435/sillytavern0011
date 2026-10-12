@@ -42,6 +42,8 @@ export interface LatestDebugRound {
   main: DebugStage & {
     userInput: string;
     combinedPrompt: string;
+    /** 原始提示词之外，使用生成当时的 stat_data 展开 ERA 宏。 */
+    expandedCombinedPrompt?: string;
     output: string;
   };
   variable: DebugStage & {
@@ -49,6 +51,8 @@ export interface LatestDebugRound {
     modeSnapshot: DebugVariableModeSnapshot;
     skipReason: string;
     input: string;
+    /** 变量模型构造时的宏展开快照。 */
+    expandedInput?: string;
     output: string;
     appendedBlocks: string;
     finalMessageText: string;
@@ -88,6 +92,7 @@ function createEmptyDebugRound(): LatestDebugRound {
       retryFailureLastDelayMs: 0,
       userInput: '',
       combinedPrompt: '',
+      expandedCombinedPrompt: '',
       output: '',
     },
     variable: {
@@ -100,7 +105,8 @@ function createEmptyDebugRound(): LatestDebugRound {
       modeSnapshot: '',
       skipReason: '',
       input: '',
-      output: '',
+      expandedInput: '',
+      output: ''
       appendedBlocks: '',
       finalMessageText: '',
       appendReadbackText: '',
@@ -214,6 +220,7 @@ function normalizeLoadedDebugRound(value: unknown): LatestDebugRound | null {
       retryFailureLastDelayMs: normalizeNumber(main.retryFailureLastDelayMs) ?? 0,
       userInput: normalizeString(main.userInput),
       combinedPrompt: normalizeString(main.combinedPrompt),
+      expandedCombinedPrompt: normalizeString(main.expandedCombinedPrompt),
       output: normalizeString(main.output),
     },
     variable: {
@@ -229,6 +236,7 @@ function normalizeLoadedDebugRound(value: unknown): LatestDebugRound | null {
       modeSnapshot: normalizeDebugVariableModeSnapshot(variable.modeSnapshot),
       skipReason: normalizeString(variable.skipReason),
       input: normalizeString(variable.input),
+      expandedInput: normalizeString(variable.expandedInput),
       output: normalizeString(variable.output),
       appendedBlocks: normalizeString(variable.appendedBlocks),
       finalMessageText: normalizeString(variable.finalMessageText),
@@ -311,6 +319,7 @@ export function useDebugLogs() {
         retryFailureLastDelayMs: 0,
         userInput,
         combinedPrompt: '',
+        expandedCombinedPrompt: '',
         output: '',
       },
     };
