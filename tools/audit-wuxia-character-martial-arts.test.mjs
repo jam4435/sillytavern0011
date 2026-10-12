@@ -344,7 +344,8 @@ describe('wuxia character martial arts audit', () => {
       ['天龙第十八回00-人物登场.yaml', '薛慕华', '百家杂手', '拳掌'],
     ];
     expect(new Set(source.功法.map(item => item.功法名称)).size).toBe(source.功法.length);
-    expect(source.功法).toHaveLength(488);
+    // 正式库后续扩充不应使第三批的存量回归测试失败。
+    expect(source.功法.length).toBeGreaterThanOrEqual(488);
     for (const [file, person, art, type] of entries) {
       const eventData = parseYaml(readFileSync(path.join(root, file), 'utf8'));
       const skill = eventData.insert?.[person]?.功法?.[art];
