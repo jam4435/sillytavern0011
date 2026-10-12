@@ -417,6 +417,24 @@ describe('wuxia character martial arts audit', () => {
     expect(after.触发条件.月).toBeGreaterThanOrEqual(intro.触发条件.月);
   });
 
+  it('马光佐新增熟铜棍实战功法，精确匹配且不误归其他宗门传承', () => {
+    const db = JSON.parse(readFileSync(path.join(process.cwd(), 'src', '武侠', 'data', '_合并后功法.json'), 'utf8'));
+    const matching = db.功法.filter(art => art.功法名称 === '回疆铜棍法');
+    expect(matching).toHaveLength(1);
+    const [skill] = matching;
+    expect(skill.类型).toBe('棍锤');
+    expect(skill.功法品阶).toBe('传家');
+    expect(skill.来源类型).toBe('合理补全');
+    expect(skill.来源说明).toContain('第二十一回');
+    expect(skill.战斗系数.属性列表[0].属性).toBe('臂力');
+    const file = path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书', '神雕第十六回00-人物登场.yaml');
+    const debut = parseYaml(readFileSync(file, 'utf8'));
+    expect(debut.insert.马光佐.功法.回疆铜棍法.掌握程度).toBe('融会贯通');
+    expect(debut.insert.马光佐.重要物品.熟铜棍).toContain('兵器');
+    expect(debut.insert.马光佐.功法).not.toHaveProperty('蒙古摔跤');
+    expect(skill.修炼限制.臂力).toBeLessThanOrEqual(debut.insert.马光佐.初始属性.臂力);
+  });
+
   it('生成门派谱系时遵守层级上限、指定传人与关系排除规则', () => {
     const materialized = materializeCharacterMartialArts([
       event(
