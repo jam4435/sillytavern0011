@@ -286,6 +286,53 @@ describe('wuxia character martial arts audit', () => {
     expect(teenEvent.触发条件.年).toBeGreaterThan(babyEvent.触发条件.年);
   });
 
+  it('同义功法名称整链归一，34 个世界书事件的变量键能精确命中数据库', () => {
+    const manifest = JSON.parse(
+      readFileSync(path.join(process.cwd(), 'plans', '武侠NPC功法名称归一-2026-10-12.json'), 'utf8'),
+    );
+    const database = JSON.parse(
+      readFileSync(path.join(process.cwd(), 'src', '武侠', 'data', '_合并后功法.json'), 'utf8'),
+    );
+    const available = new Set(database.功法.map(art => art.功法名称));
+    const oldNames = new Set(Object.keys(manifest.归一映射));
+    expect(manifest.事件文件).toHaveLength(34);
+    for (const [oldName, canonical] of Object.entries(manifest.归一映射)) {
+      expect(available.has(canonical), `数据库未收录 ${canonical}`).toBe(true);
+      expect(canonicalMartialArtName(oldName)).toBe(canonical);
+    }
+    let normalizedNames = 0;
+    for (const file of manifest.事件文件) {
+      const eventData = parseYaml(
+        readFileSync(path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书', file), 'utf8'),
+      );
+      const walk = value => {
+        if (!value || typeof value !== 'object') return;
+        for (const [key, nested] of Object.entries(value)) {
+          if (key === '功法' && nested && typeof nested === 'object' && !Array.isArray(nested)) {
+            for (const artName of Object.keys(nested)) {
+              expect(oldNames.has(artName), `${file} 仍使用旧功法键 ${artName}`).toBe(false);
+              if (Object.values(manifest.归一映射).includes(artName)) normalizedNames += 1;
+            }
+          }
+          walk(nested);
+        }
+      };
+      for (const operation of ['insert', 'update', 'delete']) walk(eventData[operation]);
+    }
+    expect(normalizedNames).toBeGreaterThanOrEqual(manifest.经审计现存记录);
+  });
+
+  it('审计中不得把不同武学、全套绝技和笼统门派武学强行合并', () => {
+    for (const name of [
+      '太祖长拳', '少林七十二绝技', '少林神功', '少林内功',
+      '慕容氏家传掌法', '桃花岛基础武学', '桃花岛武学',
+      '古墓派武功', '全真教武功', '逆行经脉之法',
+      '丐帮杖法', '降龙二十八掌', '降龙廿八掌',
+    ]) {
+      expect(canonicalMartialArtName(name), name).toBe(name);
+    }
+  });
+
   it('生成门派谱系时遵守层级上限、指定传人与关系排除规则', () => {
     const materialized = materializeCharacterMartialArts([
       event(
