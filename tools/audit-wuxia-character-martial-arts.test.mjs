@@ -503,7 +503,7 @@ describe('wuxia character martial arts audit', () => {
     expect(eventData.事件详情).toContain('内力运掌破冰');
     expect(eventData.insert.虚竹.身份.灵鹫宫尊主).toBeTruthy();
     expect(eventData.insert.虚竹.人物经历['天龙第三十五回07-融汇内力合葬师长接任宫主']).toContain('掌力破冰建穴');
-    expect(eventData.insert.虚竹.update.功法.北冥真气).toBeTruthy();
+    expect(eventData.update.虚竹.功法.北冥真气).toBeTruthy();
     expect(JSON.stringify(eventData)).not.toContain('劈空掌');
     expect(eventData.insert.虚竹.功法?.劈空掌).toBeUndefined();
   });
