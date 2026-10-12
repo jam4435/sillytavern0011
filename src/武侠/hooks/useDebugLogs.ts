@@ -106,7 +106,7 @@ function createEmptyDebugRound(): LatestDebugRound {
       skipReason: '',
       input: '',
       expandedInput: '',
-      output: ''
+      output: '',
       appendedBlocks: '',
       finalMessageText: '',
       appendReadbackText: '',
