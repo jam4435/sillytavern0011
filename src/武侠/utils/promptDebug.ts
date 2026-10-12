@@ -1,3 +1,41 @@
+import _ from 'lodash';
+import { unescapeEraData } from '../../ERA变量框架/utils/data';
+import { removeMetaFields } from '../../ERA变量框架/utils/era_data';
+
+/**
+ * 仅供调试页查看：基于生成时的聊天 stat_data 展开 ERA 宏。
+ * 不改动发送给模型的提示词，也不以回合结算后的变量冒充生成时快照。
+ * 查不到的宏保留原文，便于排查路径错误。
+ */
+export function expandEraMacrosForDebug(prompt: string, statData: Record<string, unknown>): string {
+  if (!/{{\s*ERA(?:-withmeta)?\s*:/i.test(prompt)) return prompt;
+
+  return prompt.replace(/{{\s*ERA(-withmeta)?\s*:\s*([^}]+?)\s*}}/gi, (original, withMeta: string, rawPath: string) => {
+    const path = rawPath.trim();
+    const value = path === '$ALLDATA' ? statData : _.get(statData, path);
+    if (value === undefined) return original;
+
+    const displayValue = unescapeEraData(withMeta ? value : removeMetaFields(value));
+    return displayValue !== null && typeof displayValue === 'object'
+      ? JSON.stringify(displayValue)
+      : String(displayValue);
+  });
+}
+
+export function expandCurrentChatEraMacrosForDebug(prompt: string): string {
+  if (!/{{\s*ERA(?:-withmeta)?\s*:/i.test(prompt)) return prompt;
+  try {
+    const chatVariables = getVariables({ type: 'chat' }) as { stat_data?: unknown };
+    const statData = chatVariables?.stat_data;
+    return statData && typeof statData === 'object' && !Array.isArray(statData)
+      ? expandEraMacrosForDebug(prompt, statData as Record<string, unknown>)
+      : prompt;
+  } catch {
+    // 调试视图不能阻断正文生成；失败时保留宏原文。
+    return prompt;
+  }
+}
+
 type PromptCaptureListener = {
   stop: () => void;
 };
