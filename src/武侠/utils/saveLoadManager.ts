@@ -45,6 +45,71 @@ export { HISTORY_CHECKOUT_COMMIT_EVENT, HISTORY_CHECKOUT_STATE_EVENT, isHistoryC
 
 export type CheckoutActionKind = 'existing_branch' | 'in_place_swipe' | 'fork_branch';
 
+/**
+ * 只用于故障取证，不是恢复 journal，也不参与发送/分叉锁定。
+ * journal 建立前的异常同样必须有可跨 iframe 重载读取的原始诊断。
+ */
+export const WUXIA_HISTORY_CHECKOUT_LAST_FAILURE_KEY = 'wuxia_history_checkout_last_failure_v1';
+
+const HistoryCheckoutFailureDiagnosticSchema = z.object({
+  occurredAt: z.number().finite(),
+  nodeId: z.string(),
+  actionKind: z.enum(['existing_branch', 'in_place_swipe', 'fork_branch']),
+  step: z.string(),
+  journalStage: z.string().nullable(),
+  summary: z.string(),
+  originalError: z.string(),
+  details: z.string(),
+}).strict();
+
+export type HistoryCheckoutFailureDiagnostic = z.infer<typeof HistoryCheckoutFailureDiagnosticSchema>;
+
+export function readLastHistoryCheckoutFailure(): HistoryCheckoutFailureDiagnostic | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(WUXIA_HISTORY_CHECKOUT_LAST_FAILURE_KEY);
+    if (!raw) return null;
+    const parsed = HistoryCheckoutFailureDiagnosticSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLastHistoryCheckoutFailure(failure: HistoryCheckoutFailureDiagnostic): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(WUXIA_HISTORY_CHECKOUT_LAST_FAILURE_KEY, JSON.stringify(failure));
+    }
+  } catch (error) {
+    console.warn('[历史恢复] 保存最近一次错误诊断失败:', error);
+  }
+}
+
+function clearLastHistoryCheckoutFailure(): void {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(WUXIA_HISTORY_CHECKOUT_LAST_FAILURE_KEY);
+  } catch (error) {
+    console.warn('[历史恢复] 清理已完成的错误诊断失败:', error);
+  }
+}
+
+function describeCheckoutOriginalError(error: unknown): string {
+  const parts: string[] = [];
+  let current: unknown = error;
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (!(current instanceof Error)) {
+      parts.push(String(current));
+      break;
+    }
+    parts.push(`${depth === 0 ? '原始异常' : `cause ${depth}`}：${current.name}: ${current.message}`);
+    if (current.stack) parts.push(current.stack);
+    if (current.cause === undefined || current.cause === current) break;
+    current = current.cause;
+  }
+  return parts.join('\n');
+}
+
 export const HistoryLocatorSchema = z
   .object({
     chatId: z.string(),
@@ -1642,18 +1707,23 @@ async function executeCheckout(
 ): Promise<HistoryCheckoutResult> {
   let state: HistoryTreeViewState | null = null;
   let actionKind: CheckoutActionKind = 'fork_branch';
+  let failureStep = '读取目标历史节点';
   try {
     const tree = loadHistoryTree();
     const node = tree.nodes[nodeId];
     if (!node) throw new Error(`历史节点不存在：${nodeId}`);
 
+    failureStep = '识别当前来源聊天';
     const sourceChat = await readCurrentChatIdentity();
     const sourceBranch = tree.branches[branchIdForChat(sourceChat.id)];
     let journal = existingJournal;
     if (!journal) {
+      failureStep = '等待待处理的游戏数据写入';
       await flushPendingGameDataCompletion('before-history-checkout');
+      failureStep = '选择节点切换或创建分支方式';
       const selected = await selectCheckoutAction(tree, node, options.forceBranch === true);
       actionKind = selected.actionKind;
+      failureStep = '读取分支后续输入草稿';
       const draftMessage =
         selected.actionKind === 'fork_branch'
           ? await readHistoryUserMessage(
@@ -1661,6 +1731,7 @@ async function executeCheckout(
               selected.draftUserMessageId,
             )
           : '';
+      failureStep = '创建历史恢复事务记录';
       journal = createHistoryCheckoutJournal({
         targetNodeId: nodeId,
         targetLocator: selected.locator,
@@ -1683,6 +1754,7 @@ async function executeCheckout(
     }
 
     if (actionKind === 'fork_branch' && journal.draftUserMessageId === undefined) {
+      failureStep = '补全旧事务的分支输入草稿';
       const branchSourceLocator = resolveBranchSourceLocator(node, journal);
       const draftUserMessageId = getContinuationDraftUserMessageId(tree, node.id, branchSourceLocator);
       const draftMessage = await readHistoryUserMessage(
@@ -1699,6 +1771,7 @@ async function executeCheckout(
     }
 
     if (journal.stage === 'navigate_source') {
+      failureStep = '切换至历史节点所在聊天';
       if (actionKind === 'fork_branch') {
         const branchSourceLocator = resolveBranchSourceLocator(node, journal);
         await openChat(branchSourceLocator);
@@ -1710,6 +1783,7 @@ async function executeCheckout(
     }
 
     if (journal.stage === 'create_branch') {
+      failureStep = '创建历史分支聊天';
       const branchSourceLocator = resolveBranchSourceLocator(node, journal);
       const current = await readCurrentChatIdentity();
       let branchedChat: HistoryChatIdentity;
@@ -1754,12 +1828,14 @@ async function executeCheckout(
     }
 
     if (journal.stage === 'activate_swipe') {
+      failureStep = '激活历史节点 swipe';
       await openChat(journal.targetLocator);
       await activateSwipe(journal.targetLocator);
       journal = updateHistoryCheckoutJournal({ stage: 'sync_era' }) ?? journal;
     }
 
     if (journal.stage === 'sync_era') {
+      failureStep = 'ERA 完全同步与事件预检查';
       await openChat(journal.targetLocator);
       recordHistoryBranchMkAudit('checkout-before-explicit-full-sync');
       await runFullHistorySync(true);
@@ -1767,6 +1843,7 @@ async function executeCheckout(
     }
 
     if (journal.stage === 'verify') {
+      failureStep = '验证历史节点身份与封存状态';
       state = await scanCurrentChat({
         originNodeId: actionKind === 'fork_branch' ? nodeId : undefined,
       });
@@ -1782,6 +1859,7 @@ async function executeCheckout(
     }
 
     if (!state) {
+      failureStep = '扫描恢复后的聊天节点';
       state = await scanCurrentChat({
         originNodeId: actionKind === 'fork_branch' ? nodeId : undefined,
       });
@@ -1791,15 +1869,18 @@ async function executeCheckout(
       journal.draftUserMessageId !== null &&
       journal.draftUserMessageId !== undefined
     ) {
+      failureStep = '保存分支后续输入草稿';
       writeHistoryCheckoutDraft({
         transactionId: journal.transactionId,
         chatId: state.currentChat.id,
         message: journal.draftMessage ?? '',
       });
     }
+    failureStep = '提交历史恢复事务';
     const resumed = Boolean(existingJournal);
     const postCommitChatName = actionKind === 'fork_branch' ? (journal.postCommitChatName ?? null) : null;
     clearHistoryCheckoutJournal();
+    clearLastHistoryCheckoutFailure();
     notifyHistoryCheckoutCommit(resumed, { postCommitChatName });
     return makeCheckoutResult('commit', actionKind, nodeId, state, null, postCommitChatName);
   } catch (error) {
@@ -1809,8 +1890,10 @@ async function executeCheckout(
     // 状态指纹不一致仍可再次完成全量同步；只有聊天本身不可访问才是不可恢复的断链。
     const broken = Boolean(unavailableChat);
     const journal = readHistoryCheckoutJournal();
-    if (journal) {
-      const trace = journal.verificationTrace;
+    const trace = journal?.verificationTrace;
+    {
+      // 失败也可能发生在 journal 创建前；诊断必须独立于它保存。
+
       // 故障诊断只能尽力读取，不得让二次读取失败遮盖原始 checkout 异常。
       let baselineHash: string | undefined;
       let finalHash = '读取失败';
@@ -1837,14 +1920,17 @@ async function executeCheckout(
         causeHint = '分阶段校验结果一致，请检查更具体的事件差异。';
       }
       const diagnostics = [
-        `恢复事务：${journal.transactionId}`,
+        `恢复事务：${journal?.transactionId ?? '未建立'}`,
         `恢复动作：${actionKind}`,
-        `失败阶段：${journal.stage}`,
+        `失败步骤：${failureStep}`,
+        `事务阶段：${journal?.stage ?? '尚未创建恢复 journal'}`,
         `目标节点：${nodeId}`,
-        `来源聊天：${journal.sourceChatName}（${journal.sourceChatId}）`,
-        `目标聊天：${journal.targetLocator.chatName}（${journal.targetLocator.chatId}）`,
-        `目标楼层：User ${journal.targetLocator.userMessageId ?? '无'} / Assistant ${journal.targetLocator.assistantMessageId} / swipe ${journal.targetLocator.swipeId}`,
+        `来源聊天：${journal?.sourceChatName ?? '未记录'}（${journal?.sourceChatId ?? '未记录'}）`,
+        `目标聊天：${journal?.targetLocator.chatName ?? '未记录'}（${journal?.targetLocator.chatId ?? '未记录'}）`,
+        `目标楼层：User ${journal?.targetLocator.userMessageId ?? '无'} / Assistant ${journal?.targetLocator.assistantMessageId ?? '无'} / swipe ${journal?.targetLocator.swipeId ?? '无'}`,
         `异常信息：${message}`,
+        '底层异常与堆栈：',
+        describeCheckoutOriginalError(error),
         ...(error instanceof HistoryVerificationError && error.diagnostics
           ? ['校验诊断详情：', error.diagnostics]
           : []),
@@ -1859,9 +1945,21 @@ async function executeCheckout(
             ]
           : []),
       ].join('\n');
-      updateHistoryCheckoutJournal({
-        failure: { stage: journal.stage, message: userMessage, occurredAt: Date.now(), details: diagnostics },
-      }, { touch: false });
+      writeLastHistoryCheckoutFailure({
+        occurredAt: Date.now(),
+        nodeId,
+        actionKind: journal?.actionKind ?? actionKind,
+        step: failureStep,
+        journalStage: journal?.stage ?? null,
+        summary: userMessage,
+        originalError: message,
+        details: diagnostics,
+      });
+      if (journal) {
+        updateHistoryCheckoutJournal({
+          failure: { stage: journal.stage, message: userMessage, occurredAt: Date.now(), details: diagnostics },
+        }, { touch: false });
+      }
     }
     const currentChat = unavailableChat ? null : await readCurrentChatIdentity().catch(() => null);
     const branchId = unavailableChat
@@ -2041,6 +2139,7 @@ export async function returnToCheckoutSource(): Promise<HistoryCheckoutResult | 
       state = buildViewState(updatedTree, state.currentChat);
     }
     clearHistoryCheckoutJournal();
+    clearLastHistoryCheckoutFailure();
     notifyHistoryCheckoutCommit(true);
     return makeCheckoutResult(
       'commit',
