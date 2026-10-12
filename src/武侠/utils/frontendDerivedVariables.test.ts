@@ -112,11 +112,13 @@ describe('frontendDerivedVariables', () => {
 
     expect(table).toBe(
       [
-        '少侠|位置:大宋/临安府/牛家村/村西树林|基础:50|轻功:凌波微步=85;水上漂=64|拳掌:降龙十八掌=140;劈空掌=40',
-        '洪七公|位置:大宋/临安府/牛家村/曲三酒馆|基础:44|拳掌:降龙十八掌=125',
+        '少侠|基础:50|轻功:凌波微步=85;水上漂=64|拳掌:降龙十八掌=140;劈空掌=40',
+        '洪七公|基础:44|拳掌:降龙十八掌=125',
       ].join('\n'),
     );
     expect(table).not.toContain('黄蓉');
+    expect(table).not.toContain('位置:');
+    expect(table).not.toContain('大宋/临安府');
   });
 
   it('按严格三级活动区派生重要地点背景，第四级变化不改变命中', () => {
@@ -247,7 +249,7 @@ describe('frontendDerivedVariables', () => {
       },
     });
 
-    expect(table).toBe('少侠|位置:大宋/临安府/牛家村|基础:0|拳掌:劈空掌=18');
+    expect(table).toBe('少侠|基础:0|拳掌:劈空掌=18');
   });
 
   it('玩家战力区会读取聊天分支中的奇经八脉修正', () => {
@@ -278,7 +280,7 @@ describe('frontendDerivedVariables', () => {
       },
     });
 
-    expect(table).toBe('少侠|位置:大宋/临安府/牛家村|基础:0|拳掌:劈空掌=11');
+    expect(table).toBe('少侠|基础:0|拳掌:劈空掌=11');
   });
 
   it('没有具名功法时按结算后战斗属性提供境界基础招式保底', () => {
@@ -302,7 +304,7 @@ describe('frontendDerivedVariables', () => {
       },
     });
 
-    expect(table).toMatch(/^高手\|位置:大宋\/临安府\/牛家村\|基础:[1-9]\d*$/);
+    expect(table).toMatch(/^高手\|基础:[1-9]\d*$/);
     expect(table).not.toContain('无');
   });
 });
