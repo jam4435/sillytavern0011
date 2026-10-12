@@ -410,6 +410,17 @@
         }
       }
 
+      // 先完成已到期人物登场，再结算普通事件经历。
+      // 否则跨时段跳跃时，普通事件会先把不存在的 NPC 插成 $template 空壳。
+      if (debutEventsToComplete.length > 0) {
+        log(`🎭 发现 ${debutEventsToComplete.length} 个登场事件需要直接完成:`, debutEventsToComplete);
+        const committed = await batchCompleteDebutEvents(debutEventsToComplete, eventDefinitions);
+        if (!committed) {
+          // 人物出生数据未落地时不能继续普通事件结算，避免创建不可恢复的空壳。
+          throw new Error(`人物登场事件未确认提交，暂停后续事件结算: ${debutEventsToComplete.join(', ')}`);
+        }
+      }
+
       if (historicalEventsToComplete.length > 0) {
         log(`📚 发现 ${historicalEventsToComplete.length} 个已错过完整时间窗的历史事件，直接补做终态结算:`, historicalEventsToComplete);
         const committed = await batchEndEvents(historicalEventsToComplete, eventDefinitions, {
@@ -509,14 +520,6 @@
         }
       }
 
-      // 批量完成登场事件（直接从未发生 -> 已完成）
-      if (debutEventsToComplete.length > 0) {
-        log(`🎭 发现 ${debutEventsToComplete.length} 个登场事件需要直接完成:`, debutEventsToComplete);
-        const committed = await batchCompleteDebutEvents(debutEventsToComplete, eventDefinitions);
-        if (!committed && options.requireConfirmedSettlement) {
-          throw new Error(`人物登场事件未确认提交: ${debutEventsToComplete.join(', ')}`);
-        }
-      }
       debugGroupEnd();
 
       // ⚠️ 重新读取变量，因为事件状态可能已改变
