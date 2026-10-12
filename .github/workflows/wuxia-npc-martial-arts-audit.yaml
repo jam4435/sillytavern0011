@@ -31,3 +31,17 @@ jobs:
         run: pnpm exec vitest run --configLoader native --pool threads --reporter verbose tools/audit-wuxia-character-martial-arts.test.mjs
       - name: Replay deterministic worldbook events
         run: node scripts/audit-wuxia-character-martial-arts.mjs --output-dir "$RUNNER_TEMP/wuxia-npc-martial-arts-audit"
+      - name: Print refreshed audit statistics
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const file = path.join(process.env.RUNNER_TEMP, 'wuxia-npc-martial-arts-audit', 'NPC功法四类专项审计.json');
+          const report = JSON.parse(fs.readFileSync(file, 'utf8'));
+          console.log(JSON.stringify(report.统计, null, 2));
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wuxia-npc-martial-arts-audit
+          path: ${{ runner.temp }}/wuxia-npc-martial-arts-audit/
+          retention-days: 14
