@@ -12,7 +12,7 @@ import {
 } from '../utils/variableReader';
 import { messageLogger, variableTraceLogger } from '../utils/logger';
 import { regenerateLastAssistantSwipe, type RegenerateRequestOptions } from '../utils/messageActions';
-import { captureNextCombinedPromptForDebug } from '../utils/promptDebug';
+import { captureNextCombinedPromptForDebug, expandCurrentChatEraMacrosForDebug } from '../utils/promptDebug';
 import { syncFrontendDerivedVariables } from '../utils/frontendDerivedVariables';
 import { extractExplicitMapTargetsFromText } from '../utils/locationContext';
 import {
@@ -473,6 +473,7 @@ export function useMessageHandler({
           patchLatestDebugRound({
             variable: createExtraVariableDecisionPatch(decision, {
               input: prompt,
+              expandedInput: expandCurrentChatEraMacrosForDebug(prompt),
               status: 'running',
             }),
           });
@@ -639,7 +640,12 @@ export function useMessageHandler({
 
         const generateStartTime = Date.now();
         const combinedPromptCapture = captureNextCombinedPromptForDebug(prompt => {
-          patchLatestDebugRound({ main: { combinedPrompt: prompt } });
+          patchLatestDebugRound({
+            main: {
+              combinedPrompt: prompt,
+              expandedCombinedPrompt: expandCurrentChatEraMacrosForDebug(prompt),
+            },
+          });
         });
         let result: string | GenerateToolCallResult;
         try {
@@ -1141,7 +1147,12 @@ export function useMessageHandler({
       const result = await regenerateLastAssistantSwipe({
         ...request,
         onCombinedPrompt: prompt => {
-          patchLatestDebugRound({ main: { combinedPrompt: prompt } });
+          patchLatestDebugRound({
+            main: {
+              combinedPrompt: prompt,
+              expandedCombinedPrompt: expandCurrentChatEraMacrosForDebug(prompt),
+            },
+          });
         },
         onTargetAssistantResolved: assistantMessageId => {
           targetAssistantMessageId = assistantMessageId;
@@ -1164,6 +1175,9 @@ export function useMessageHandler({
         main: {
           userInput: result.userInput || '重新生成最新回复',
           combinedPrompt: result.combinedPrompt || result.userInput || '重新生成最新回复',
+          expandedCombinedPrompt: expandCurrentChatEraMacrosForDebug(
+            result.combinedPrompt || result.userInput || '重新生成最新回复',
+          ),
           output: result.rawReply,
           status: 'success',
           finishedAt: Date.now(),
