@@ -84,17 +84,12 @@ function createRegex(
 }
 
 export function buildConversationSummaryRegexes(recentReplies: number): TavernRegex[] {
-  const keepReplies = clampRecentReplies(recentReplies);
-  const recentMaxDepth = keepReplies * 2 - 1;
-  const oldMinDepth = recentMaxDepth + 1;
+  // 角色正则只隐藏显示层的摘要；最终送模压缩由 CHAT_COMPLETION_PROMPT_READY
+  // 根据真实 Assistant 楼层完成，不再用正则深度估算 User/Assistant 配对。
+  void recentReplies;
   const summaryBlock = '/<summary>[\\s\\S]*?<\\/summary>/gi';
-
   return [
     createRegex('wuxia-card-summary-display-hide','武侠卡-隐藏对话摘要显示',summaryBlock,'',{ai_output:true},{display:true},null,null),
-    createRegex('wuxia-card-summary-recent-hide','武侠卡-最近回复正文去摘要',summaryBlock,'',{ai_output:true},{prompt:true},null,recentMaxDepth),
-    createRegex('wuxia-card-summary-old-assistant-keep','武侠卡-旧回复仅保留摘要','/^[\\s\\S]*?(<summary>[\\s\\S]*?<\\/summary>)[\\s\\S]*$/i','$1',{ai_output:true},{prompt:true},oldMinDepth,null),
-    createRegex('wuxia-card-summary-old-assistant-empty','武侠卡-旧回复无摘要则清空','/^(?![\\s\\S]*<summary>)[\\s\\S]*$/i','',{ai_output:true},{prompt:true},oldMinDepth,null),
-    createRegex('wuxia-card-summary-old-user-empty','武侠卡-旧用户输入由摘要承接','/^[\\s\\S]*$/i','',{user_input:true},{prompt:true},oldMinDepth,null),
   ];
 }
 
@@ -346,30 +341,75 @@ function extractSummaryTagContent(text: string, tagValue: string): string {
 }
 
 /**
- * 兼容玩家预设摘要：不负责要求模型生成摘要，只识别玩家填写的 XML 标签并压缩最终 prompt。
- * 最近 N 条 assistant 回复保留正文（去掉重复摘要块）；更早的已摘要回复仅保留摘要，并移除配对 user。
- * 未找到摘要标签的旧回复保持原样，避免因为预设偶发漏摘要而丢失上下文。
+ * card / preset 统一在最终 prompt 压缩上下文；不改写真实聊天楼层。
+ * 根据真实 Assistant 历史计数，而不是每两条消息视为一个回合。
+ * 缺少有效摘要的旧回复必须保留原文，交给补完工作台处理。
  */
-export function filterPresetSummaryContextFromPrompt(
+export function filterConversationSummaryContextFromPrompt(
   chat: SillyTavern.SendingMessage[],
   recentReplies: number,
-  presetTag: string,
+  summaryTag: string,
+  history: PromptHistoryMessage[] = [],
+  promptRefs?: Map<number, SillyTavern.SendingMessage>,
 ): number {
   const keepReplies = clampRecentReplies(recentReplies);
+  const originalIndices = new Map(chat.map((message, index) => [message, index]));
   const assistantIndices = chat
     .map((message, index) => (message.role === 'assistant' ? index : -1))
     .filter(index => index >= 0);
   const recentAssistantIndices = new Set(assistantIndices.slice(-keepReplies));
+  const pairs: Array<{ assistantIndex: number; recent: boolean; userIndex?: number }> = [];
+
+  if (history.length > 0 && promptRefs && promptRefs.size > 0) {
+    const dialogueHistory = history.filter(message => message.role === 'user' || message.role === 'assistant');
+    const assistantHistory = dialogueHistory.filter(message => message.role === 'assistant');
+    const recentIds = new Set(assistantHistory.slice(-keepReplies).map(message => message.message_id));
+
+    for (let index = 0; index < dialogueHistory.length; index += 1) {
+      const entry = dialogueHistory[index];
+      if (entry.role !== 'assistant') continue;
+      const promptMessage = promptRefs.get(entry.message_id);
+      const assistantIndex = promptMessage && originalIndices.get(promptMessage);
+      if (assistantIndex === undefined || chat[assistantIndex].role !== 'assistant') continue;
+
+      let userIndex: number | undefined;
+      for (let previous = index - 1; previous >= 0; previous -= 1) {
+        if (dialogueHistory[previous].role === 'assistant') break;
+        if (dialogueHistory[previous].role !== 'user') continue;
+        const userMessage = promptRefs.get(dialogueHistory[previous].message_id);
+        const matchedUserIndex = userMessage && originalIndices.get(userMessage);
+        if (matchedUserIndex !== undefined && chat[matchedUserIndex].role === 'user') {
+          userIndex = matchedUserIndex;
+        }
+        break;
+      }
+      pairs.push({ assistantIndex, recent: recentIds.has(entry.message_id), userIndex });
+    }
+  } else {
+    // 独立调用无聊天元数据时使用 prompt 内 Assistant 的顺序。
+    for (const assistantIndex of assistantIndices) {
+      let userIndex: number | undefined;
+      for (let previous = assistantIndex - 1; previous >= 0; previous -= 1) {
+        if (chat[previous].role === 'assistant') break;
+        if (chat[previous].role === 'user') {
+          userIndex = previous;
+          break;
+        }
+      }
+      pairs.push({ assistantIndex, recent: recentAssistantIndices.has(assistantIndex), userIndex });
+    }
+  }
+
   const removeUserIndices = new Set<number>();
   let changed = 0;
-
-  for (const index of assistantIndices) {
-    const message = chat[index];
+  for (const pair of pairs) {
+    const message = chat[pair.assistantIndex];
     const text = getSendingMessageText(message);
     if (!text) continue;
 
-    if (recentAssistantIndices.has(index)) {
-      const withoutSummary = removeSummaryTagBlocks(text, presetTag);
+    if (pair.recent) {
+      const withoutSummary = removeSummaryTagBlocks(text, summaryTag);
+      // 摘要是唯一内容时不能把整楼清空。
       if (withoutSummary && withoutSummary !== text) {
         setSendingMessageText(message, withoutSummary);
         changed += 1;
@@ -377,32 +417,19 @@ export function filterPresetSummaryContextFromPrompt(
       continue;
     }
 
-    const summaryBlock = extractSummaryTagBlock(text, presetTag);
+    const summaryBlock = extractSummaryTagBlock(text, summaryTag);
     if (!summaryBlock) continue;
-
     if (text.trim() !== summaryBlock) {
       setSendingMessageText(message, summaryBlock);
       changed += 1;
     }
-
-    for (let previous = index - 1; previous >= 0; previous -= 1) {
-      if (removeUserIndices.has(previous)) continue;
-      if (chat[previous].role === 'user') {
-        removeUserIndices.add(previous);
-        break;
-      }
-      if (chat[previous].role === 'assistant') {
-        break;
-      }
-    }
+    if (pair.userIndex !== undefined) removeUserIndices.add(pair.userIndex);
   }
 
   if (removeUserIndices.size > 0) {
-    const kept = chat.filter((_, index) => !removeUserIndices.has(index));
-    chat.splice(0, chat.length, ...kept);
+    chat.splice(0, chat.length, ...chat.filter((_, index) => !removeUserIndices.has(index)));
     changed += removeUserIndices.size;
   }
-
   return changed;
 }
 
@@ -836,14 +863,16 @@ export function installConversationSummaryPromptFilter(): () => void {
       }
     }
 
-    if (mode === 'preset') {
-      const changed = filterPresetSummaryContextFromPrompt(
+    if (mode === 'card' || mode === 'preset') {
+      const changed = filterConversationSummaryContextFromPrompt(
         eventData.chat,
         settings.summarySettings.conversationSummaryRecentReplies,
-        settings.summarySettings.conversationSummaryPresetTag,
+        summaryTag,
+        coverage.history,
+        initialPromptRefs,
       );
       if (changed > 0) {
-        dataLogger.log(`[conversationSummary] 预设摘要兼容过滤调整了 ${changed} 条最终提示词消息。`);
+        dataLogger.log(`[conversationSummary] ${mode === 'card' ? '卡内' : '预设'}摘要统一压缩调整了 ${changed} 条最终提示词消息。`);
       }
     }
 
