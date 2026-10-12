@@ -41,6 +41,7 @@ import {
   buildMainOutputDebugContent,
   buildVariableInputDebugContent,
   buildVariableOutputDebugContent,
+  type DebugMacroViewMode,
   getDebugStageStatusLabel,
   getVariableApplyStatusLabel,
   shouldShowVariableDebug,
@@ -454,6 +455,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [debugCopyMessage, setDebugCopyMessage] = useState('');
+  const [debugMacroView, setDebugMacroView] = useState<DebugMacroViewMode>('expanded');
   const [openSettingBlocks, setOpenSettingBlocks] = useState(DEFAULT_OPEN_SETTING_BLOCKS);
   const autoAdvanceStopRequestedRef = useRef(false);
 
@@ -1998,12 +2000,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const handleCopyDebugRound = useCallback(async () => {
     if (!latestDebugRound) return;
     try {
-      await copyTextToClipboard(buildDebugRoundCopyText(latestDebugRound));
+      await copyTextToClipboard(buildDebugRoundCopyText(latestDebugRound, debugMacroView));
       setDebugCopyMessage('复制成功');
     } catch (error) {
       setDebugCopyMessage(`复制失败：${getErrorMessage(error)}`);
     }
-  }, [latestDebugRound]);
+  }, [latestDebugRound, debugMacroView]);
 
   const shouldShowVariableDebugSection = shouldShowVariableDebug(latestDebugRound);
   const debugSections = latestDebugRound
@@ -2012,7 +2014,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           id: 'main-input',
           title: '正文输入',
           status: latestDebugRound.main.status,
-          content: buildMainInputDebugContent(latestDebugRound),
+          content: buildMainInputDebugContent(latestDebugRound, debugMacroView),
         },
         {
           id: 'main-output',
@@ -2026,7 +2028,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 id: 'variable-input',
                 title: '额外变量输入',
                 status: latestDebugRound.variable.status,
-                content: buildVariableInputDebugContent(latestDebugRound),
+                content: buildVariableInputDebugContent(latestDebugRound, debugMacroView),
               },
               {
                 id: 'variable-output',
@@ -4005,7 +4007,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         {/* 调试设置 */}
         {activeTab === 'debug' && (
           <div className="settings-section">
-            <p className="settings-description">查看每次发送给 AI 的消息和 AI 回复的内容，帮助调试提示词和检查输出。</p>
+            <p className="settings-description">
+              查看每次发送给 AI 的消息和 AI 回复的内容。ERA 宏默认按生成时的变量快照展开用于调试预览，
+              原始提示词不被修改，展开视图不代表重新发送过提示词。
+            </p>
+            <button
+              type="button"
+              className="settings-action-btn"
+              data-wuxia-automation="debug-era-macro-toggle"
+              onClick={() => setDebugMacroView(mode => mode === 'expanded' ? 'raw' : 'expanded')}
+            >
+              {debugMacroView === 'expanded' ? '显示宏原文' : '显示宏展开值'}
+            </button>
 
             {/* 最新一轮调试记录 */}
             <div className="debug-logs-list">
