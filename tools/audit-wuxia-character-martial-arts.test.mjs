@@ -435,6 +435,53 @@ describe('wuxia character martial arts audit', () => {
     expect(skill.修炼限制.臂力).toBeLessThanOrEqual(debut.insert.马光佐.初始属性.臂力);
   });
 
+
+  it('包不同首次登记提前至天龙第十三回，第三十八回仅变更位置且不重新插入人物', () => {
+    const eventRoot = path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书');
+    const first = parseYaml(readFileSync(path.join(eventRoot, '天龙第十三回00-人物登场.yaml'), 'utf8'));
+    const later = parseYaml(readFileSync(path.join(eventRoot, '天龙第三十八回00-人物登场.yaml'), 'utf8'));
+    const db = JSON.parse(readFileSync(path.join(process.cwd(), 'src', '武侠', 'data', '_合并后功法.json'), 'utf8'));
+    const skillDefs = db.功法.filter(art => art.功法名称 === '掠影截刃手');
+    expect(skillDefs).toHaveLength(1);
+    expect(skillDefs[0].类型).toBe('拳掌');
+    expect(skillDefs[0].功法品阶).toBe('传家');
+    expect(skillDefs[0].来源类型).toBe('合理补全');
+    expect(skillDefs[0].修炼限制.机敏).toBeLessThanOrEqual(first.insert.包不同.初始属性.机敏);
+    expect(first.新登场人物).toContain('包不同');
+    expect(first.insert.包不同.所在位置).toBe('大宋/太湖/听香水榭');
+    expect(first.insert.包不同.功法.掠影截刃手.掌握程度).toBe('融会贯通');
+    expect(first.触发条件.年).toBe(1202);
+    expect(later.触发条件.年).toBe(1205);
+    expect(later.新登场人物).not.toContain('包不同');
+    expect(later.insert?.包不同).toBeUndefined();
+    expect(later.update?.包不同?.所在位置).toBe('西夏/灵州/城郊荒原/荒谷');
+  });
+
+  it('彭长老在射雕登场功法用正式名称摄魂大法，不重复把不同版本名称当独立武学', () => {
+    const root = path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书');
+    const debut = parseYaml(readFileSync(path.join(root, '射雕第二十七回00-人物登场.yaml'), 'utf8'));
+    const artNames = Object.keys(debut.insert.彭长老.功法);
+    const db = JSON.parse(readFileSync(path.join(process.cwd(), 'src', '武侠', 'data', '_合并后功法.json'), 'utf8'));
+    expect(artNames).toContain('摄魂大法');
+    expect(artNames).not.toContain('摄心术');
+    expect(artNames).not.toContain('慑心法');
+    expect(db.功法.filter(art => art.功法名称 === '摄魂大法')).toHaveLength(1);
+    const later = parseYaml(readFileSync(path.join(root, '神雕第三十回03-彭长老摄魂害瘦丐慈恩连杀二人.yaml'), 'utf8'));
+    expect(later.事件详情).toContain('彭长老以摄魂大法');
+  });
+
+  it('第九回美女拳法为杨过实战陆无双报招，不给陆无双错补杨过的武学', () => {
+    const root = path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书');
+    const data = parseYaml(readFileSync(path.join(root, '神雕第九回02-美女拳法退三丐.yaml'), 'utf8'));
+    expect(data.事件概要).toContain('杨过使出古墓派美女拳法');
+    expect(data.事件概要).toContain('陆无双在旁报出拳式招名');
+    expect(data.事件概要).not.toContain('陆无双以美女拳法击退');
+    expect(data.insert?.陆无双?.功法?.美女拳法).toBeUndefined();
+    expect(data.update?.陆无双?.功法?.美女拳法).toBeUndefined();
+    expect(isActiveUseSentence(data.事件概要.split('；')[0], ['陆无双'], '美女拳法')).toBe(false);
+    expect(isActiveUseSentence(data.事件概要.split('；')[0], ['杨过'], '美女拳法')).toBe(true);
+  });
+
   it('生成门派谱系时遵守层级上限、指定传人与关系排除规则', () => {
     const materialized = materializeCharacterMartialArts([
       event(
