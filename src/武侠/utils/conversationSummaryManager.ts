@@ -369,6 +369,7 @@ export function filterConversationSummaryContextFromPrompt(
   summaryTag: string,
   history: PromptHistoryMessage[] = [],
   promptRefs?: Map<number, SillyTavern.SendingMessage>,
+  compactedPromptRefs?: Map<number, SillyTavern.SendingMessage>,
 ): number {
   const keepReplies = clampRecentReplies(recentReplies);
   const originalIndices = new Map<SillyTavern.SendingMessage, number>(chat.map((message, index) => [message, index]));
@@ -376,7 +377,7 @@ export function filterConversationSummaryContextFromPrompt(
     .map((message, index) => (message.role === 'assistant' ? index : -1))
     .filter(index => index >= 0);
   const recentAssistantIndices = new Set(assistantIndices.slice(-keepReplies));
-  const pairs: Array<{ assistantIndex: number; recent: boolean; userIndex?: number }> = [];
+  const pairs: Array<{ assistantIndex: number; recent: boolean; userIndex?: number; messageId?: number }> = [];
 
   if (history.length > 0 && promptRefs && promptRefs.size > 0) {
     const dialogueHistory = history.filter(message => message.role === 'user' || message.role === 'assistant');
@@ -407,7 +408,7 @@ export function filterConversationSummaryContextFromPrompt(
         }
         break;
       }
-      pairs.push({ assistantIndex, recent: recentIds.has(entry.message_id), userIndex });
+      pairs.push({ assistantIndex, recent: recentIds.has(entry.message_id), userIndex, messageId: entry.message_id });
     }
   } else {
     // 独立调用无聊天元数据时使用 prompt 内 Assistant 的顺序。
@@ -425,6 +426,7 @@ export function filterConversationSummaryContextFromPrompt(
   }
 
   const removeUserIndices = new Set<number>();
+  const oldSummaries: Array<{ assistantIndex: number; summary: string; messageId?: number }> = [];
   let changed = 0;
   for (const pair of pairs) {
     const message = chat[pair.assistantIndex];
@@ -441,18 +443,65 @@ export function filterConversationSummaryContextFromPrompt(
       continue;
     }
 
-    const summaryBlock = extractSummaryTagBlock(text, summaryTag);
-    if (!summaryBlock) continue;
-    if (text.trim() !== summaryBlock) {
-      setSendingMessageText(message, summaryBlock);
+    // 只在摘要非空时替代旧楼层；空标签与缺失摘要一律保留原文及 User。
+    const summary = extractSummaryTagContent(text, summaryTag)
+      .replace(/[ \t]*\r?\n[ \t]*/g, ' ')
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim();
+    if (!summary) continue;
+    if (text.trim() !== summary) {
+      setSendingMessageText(message, summary);
       changed += 1;
     }
     if (pair.userIndex !== undefined) removeUserIndices.add(pair.userIndex);
+
+    // 多模态消息与 tool 调用不合并，防止丢掉非文本内容。
+    if (typeof message.content === 'string' && !message.tool_calls && !message.tool_call_id) {
+      oldSummaries.push({ assistantIndex: pair.assistantIndex, summary, messageId: pair.messageId });
+    } else if (pair.messageId !== undefined) {
+      compactedPromptRefs?.set(pair.messageId, message);
+    }
   }
 
-  if (removeUserIndices.size > 0) {
-    chat.splice(0, chat.length, ...chat.filter((_, index) => !removeUserIndices.has(index)));
-    changed += removeUserIndices.size;
+  // 仅跨越确定要删除的配对 User 合并相邻旧摘要。
+  // 夹杂 system/tool、额外 User、没摘要的旧 Assistant 时，必须分组，保持原始消息顺序。
+  const removeAssistantIndices = new Set<number>();
+  const flushGroup = (group: typeof oldSummaries): void => {
+    if (group.length === 0) return;
+    const target = chat[group[0].assistantIndex];
+    if (group.length > 1) {
+      const combined = '---\n' + group.map(item => item.summary).join('\n---\n');
+      setSendingMessageText(target, combined);
+      for (const item of group.slice(1)) removeAssistantIndices.add(item.assistantIndex);
+    }
+    for (const item of group) {
+      if (item.messageId !== undefined) compactedPromptRefs?.set(item.messageId, target);
+    }
+  };
+
+  let group: typeof oldSummaries = [];
+  for (const item of oldSummaries) {
+    const previous = group.at(-1);
+    const canJoin = previous !== undefined
+      && Array.from(
+        { length: item.assistantIndex - previous.assistantIndex - 1 },
+        (_, offset) => previous.assistantIndex + offset + 1,
+      ).every(index => removeUserIndices.has(index));
+    if (!canJoin) {
+      flushGroup(group);
+      group = [];
+    }
+    group.push(item);
+  }
+  flushGroup(group);
+
+  if (removeUserIndices.size > 0 || removeAssistantIndices.size > 0) {
+    chat.splice(
+      0,
+      chat.length,
+      ...chat.filter((_, index) => !removeUserIndices.has(index) && !removeAssistantIndices.has(index)),
+    );
+    changed += removeUserIndices.size + removeAssistantIndices.size;
   }
   return changed;
 }
@@ -685,6 +734,7 @@ function captureConversationSummaryPromptTrace(
   settings: ReturnType<typeof loadSettings>,
   coverage: ArchivedConversationCoverage,
   initialPromptRefs: Map<number, SillyTavern.SendingMessage>,
+  compactedPromptRefs: Map<number, SillyTavern.SendingMessage>,
 ): void {
   const mode = settings.summarySettings.conversationSummaryMode || activeConversationSummaryMode;
   const summaryTag =
@@ -709,6 +759,9 @@ function captureConversationSummaryPromptTrace(
 
       if (chapterCoveredIds.has(message.message_id)) {
         contextState = 'chapter_memory';
+      } else if (compactedPromptRefs.has(message.message_id) && finalPromptMessages.has(compactedPromptRefs.get(message.message_id)!)) {
+        contextState = 'summary_only';
+        contextPreview = summary.slice(0, 260);
       } else if (promptMessage && finalPromptMessages.has(promptMessage) && isMatchingHistoryPromptText(message, promptMessage)) {
         const finalText = getSendingMessageText(promptMessage).trim();
         contextPreview = finalText.slice(0, 260);
@@ -898,6 +951,7 @@ export function installConversationSummaryPromptFilter(): () => void {
       }
     }
 
+    const compactedPromptRefs = new Map<number, SillyTavern.SendingMessage>();
     if (mode === 'card' || mode === 'preset') {
       const changed = filterConversationSummaryContextFromPrompt(
         eventData.chat,
@@ -905,6 +959,7 @@ export function installConversationSummaryPromptFilter(): () => void {
         summaryTag,
         coverage.history,
         initialPromptRefs,
+        compactedPromptRefs,
       );
       if (changed > 0) {
         dataLogger.log(`[conversationSummary] ${mode === 'card' ? '卡内' : '预设'}摘要统一压缩调整了 ${changed} 条最终提示词消息。`);
@@ -914,7 +969,7 @@ export function installConversationSummaryPromptFilter(): () => void {
     // 延后到本轮同步 CHAT_COMPLETION_PROMPT_READY 监听器全部执行后再取快照，
     // 尽量反映真正提交给模型前的最终上下文，而不是只看本监听器刚处理完的中间态。
     queueMicrotask(() => {
-      captureConversationSummaryPromptTrace(eventData.chat, settings, coverage, initialPromptRefs);
+      captureConversationSummaryPromptTrace(eventData.chat, settings, coverage, initialPromptRefs, compactedPromptRefs);
     });
   });
   return () => subscription.stop();
