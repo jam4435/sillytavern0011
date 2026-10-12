@@ -38,6 +38,23 @@ function createDebugRound(): LatestDebugRound {
 }
 
 describe('debugRoundView', () => {
+  it('默认显示生成阶段宏展开快照，原始文本保留可切换且复制遵循选择', () => {
+    const round = createDebugRound();
+    round.main.combinedPrompt = '战力：{{ERA:前端变量.战力区}}';
+    round.main.expandedCombinedPrompt = '战力：风波恶|基础:42';
+    round.variable.input = '人物：{{ERA:角色数据.风波恶.境界}}';
+    round.variable.expandedInput = '人物：二流-中期';
+
+    expect(buildMainInputDebugContent(round)).toContain('战力：风波恶|基础:42');
+    expect(buildMainInputDebugContent(round)).not.toContain('{{ERA:');
+    expect(buildMainInputDebugContent(round, 'raw')).toContain('{{ERA:前端变量.战力区}}');
+    expect(buildVariableInputDebugContent(round)).toBe('人物：二流-中期');
+    expect(buildVariableInputDebugContent(round, 'raw')).toContain('{{ERA:角色数据.风波恶.境界}}');
+    expect(buildDebugRoundCopyText(round)).toContain('战力：风波恶|基础:42');
+    expect(buildDebugRoundCopyText(round, 'raw')).toContain('{{ERA:前端变量.战力区}}');
+  });
+
+
   it('一键复制使用四个标题分隔并保留完整输入输出', () => {
     const debugRound = createDebugRound();
     debugRound.variable = {
