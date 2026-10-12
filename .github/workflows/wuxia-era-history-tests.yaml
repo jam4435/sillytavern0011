@@ -22,6 +22,7 @@ on:
       - 'src/事件脚本/era-logging.test.ts'
       - 'src/事件脚本/era-lifecycle.test.ts'
       - 'src/武侠/utils/saveLoadManager*'
+      - 'src/武侠/components/SaveLoadPanel*'
       - 'src/武侠/utils/variableReader.ts'
       - 'src/武侠/utils/variableReader.test.ts'
       - 'src/武侠/utils/historyEventSnapshot.ts'
@@ -61,6 +62,7 @@ jobs:
           src/ERA变量框架/utils/log.test.ts
           src/事件脚本/era-logging.test.ts
           src/武侠/utils/saveLoadManager.test.ts
+          src/武侠/components/SaveLoadPanel.test.tsx
           src/武侠/utils/logger.test.ts
           src/武侠/utils/eraWriteWait.test.ts
           src/事件脚本/era-lifecycle.test.ts
