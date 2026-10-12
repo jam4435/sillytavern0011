@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { parse as parseYaml } from 'yaml';
 
 import {
   canonicalCharacterName,
@@ -255,6 +258,32 @@ describe('wuxia character martial arts audit', () => {
     expect(isActiveUseSentence('甲以剑势逼退丙、乙以测试掌法击败丁', ['甲'], '测试掌法')).toBe(false);
     expect(isActiveUseSentence('甲以测试掌法击退丙、乙以测试剑法迎战丁', ['甲'], '测试掌法')).toBe(true);
     expect(isActiveUseSentence('甲以测试掌法击退丙、乙以测试剑法迎战丁', ['甲'], '测试剑法')).toBe(false);
+  });
+
+  it('已确认的七条原著功法均落在正确人物及成年时间线，且名称能命中数据库', () => {
+    const eventRoot = path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书');
+    const database = JSON.parse(readFileSync(path.join(process.cwd(), 'src', '武侠', 'data', '_合并后功法.json'), 'utf8'));
+    const names = new Set(database.功法.map(item => item.功法名称));
+    const expected = [
+      ['射雕第七回00-人物登场.yaml', '穆念慈', '逍遥游'],
+      ['天龙第十九回00-人物登场.yaml', '萧远山', '无相劫指'],
+      ['天龙第十九回00-人物登场.yaml', '萧远山', '般若掌'],
+      ['神雕第二十三回05-杨过谎言劝退武氏兄弟.yaml', '武敦儒', '越女剑法'],
+      ['神雕第二十三回05-杨过谎言劝退武氏兄弟.yaml', '武修文', '越女剑法'],
+      ['神雕第三十三回01-风陵渡安渡老店三姊弟投店围炉夜话.yaml', '郭芙', '越女剑法'],
+      ['神雕第三十三回01-风陵渡安渡老店三姊弟投店围炉夜话.yaml', '郭襄', '越女剑法'],
+    ];
+    for (const [file, person, martialArt] of expected) {
+      const data = parseYaml(readFileSync(path.join(eventRoot, file), 'utf8'));
+      expect(data.insert?.[person]?.功法?.[martialArt], `${file}:${person}:${martialArt}`).toBeTruthy();
+      expect(names.has(martialArt)).toBe(true);
+    }
+    const babyEvent = parseYaml(readFileSync(path.join(eventRoot, '神雕第二十二回00-人物登场.yaml'), 'utf8'));
+    expect(babyEvent.insert.郭襄.功法?.越女剑法).toBeUndefined();
+    const teenEvent = parseYaml(
+      readFileSync(path.join(eventRoot, '神雕第三十三回01-风陵渡安渡老店三姊弟投店围炉夜话.yaml'), 'utf8'),
+    );
+    expect(teenEvent.触发条件.年).toBeGreaterThan(babyEvent.触发条件.年);
   });
 
   it('生成门派谱系时遵守层级上限、指定传人与关系排除规则', () => {
