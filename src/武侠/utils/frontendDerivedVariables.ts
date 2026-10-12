@@ -397,9 +397,8 @@ function buildCharacterPowerRow(character: CombatCharacter): string {
   });
 
   const basicTechniquePower = calculateBasicTechniquePower(character.realm, combatAttributes);
-  return [character.displayName, `位置:${character.normalizedLocation}`, `基础:${basicTechniquePower}`, ...cells].join(
-    '|',
-  );
+  // 地点仅用于在 buildCombatPowerZoneFromStatData 中筛选 NPC，不写入战力区送模文本。
+  return [character.displayName, `基础:${basicTechniquePower}`, ...cells].join('|');
 }
 
 function calculateEffectiveCultivationBonus(character: CombatCharacter): number {
