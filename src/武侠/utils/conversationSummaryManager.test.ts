@@ -345,6 +345,35 @@ describe('conversationSummaryManager', () => {
     expect(chat[1].content).toBe('不可丢弃的旧正文<summary> \\n  </summary>');
   });
 
+  it('removes every consecutive historical user message covered by one old assistant summary', () => {
+    const chat: SillyTavern.SendingMessage[] = [
+      { role: 'system', content: '规则文本必须保留' },
+      { role: 'user', content: '我们继续深入' },
+      { role: 'user', content: '继续深入古洞' },
+      { role: 'user', content: '再向前走' },
+      { role: 'assistant', content: '旧正文<summary>玩家与段誉继续深入，发现了白玉雕像。</summary>' },
+      { role: 'user', content: '当前输入' },
+      { role: 'assistant', content: '当前正文<summary>近期摘要</summary>' },
+    ];
+    const history = [
+      { message_id: 10, role: 'user' as const, message: '我们继续深入' },
+      { message_id: 11, role: 'user' as const, message: '继续深入古洞' },
+      { message_id: 12, role: 'user' as const, message: '再向前走' },
+      { message_id: 13, role: 'assistant' as const, message: '旧正文<summary>玩家与段誉继续深入，发现了白玉雕像。</summary>' },
+      { message_id: 14, role: 'user' as const, message: '当前输入' },
+      { message_id: 15, role: 'assistant' as const, message: '当前正文<summary>近期摘要</summary>' },
+    ];
+    const refs = new Map<number, SillyTavern.SendingMessage>();
+    history.forEach((message, index) => refs.set(message.message_id, chat[index + 1]));
+    expect(filterConversationSummaryContextFromPrompt(chat, 1, 'summary', history, refs)).toBe(5);
+    expect(chat).toEqual([
+      { role: 'system', content: '规则文本必须保留' },
+      { role: 'assistant', content: '玩家与段誉继续深入，发现了白玉雕像。' },
+      { role: 'user', content: '当前输入' },
+      { role: 'assistant', content: '当前正文' },
+    ]);
+  });
+
   it('does not merge tool or rich-content assistants with nearby archived summaries', () => {
     const chat: SillyTavern.SendingMessage[] = [
       { role: 'user', content: '用户1' },
