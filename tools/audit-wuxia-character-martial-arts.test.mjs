@@ -389,6 +389,18 @@ describe('wuxia character martial arts audit', () => {
     expect(rodEvent.insert.潇湘子.重要物品.毒烟哭丧棒).toContain('兵器装置');
   });
 
+  it('黄蓉于君山大会首次明确施展移魂大法，保留九阴真经及学习阶段', () => {
+    const root = path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书');
+    const eventData = parseYaml(readFileSync(path.join(root, '射雕第二十八回01-黄蓉智夺帮主位.yaml'), 'utf8'));
+    const database = JSON.parse(readFileSync(path.join(process.cwd(), 'src', '武侠', 'data', '_合并后功法.json'), 'utf8'));
+    expect(eventData.update.黄蓉.功法.九阴真经).toBeTruthy();
+    const skill = eventData.update.黄蓉.功法.移魂大法;
+    expect(skill.掌握程度).toMatch(/^初窥门径/);
+    expect(skill.掌握程度).toContain('君山大会');
+    expect(database.功法.some(item => item.功法名称 === '移魂大法')).toBe(true);
+    expect(eventData.事件详情).toContain('移魂大法');
+  });
+
   it('薛慕华只在阿朱疗伤之后获得白世镜传授的七招，不提前入登场功法', () => {
     const root = path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书');
     const intro = parseYaml(readFileSync(path.join(root, '天龙第十八回00-人物登场.yaml'), 'utf8'));
