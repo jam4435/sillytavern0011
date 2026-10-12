@@ -49,14 +49,20 @@ describe('conversationSummaryManager', () => {
       refs.set(i * 2, assistant);
     }
 
-    expect(filterConversationSummaryContextFromPrompt(chat, 5, 'summary', history, refs)).toBe(11);
+    const compacted = new Map<number, SillyTavern.SendingMessage>();
+    expect(filterConversationSummaryContextFromPrompt(chat, 5, 'summary', history, refs, compacted)).toBe(13);
     expect(chat[0].content).toBe('世界书中的 <summary> 不得改动');
     expect(chat[2].content).toBe('few-shot 助手示例 <summary>示例摘要</summary>');
+    const compactHistory = chat.find(message =>
+      message.role === 'assistant' && String(message.content).startsWith('---\n摘要1'),
+    );
+    expect(compactHistory?.content).toBe('---\n摘要1\n---\n摘要2\n---\n摘要3');
     for (let i = 1; i <= 3; i += 1) {
       expect(chat.some(message => message.content === '用户' + i)).toBe(false);
-      expect(chat.some(message => message.content === '<summary>摘要' + i + '</summary>')).toBe(true);
       expect(chat.some(message => String(message.content).includes('第' + i + '轮原始正文'))).toBe(false);
+      expect(compacted.get(i * 2)).toBe(compactHistory);
     }
+    expect(chat.filter(message => message.role === 'assistant')).toHaveLength(7);
     for (let i = 4; i <= 8; i += 1) {
       expect(chat.some(message => message.content === '用户' + i)).toBe(true);
       expect(chat.some(message => message.content === '第' + i + '轮原始正文')).toBe(true);
@@ -292,12 +298,74 @@ describe('conversationSummaryManager', () => {
     expect(filterConversationSummaryContextFromPrompt(chat, 1, '<memory>')).toBe(5);
     expect(chat).toEqual([
       { role: 'system', content: '设定' },
-      { role: 'assistant', content: '<memory>旧摘要1</memory>' },
+      { role: 'assistant', content: '旧摘要1' },
       { role: 'system', content: '深度世界书' },
-      { role: 'assistant', content: '<memory>旧摘要2</memory>' },
+      { role: 'assistant', content: '旧摘要2' },
       { role: 'user', content: '当前用户' },
       { role: 'assistant', content: '当前正文' },
     ]);
+  });
+
+  it('does not merge summaries across uncompressed history or a system prompt', () => {
+    const chat = [
+      { role: 'user' as const, content: '用户1' },
+      { role: 'assistant' as const, content: '正文1<summary>摘要1</summary>' },
+      { role: 'user' as const, content: '用户2' },
+      { role: 'assistant' as const, content: '正文2<summary>摘要2</summary>' },
+      { role: 'system' as const, content: '重要的世界书提示词' },
+      { role: 'user' as const, content: '用户3' },
+      { role: 'assistant' as const, content: '正文3<summary>摘要3</summary>' },
+      { role: 'user' as const, content: '未摘要输入' },
+      { role: 'assistant' as const, content: '旧正文没有小总结' },
+      { role: 'user' as const, content: '用户5' },
+      { role: 'assistant' as const, content: '最近正文<summary>最近摘要</summary>' },
+    ];
+
+    filterConversationSummaryContextFromPrompt(chat, 1, 'summary');
+    expect(chat).toEqual([
+      { role: 'assistant', content: '---\n摘要1\n---\n摘要2' },
+      { role: 'system', content: '重要的世界书提示词' },
+      { role: 'assistant', content: '摘要3' },
+      { role: 'user', content: '未摘要输入' },
+      { role: 'assistant', content: '旧正文没有小总结' },
+      { role: 'user', content: '用户5' },
+      { role: 'assistant', content: '最近正文' },
+    ]);
+  });
+
+  it('treats an empty summary as missing instead of discarding the corresponding user', () => {
+    const chat = [
+      { role: 'user' as const, content: '不可丢弃的旧输入' },
+      { role: 'assistant' as const, content: '不可丢弃的旧正文<summary> \\n  </summary>' },
+      { role: 'user' as const, content: '当前输入' },
+      { role: 'assistant' as const, content: '当前正文<summary>当前摘要</summary>' },
+    ];
+    filterConversationSummaryContextFromPrompt(chat, 1, 'summary');
+    expect(chat[0].content).toBe('不可丢弃的旧输入');
+    expect(chat[1].content).toBe('不可丢弃的旧正文<summary> \\n  </summary>');
+  });
+
+  it('does not merge tool or rich-content assistants with nearby archived summaries', () => {
+    const chat: SillyTavern.SendingMessage[] = [
+      { role: 'user', content: '用户1' },
+      { role: 'assistant', content: '正文1<summary>摘要1</summary>' },
+      { role: 'user', content: '用户2' },
+      {
+        role: 'assistant',
+        content: [{ type: 'text', text: '正文2<summary>摘要2</summary>' }],
+        tool_calls: [{ id: 'call', type: 'function', function: { name: 'x', arguments: '{}' } }],
+      },
+      { role: 'user', content: '用户3' },
+      { role: 'assistant', content: '正文3<summary>摘要3</summary>' },
+      { role: 'user', content: '用户4' },
+      { role: 'assistant', content: '正文4<summary>摘要4</summary>' },
+    ];
+    filterConversationSummaryContextFromPrompt(chat, 1, 'summary');
+    expect(chat.filter(message => message.role === 'assistant')).toHaveLength(4);
+    expect(chat[0].content).toBe('摘要1');
+    expect(chat[1].content).toEqual([{ type: 'text', text: '摘要2' }]);
+    expect(chat[2].content).toBe('摘要3');
+    expect(chat[4].content).toBe('正文4');
   });
 
   it('does not delete an old preset round when that assistant reply has no configured summary tag', () => {
