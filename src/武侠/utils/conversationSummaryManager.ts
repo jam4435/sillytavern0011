@@ -377,7 +377,7 @@ export function filterConversationSummaryContextFromPrompt(
     .map((message, index) => (message.role === 'assistant' ? index : -1))
     .filter(index => index >= 0);
   const recentAssistantIndices = new Set(assistantIndices.slice(-keepReplies));
-  const pairs: Array<{ assistantIndex: number; recent: boolean; userIndex?: number; messageId?: number }> = [];
+  const pairs: Array<{ assistantIndex: number; recent: boolean; userIndices: number[]; messageId?: number }> = [];
 
   if (history.length > 0 && promptRefs && promptRefs.size > 0) {
     const dialogueHistory = history.filter(message => message.role === 'user' || message.role === 'assistant');
@@ -392,7 +392,9 @@ export function filterConversationSummaryContextFromPrompt(
       const assistantIndex = originalIndices.get(promptMessage);
       if (assistantIndex === undefined || chat[assistantIndex].role !== 'assistant') continue;
 
-      let userIndex: number | undefined;
+      const userIndices: number[] = [];
+      // 一次回复可能对应连续多条 User（例如玩家连续发送“继续深入”）。
+      // 仅移除能和真实历史成功对齐的 User；遇到前一条 Assistant 即停止。
       for (let previous = index - 1; previous >= 0; previous -= 1) {
         if (dialogueHistory[previous].role === 'assistant') break;
         if (dialogueHistory[previous].role !== 'user') continue;
@@ -404,24 +406,20 @@ export function filterConversationSummaryContextFromPrompt(
           && userMessage
           && isMatchingHistoryPromptText(dialogueHistory[previous], userMessage)
         ) {
-          userIndex = matchedUserIndex;
+          userIndices.push(matchedUserIndex);
         }
-        break;
       }
-      pairs.push({ assistantIndex, recent: recentIds.has(entry.message_id), userIndex, messageId: entry.message_id });
+      pairs.push({ assistantIndex, recent: recentIds.has(entry.message_id), userIndices, messageId: entry.message_id });
     }
   } else {
     // 独立调用无聊天元数据时使用 prompt 内 Assistant 的顺序。
     for (const assistantIndex of assistantIndices) {
-      let userIndex: number | undefined;
+      const userIndices: number[] = [];
       for (let previous = assistantIndex - 1; previous >= 0; previous -= 1) {
         if (chat[previous].role === 'assistant') break;
-        if (chat[previous].role === 'user') {
-          userIndex = previous;
-          break;
-        }
+        if (chat[previous].role === 'user') userIndices.push(previous);
       }
-      pairs.push({ assistantIndex, recent: recentAssistantIndices.has(assistantIndex), userIndex });
+      pairs.push({ assistantIndex, recent: recentAssistantIndices.has(assistantIndex), userIndices });
     }
   }
 
@@ -453,7 +451,7 @@ export function filterConversationSummaryContextFromPrompt(
       setSendingMessageText(message, summary);
       changed += 1;
     }
-    if (pair.userIndex !== undefined) removeUserIndices.add(pair.userIndex);
+    pair.userIndices.forEach(index => removeUserIndices.add(index));
 
     // 多模态消息与 tool 调用不合并，防止丢掉非文本内容。
     if (typeof message.content === 'string' && !message.tool_calls && !message.tool_call_id) {
