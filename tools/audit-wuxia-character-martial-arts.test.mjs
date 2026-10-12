@@ -209,6 +209,54 @@ describe('wuxia character martial arts audit', () => {
     expect(report.合理没有武功.some(item => item.人物 === '段誉')).toBe(true);
   });
 
+  it('只统计当前功法名称异常、保留历史名称问题并检查已有功法人物的漏项', () => {
+    const materialized = materializeCharacterMartialArts([
+      event(
+        '测试第一回00-人物登场',
+        1,
+        {
+          insert: {
+            甲: {
+              境界: '一流-初期',
+              身份: { 剑客: '江湖剑客' },
+              功法: {
+                落英神剑掌: { 掌握程度: '略有小成' },
+                旧称掌法: { 掌握程度: '初窥门径' },
+              },
+            },
+          },
+        },
+        'debut',
+      ),
+      event('测试第一回01-删除旧称', 2, {
+        delete: { 甲: { 功法: { 旧称掌法: {} } } },
+      }),
+      event('测试第一回02-施展另一功法', 3, {
+        事件详情: '甲施展测试剑法击退恶徒。',
+        参与人物: ['甲'],
+      }),
+    ]);
+    const database = {
+      功法: [
+        { 功法名称: '落英神剑掌法', 功法描述: '一门掌法' },
+        { 功法名称: '测试剑法', 功法描述: '一门剑法' },
+      ],
+    };
+    const report = createFourCategoryMartialArtsAuditDocument(materialized, database);
+    expect(report.功法名称不一致.map(item => item.原始功法名称)).toContain('落英神剑掌');
+    expect(report.功法名称不一致.map(item => item.原始功法名称)).not.toContain('旧称掌法');
+    expect(report.历史功法名称不一致.map(item => item.原始功法名称)).toContain('旧称掌法');
+    const missing = report.真正漏掉的代表武学.find(item => item.人物 === '甲');
+    expect(missing?.代表武学证据.map(item => item.功法)).toContain('测试剑法');
+    expect(missing?.当前已掌握战斗功法).toContain('落英神剑掌法');
+  });
+
+  it('多人动作中不能把后一个角色的招式误归给前一个角色', () => {
+    expect(isActiveUseSentence('甲以剑势逼退丙、乙以测试掌法击败丁', ['甲'], '测试掌法')).toBe(false);
+    expect(isActiveUseSentence('甲以测试掌法击退丙、乙以测试剑法迎战丁', ['甲'], '测试掌法')).toBe(true);
+    expect(isActiveUseSentence('甲以测试掌法击退丙、乙以测试剑法迎战丁', ['甲'], '测试剑法')).toBe(false);
+  });
+
   it('生成门派谱系时遵守层级上限、指定传人与关系排除规则', () => {
     const materialized = materializeCharacterMartialArts([
       event(
