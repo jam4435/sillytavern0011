@@ -7,7 +7,7 @@ import {
   filterArchivedSummariesFromPrompt,
   filterEraBaseContextFromPrompt,
   filterHistoricalBackfillTurnsFromPrompt,
-  filterPresetSummaryContextFromPrompt,
+  filterConversationSummaryContextFromPrompt,
   filterSelectedPresetModulesFromPrompt,
   syncConversationSummaryRegexes,
 } from './conversationSummaryManager';
@@ -19,16 +19,74 @@ describe('conversationSummaryManager', () => {
     vi.restoreAllMocks();
   });
 
-  it('keeps five recent assistant replies full and reduces older context to summaries', () => {
-    const rules=buildConversationSummaryRegexes(5);
-    expect(rules.find(r=>r.id==='wuxia-card-summary-recent-hide')?.max_depth).toBe(9);
-    expect(rules.find(r=>r.id==='wuxia-card-summary-old-assistant-keep')?.min_depth).toBe(10);
-    expect(rules.find(r=>r.id==='wuxia-card-summary-old-user-empty')?.min_depth).toBe(10);
+  it('only installs the card display regex; prompt compression no longer depends on message depth', () => {
+    const rules = buildConversationSummaryRegexes(5);
+    expect(rules).toHaveLength(1);
+    expect(rules[0].id).toBe('wuxia-card-summary-display-hide');
+    expect(rules[0].destination).toEqual({ display: true, prompt: false });
+    expect(rules[0].min_depth).toBeNull();
+    expect(rules[0].max_depth).toBeNull();
+    expect(buildConversationSummaryRegexes(1)).toEqual(buildConversationSummaryRegexes(20));
   });
 
-  it('clamps the recent reply count', () => {
-    expect(buildConversationSummaryRegexes(0).find(r=>r.id==='wuxia-card-summary-recent-hide')?.max_depth).toBe(1);
-    expect(buildConversationSummaryRegexes(999).find(r=>r.id==='wuxia-card-summary-recent-hide')?.max_depth).toBe(39);
+  it('counts the five most recent real assistant floors across mixed system/user messages', () => {
+    const history: Array<{ message_id: number; role: 'user' | 'assistant'; message: string }> = [];
+    const chat: SillyTavern.SendingMessage[] = [
+      { role: 'system', content: '世界书中的 <summary> 不得改动' },
+      { role: 'user', content: 'few-shot 用户' },
+      { role: 'assistant', content: 'few-shot 助手示例 <summary>示例摘要</summary>' },
+    ];
+    const refs = new Map<number, SillyTavern.SendingMessage>();
+    for (let i = 1; i <= 8; i += 1) {
+      const user = { role: 'user' as const, content: '用户' + i };
+      const assistant = { role: 'assistant' as const, content: '第' + i + '轮原始正文\n<summary>摘要' + i + '</summary>' };
+      history.push({ message_id: i * 2 - 1, role: 'user', message: user.content });
+      history.push({ message_id: i * 2, role: 'assistant', message: assistant.content });
+      chat.push(user);
+      if (i === 4) chat.push({ role: 'system', content: '夹在 user/assistant 之间的系统消息' });
+      chat.push(assistant);
+      refs.set(i * 2 - 1, user);
+      refs.set(i * 2, assistant);
+    }
+
+    expect(filterConversationSummaryContextFromPrompt(chat, 5, 'summary', history, refs)).toBe(11);
+    expect(chat[0].content).toBe('世界书中的 <summary> 不得改动');
+    expect(chat[2].content).toBe('few-shot 助手示例 <summary>示例摘要</summary>');
+    for (let i = 1; i <= 3; i += 1) {
+      expect(chat.some(message => message.content === '用户' + i)).toBe(false);
+      expect(chat.some(message => message.content === '<summary>摘要' + i + '</summary>')).toBe(true);
+      expect(chat.some(message => String(message.content).includes('第' + i + '轮原始正文'))).toBe(false);
+    }
+    for (let i = 4; i <= 8; i += 1) {
+      expect(chat.some(message => message.content === '用户' + i)).toBe(true);
+      expect(chat.some(message => message.content === '第' + i + '轮原始正文')).toBe(true);
+    }
+    expect(chat.some(message => message.content === '夹在 user/assistant 之间的系统消息')).toBe(true);
+  });
+
+  it('retains older full replies and paired user if no valid summary exists', () => {
+    const chat = [
+      { role: 'user' as const, content: '旧用户' },
+      { role: 'assistant' as const, content: '旧正文没有摘要' },
+      { role: 'user' as const, content: '近期用户' },
+      { role: 'assistant' as const, content: '近期正文\n<memory>近期摘要</memory>' },
+    ];
+    expect(filterConversationSummaryContextFromPrompt(chat, 1, 'memory')).toBe(1);
+    expect(chat).toEqual([
+      { role: 'user', content: '旧用户' },
+      { role: 'assistant', content: '旧正文没有摘要' },
+      { role: 'user', content: '近期用户' },
+      { role: 'assistant', content: '近期正文' },
+    ]);
+  });
+
+  it('keeps an assistant which contains only summary instead of blanking its content', () => {
+    const chat = [
+      { role: 'user' as const, content: '输入' },
+      { role: 'assistant' as const, content: '<summary>仅有摘要</summary>' },
+    ];
+    expect(filterConversationSummaryContextFromPrompt(chat, 5, 'summary')).toBe(0);
+    expect(chat[1].content).toBe('<summary>仅有摘要</summary>');
   });
 
   it('does not rewrite character regexes when card rules are already identical', async () => {
@@ -203,7 +261,7 @@ describe('conversationSummaryManager', () => {
       { role: 'assistant' as const, content: '当前正文\n<memory>当前摘要</memory>' },
     ];
 
-    expect(filterPresetSummaryContextFromPrompt(chat, 1, '<memory>')).toBe(5);
+    expect(filterConversationSummaryContextFromPrompt(chat, 1, '<memory>')).toBe(5);
     expect(chat).toEqual([
       { role: 'system', content: '设定' },
       { role: 'assistant', content: '<memory>旧摘要1</memory>' },
@@ -222,7 +280,7 @@ describe('conversationSummaryManager', () => {
       { role: 'assistant' as const, content: '当前正文<memory>当前摘要</memory>' },
     ];
 
-    filterPresetSummaryContextFromPrompt(chat, 1, 'memory');
+    filterConversationSummaryContextFromPrompt(chat, 1, 'memory');
     expect(chat[0]).toEqual({ role: 'user', content: '旧用户' });
     expect(chat[1]).toEqual({ role: 'assistant', content: '预设本轮漏掉了摘要标签' });
     expect(chat.at(-1)).toEqual({ role: 'assistant', content: '当前正文' });
