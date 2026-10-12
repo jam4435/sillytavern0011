@@ -12221,14 +12221,14 @@
       "discoveryHour": 10408527.5,
       "location": "西域/天山/缥缈峰/冰崖",
       "intro": "风雪呼啸如咽，绝顶冰崖上一片死寂，两位一代宗师凄然长逝，唯余森寒冻气弥漫四周。",
-      "summary": "虚竹盘膝运起逍遥派心法，将体内无崖子、童姥与李秋水三大宗师二百余年浩瀚真气熔铸贯通，神功修为登峰造极。调息毕，虚竹以劈空掌凿开幽深玄冰穴，合十诵经将二位长辈合葬冰封，随后抚指环遵遗命接任灵鹫宫宫主，担起门派重托。",
+      "summary": "虚竹盘膝运起逍遥派心法，将体内无崖子、童姥与李秋水三大宗师二百余年浩瀚真气熔铸贯通，神功修为登峰造极。调息毕，虚竹运雄浑内力震开坚冰，凿出幽深玄冰墓穴，合十诵经将二位长辈合葬冰封，随后抚指环遵遗命接任灵鹫宫宫主，担起门派重托。",
       "participants": [
         "虚竹"
       ],
       "followups": {
         "天龙第三十五回08-虚竹施六阳掌化符收服万仙": "虚竹在冰崖料理完两位尊长合葬身后事，戴定七宝指环正式接掌灵鹫宫，决意循遗命下崖前往缥缈峰处置群雄聚啸之局。"
       },
-      "hash": "6e529da8f260f68f51a0910a430cb628b144f5f8bc30c4697d0308d24c68e8ef",
+      "hash": "672c477fdee2fbc497e14d087aade2c5de484cac89718a82cd191b38724fb41d",
       "shardId": "shard-0007"
     },
     {
@@ -28319,7 +28319,7 @@
       "intro": null,
       "summary": null,
       "participants": [],
-      "hash": "762084ac22a74e85d0a1daf81937954d8dea2af6aed1cadc2e91be037555746e",
+      "hash": "0429e5017ad27005a09866f1be5fb65f77ecd6d99dd5431c2b3815bf104d1e21",
       "shardId": "shard-0014"
     },
     {
@@ -32372,7 +32372,7 @@
         "耶律燕",
         "陆无双"
       ],
-      "hash": "d8ec7de9d0893af0b9beb0522dc42a1811df57a30431aaabc90a22b0c6a00a40",
+      "hash": "fedbebcfb76d692ab060ece621e7288cdbe73b10111a1141855e3e71610348f1",
       "shardId": "shard-0016"
     },
     {
@@ -45684,7 +45684,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "天龙第三十五回06-大笑悲叹二宗同归于尽冰崖",
       "lastRuntimeKey": "天龙第四十一回03-萧远山自述潜伏复仇揭杀戮真相",
-      "byteLength": 148379
+      "byteLength": 148382
     },
     {
       "id": "shard-0008",
@@ -45740,7 +45740,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "射雕第三十五回03-黄蓉舍身救柯镇恶",
       "lastRuntimeKey": "神雕第一回01-南湖采莲遇武三通",
-      "byteLength": 129953
+      "byteLength": 130078
     },
     {
       "id": "shard-0015",
@@ -45756,7 +45756,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "神雕第五回06-小龙女为孙婆婆复仇斗郝丘",
       "lastRuntimeKey": "神雕第九回07-龙驹寨耶律家夜遇刺客",
-      "byteLength": 202848
+      "byteLength": 202917
     },
     {
       "id": "shard-0017",
@@ -60102,5 +60102,5 @@
     ]
   },
   "unresolvedReferences": [],
-  "contentHash": "f2985ed85af195125503bf0a794ec87fb511cf6c0c3a75f3d4a41c0fb95bfd75"
+  "contentHash": "943d3de10bb4ff8c6e826ac257b73211bf17cbe5269d0cba903d8a4215420788"
 }
