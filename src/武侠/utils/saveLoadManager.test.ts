@@ -13,12 +13,14 @@ import type { HistoryLocator, WuxiaHistoryTreeV2 } from '../types';
 import {
   WUXIA_HISTORY_TREE_V2_KEY,
   WUXIA_HISTORY_TREE_UPDATED_EVENT,
+  WUXIA_HISTORY_CHECKOUT_LAST_FAILURE_KEY,
   WuxiaHistoryTreeV2Schema,
   checkoutNode,
   configureHistoryEraSyncTiming,
   finalizeCurrentTurn,
   getCheckoutRecoveryState,
   loadHistoryTree,
+  readLastHistoryCheckoutFailure,
   migrateHistoryChatIdentity,
   renameNode,
   retryCheckoutRecovery,
@@ -652,6 +654,36 @@ describe('history tree v2 scanning', () => {
 });
 
 describe('history checkout', () => {
+  it('journal 创建前失败仍保存原始异常与失败步骤，不创建恢复锁；下一次成功后清理诊断', async () => {
+    currentChat().messages = [{ message_id: 0, role: 'assistant', message: '原始节点' }];
+    const scanned = await scanCurrentChat();
+    vi.mocked(SillyTavern.getCurrentChatId).mockImplementation(() => {
+      throw new Error('测试：读取当前聊天身份失败');
+    });
+
+    const failed = await checkoutNode(scanned.currentNodeId!);
+
+    expect(failed.status).toBe('recovery_failed');
+    expect(failed.error).toBe('历史恢复未完成，请重试或返回原聊天。');
+    expect(readHistoryCheckoutJournal()).toBeNull();
+    const diagnostic = readLastHistoryCheckoutFailure();
+    expect(diagnostic).toEqual(expect.objectContaining({
+      nodeId: scanned.currentNodeId,
+      step: '识别当前来源聊天',
+      journalStage: null,
+      originalError: '测试：读取当前聊天身份失败',
+    }));
+    expect(diagnostic?.details).toContain('尚未创建恢复 journal');
+    expect(diagnostic?.details).toContain('Error: 测试：读取当前聊天身份失败');
+    expect(localStorage.getItem(WUXIA_HISTORY_CHECKOUT_LAST_FAILURE_KEY)).not.toBeNull();
+
+    vi.mocked(SillyTavern.getCurrentChatId).mockImplementation(() => currentChatId);
+    const recovered = await checkoutNode(scanned.currentNodeId!);
+    expect(recovered.status).toBe('commit');
+    expect(readLastHistoryCheckoutFailure()).toBeNull();
+    expect(readHistoryCheckoutJournal()).toBeNull();
+  });
+
   it('回到第6楼前的节点时恢复六组封存事件，不继承第12楼的 direct 状态', async () => {
     const oldState = {
       事件系统: { 未发生事件: { '第三回01': { 年: 1202, 时: 10 } } },
@@ -1071,6 +1103,14 @@ describe('history checkout', () => {
     expect(details).toContain('实际活动叶节点：');
     expect(details).toContain('首个不同节点序号：');
     expect(details).toContain('失败于历史节点身份匹配');
+    expect(details).toContain('失败步骤：验证历史节点身份与封存状态');
+    expect(details).toContain('底层异常与堆栈：');
+    expect(readLastHistoryCheckoutFailure()).toEqual(expect.objectContaining({
+      nodeId: target.id,
+      step: '验证历史节点身份与封存状态',
+      journalStage: 'verify',
+      originalError: '切换后的活动叶节点不是目标节点。',
+    }));
     expect(details).not.toContain('缺少分阶段诊断');
   });
 
@@ -1271,6 +1311,7 @@ describe('history checkout', () => {
     expect(result.status).toBe('recovery_failed');
     expect(result.error).toContain('不能叠加创建另一条分叉');
     expect(readHistoryCheckoutJournal()?.targetNodeId).toBe(source.id);
+    expect(readLastHistoryCheckoutFailure()).toBeNull();
     expect(triggerSlashMock.mock.calls.some(([command]) => String(command).startsWith('/branch-create'))).toBe(false);
   });
 
