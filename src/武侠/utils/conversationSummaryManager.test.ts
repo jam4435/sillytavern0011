@@ -64,6 +64,34 @@ describe('conversationSummaryManager', () => {
     expect(chat.some(message => message.content === '夹在 user/assistant 之间的系统消息')).toBe(true);
   });
 
+  it('does not mistake an injected few-shot assistant for a real history floor', () => {
+    const fakeAssistant = { role: 'assistant' as const, content: '独立的示例回答<summary>示例摘要</summary>' };
+    const actualAssistant = { role: 'assistant' as const, content: '实际最近正文\n<summary>实际最近摘要</summary>' };
+    const chat = [
+      { role: 'user' as const, content: '示例输入' },
+      fakeAssistant,
+      { role: 'user' as const, content: '当前输入' },
+      actualAssistant,
+    ];
+    const history = [
+      { message_id: 1, role: 'user' as const, message: '较旧输入' },
+      { message_id: 2, role: 'assistant' as const, message: '较旧正文\n<summary>较旧摘要</summary>' },
+      { message_id: 3, role: 'user' as const, message: '当前输入' },
+      { message_id: 4, role: 'assistant' as const, message: actualAssistant.content },
+    ];
+    const refs = new Map<number, SillyTavern.SendingMessage>([
+      [1, chat[0]],
+      [2, fakeAssistant],
+      [3, chat[2]],
+      [4, actualAssistant],
+    ]);
+
+    expect(filterConversationSummaryContextFromPrompt(chat, 1, 'summary', history, refs)).toBe(1);
+    expect(chat[0].content).toBe('示例输入');
+    expect(fakeAssistant.content).toBe('独立的示例回答<summary>示例摘要</summary>');
+    expect(actualAssistant.content).toBe('实际最近正文');
+  });
+
   it('retains older full replies and paired user if no valid summary exists', () => {
     const chat = [
       { role: 'user' as const, content: '旧用户' },
@@ -131,7 +159,7 @@ describe('conversationSummaryManager', () => {
 
   it('rewrites character regexes exactly once when card rules actually differ', async () => {
     const current = buildConversationSummaryRegexes(5);
-    current[1] = { ...current[1], max_depth: 7 };
+    current[0] = { ...current[0], destination: { display: false, prompt: true } };
 
     vi.stubGlobal('getTavernRegexes', vi.fn(() => current));
     const update = vi.fn(async (updater: (regexes: TavernRegex[]) => TavernRegex[]) => updater(current));
