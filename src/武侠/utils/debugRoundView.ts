@@ -1,4 +1,5 @@
 import type { DebugVariableApplyStatus, ExtendedDebugStageStatus, LatestDebugRound } from '../hooks/useDebugLogs';
+import { getLatestConversationSummaryPromptTrace } from './conversationSummaryManager';
 
 export type DebugMacroViewMode = 'expanded' | 'raw';
 
@@ -144,6 +145,22 @@ export function buildMainInputDebugContent(debugRound: LatestDebugRound, macroVi
 
   sections.push('【最终送模提示词】');
   sections.push(combinedPrompt || '(未捕获到最终送模提示词)');
+
+  // 与最终提示词本体分开，标明这是最近一次 CHAT_COMPLETION_PROMPT_READY 的诊断快照。
+  const summaryTrace = getLatestConversationSummaryPromptTrace();
+  if (summaryTrace && summaryTrace.mode !== 'off' && combinedPrompt) {
+    sections.push('', '【最近一次摘要压缩诊断】');
+    sections.push('摘要模式：' + (summaryTrace.mode === 'card' ? '卡内摘要' : '兼容预设'));
+    sections.push('设置保留最近 Assistant 正文：' + summaryTrace.recentReplies + ' 条');
+    sections.push('实际进入最终上下文的完整 Assistant 正文：' + summaryTrace.fullReplyCount + ' 条');
+    sections.push('仅发送小总结的 Assistant：' + summaryTrace.summaryOnlyCount + ' 条');
+    if (summaryTrace.olderFullReplyMessageIds.length > 0) {
+      sections.push(
+        '仍发送旧楼层完整正文：' + summaryTrace.olderFullReplyMessageIds.length + ' 条（楼层 '
+        + summaryTrace.olderFullReplyMessageIds.join('、') + '；请检查对应小总结是否缺失）',
+      );
+    }
+  }
 
   if (debugRound.main.error) {
     sections.push(`\n【错误】\n${debugRound.main.error}`);
