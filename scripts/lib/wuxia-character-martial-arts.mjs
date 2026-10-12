@@ -767,7 +767,8 @@ function splitEvidenceText(event) {
 
 export function isActiveUseSentence(sentence, aliases, artName) {
   const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const art = escapeRegExp(artName);
+  // Some event prose says “古墓派美女拳法” although the exact database key is “美女拳法”.
+  const art = `(?:古墓派)?${escapeRegExp(artName)}`;
   const actionVerbs = /施展|使出|使开|使动|运起|运使|催动|用出|使起|施起|利用|以|用/g;
   for (const alias of aliases) {
     // Descriptive aliases, e.g. "书生", do not identify a unique actor.
