@@ -768,37 +768,42 @@ function splitEvidenceText(event) {
 export function isActiveUseSentence(sentence, aliases, artName) {
   const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const art = escapeRegExp(artName);
-  return aliases.some(alias => {
+  const actionVerbs = /施展|使出|使开|使动|运起|运使|催动|用出|使起|施起|利用|以|用/g;
+  for (const alias of aliases) {
+    // Descriptive aliases, e.g. "书生", do not identify a unique actor.
+    if (!alias || GENERIC_CHARACTER_ALIASES.has(alias)) continue;
     const actor = escapeRegExp(alias);
     const attributedUse = new RegExp(`${art}[^，,。！？；;—]{0,10}(?:由|乃是|是)${actor}(?:所使|所施|施展|使出)`);
     if (attributedUse.test(sentence)) return true;
-
     let actorIndex = sentence.indexOf(alias);
     while (actorIndex >= 0) {
-      const afterActor = sentence.slice(actorIndex + alias.length, actorIndex + alias.length + 48);
-      for (const verbMatch of afterActor.matchAll(/使出|施展|使开|使动|运起|运使|催动|用出|使起|施起|改用|以|用/g)) {
-        const beforeVerb = afterActor.slice(0, verbMatch.index);
-        if (beforeVerb.length > 20 || /[、，,。！？；;—]|被|遭|受|中了|说|问|要|令|让|教|传|换|求|命|劝/.test(beforeVerb))
+      const prefix = sentence.slice(Math.max(0, actorIndex - 24), actorIndex).split(/[，,。！？；;—：:]/).at(-1);
+      const tail = sentence.slice(actorIndex + alias.length).split(/[，,。！？；;—：:]/)[0];
+      // A joint subject does not prove that every named actor learned a technique.
+      if (/[与和及跟同]$/.test(prefix) || /^[与和及跟同][\u3400-\u9fff]{2,8}(?:联袂|一同|共同|齐齐|合力|并肩)/.test(tail)) {
+        actorIndex = sentence.indexOf(alias, actorIndex + alias.length);
+        continue;
+      }
+      for (const verbMatch of tail.matchAll(actionVerbs)) {
+        const beforeVerb = tail.slice(0, verbMatch.index);
+        // Reporting/perception and changed subjects are not proof of use.
+        if (beforeVerb.length > 20 || /[、，,。！？；;—]|被|遭|受|中了|说|问|要|令|让|教|传|换|求|命|劝|知|闻|听|见|望|想|省起|提醒|发现|以为|记起|回忆/.test(beforeVerb))
           continue;
-        const afterVerb = afterActor.slice(verbMatch.index + verbMatch[0].length);
-        const artIndex = afterVerb.indexOf(artName);
-        if (artIndex < 0 || artIndex > 16) continue;
-        const between = afterVerb.slice(0, artIndex);
-        if (/[、，,。！？；;—]/.test(between)) continue;
-        if (
-          /[一-龥]{2,10}(?:身法|步法|轻功|剑法|刀法|杖法|鞭法|掌法|拳法|指法|功|法|掌|拳|剑|刀|杖|鞭|指|手|阵)/.test(
-            between,
-          )
-        )
-          continue;
-        return true;
+        if (verbMatch[0] === '用' && /改$/.test(beforeVerb)) continue;
+        const afterVerb = tail.slice(verbMatch.index + verbMatch[0].length);
+        // Taking a hit from an art is not using it; broad "某经武功" is ambiguous.
+        const start = verbMatch[0] === '以' || verbMatch[0] === '用'
+          ? new RegExp(`^(?:[“‘《])?${art}(?!武功|功夫)`)
+          : verbMatch[0] === '利用'
+            ? new RegExp(`^(?:《[^》]{2,16}》中的[“‘]?|[“‘]?)${art}(?!武功|功夫)`)
+            : new RegExp(`^(?:了|着|一招|一式|一记|[“‘《]){0,2}${art}(?!武功|功夫)`);
+        if (start.test(afterVerb)) return true;
       }
       actorIndex = sentence.indexOf(alias, actorIndex + alias.length);
     }
-    return false;
-  });
+  }
+  return false;
 }
-
 function extractActionPhrases(sentence, aliases) {
   if (!aliases.some(alias => sentence.includes(alias))) return [];
   const phrases = [];
