@@ -525,13 +525,20 @@ describe('SettingsPanel 调试复制', () => {
       id: 'copy-latest',
       startedAt: 1,
       updatedAt: 1,
-      main: { status: 'success', userInput: '师父好', combinedPrompt: '正文送模提示词', output: '师父颔首' },
+      main: {
+        status: 'success',
+        userInput: '师父好',
+        combinedPrompt: '正文送模提示词 {{ERA:前端变量.战力区}}',
+        expandedCombinedPrompt: '正文送模提示词 风波恶|基础:42',
+        output: '师父颔首',
+      },
       variable: {
         status: 'success',
         trigger: 'send',
         modeSnapshot: 'extra',
         skipReason: '',
-        input: '变量送模提示词',
+        input: '变量送模提示词 {{ERA:角色数据.风波恶.境界}}',
+        expandedInput: '变量送模提示词 二流-中期',
         output: '<VariableThink>无变化</VariableThink>',
         appendedBlocks: '',
         finalMessageText: '',
@@ -565,11 +572,20 @@ describe('SettingsPanel 调试复制', () => {
       expect(writeText).toHaveBeenCalledTimes(1);
       const copied = writeText.mock.calls[0][0] as string;
       expect(copied).toContain('---\n正文输入\n---');
-      expect(copied).toContain('正文送模提示词');
+      expect(copied).toContain('正文送模提示词 风波恶|基础:42');
+      expect(copied).not.toContain('{{ERA:');
       expect(copied).toContain('---\n正文输出\n---\n师父颔首');
-      expect(copied).toContain('---\n变量输入\n---\n变量送模提示词');
+      expect(copied).toContain('---\n变量输入\n---\n变量送模提示词 二流-中期');
       expect(copied).toContain('---\n变量输出\n---');
       expect(copied).toContain('<VariableThink>无变化</VariableThink>');
+
+      fireEvent.click(screen.getByRole('button', { name: '显示宏原文' }));
+      fireEvent.click(copyButton);
+      expect(writeText).toHaveBeenCalledTimes(2);
+      const rawCopied = writeText.mock.calls[1][0] as string;
+      expect(rawCopied).toContain('{{ERA:前端变量.战力区}}');
+      expect(rawCopied).toContain('{{ERA:角色数据.风波恶.境界}}');
+      expect(screen.getByRole('button', { name: '显示宏展开值' })).toBeInTheDocument();
     } finally {
       if (clipboardDescriptor) {
         Object.defineProperty(navigator, 'clipboard', clipboardDescriptor);
