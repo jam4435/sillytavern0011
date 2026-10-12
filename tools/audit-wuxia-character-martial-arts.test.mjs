@@ -482,6 +482,47 @@ describe('wuxia character martial arts audit', () => {
     expect(isActiveUseSentence(data.事件概要.split('；')[0], ['杨过'], '美女拳法')).toBe(true);
   });
 
+  it('李莫愁小擒拿手原著实证，登场功法精确命中且第九回能追溯施展', () => {
+    const root = path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书');
+    const debut = parseYaml(readFileSync(path.join(root, '神雕第一回00-人物登场.yaml'), 'utf8'));
+    const useEvent = parseYaml(readFileSync(path.join(root, '神雕第九回05-逆行经脉夺拂尘逃逸.yaml'), 'utf8'));
+    const db = JSON.parse(readFileSync(path.join(process.cwd(), 'src', '武侠', 'data', '_合并后功法.json'), 'utf8'));
+    const arts = db.功法.filter(art => art.功法名称 === '小擒拿手');
+    expect(arts).toHaveLength(1);
+    expect(arts[0].功法描述).toContain('李莫愁');
+    expect(debut.insert.李莫愁.功法.小擒拿手.掌握程度).toMatch(/^融会贯通/);
+    expect(debut.触发条件.年).toBeLessThan(useEvent.触发条件.年);
+    expect(useEvent.事件详情).toContain('李莫愁不敢过分逼近只施展小擒拿手夺回拂尘');
+    expect(isActiveUseSentence('李莫愁不敢过分逼近只施展小擒拿手夺回拂尘', ['李莫愁'], '小擒拿手')).toBe(true);
+  });
+
+  it('虚竹的隔空掌力不应误记为特定劈空掌，全套正式绝技仍保留', () => {
+    const root = path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书');
+    const eventData = parseYaml(readFileSync(path.join(root, '天龙第三十五回07-融汇内力合葬师长接任宫主.yaml'), 'utf8'));
+    expect(eventData.事件概要).toContain('内力震开坚冰');
+    expect(eventData.事件详情).toContain('内力运掌破冰');
+    expect(eventData.insert.虚竹.身份.灵鹫宫尊主).toBeTruthy();
+    expect(eventData.insert.虚竹.人物经历['天龙第三十五回07-融汇内力合葬师长接任宫主']).toContain('掌力破冰建穴');
+    expect(eventData.insert.虚竹.update.功法.北冥真气).toBeTruthy();
+    expect(JSON.stringify(eventData)).not.toContain('劈空掌');
+    expect(eventData.insert.虚竹.功法?.劈空掌).toBeUndefined();
+  });
+
+  it('耶律燕使用普通空手夺白刃手法，不证明习得全真派同名专门武学', () => {
+    const root = path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书');
+    const debut = parseYaml(readFileSync(path.join(root, '神雕第九回00-人物登场.yaml'), 'utf8'));
+    const encounter = parseYaml(readFileSync(path.join(root, '神雕第九回07-龙驹寨耶律家夜遇刺客.yaml'), 'utf8'));
+    const db = JSON.parse(readFileSync(path.join(process.cwd(), 'src', '武侠', 'data', '_合并后功法.json'), 'utf8'));
+    const skill = db.功法.find(item => item.功法名称 === '空手夺白刃');
+    expect(skill.功法描述).toContain('全真派');
+    expect(debut.insert.耶律燕.功法.空手夺白刃).toBeUndefined();
+    expect(encounter.事件详情).toContain('左手以空手夺白刃手法去抢她刀子');
+    const narration = '耶律燕右手出掌劈向刺客脸颊，左手以空手夺白刃手法去抢她刀子';
+    expect(isActiveUseSentence(narration, ['耶律燕'], '空手夺白刃')).toBe(false);
+    expect(isActiveUseSentence('耶律燕施展“空手夺白刃”制敌', ['耶律燕'], '空手夺白刃')).toBe(true);
+    expect(encounter.update.耶律燕.状态).toContain('刺客');
+  });
+
   it('生成门派谱系时遵守层级上限、指定传人与关系排除规则', () => {
     const materialized = materializeCharacterMartialArts([
       event(
