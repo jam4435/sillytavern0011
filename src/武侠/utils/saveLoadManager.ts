@@ -1891,9 +1891,8 @@ async function executeCheckout(
     const broken = Boolean(unavailableChat);
     const journal = readHistoryCheckoutJournal();
     const trace = journal?.verificationTrace;
+    // 失败也可能发生在 journal 创建前；诊断必须独立于它保存。
     {
-      // 失败也可能发生在 journal 创建前；诊断必须独立于它保存。
-
       // 故障诊断只能尽力读取，不得让二次读取失败遮盖原始 checkout 异常。
       let baselineHash: string | undefined;
       let finalHash = '读取失败';
@@ -1906,6 +1905,8 @@ async function executeCheckout(
       let causeHint: string;
       if (error instanceof HistoryVerificationError && message.includes('活动叶节点不是目标节点')) {
         causeHint = '失败于历史节点身份匹配，尚未进入事件封存指纹校验；应优先核对目标/实际节点的父链、MK 与 swipe，不应直接判断为事件变量漂移。';
+      } else if (!journal) {
+        causeHint = '失败发生在恢复事务创建之前；请根据失败步骤和底层异常排查。尚未开始变更历史聊天。';
       } else if (!trace) {
         causeHint = '缺少分阶段诊断：请重试恢复，以记录 ERA 同步与事件脚本检查各自的结果。';
       } else if (!baselineHash) {
@@ -2161,12 +2162,32 @@ export async function returnToCheckoutSource(): Promise<HistoryCheckoutResult | 
       chatName: failedChat.chatName,
       originNodeId: journal.sourceHeadNodeId || null,
     });
+    const returnFailureDetails = [
+      '返回来源聊天失败',
+      `事务：${journal.transactionId}`,
+      `来源：${journal.sourceChatName}（${journal.sourceChatId}）`,
+      `目标：${journal.targetLocator.chatName}（${journal.targetLocator.chatId}）`,
+      `当前阶段：${journal.stage}`,
+      `异常：${message}`,
+      '底层异常与堆栈：',
+      describeCheckoutOriginalError(error),
+    ].join('\n');
+    writeLastHistoryCheckoutFailure({
+      occurredAt: Date.now(),
+      nodeId: journal.targetNodeId,
+      actionKind: journal.actionKind ?? 'existing_branch',
+      step: '返回来源聊天并同步 ERA',
+      journalStage: journal.stage,
+      summary: message,
+      originalError: message,
+      details: returnFailureDetails,
+    });
     updateHistoryCheckoutJournal({
       failure: {
         stage: journal.stage,
         message,
         occurredAt: Date.now(),
-        details: `返回来源聊天失败\n事务：${journal.transactionId}\n来源：${journal.sourceChatName}（${journal.sourceChatId}）\n目标：${journal.targetLocator.chatName}（${journal.targetLocator.chatId}）\n异常：${message}`,
+        details: returnFailureDetails,
       },
     }, { touch: false });
     notifyHistoryCheckoutFailure();
