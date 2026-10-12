@@ -587,6 +587,7 @@ export function createFourCategoryMartialArtsAuditDocument(materialized, martial
   const completion = createCompletionCandidatesDocument(materialized, martialArtsDatabase, metadata);
   const databaseNames = new Set((martialArtsDatabase.功法 || []).map(item => item.功法名称));
   const nameMismatches = [];
+  const historicalNameMismatches = [];
   const nonMartialItems = [];
   const reasonableEmpty = [];
   const missingRepresentativeArts = [];
@@ -623,12 +624,13 @@ export function createFourCategoryMartialArtsAuditDocument(materialized, martial
       const source = compactChangeSources(artRecord);
       for (const rawName of artRecord.源功法名) {
         const match = strictNameMatch(rawName, databaseNames);
+        const rawNameStillExists = Object.hasOwn(character.当前原始功法变量 || {}, rawName);
         const item = {
           人物: character.角色,
           原始人物键: character.原始角色键,
           原始功法名称: rawName,
           审计归并名称: artRecord.功法,
-          当前存在: artRecord.当前存在,
+          当前存在: rawNameStillExists,
           ...match,
           事件来源: source.filter(change => change.原始功法名称 === rawName),
           判断依据: match.数据库精确命中
@@ -648,18 +650,21 @@ export function createFourCategoryMartialArtsAuditDocument(materialized, martial
             置信度: '确定',
           });
         } else if (!match.数据库精确命中) {
-          nameMismatches.push({ ...item, 问题类别: '功法名称不一致' });
+          if (rawNameStillExists) nameMismatches.push({ ...item, 问题类别: '功法名称不一致' });
+          else historicalNameMismatches.push({ ...item, 问题类别: '历史功法名称不一致' });
         }
       }
     }
 
-    if (character.功法记录.some(record => record.当前存在)) continue;
+    const hasCurrentMartialArt = character.功法记录.some(record => record.当前存在);
     const directCandidate = completion.候选角色.find(item => item.角色 === character.角色);
     const directSuggestions = (directCandidate?.建议功法 || []).filter(
       suggestion =>
         !suggestion.是否原创 &&
         suggestion.置信度?.等级 === '高' &&
-        suggestion.来源类型 === '世界书明示功法',
+        suggestion.来源类型 === '世界书明示功法' &&
+        suggestion.功法库状态 === '精确命中' &&
+        suggestion.依据?.some(item => item.类型 === '事件明示施展'),
     );
     if (directSuggestions.length > 0) {
       missingRepresentativeArts.push({
@@ -668,11 +673,14 @@ export function createFourCategoryMartialArtsAuditDocument(materialized, martial
         原始人物键: character.原始角色键,
         当前境界: character.人物信息.境界,
         当前身份: character.人物信息.身份,
+        当前已掌握战斗功法: character.功法记录.filter(record => record.当前存在).map(record => record.功法),
         代表武学证据: directSuggestions,
-        判断依据: '人物当前没有战斗功法，且世界书事件明确记载其主动施展该功法；不使用功法描述、境界、门派或兵器的推测。',
+        判断依据: '世界书事件存在疑似该人物主动施展、且数据库收录的武学；即使人物已有其他功法也需核查遗漏。事件动词归属仍须人工核对，不自动回写。',
         置信度: '高',
         需要人工审核: true,
       });
+    } else if (hasCurrentMartialArt) {
+      continue;
     } else if (REASONABLE_EMPTY_CHARACTER_RULES.has(character.角色)) {
       reasonableEmpty.push({
         问题类别: '合理没有武功',
@@ -708,19 +716,20 @@ export function createFourCategoryMartialArtsAuditDocument(materialized, martial
   }
 
   const sortByPerson = (left, right) => left.人物.localeCompare(right.人物, 'zh-CN') || left.原始功法名称?.localeCompare(right.原始功法名称 || '', 'zh-CN');
-  for (const items of [nameMismatches, nonMartialItems, reasonableEmpty, missingRepresentativeArts, manualReview]) items.sort(sortByPerson);
+  for (const items of [nameMismatches, historicalNameMismatches, nonMartialItems, reasonableEmpty, missingRepresentativeArts, manualReview]) items.sort(sortByPerson);
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     生成信息: {
       ...total.生成信息,
       审计范围: '仅重放具有唯一确定生效时间的世界书事件；条件事件不代表所有玩家分支状态。',
       严格匹配口径: '数据库精确命中只比较原始功法变量键与正式功法名称。审计别名仅作人工审核候选，绝不视为运行时命中。',
-      缺漏口径: '只将世界书主动施展或功法库明确人物归属的高置信非原创证据列为真正漏掉的代表武学。',
+      缺漏口径: '从所有人物（含已有功法者）识别高置信世界书主动施展候选；人物动作归属需人工复核，原著/功法库人物提及另行核对。',
     },
     统计: {
       NPC总数: total.统计.角色数,
       真正漏掉的代表武学: missingRepresentativeArts.length,
       功法名称不一致: nameMismatches.length,
+      历史功法名称不一致: historicalNameMismatches.length,
       合理没有武功: reasonableEmpty.length,
       非武学项目混入: nonMartialItems.length,
       需人工审核的空功法人物: manualReview.length,
@@ -735,6 +744,7 @@ export function createFourCategoryMartialArtsAuditDocument(materialized, martial
     })),
     真正漏掉的代表武学: missingRepresentativeArts,
     功法名称不一致: nameMismatches,
+    历史功法名称不一致: historicalNameMismatches,
     合理没有武功: reasonableEmpty,
     非武学项目混入: nonMartialItems,
     尚不能确定的人工审核项目: manualReview,
@@ -777,13 +787,13 @@ export function isActiveUseSentence(sentence, aliases, artName) {
       const afterActor = sentence.slice(actorIndex + alias.length, actorIndex + alias.length + 48);
       for (const verbMatch of afterActor.matchAll(/使出|施展|使开|使动|运起|运使|催动|用出|使起|施起|改用|以|用/g)) {
         const beforeVerb = afterActor.slice(0, verbMatch.index);
-        if (beforeVerb.length > 20 || /[，,。！？；;—]|被|遭|受|中了|说|问|要|令|让|教|传|换|求|命|劝/.test(beforeVerb))
+        if (beforeVerb.length > 20 || /[、，,。！？；;—]|被|遭|受|中了|说|问|要|令|让|教|传|换|求|命|劝/.test(beforeVerb))
           continue;
         const afterVerb = afterActor.slice(verbMatch.index + verbMatch[0].length);
         const artIndex = afterVerb.indexOf(artName);
         if (artIndex < 0 || artIndex > 16) continue;
         const between = afterVerb.slice(0, artIndex);
-        if (/[，,。！？；;—]/.test(between)) continue;
+        if (/[、，,。！？；;—]/.test(between)) continue;
         if (
           /[一-龥]{2,10}(?:身法|步法|轻功|剑法|刀法|杖法|鞭法|掌法|拳法|指法|功|法|掌|拳|剑|刀|杖|鞭|指|手|阵)/.test(
             between,
