@@ -1344,8 +1344,9 @@ describe('ERA 主线初始化控制', () => {
     vars.stat_data.后续事件线索计数.新线索 = 3;
     await find(tavern_events.MESSAGE_SENT)({});
     await find('wuxia:turn-completed')({ messageId: 97, roundId: 'old-97', chatId: 'test-chat' });
+    // 测试写入 mock 会原地改动传入的计数字典，所以这里只核对资格集合和新线索。
     expect(queue.buildFollowupCounterPlan).toHaveBeenCalledWith(
-      { 旧线索: 3, 新线索: 3 }, new Set(['旧线索']),
+      expect.objectContaining({ 新线索: 3 }), new Set(['旧线索']),
     );
     expect(vars.stat_data.后续事件线索计数).toEqual({ 旧线索: 2, 新线索: 3 });
     expect(writer.writeEraTransaction).toHaveBeenCalledTimes(1);
