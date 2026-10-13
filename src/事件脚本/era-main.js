@@ -1213,11 +1213,25 @@
         logWarning(`已有回合 ${activeTurnBarrier.roundId} 持有事件写入屏障，忽略并发回合 ${roundId} 的屏障请求`);
         return;
       }
+      const turnChatId = typeof detail?.chatId === 'string' ? detail.chatId : '';
+      const currentChatId = String(SillyTavern?.getCurrentChatId?.() ?? '');
+      if (turnChatId && currentChatId && turnChatId !== currentChatId) {
+        logWarning(`忽略旧聊天的回合启动: roundId=${roundId}, chatId=${turnChatId}`);
+        return;
+      }
       activeTurnBarrier = {
         roundId,
-        chatId: typeof detail?.chatId === 'string' ? detail.chatId : '',
+        chatId: turnChatId,
         startedAt: Date.now(),
       };
+      // 在 User 楼层创建前冻结已有线索；同楼事件结算新建的线索不在本轮扣减。
+      try {
+        const startVariables = getVariables({ type: 'chat' });
+        pendingTurnCounterKeys = new Set(Object.keys(startVariables?.stat_data?.后续事件线索计数 || {}));
+      } catch (error) {
+        pendingTurnCounterKeys = new Set();
+        logWarning('回合开始读取线索计数失败，本轮保守跳过线索扣减', error);
+      }
       if (checkEventsTimer || pendingCheckReason) {
         markPendingTurnEventCheck(pendingCheckReason || 'scheduled-before-turn-start');
         pendingCheckReason = null;
@@ -1246,13 +1260,21 @@
     }
   });
 
-  // MESSAGE_SENT 只做事件检查，不再扣减线索倒计时。
-  // 扣减改由 wuxia:turn-completed 在回合真正成功完成后触发（见下方监听器），
-  // 避免发送后生成失败/取消/报错/未形成助手回合时仍被扣一次。
+  // MESSAGE_SENT 仅兼容无回合屏障的路径；不得覆盖 lifecycle.start 的权威快照。
+  // 扣减仍只在 wuxia:turn-completed 后进行，失败/取消不扣减。
   eventOn(tavern_events.MESSAGE_SENT, async () => {
     log('📨 检测到消息发送，触发事件检查');
-    const turnStartVariables = await getVariables({ type: 'chat' });
-    pendingTurnCounterKeys = new Set(Object.keys(turnStartVariables?.stat_data?.后续事件线索计数 || {}));
+    if (!activeTurnBarrier && pendingTurnCounterKeys === null) {
+      try {
+        const turnStartVariables = await getVariables({ type: 'chat' });
+        // await 期间可能已经启动正式回合，不能用迟到结果覆盖。
+        if (!activeTurnBarrier && pendingTurnCounterKeys === null) {
+          pendingTurnCounterKeys = new Set(Object.keys(turnStartVariables?.stat_data?.后续事件线索计数 || {}));
+        }
+      } catch (error) {
+        logWarning('MESSAGE_SENT 读取线索计数失败，结算时保守跳过扣减', error);
+      }
+    }
     scheduleCheckEvents('message-sent');
   });
 
@@ -1295,7 +1317,8 @@
       completedTurnRoundIds.delete(oldestRoundId);
     }
     const deferredCheck = clearPendingTurnEventCheck();
-    const eligibleCounterKeys = pendingTurnCounterKeys;
+    // 没有初始快照不能把 null 当成“所有线索均可扣减”。
+    const eligibleCounterKeys = pendingTurnCounterKeys instanceof Set ? pendingTurnCounterKeys : new Set();
     pendingTurnCounterKeys = null;
     const shouldDecrementCounters = messageId !== lastCountedMessageId;
     log(
