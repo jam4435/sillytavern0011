@@ -567,6 +567,61 @@ describe('wuxia character martial arts audit', () => {
     expect(canonicalMartialArtName('降龙廿八掌')).toBe('降龙廿八掌');
   });
 
+  it('乔峰毒酒封功仅改状态不降境界，重返少室山时恢复掌力', () => {
+    const root = path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书');
+    const read = n => parseYaml(readFileSync(path.join(root, n), 'utf8'));
+    const poisoned = read('天龙第三十九回05-阿紫私宴献酒致萧峰内力尽失.yaml');
+    const recovered = read('天龙第四十一回01-蒙面双老现身少室山震动群雄.yaml');
+    expect(poisoned.update.乔峰.境界).toBeUndefined();
+    expect(poisoned.update.乔峰.状态).toContain('内力暂封');
+    expect(recovered.update.乔峰.状态).toContain('内力恢复');
+  });
+
+  it('降龙廿八掌在生前去繁为十八掌，虚竹同步习得且后期不重复初始化', () => {
+    const root = path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书');
+    const read = n => parseYaml(readFileSync(path.join(root, n), 'utf8'));
+    const transfer = read('天龙第四十四回01-虚竹遵遗愿率部众西赴天山.yaml');
+    const later = read('天龙第五十回03-虚竹偕妻归隐传续两派神功.yaml');
+    const teach = read('天龙第四十九回05-密室传授降龙绝艺续接道统.yaml');
+    expect(transfer.insert.乔峰.功法.降龙十八掌.掌握程度).toMatch(/^出神入化/);
+    expect(transfer.delete.乔峰.功法.降龙廿八掌).toEqual({});
+    expect(transfer.insert.虚竹.功法.降龙十八掌.掌握程度).toMatch(/^融会贯通/);
+    expect(transfer.insert.虚竹.功法.打狗棒法.掌握程度).toMatch(/^融会贯通/);
+    expect(transfer.参与人物).toContain('乔峰');
+    expect(later.insert.虚竹.功法).toBeUndefined();
+    expect(teach.事件详情).toContain('降龙十八掌');
+    expect(transfer.触发条件.年).toBe(1205);
+    expect(transfer.触发条件.月).toBe(4);
+    expect(transfer.触发条件.日).toBe(5);
+  });
+
+  it('降龙十八掌不应在传承简化发生以前作为乔峰的独立掌法反复施展', () => {
+    const root = path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书');
+    const stale = [];
+    for (const filename of readdirSync(root).filter(f => f.startsWith('天龙第') && f.endsWith('.yaml'))) {
+      const e = parseYaml(readFileSync(path.join(root, filename), 'utf8'));
+      const t = e.触发条件 || {};
+      if (typeof t.年 !== 'number' || t.年 > 1205 ||
+          (t.年 === 1205 && (t.月 > 4 || (t.月 === 4 && t.日 >= 5)))) continue;
+      const prose = [e.事件详情, e.事件概要, e.事件引子].filter(v => typeof v === 'string').join('；');
+      if (prose.includes('降龙十八掌')) stale.push(filename);
+    }
+    expect(stale).toEqual([]);
+  });
+
+  it('四十六回死亡不可在五十回重新发生，也不可再移动已故乔峰或阿紫', () => {
+    const root = path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书');
+    const read = n => parseYaml(readFileSync(path.join(root, n), 'utf8'));
+    const death = read('天龙第四十六回07-萧峰拔断箭自插胸膛以死明志.yaml');
+    const recollection = read('天龙第五十回05-萧峰舍身止战长眠雁门绝壁.yaml');
+    expect(death.update.乔峰.状态).toBe('死亡');
+    expect(recollection.事件概要).toContain('追忆');
+    expect(recollection.参与人物).toEqual([]);
+    expect(recollection.insert).toEqual({});
+    expect(recollection.update).toEqual({});
+    expect(recollection.delete).toEqual({});
+  });
+
   it('生成门派谱系时遵守层级上限、指定传人与关系排除规则', () => {
     const materialized = materializeCharacterMartialArts([
       event(
