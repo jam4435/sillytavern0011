@@ -13618,7 +13618,7 @@
       "followups": {
         "天龙第三十九回06-辽国御林军破门合力擒获萧峰": "萧峰身中剧毒内力尽失瘫软于地，王府外陡然传来密集的铁甲脚步与破门合围之声。"
       },
-      "hash": "a7052bac8a8ad984126b90c0ff1c4121607595d9c09791fec7902ab8b2725428",
+      "hash": "2f49b2f24206240a1ecb952aaf1db07dbe200e7c7d35b569eddcf151d86fa8f1",
       "shardId": "shard-0007"
     },
     {
@@ -14100,7 +14100,7 @@
       "followups": {
         "天龙第四十一回02-萧远山揭面认亲与萧峰痛哭": "两名黑衣老者展现惊人功力傲立全场，引得少林及各派高手极度警惕，广场陷入更深杀局。"
       },
-      "hash": "f3093eb1f4c4efdd289001c5970ab45b8993bdb214431fcd181b0c2517d3d71a",
+      "hash": "78a9944daa8f67d5f78c57f69b1ed9dfbea95108753bb8a0a929fb04d6e69d20",
       "shardId": "shard-0007"
     },
     {
@@ -45684,7 +45684,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "天龙第三十五回06-大笑悲叹二宗同归于尽冰崖",
       "lastRuntimeKey": "天龙第四十一回03-萧远山自述潜伏复仇揭杀戮真相",
-      "byteLength": 148382
+      "byteLength": 148634
     },
     {
       "id": "shard-0008",
@@ -60102,5 +60102,5 @@
     ]
   },
   "unresolvedReferences": [],
-  "contentHash": "ca954bff61f84d7d519989a6af07f567870fa5a6165449025b20648535a28f91"
+  "contentHash": "f5a130be7597bf712eb0dbe185f0ed0948b772f1c1b6a1e23730fb27dc5a05b3"
 }
