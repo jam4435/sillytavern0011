@@ -595,6 +595,7 @@ export function createFourCategoryMartialArtsAuditDocument(materialized, martial
             .map(event => ({ 事件: event.runtimeKey, 原文件: event.sourceName, 时间: cloneJson(event.effectTime) }))
         : [];
     const bothPresent = Boolean(left && right);
+    const provenSingleKey = Boolean(left && !right && leftState?.身份?.契丹本姓?.includes(pair.名称二));
     return {
       ...pair,
       名称一是否出现: Boolean(left),
@@ -604,8 +605,10 @@ export function createFourCategoryMartialArtsAuditDocument(materialized, martial
       最终状态一致: bothPresent ? compareJson(leftState, rightState) : null,
       结论: bothPresent
         ? '两个原始键都在确定性重放中出现，且最终状态不同；本审计保持为两个运行时记录，不自动合并，需由世界书明确提供迁移/删除链后再处理。'
-        : '当前确定性事件只出现其中一个原始键，不进行自动别名归并。',
-      需要人工审核: true,
+        : provenSingleKey
+          ? '已确认仅保留乔峰为原始状态键，契丹本姓注明萧峰，全部事件差分写入原角色；无需运行时合并。'
+          : '当前确定性事件只出现其中一个原始键；还需核查是否确实完成别名归一。',
+      需要人工审核: !provenSingleKey,
     };
   });
 
@@ -724,7 +727,7 @@ export function createFourCategoryMartialArtsAuditDocument(materialized, martial
       合理没有武功: reasonableEmpty.length,
       非武学项目混入: nonMartialItems.length,
       需人工审核的空功法人物: manualReview.length,
-      人物身份归一待核查: identityReviews.length,
+      人物身份归一待核查: identityReviews.filter(review => review.需要人工审核).length,
     },
     全体NPC状态: total.角色列表.map(character => ({
       人物: character.角色,
