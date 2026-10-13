@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { parse as parseYaml } from 'yaml';
 
@@ -521,6 +521,50 @@ describe('wuxia character martial arts audit', () => {
     expect(isActiveUseSentence(narration, ['耶律燕'], '空手夺白刃')).toBe(false);
     expect(isActiveUseSentence('耶律燕施展“空手夺白刃”制敌', ['耶律燕'], '空手夺白刃')).toBe(true);
     expect(encounter.update.耶律燕.状态).toContain('刺客');
+  });
+
+  it('乔峰与萧峰使用同一运行时人物键，所有世界书变量路径不得重新创建萧峰', () => {
+    const root = path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书');
+    const remaining = [];
+    const visit = (value, location) => {
+      if (Array.isArray(value)) {
+        for (const [index, item] of value.entries()) visit(item, `${location}[${index}]`);
+      } else if (value && typeof value === 'object') {
+        for (const [key, item] of Object.entries(value)) {
+          if (key === '萧峰') remaining.push(`${location}.萧峰`);
+          visit(item, `${location}.${key}`);
+        }
+      }
+    };
+    for (const filename of readdirSync(root).filter(item => item.endsWith('.yaml'))) {
+      const e = parseYaml(readFileSync(path.join(root, filename), 'utf8'));
+      for (const op of ['insert', 'update', 'delete']) visit(e?.[op], `${filename}.${op}`);
+      for (const list of ['参与人物', '新登场人物']) {
+        if (e?.[list]?.includes('萧峰')) remaining.push(`${filename}.${list}`);
+      }
+    }
+    expect(remaining).toEqual([]);
+  });
+
+  it('萧峰改姓不再创建第二个初始属性对象，沿用乔峰功法和终局死亡状态', () => {
+    const root = path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书');
+    const read = filename => parseYaml(readFileSync(path.join(root, filename), 'utf8'));
+    const debut = read('天龙第十四回00-人物登场.yaml');
+    const alias = read('天龙第二十九回00-人物登场.yaml');
+    const death = read('天龙第四十六回07-萧峰拔断箭自插胸膛以死明志.yaml');
+    expect(debut.新登场人物).toContain('乔峰');
+    expect(debut.insert.乔峰.功法.降龙廿八掌).toBeTruthy();
+    expect(alias.新登场人物).not.toContain('萧峰');
+    expect(alias.insert?.萧峰).toBeUndefined();
+    expect(alias.insert?.乔峰?.初始属性).toBeUndefined();
+    expect(alias.insert?.乔峰?.身份?.契丹本姓).toContain('萧峰');
+    expect(alias.update.乔峰.功法.降龙廿八掌.掌握程度).toBe('出神入化');
+    expect(death.update?.乔峰?.状态).toBe('死亡');
+    expect(death.参与人物).toContain('乔峰');
+    const db = JSON.parse(readFileSync(path.join(process.cwd(), 'src', '武侠', 'data', '_合并后功法.json'), 'utf8'));
+    expect(db.功法.filter(item => item.功法名称 === '降龙廿八掌')).toHaveLength(1);
+    expect(db.功法.some(item => item.功法名称 === '降龙十八掌')).toBe(true);
+    expect(canonicalMartialArtName('降龙廿八掌')).toBe('降龙廿八掌');
   });
 
   it('生成门派谱系时遵守层级上限、指定传人与关系排除规则', () => {
