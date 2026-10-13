@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { FOLLOWUP_MOVEMENT_GUIDANCE } from './activeEventFollowups';
 
 const fullSource = readFileSync(resolve(process.cwd(), '世界书/金庸群侠传1/世界书/输出提示词.txt'), 'utf8');
 const locationStart = fullSource.indexOf('<%\nconst rawSurrounding =');
@@ -122,4 +123,13 @@ describe('正文提示词提前显示后续事件地点', () => {
     expect(result).not.toContain('目标事件地点（后续事件名称尚未同步）');
   });
 
+});
+
+
+describe('后继地点提示文案', () => {
+  it('后继地点提示文案标明只读且不创建后续线索计数', () => {
+    expect(FOLLOWUP_MOVEMENT_GUIDANCE).toContain('只读后继事件地点预告');
+    expect(FOLLOWUP_MOVEMENT_GUIDANCE).toContain('不能提前创建/修改/删除后续事件线索或其计数');
+    expect(FOLLOWUP_MOVEMENT_GUIDANCE).toContain('当参与事件全阶段完成');
+  });
 });

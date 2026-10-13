@@ -85,6 +85,7 @@ jobs:
           pnpm exec vitest run --configLoader native --pool threads --reporter verbose
           src/武侠/utils/extraVariableUpdateManager.test.ts
           src/武侠/utils/activeFollowupPrompt.test.ts
+          -t '模型擅自写入|后继地点提示文案'
       - name: Event admission scheduler regressions
         run: >
           pnpm exec vitest run --configLoader native --pool threads --reporter verbose
