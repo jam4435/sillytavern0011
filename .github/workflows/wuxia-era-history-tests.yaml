@@ -2,7 +2,7 @@ name: wuxia-era-history-tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'fix/wuxia-followup-count-turn-snapshot-20261013']
     paths:
       - 'src/ERA变量框架/**'
       - 'src/事件脚本/era-event-operations.js'
@@ -21,6 +21,11 @@ on:
       - 'src/事件脚本/era-utils.js'
       - 'src/事件脚本/era-logging.test.ts'
       - 'src/事件脚本/era-lifecycle.test.ts'
+      - 'src/武侠/utils/extraVariableUpdateManager.ts'
+      - 'src/武侠/utils/extraVariableUpdateManager.test.ts'
+      - 'src/武侠/utils/activeEventFollowups.ts'
+      - 'src/武侠/utils/activeFollowupPrompt.test.ts'
+      - 'src/武侠/prompts/变量指导.txt'
       - 'src/武侠/utils/saveLoadManager*'
       - 'src/武侠/components/SaveLoadPanel*'
       - 'src/武侠/utils/variableReader.ts'
@@ -75,10 +80,15 @@ jobs:
           src/事件脚本/era-notifications.test.ts
           src/武侠/hooks/useEventNotifications.test.tsx
           src/武侠/hooks/useEventListeners.test.tsx
+      - name: Variable-model ownership and future-location prompt regressions
+        run: >
+          pnpm exec vitest run --configLoader native --pool threads --reporter verbose
+          src/武侠/utils/extraVariableUpdateManager.test.ts
+          src/武侠/utils/activeFollowupPrompt.test.ts
       - name: Event admission scheduler regressions
         run: >
           pnpm exec vitest run --configLoader native --pool threads --reporter verbose
-          src/事件脚本/era-main.test.ts -t '已有进行中事件|同一三级地点|回合事件结算|事件启动提交失败|切换聊天后|诊断：同一 messageId'
+          src/事件脚本/era-main.test.ts -t '已有进行中事件|同一三级地点|回合事件结算|事件启动提交失败|切换聊天后|诊断：同一 messageId|本轮新建线索|迟到 MESSAGE_SENT'
       - name: Turn settlement event-runtime regressions
         run: >
           pnpm exec vitest run --configLoader native --pool threads --reporter verbose
