@@ -2,7 +2,7 @@ import followupLocationIndex from '../data/后续事件地点.generated.json';
 import { normalizeLocationPath, parseLocationPath } from '../../shared/locationPath.js';
 
 export const FOLLOWUP_MOVEMENT_GUIDANCE =
-  '当参与事件全阶段完成且玩家有继续推进想法时，往后续事件地点移动；尊重玩家其他选择，按实际行程推进，不得直接传送或提前演出后续事件。';
+  '此为只读后继事件地点预告，不是已获得的后续事件线索，不能提前创建/修改/删除后续事件线索或其计数；正式线索由事件脚本在原事件结算时维护。当参与事件全阶段完成且玩家有继续推进想法时，往后续事件地点移动；尊重玩家其他选择，按实际行程推进，不得直接传送或提前演出后续事件。';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);

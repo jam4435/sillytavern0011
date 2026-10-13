@@ -1179,6 +1179,22 @@ describe('executeExtraVariableUpdate', () => {
     expect(prompt).not.toContain('参与事件:{');
     expect(prompt).not.toContain('后续事件移动指引:');
   });
+  it('模型擅自写入后续线索或计数时拒绝落盘', async () => {
+    for (const block of [
+      '<VariableEdit>{"后续事件线索计数":{"天龙第七回01-测试":1}}</VariableEdit>',
+      '<VariableInsert>{"后续事件线索":{"天龙第七回01-测试":"提前线索"}}</VariableInsert>',
+      '<VariableDelete>{"后续事件线索计数":{"天龙第七回01-测试":{}}}</VariableDelete>',
+    ]) {
+      requestConfiguredTextMock.mockResolvedValueOnce('<VariableThink>错误声明</VariableThink>' + block);
+      await expect(executeExtraVariableUpdate({
+        settings: { ...DEFAULT_SUMMARY_SETTINGS, variableUpdateMode: 'extra' },
+        assistantMessageId: 28,
+        latestRawReply: '当前事件仍在推进。',
+      })).rejects.toThrow('后续事件线索及计数由事件脚本维护');
+    }
+    expect(setChatMessagesMock).not.toHaveBeenCalled();
+    expect(emitSourcedEraVariableWriteAndWaitMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('ensureTurnVariableBlocksCommitted', () => {
@@ -1228,4 +1244,7 @@ describe('ensureTurnVariableBlocksCommitted', () => {
       }),
     ).rejects.toThrow('未闭合');
   });
+
+
+
 });

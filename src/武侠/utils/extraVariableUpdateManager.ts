@@ -262,7 +262,10 @@ function validateDeclaredLocations(declaredChanges: VariableDeclaredChange[]): {
   const rejected: RejectedVariableAction[] = [];
   for (const change of declaredChanges) {
     let reason = '';
-    if (change.action !== 'delete' && change.path.at(-1) === '所在位置') {
+    // 后续线索与计数专由事件脚本维护；不允许变量模型绕过提示词模板写入。
+    if (change.path[0] === '后续事件线索' || change.path[0] === '后续事件线索计数') {
+      reason = '后续事件线索及计数由事件脚本维护，变量模型不得写入。';
+    } else if (change.action !== 'delete' && change.path.at(-1) === '所在位置') {
       const parsed = parseLocationPath(change.value);
       if (!parsed) {
         reason = `地点 ${JSON.stringify(change.value)} 无效；地点必须是三级或四级完整路径。`;
