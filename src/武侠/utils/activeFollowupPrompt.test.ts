@@ -65,6 +65,7 @@ describe('正文提示词提前显示后续事件地点', () => {
     });
     expect(result).toContain(`${nextEvent}: ${nextLocation}`);
     expect(result).toContain('当参与事件全阶段完成且玩家有继续推进想法时，往后续事件地点移动');
+    expect(result).toContain('只读后继事件地点预告，不是已获得的后续事件线索');
     expect(result).toContain('大理/无量山/后山森林');
   });
 
