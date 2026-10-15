@@ -3,6 +3,7 @@ import { recordEraDiagnostic } from '../../ERA变量框架/utils/diagnostics';
 import { recordHistoryBranchMkAudit } from '../../shared/historyBranchMkAudit';
 import { recordHistoryEventForensics, snapshotHistoryEventForensics } from '../../shared/historyEventForensics';
 import { captureHistoryEventRoots, HISTORY_EVENT_ROOTS, loadHistoryEventSnapshot, saveHistoryEventSnapshot } from './historyEventSnapshot';
+import { describeHistoryMkDifferences, loadHistoryMkSnapshot, saveHistoryMkSnapshot } from './historyMkSnapshot';
 import {
   clearHistoryCheckoutJournal,
   clearHistoryCheckoutReturnIntent,
@@ -754,6 +755,21 @@ export async function finalizeCurrentTurn(options: FinalizeHistoryTurnOptions = 
   const node = tree.nodes[scanned.currentNodeId];
   if (!node) return scanned;
   const sealedVerification = readCurrentVerification();
+  // 保存 MK 的逐楼封存基准，仅供错误诊断；不用于跳过 ERA 重算或修改恢复结果。
+  try {
+    const selectedMks = getVariables({ type: 'chat' })?.ERAMetaData?.SelectedMks;
+    if (!Array.isArray(selectedMks) || stableHistoryHash(selectedMks) !== sealedVerification.selectedMksHash) {
+      throw new Error('MK 基准与节点封存指纹不一致');
+    }
+    saveHistoryMkSnapshot(sealedVerification.selectedMksHash, selectedMks);
+  } catch (error) {
+    recordEraDiagnostic('wuxia-history-checkout', 'history-mk-snapshot-save-failed', {
+      nodeId: node.id,
+      selectedMksHash: sealedVerification.selectedMksHash,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    console.warn('[历史节点] MK 逐楼基准封存失败，检出时将只有当前楼层对账信息', error);
+  }
   // 按内容指纹只保存一份事件根；多节点若状态一致可共享快照。
   // 不把体积较大的原值塞进历史树元数据，避免每次扫描复制全部事件内容。
   try {
@@ -1583,6 +1599,40 @@ function describeCheckoutNodeMismatch(
   return lines.join('\n');
 }
 
+/** 封存值只作为证据，不修改 SelectedMks、消息或 ERA 日志。诊断失败不能遮盖原始校验异常。 */
+function describeCheckoutMkMismatch(sealedHash: string, node: HistoryNode | undefined): string[] {
+  try {
+    const vars = getVariables({ type: 'chat' });
+    const selectedMks = Array.isArray(vars?.ERAMetaData?.SelectedMks)
+      ? vars.ERAMetaData.SelectedMks as unknown[] : [];
+    const saved = loadHistoryMkSnapshot(sealedHash);
+    const baseline = saved && stableHistoryHash(saved) === sealedHash ? saved : null;
+    const messages = readAllHistoryMessages().map(message => {
+      const { texts, activeSwipeId } = getSwipeTexts(message);
+      const activeSwipeText = texts[activeSwipeId] ?? '';
+      const activeText = typeof message.mes === 'string' ? message.mes : activeSwipeText;
+      return {
+        messageId: message.message_id,
+        role: getMessageRole(message),
+        mk: extractMessageKey(activeText),
+        swipeMk: extractMessageKey(activeSwipeText),
+      };
+    });
+    const targetMessageId = node?.locators.find(locator => locator.chatId ===
+      String(SillyTavern.getCurrentChatId?.() ?? ''))?.assistantMessageId ??
+      node?.locators[0]?.assistantMessageId;
+    const target = messages.find(message => message.messageId === targetMessageId);
+    return [
+      ...describeHistoryMkDifferences(baseline, selectedMks, messages),
+      '目标节点 Assistant 楼层：' + (targetMessageId ?? '未知') +
+        '；节点保存的 MK：' + (node?.messageKey ?? '未记录') +
+        '；当前消息 MK：' + (target?.mk ?? '未找到'),
+    ];
+  } catch (error) {
+    return ['逐楼 MK 诊断采集失败：' + (error instanceof Error ? error.message : String(error))];
+  }
+}
+
 function commitVerification(
   state: HistoryTreeViewState,
   targetNodeId: string,
@@ -1616,6 +1666,7 @@ function commitVerification(
       `历史节点校验失败：ERA 主干或事件状态与封存记录不一致（主干${mksSame ? '一致' : '不一致'}，事件状态${eventSame ? '一致' : '不一致'}）。`,
       [
         `ERA SelectedMks：封存 ${baseline.selectedMksHash}；恢复 ${verification.selectedMksHash}`,
+        ...(!mksSame ? describeCheckoutMkMismatch(baseline.selectedMksHash, state.tree.nodes[targetNodeId]) : []),
         `事件整体：封存 ${baseline.eventStateHash}；恢复 ${verification.eventStateHash}`,
         ...eventDetails,
       ].join('\n'),
@@ -1911,6 +1962,8 @@ async function executeCheckout(
         causeHint = '缺少分阶段诊断：请重试恢复，以记录 ERA 同步与事件脚本检查各自的结果。';
       } else if (!baselineHash) {
         causeHint = '已记录分阶段诊断，但目标节点没有可用的封存事件指纹，无法进行封存状态比较。';
+      } else if (error instanceof HistoryVerificationError && message.includes('主干不一致') && message.includes('事件状态一致')) {
+        causeHint = '事件状态与封存一致，ERA SelectedMks 主干不一致；请查看逐楼 MK 差异和实际消息 MK 对账，不要归因于事件预检查。';
       } else if (trace.eraEventStateHash !== baselineHash) {
         causeHint = 'ERA 完全同步结束时就已经与历史封存不一致：优先排查未受 ERA 回滚管理的事件直接写入或原有快照缺失。';
       } else if (trace.preparedEventStateHash !== baselineHash) {
