@@ -45,6 +45,7 @@ vi.mock('./era-event-checker.js', () => ({
 vi.mock('./era-event-operations.js', () => ({
   initializeEventList: initializeEventListMock,
   batchStartEvents: vi.fn(),
+  getPairedDebutEventName: vi.fn(() => null),
   batchCompleteDebutEvents: vi.fn(),
   playerJoinsEvents: vi.fn(),
   batchEndEvents: vi.fn(),
