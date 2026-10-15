@@ -45,7 +45,7 @@ vi.mock('./era-notifications.js', () => ({ notifyEvent: notifyMock }));
 vi.mock('./era-event-scheduler.js', () => ({ sortUnstartedEventsByTrigger: (v: unknown) => v }));
 vi.mock('../shared/directVariableWrite', () => ({ writeDirectChatTransaction: vi.fn() }));
 
-import { batchStartEvents, batchCompleteDebutEvents, playerJoinsEvents } from './era-event-operations.js';
+import { batchStartEvents, batchCompleteDebutEvents, getPairedDebutEventName, playerJoinsEvents } from './era-event-operations.js';
 
 type RecordValue = Record<string, any>;
 type Operation = { type: 'insert' | 'update' | 'delete'; payload: RecordValue };
@@ -219,6 +219,117 @@ describe('事件开始 / 玩家入场 ERA 单事务', () => {
     expect(variables.stat_data.参与事件[first].结局).toBe('玩家改变过的结局');
     expect(transactionMock.mock.calls[0][0].some((op: Operation) => op.payload.参与事件)).toBe(false);
     expect(notifyMock.mock.calls.map(([notice]) => notice.kind)).toEqual(['event-started']);
+  });
+
+  const chapterDebut = '天龙第七回00-人物登场';
+  const chapterFirst = '天龙第七回01-段誉携木婉清归府受迎';
+  const chapterSecond = '天龙第七回02-段誉述说历险隐匿神功';
+  const palace = '大理/大理城/镇南王府/正厅';
+  const chapterDefinitions = {
+    [chapterDebut]: {
+      事件类型: '登场事件',
+      insert: {
+        段正淳: {
+          性别: '男', 境界: '一流-中期', 出生年份: 1162,
+          初始属性: { 臂力: 8, 根骨: 12, 机敏: 11, 洞察: 7, 悟性: 14 },
+          所在位置: '大理/大理城/镇南王府/偏厅', 人物经历: {},
+        },
+        刀白凤: {
+          性别: '女', 境界: '二流-中期', 出生年份: 1164,
+          初始属性: { 臂力: 5, 根骨: 8, 机敏: 13, 洞察: 9, 悟性: 11 },
+          所在位置: palace, 人物经历: {},
+        },
+      },
+    },
+    [chapterFirst]: {
+      ...definition(chapterFirst, palace),
+      参与人物: ['段誉', '段正淳', '刀白凤'],
+    },
+    [chapterSecond]: definition(chapterSecond, palace),
+  };
+
+  it('只有同回目的 01 绑定 00；后续事件和不存在 00 的回目仍正常执行', () => {
+    expect(getPairedDebutEventName(chapterFirst, chapterDefinitions)).toBe(chapterDebut);
+    expect(getPairedDebutEventName(chapterSecond, chapterDefinitions)).toBeNull();
+    expect(getPairedDebutEventName(first, definitions)).toBeNull();
+  });
+
+  it('01 提前触发时，同一 ERA 事务先建正式 NPC、完成 00，再让其进入 01 场景', async () => {
+    variables.stat_data.user数据.所在位置 = palace;
+    variables.stat_data.事件系统.未发生事件[chapterDebut] = TIME;
+    variables.stat_data.事件系统.未发生事件[chapterFirst] = TIME;
+    await expect(batchStartEvents([chapterFirst], chapterDefinitions, {
+      currentTime: TIME, earlyEventNames: [chapterFirst],
+    })).resolves.toBe(true);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    const operations = transactionMock.mock.calls[0][0] as Operation[];
+    expect(operations[0].type).toBe('insert');
+    expect(operations[0].payload.事件系统.已完成事件[chapterDebut]).toBe(0);
+    expect(operations[0].payload.角色数据.段正淳.出生年份).toBe(1162);
+    expect(operations.some(op => op.type === 'update' && op.payload.角色数据?.段正淳?.所在位置 === palace)).toBe(true);
+    expect(variables.stat_data.角色数据.段正淳).toMatchObject({
+      性别: '男', 境界: '一流-中期', 所在位置: palace,
+    });
+    expect(variables.stat_data.角色数据.刀白凤).toMatchObject({
+      性别: '女', 境界: '二流-中期', 所在位置: palace,
+    });
+    expect(variables.stat_data.事件系统.已完成事件[chapterDebut]).toBe(0);
+    expect(variables.stat_data.事件系统.未发生事件[chapterDebut]).toBeUndefined();
+    expect(variables.stat_data.事件系统.进行中事件[chapterFirst]).toBeDefined();
+    expect(variables.stat_data.参与事件[chapterFirst]).toBeDefined();
+  });
+
+  it('00 已完成时，01 不重复登场也不覆盖已经改变的人物资料', async () => {
+    variables.stat_data.user数据.所在位置 = palace;
+    variables.stat_data.事件系统.已完成事件[chapterDebut] = 0;
+    variables.stat_data.事件系统.未发生事件[chapterFirst] = TIME;
+    variables.stat_data.角色数据.段正淳 = { 性别: '男', 境界: '绝顶', 所在位置: OTHER_LOCATION };
+    await expect(batchStartEvents([chapterFirst], chapterDefinitions)).resolves.toBe(true);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    const operations = transactionMock.mock.calls[0][0] as Operation[];
+    expect(operations.every(op => !op.payload.角色数据?.刀白凤)).toBe(true);
+    expect(variables.stat_data.角色数据.段正淳.境界).toBe('绝顶');
+    expect(variables.stat_data.事件系统.已完成事件[chapterDebut]).toBe(0);
+  });
+
+  it('01 不能使用 manifest 空 insert 冒充正式登场定义', async () => {
+    const lightweight = {
+      ...chapterDefinitions,
+      [chapterDebut]: { 事件类型: '登场事件', insert: {} },
+    };
+    await expect(batchStartEvents([chapterFirst], lightweight)).resolves.toBe(false);
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(notifyMock).not.toHaveBeenCalled();
+  });
+
+  it('00 的 $template 空壳修复与 01 入场同一事务，保留已有经历', async () => {
+    variables.stat_data.user数据.所在位置 = palace;
+    variables.stat_data.事件系统.未发生事件[chapterDebut] = TIME;
+    variables.stat_data.角色数据.段正淳 = {
+      性别: '', 外貌: '', 性格: '', 境界: '', 出生年份: 0, 状态: '',
+      初始属性: { 臂力: 0, 根骨: 0, 机敏: 0, 洞察: 0, 悟性: 0 },
+      所在位置: '大理/大理城/镇南王府/书房',
+      人物经历: { 既有剧情: '应保留' },
+    };
+    await expect(batchStartEvents([chapterFirst], chapterDefinitions)).resolves.toBe(true);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(variables.stat_data.角色数据.段正淳).toMatchObject({
+      性别: '男', 境界: '一流-中期', 出生年份: 1162,
+      所在位置: palace, 人物经历: { 既有剧情: '应保留' },
+    });
+  });
+
+  it('00 终态未落地时不把 01 参与通知视为成功', async () => {
+    variables.stat_data.user数据.所在位置 = palace;
+    transactionMock.mockImplementationOnce(async (operations: Operation[]) => {
+      for (const op of operations) {
+        if (op.payload.事件系统?.已完成事件) continue;
+        applyPatch(variables.stat_data, op.payload, op.type);
+      }
+      return true;
+    });
+    await expect(batchStartEvents([chapterFirst], chapterDefinitions)).resolves.toBe(false);
+    expect(notifyMock).not.toHaveBeenCalled();
   });
 
   it('NPC 先被经历插入生成模板空壳后，正式登场在同笔事务中补全默认值，保留真实位置和经历', async () => {
