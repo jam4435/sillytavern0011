@@ -31,6 +31,7 @@
   const {
     initializeEventList,
     batchStartEvents,
+    getPairedDebutEventName,
     batchCompleteDebutEvents,
     playerJoinsEvents,
     batchEndEvents,
@@ -396,8 +397,18 @@
         debugGroupEnd();
       }
 
+      // 01 可提前启动，而同回目的 00 可能尚未到原定时间。
+      // 事务开始之前必须加载 00 的完整人物档案，不能使用 manifest 的空 insert 占位。
+      const pairedDebutNamesToHydrate = [...eventsToStart, ...earlyEventsToStart]
+        .map(name => getPairedDebutEventName(name, eventDefinitions))
+        .filter(name => name && !Object.prototype.hasOwnProperty.call(
+          variables.stat_data.事件系统?.已完成事件 || {}, name,
+        ));
       const definitionsToHydrate = [
-        ...new Set([...eventsToStart, ...earlyEventsToStart, ...debutEventsToComplete, ...historicalEventsToComplete]),
+        ...new Set([
+          ...eventsToStart, ...earlyEventsToStart, ...debutEventsToComplete,
+          ...historicalEventsToComplete, ...pairedDebutNamesToHydrate,
+        ]),
       ];
       if (definitionsToHydrate.length > 0 && eventManifest) {
         Object.assign(eventDefinitions, await loadEventDefinitions(definitionsToHydrate));
