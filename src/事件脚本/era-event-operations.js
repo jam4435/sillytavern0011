@@ -31,6 +31,7 @@ import { writeEraTransaction } from './era-write-helper.js';
 import { buildParticipantEntryPlan } from './era-participant-entry.js';
 import { buildDebutShellRecoveryPatch, isDebutShellRecoveryApplied } from './era-debut-shell.js';
 import { isSameLocationScope } from '../shared/locationPath.js';
+import { EVENT_KIND, parseCanonicalEventKey } from '../shared/eventKey.js';
 import {
   getEventSummary,
   buildWorldEventRecord,
@@ -533,6 +534,14 @@ export async function persistRelativeEventRebase(deferredConditions) {
 
 // 开局初始化已统一走上方的单事务规划器；旧的多写入实现已移除。
 
+/** 仅将同一回目的首个普通事件与 00-人物登场绑定；00 仍保留独立时间触发。 */
+export function getPairedDebutEventName(eventName, eventDefinitions) {
+  const descriptor = parseCanonicalEventKey(eventName);
+  if (descriptor?.kind !== EVENT_KIND.ORDINARY || descriptor.sequence !== '01') return null;
+  const debutName = `${descriptor.series}${descriptor.chapter}00-人物登场`;
+  return eventDefinitions?.[debutName] ? debutName : null;
+}
+
 /** 事件开启和 NPC 入场使用相同 ERA 事务，永不在后续检查重新传送。 */
 export function buildEventStartParticipantOperations(eventNames, eventDefinitions, characters) {
   const claimedCharacters = {}, locationUpdates = {}, locationInserts = {};
@@ -540,7 +549,11 @@ export function buildEventStartParticipantOperations(eventNames, eventDefinition
     const data = eventDefinitions[eventName];
     if (!data || isDebutEvent(data)) continue;
     const plan = buildParticipantEntryPlan({ eventName, eventData: data, characters, claimedCharacters });
-    for (const name of plan.missingCharacters) logWarning(`事件 ${eventName} NPC ${name} 尚未登场`);
+    for (const name of plan.missingCharacters) {
+      const message = `事件 ${eventName} NPC ${name} 尚未登场；请核查人物登场定义或跨回目依赖`;
+      if (getPairedDebutEventName(eventName, eventDefinitions)) logError(message);
+      else logWarning(message);
+    }
     for (const conflict of plan.conflicts) logWarning(`NPC ${conflict.人物} 同批已进入 ${conflict.当前事件}，不重复移动`);
     for (const [name, patch] of Object.entries(plan.locationUpdates)) {
       const character = characters?.[name];
@@ -611,6 +624,32 @@ export async function batchStartEvents(eventNames, eventDefinitions, options = {
     const startStat = startVars?.stat_data || {};
     const playerLocation = startStat.user数据?.所在位置;
     const startTime = options.currentTime || startStat.世界信息?.时间 || {};
+    // 01 提前启动时，将本回目的 00 正式人物档案一起提交；不改变 00 自身到点触发。
+    const pairedDebutNames = [...new Set(
+      eventNames.map(name => getPairedDebutEventName(name, eventDefinitions)).filter(Boolean),
+    )].filter(name => !Object.prototype.hasOwnProperty.call(startStat.事件系统?.已完成事件 || {}, name));
+    const debutCharacterInserts = {};
+    for (const debutName of pairedDebutNames) {
+      const debutData = eventDefinitions[debutName];
+      // manifest 的轻量定义只有 insert: {}，严禁把它误当成正式人物资料。
+      if (!isPlainObject(debutData?.insert) || Object.keys(debutData.insert).length === 0) {
+        throw new Error(`配套登场事件 ${debutName} 缺少完整人物档案，禁止启动 01`);
+      }
+      for (const [name, patch] of Object.entries(debutData.insert)) {
+        if (!isPlainObject(patch)) throw new Error(`配套登场事件 ${debutName} 人物 ${name} 档案无效`);
+        if (!debutCharacterInserts[name]) debutCharacterInserts[name] = {};
+        mergeCharacterDeltaForEvent(debutCharacterInserts[name], patch, debutName);
+      }
+      未发生删除对象[debutName] = {};
+    }
+    const shellRecovery = buildDebutShellRecoveryPatch(startStat.角色数据, debutCharacterInserts);
+    const projectedCharacters = cloneJson(startStat.角色数据 || {});
+    applyOpeningObjectPatch(projectedCharacters, 'insert', debutCharacterInserts);
+    applyOpeningObjectPatch(projectedCharacters, 'update', shellRecovery);
+    if (pairedDebutNames.length > 0) {
+      insertPayload.角色数据 = debutCharacterInserts;
+      insertPayload.事件系统.已完成事件 = Object.fromEntries(pairedDebutNames.map(name => [name, 0]));
+    }
     // 已在事件地点的玩家，与进行中状态、NPC 首次入场一同落库。
     // 已参与的旧记录不覆盖；玩家稍后抵达既有进行中事件仍由 playerJoinsEvents 处理。
     const joiningNames = [...new Set(eventNames)].filter(name =>
@@ -623,10 +662,13 @@ export async function batchStartEvents(eventNames, eventDefinitions, options = {
       buildPlayerParticipationEntry(name, eventDefinitions[name], startTime, 进行中事件对象[name]),
     ]));
     const npcOperations = buildEventStartParticipantOperations(
-      eventNames, eventDefinitions, startStat.角色数据,
+      eventNames, eventDefinitions, projectedCharacters,
     );
     const operations = [
       { type: 'insert', payload: insertPayload },
+      ...(Object.keys(shellRecovery).length > 0
+        ? [{ type: 'update', payload: { 角色数据: shellRecovery } }]
+        : []),
       ...npcOperations,
       ...(joiningNames.length > 0
         ? [{ type: 'insert', payload: { 参与事件: participationPatch } }]
@@ -644,8 +686,16 @@ export async function batchStartEvents(eventNames, eventDefinitions, options = {
       !Object.prototype.hasOwnProperty.call(verifyStat.事件系统?.未发生事件 || {}, name),
     );
     const joined = joiningNames.every(name => hasParticipationEntry(verifyStat.参与事件, name));
-    if (!started || !joined) {
-      throw new Error('事件启动事务确认后回读不一致，禁止提前显示参与通知');
+    const debutCompleted = pairedDebutNames.every(name =>
+      Object.prototype.hasOwnProperty.call(verifyStat.事件系统?.已完成事件 || {}, name) &&
+      !Object.prototype.hasOwnProperty.call(verifyStat.事件系统?.未发生事件 || {}, name),
+    );
+    const debutCharactersPresent = Object.keys(debutCharacterInserts).every(name =>
+      isPlainObject(verifyStat.角色数据?.[name]),
+    );
+    if (!started || !joined || !debutCompleted || !debutCharactersPresent ||
+        !isDebutShellRecoveryApplied(verifyStat.角色数据, shellRecovery)) {
+      throw new Error('事件启动与配套人物登场事务回读不一致，禁止提前显示参与通知');
     }
     if (isDebugEnabled()) {
       debugGroupCollapsed('🔍 批量开始后的事件系统状态');
