@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   describeHistoryMkDifferences,
   HISTORY_MK_SNAPSHOT_PREFIX,
@@ -13,6 +13,8 @@ beforeEach(() => {
     setItem: (key: string, value: string) => { values.set(key, value); },
   });
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe('历史封存逐楼 MK 快照', () => {
   it('保存并读取 MK 全量基准，复制返回值不修改存储', () => {

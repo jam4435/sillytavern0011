@@ -1428,7 +1428,28 @@ describe('history checkout', () => {
     expect(failure?.stage).toBe('verify');
     expect(failure?.message).toBe('历史记录、事件状态不匹配。');
     expect(failure?.details).toContain('旧封存记录没有逐组事件指纹');
+    expect(failure?.details).toContain('ERA 逐楼 MK 差异诊断');
+    expect(failure?.details).toContain('封存逐楼 MK 基准不可用');
     expect(failure?.details).toContain('目标楼层：User 无 / Assistant 0 / swipe 1');
+  });
+
+  it('新封存的 MK 基准在分支校验失败时能指出第一处差异及实际楼层 MK', async () => {
+    currentChat().messages = [{
+      message_id: 0, role: 'assistant',
+      message: '<era_data>{"era-message-key"="mk-original","era-message-type"="assistant"}</era_data>\\n序章',
+    }];
+    currentChat().variables.ERAMetaData = { SelectedMks: ['mk-original'] };
+    const sealed = await finalizeCurrentTurn();
+    expect(localStorage.getItem('wuxia_history_mk_snapshot_v1_' +
+      sealed.tree.nodes[sealed.currentNodeId!].verification?.selectedMksHash)).not.toBeNull();
+
+    (currentChat().variables.ERAMetaData as { SelectedMks: string[] }).SelectedMks = ['mk-replaced'];
+    const failed = await checkoutNode(sealed.currentNodeId!, { forceBranch: true });
+    expect(failed.status).toBe('recovery_failed');
+    const details = readHistoryCheckoutJournal()?.failure?.details ?? '';
+    expect(details).toContain('楼层 0：封存 mk-original → 恢复 mk-replaced');
+    expect(details).toContain('楼层 0 [assistant]：SelectedMks=mk-replaced；消息 MK=mk-original');
+    expect(details).toContain('事件状态与封存一致，ERA SelectedMks 主干不一致');
   });
 
   it('事件状态指纹不同但 ERA 主干一致时报告具体事件组，重试重新执行全量同步', async () => {

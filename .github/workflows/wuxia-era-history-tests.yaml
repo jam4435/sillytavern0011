@@ -31,6 +31,7 @@ on:
       - 'src/武侠/utils/variableReader.ts'
       - 'src/武侠/utils/variableReader.test.ts'
       - 'src/武侠/utils/historyEventSnapshot.ts'
+      - 'src/武侠/utils/historyMkSnapshot*'
       - 'src/武侠/utils/logger.ts'
       - 'src/武侠/utils/logger.test.ts'
       - 'src/武侠/hooks/useEventListeners.ts'
@@ -67,6 +68,7 @@ jobs:
           src/ERA变量框架/utils/log.test.ts
           src/事件脚本/era-logging.test.ts
           src/武侠/utils/saveLoadManager.test.ts
+          src/武侠/utils/historyMkSnapshot.test.ts
           src/武侠/components/SaveLoadPanel.test.tsx
           src/武侠/utils/logger.test.ts
           src/武侠/utils/eraWriteWait.test.ts
