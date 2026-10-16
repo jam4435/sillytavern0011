@@ -747,6 +747,58 @@ function readCurrentVerification(): HistoryVerification {
   };
 }
 
+
+/**
+ * 历史节点只能封存与当前激活消息严格对齐的 MK 主干。
+ * 不读备用 swipe 的 MK，也不进行任何 ERA 写入；拒绝拿尚未同步的数组做永久证据。
+ */
+function assertCurrentHistoryMksAligned(node: HistoryNode): (string | null)[] {
+  const messages = readAllHistoryMessages();
+  const raw = getVariables({ type: 'chat' })?.ERAMetaData?.SelectedMks;
+  if (!Array.isArray(raw)) throw new Error('历史封存中止：ERA SelectedMks 缺失。');
+  if (raw.length !== messages.length) {
+    throw new Error(`历史封存中止：SelectedMks 长度 ${raw.length}，实际消息 ${messages.length}；请先完成 ERA 同步。`);
+  }
+  const issues: string[] = [];
+  const ids = new Set<number>();
+  for (const message of messages) {
+    const id = message.message_id;
+    if (!Number.isInteger(id) || id < 0 || id >= raw.length || ids.has(id)) {
+      issues.push(`消息楼层 ID 异常：${String(id)}`);
+      continue;
+    }
+    ids.add(id);
+    const { texts, activeSwipeId } = getSwipeTexts(message);
+    const activeText = texts[activeSwipeId] ?? '';
+    const mk = extractMessageKey(activeText);
+    const stored = raw[id];
+    if (!Object.hasOwn(raw, id) || (stored !== null && typeof stored !== 'string') || stored !== mk) {
+      issues.push(`楼层 ${id}：SelectedMks=${String(stored)}；当前 swipe MK=${String(mk)}`);
+    }
+    // 如果酒馆的活动正文与 swipe 不一致，ERA 可能读取到另一个 MK。
+    const mes = (message as TavernHistoryMessage & { mes?: string }).mes;
+    if (typeof mes === 'string' && extractMessageKey(mes) !== mk) {
+      issues.push(`楼层 ${id}：mes MK 与当前 swipe MK 不一致`);
+    }
+  }
+  if (ids.size !== raw.length) issues.push(`消息 ID 数量 ${ids.size} 与 SelectedMks 长度 ${raw.length} 不符`);
+  const currentId = String(SillyTavern.getCurrentChatId?.() ?? '');
+  const locator = node.locators.find(item => item.chatId === currentId);
+  const target = messages.find(item => item.message_id === locator?.assistantMessageId);
+  const targetMk = target ? extractMessageKey(getSwipeTexts(target).texts[getSwipeTexts(target).activeSwipeId] ?? '') : null;
+  if (!locator || !target || targetMk !== node.messageKey || getSwipeTexts(target).activeSwipeId !== locator.swipeId) {
+    issues.push('目标节点的聊天、楼层、swipe 或 MK 身份不一致');
+  }
+  if (issues.length) {
+    recordEraDiagnostic('wuxia-history-checkout', 'history-seal-mk-alignment-rejected', {
+      nodeId: node.id, chatId: currentId, selectedMksLength: raw.length,
+      messageCount: messages.length, issues: issues.slice(0, 12),
+    });
+    throw new Error(`历史封存中止：MK 主干与活动消息不一致（${issues.length} 项）。\n${issues.slice(0, 12).join('\n')}`);
+  }
+  return raw.slice() as (string | null)[];
+}
+
 export async function finalizeCurrentTurn(options: FinalizeHistoryTurnOptions = {}): Promise<HistoryTreeViewState> {
   const scanned = await scanCurrentChat(options);
   if (!scanned.currentNodeId) return scanned;
@@ -754,13 +806,24 @@ export async function finalizeCurrentTurn(options: FinalizeHistoryTurnOptions = 
   const tree = cloneTree(scanned.tree);
   const node = tree.nodes[scanned.currentNodeId];
   if (!node) return scanned;
+  const selectedMks = assertCurrentHistoryMksAligned(node);
   const sealedVerification = readCurrentVerification();
-  // 保存 MK 的逐楼封存基准，仅供错误诊断；不用于跳过 ERA 重算或修改恢复结果。
+  if (sealedVerification.selectedMksHash !== stableHistoryHash(selectedMks)) {
+    throw new Error('历史封存中止：两次读取 ERA SelectedMks 期间主干发生变化。');
+  }
+  // 重复封存只能保持同一指纹；不能让其它聊天或迟到的异步同步静默覆盖旧证据。
+  if (node.verification &&
+      (node.verification.selectedMksHash !== sealedVerification.selectedMksHash ||
+       node.verification.eventStateHash !== sealedVerification.eventStateHash)) {
+    recordEraDiagnostic('wuxia-history-checkout', 'history-seal-immutable-verification-rejected', {
+      nodeId: node.id,
+      original: node.verification,
+      attempted: sealedVerification,
+    });
+    throw new Error('历史节点已经封存，当前 ERA/事件指纹与原封存不同；拒绝静默覆盖。请检查历史恢复或另建节点。');
+  }
+  // 保存 MK 逐楼基准只作为诊断；文件丢失不使已完成的正确封存失效。
   try {
-    const selectedMks = getVariables({ type: 'chat' })?.ERAMetaData?.SelectedMks;
-    if (!Array.isArray(selectedMks) || stableHistoryHash(selectedMks) !== sealedVerification.selectedMksHash) {
-      throw new Error('MK 基准与节点封存指纹不一致');
-    }
     saveHistoryMkSnapshot(sealedVerification.selectedMksHash, selectedMks);
   } catch (error) {
     recordEraDiagnostic('wuxia-history-checkout', 'history-mk-snapshot-save-failed', {

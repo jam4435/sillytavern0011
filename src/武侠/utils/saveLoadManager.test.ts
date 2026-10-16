@@ -464,7 +464,7 @@ describe('history tree v2 scanning', () => {
   it('finalizeCurrentTurn 幂等封存 verification，且事件 hash 排除前端派生结算字段', async () => {
     currentChat().messages = [{ message_id: 0, role: 'assistant', message: '开场' }];
     currentChat().variables = {
-      ERAMetaData: { SelectedMks: ['mk-opening'] },
+      ERAMetaData: { SelectedMks: [null] },
       stat_data: {
         事件系统: { 进行中事件: { a: 1 } },
         参与事件: { a: true },
@@ -502,11 +502,41 @@ describe('history tree v2 scanning', () => {
     expect(secondNode.worldTimeText).toBe('正午');
   });
 
+
+  it('封存时 MK 与当前消息不一致或数组尚未同步：拒绝产生错误指纹', async () => {
+    currentChat().messages = [{
+      message_id: 0, role: 'assistant',
+      message: '<era_data>{"era-message-key"="mk-live","era-message-type"="assistant"}</era_data>正文',
+    }];
+    currentChat().variables.ERAMetaData = { SelectedMks: [] };
+    await expect(finalizeCurrentTurn()).rejects.toThrow('SelectedMks 长度');
+    expect(Object.values(loadHistoryTree().nodes).every(node => !node.verification)).toBe(true);
+    currentChat().variables.ERAMetaData = { SelectedMks: ['mk-stale'] };
+    await expect(finalizeCurrentTurn()).rejects.toThrow('楼层 0');
+    expect(Object.values(loadHistoryTree().nodes).every(node => !node.verification)).toBe(true);
+    currentChat().variables.ERAMetaData = { SelectedMks: ['mk-live'] };
+    const state = await finalizeCurrentTurn();
+    expect(state.tree.nodes[state.currentNodeId!].verification?.selectedMksHash)
+      .toBe(stableHistoryHash(['mk-live']));
+  });
+
+  it('已封存节点发生事件状态漂移时拒绝静默覆盖原封存证据', async () => {
+    currentChat().messages = [{ message_id: 0, role: 'assistant', message: '剧情' }];
+    currentChat().variables.ERAMetaData = { SelectedMks: [null] };
+    const before = await finalizeCurrentTurn();
+    const nodeId = before.currentNodeId!;
+    currentChat().variables.stat_data = { 事件系统: { 状态: '后来变化' } };
+    await expect(finalizeCurrentTurn()).rejects.toThrow('拒绝静默覆盖');
+    expect(loadHistoryTree().nodes[nodeId].verification)
+      .toEqual(before.tree.nodes[nodeId].verification);
+  });
+
   it('封存回合后通知已打开的存档面板重新读取节点', async () => {
     const listener = vi.fn();
     window.addEventListener(WUXIA_HISTORY_TREE_UPDATED_EVENT, listener);
     currentChat().messages = [{ message_id: 0, role: 'assistant', message: '首回合正文' }];
 
+    currentChat().variables.ERAMetaData = { SelectedMks: [null] };
     const state = await finalizeCurrentTurn({ location: '牛家村', worldTimeText: '正午' });
 
     expect(listener).toHaveBeenCalledOnce();
@@ -695,6 +725,7 @@ describe('history checkout', () => {
     };
     currentChat().variables.stat_data = deepClone(oldState);
     currentChat().messages = [{ message_id: 0, role: 'assistant', message: '第三回之前' }];
+    currentChat().variables.ERAMetaData = { SelectedMks: [null] };
     const sealed = await finalizeCurrentTurn();
     const targetId = sealed.currentNodeId!;
     const verification = loadHistoryTree().nodes[targetId].verification!;
@@ -705,6 +736,7 @@ describe('history checkout', () => {
       { message_id: 1, role: 'user', message: '继续' },
       { message_id: 2, role: 'assistant', message: '进入第四回' },
     );
+    currentChat().variables.ERAMetaData = { SelectedMks: [null, null, null] };
     currentChat().variables.stat_data = {
       ...deepClone(oldState),
       事件系统: { 未发生事件: { '第四回01': { 年: 1202, 时: 18 } } },
