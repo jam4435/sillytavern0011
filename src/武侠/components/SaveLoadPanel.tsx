@@ -43,6 +43,7 @@ import {
   type HistoryTreeViewState,
 } from '../utils/saveLoadManager';
 import { renameCurrentChat } from '../utils/chatRenameManager';
+import { summarizeHistoryNodeBranches } from '../utils/historyBranchStatus';
 import ChatRenameDialog from './ChatRenameDialog';
 import { HistoryTreeCanvas } from './HistoryTreeCanvas';
 
@@ -120,9 +121,6 @@ function getCurrentLocator(view: HistoryTreeViewState | null): HistoryLocator | 
   return node?.locators.find(locator => locator.chatId === view.currentChat.id) ?? null;
 }
 
-function getNodeBranchStatus(view: HistoryTreeViewState, nodeId: string) {
-  return Object.values(view.tree.branches).find(branch => branch.headNodeId === nodeId)?.status ?? null;
-}
 
 const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false }) => {
   const [view, setView] = useState<HistoryTreeViewState | null>(null);
@@ -215,7 +213,10 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
   );
   const selectedNode = selectedNodeId && displayTree ? (displayTree.nodes[selectedNodeId] ?? null) : null;
   const currentLocator = useMemo(() => getCurrentLocator(view), [view]);
-  const selectedBranchStatus = view && selectedNode ? getNodeBranchStatus(view, selectedNode.id) : null;
+  const branchHealth = view && selectedNode
+    ? summarizeHistoryNodeBranches(view.tree, selectedNode.id)
+    : null;
+  const selectedBranchStatus = branchHealth?.status ?? null;
   const selectedIsCurrent = Boolean(selectedNode && selectedNode.id === view?.currentNodeId);
   const selectedIsOtherBranchLeaf = Boolean(
     selectedNode &&
@@ -643,7 +644,11 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
                   {selectedNode.pinned && <span className="history-flag">已钉住</span>}
                   {!selectedNode.verification && <span className="history-flag warn">首次扫描 · 未校验</span>}
                   {selectedBranchStatus === 'recovery_failed' && <span className="history-flag danger">恢复失败</span>}
-                  {selectedBranchStatus === 'broken' && <span className="history-flag danger">路径断链</span>}
+                  {(branchHealth?.brokenBranchCount ?? 0) > 0 && (
+                    <span className="history-flag warn" title="某条旧聊天分支失效不等于该节点的其他聊天定位不可用">
+                      {branchHealth?.usableBranchCount ? '部分分支失效' : '旧分支失效 · 可尝试其他定位'}
+                    </span>
+                  )}
                 </div>
                 <div className="history-label-editor">
                   <input
@@ -713,7 +718,7 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
                   className={`history-primary-action ${selectedIsCurrent ? 'current' : ''}`}
                   data-wuxia-automation="continue-history-node"
                   data-wuxia-history-action={primaryLabel}
-                  disabled={selectedIsCurrent || isWorking || selectedBranchStatus === 'broken'}
+                  disabled={selectedIsCurrent || isWorking}
                   onClick={handlePrimaryAction}
                 >
                   {selectedIsCurrent ? <Check size={15} /> : <GitBranch size={15} />}

@@ -30,7 +30,11 @@ vi.mock('../utils/saveLoadManager', () => ({
   abandonCheckoutRecovery: vi.fn(),
 }));
 
-vi.mock('./HistoryTreeCanvas', () => ({ HistoryTreeCanvas: () => null }));
+vi.mock('./HistoryTreeCanvas', () => ({
+  HistoryTreeCanvas: ({ onSelectNode }: { onSelectNode: (nodeId: string) => void }) => (
+    <button type="button" onClick={() => onSelectNode('selected-node')}>选择测试历史节点</button>
+  ),
+}));
 vi.mock('./ChatRenameDialog', () => ({ default: () => null }));
 vi.mock('../utils/chatRenameManager', () => ({ renameCurrentChat: vi.fn() }));
 
@@ -90,6 +94,76 @@ describe('SaveLoadPanel checkout error display', () => {
     fireEvent.click(advanced);
     expect(screen.getByRole('button', { name: '确认核验并修复' })).toBeInTheDocument();
     expect(screen.getByText(/原指纹将保留在独立审计中/)).toBeInTheDocument();
+  });
+
+
+  it('旧分支 broken 但节点有三条 locator 时仍允许从此处继续', async () => {
+    const node = {
+      id: 'selected-node', parentId: null, messageKey: 'mk-selected',
+      label: null, pinned: false, preview: '官道马车剧情', location: '大理/云南/官道/马车内',
+      worldTimeText: '壬戌年 三月 十八', createdAt: 1,
+      verification: { selectedMksHash: 'a', eventStateHash: 'b' },
+      locators: [
+        { chatId: 'missing', chatName: '已删除分支', userMessageId: 3, assistantMessageId: 4, swipeId: 0 },
+        { chatId: 'source', chatName: '原始聊天', userMessageId: 3, assistantMessageId: 4, swipeId: 0 },
+        { chatId: 'another', chatName: '现存分支', userMessageId: 3, assistantMessageId: 4, swipeId: 0 },
+      ],
+    };
+    mocks.scan.mockResolvedValue({
+      tree: {
+        version: 2, updatedAt: 1, nodes: { 'selected-node': node },
+        branches: {
+          dead: {
+            id: 'dead', chatId: 'missing', chatName: '已删除分支',
+            originNodeId: null, headNodeId: 'selected-node', createdAt: 1, status: 'broken',
+          },
+          live: {
+            id: 'live', chatId: 'another', chatName: '现存分支',
+            originNodeId: null, headNodeId: 'selected-node', createdAt: 2, status: 'available',
+          },
+        },
+      },
+      currentChat: { id: 'chat-a', name: '聊天 A' },
+      currentNodeId: null,
+      currentBranchId: 'history_branch_current',
+    });
+    render(<SaveLoadPanel gameState={gameState} onClose={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: '选择测试历史节点' }));
+    expect(screen.getByText('3 个实际聊天定位')).toBeInTheDocument();
+    expect(screen.getByText('部分分支失效')).toBeInTheDocument();
+    expect(screen.queryByText('路径断链')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '切换到该分支' })).not.toBeDisabled();
+  });
+
+  it('即使唯一历史分支 broken，仍能尝试由后端逐个核验 locator', async () => {
+    const node = {
+      id: 'selected-node', parentId: null, messageKey: 'mk-selected',
+      label: null, pinned: false, preview: '官道马车剧情', location: '马车内',
+      worldTimeText: '', createdAt: 1,
+      verification: null,
+      locators: [{ chatId: 'source', chatName: '原始聊天', userMessageId: 3, assistantMessageId: 4, swipeId: 0 }],
+    };
+    mocks.scan.mockResolvedValue({
+      tree: {
+        version: 2, updatedAt: 1, nodes: { 'selected-node': node },
+        branches: {
+          dead: {
+            id: 'dead', chatId: 'missing', chatName: '已删除分支',
+            originNodeId: null, headNodeId: 'selected-node', createdAt: 1, status: 'broken',
+          },
+        },
+      },
+      currentChat: { id: 'chat-a', name: '聊天 A' },
+      currentNodeId: null,
+      currentBranchId: 'history_branch_current',
+    });
+    render(<SaveLoadPanel gameState={gameState} onClose={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: '选择测试历史节点' }));
+    expect(screen.getByText('旧分支失效 · 可尝试其他定位')).toBeInTheDocument();
+    const action = screen.getByRole('button', { name: '从此处继续' });
+    expect(action).not.toBeDisabled();
+    fireEvent.click(action);
+    expect(screen.getByRole('button', { name: '确认继续' })).toBeInTheDocument();
   });
 
   it('已有 journal 失败仍提供重试和返回来源，技术诊断保留原始异常', async () => {

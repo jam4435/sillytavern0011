@@ -15,6 +15,7 @@ import { Pin } from 'lucide-react';
 import React, { memo, useCallback, useMemo } from 'react';
 import type { HistoryBranch, HistoryLocator, HistoryNode, WuxiaHistoryTreeV2 } from '../types';
 import { layoutHistoryTree } from '../utils/historyTreeLayout';
+import { summarizeHistoryNodeBranches } from '../utils/historyBranchStatus';
 
 const BRANCH_COLORS = ['#d8aa57', '#789f91', '#a986bd', '#b87664', '#758cae', '#9c9a63', '#b680a0'];
 
@@ -167,7 +168,10 @@ export const HistoryTreeCanvas: React.FC<HistoryTreeCanvasProps> = ({
             !currentPath.has(node.id) &&
             currentPathMessageIds.has(`${locator.chatId}:${locator.assistantMessageId}`),
           ),
-          branchStatus: branch?.headNodeId === node.id ? branch.status : null,
+          // 不以首个 broken 分支给整个多定位节点涂上“断链”标记。
+          branchStatus: summarizeHistoryNodeBranches(tree, node.id).status === 'broken'
+            ? null
+            : summarizeHistoryNodeBranches(tree, node.id).status,
           branchColor: branch ? stableColor(branch.id) : '#8d7957',
         },
       };
@@ -181,6 +185,7 @@ export const HistoryTreeCanvas: React.FC<HistoryTreeCanvasProps> = ({
     layout.positions,
     selectedNodeId,
     tree.nodes,
+    tree.branches,
   ]);
 
   const flowEdges = useMemo<Edge[]>(() => {

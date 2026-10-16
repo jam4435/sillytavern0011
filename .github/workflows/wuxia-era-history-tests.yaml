@@ -27,6 +27,7 @@ on:
       - 'src/武侠/utils/activeFollowupPrompt.test.ts'
       - 'src/武侠/prompts/变量指导.txt'
       - 'src/武侠/utils/saveLoadManager*'
+      - 'src/武侠/utils/historyBranchStatus*'
       - 'src/武侠/components/SaveLoadPanel*'
       - 'src/武侠/utils/variableReader.ts'
       - 'src/武侠/utils/variableReader.test.ts'
@@ -68,6 +69,7 @@ jobs:
           src/ERA变量框架/utils/log.test.ts
           src/事件脚本/era-logging.test.ts
           src/武侠/utils/saveLoadManager.test.ts
+          src/武侠/utils/historyBranchStatus.test.ts
           src/武侠/utils/historyMkSnapshot.test.ts
           src/武侠/components/SaveLoadPanel.test.tsx
           src/武侠/utils/logger.test.ts
