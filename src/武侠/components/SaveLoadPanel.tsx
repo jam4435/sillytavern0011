@@ -33,6 +33,7 @@ import {
   readLastHistoryCheckoutFailure,
   resumeCheckout,
   retryCheckoutRecovery,
+  repairLegacyCheckoutVerification,
   returnToCheckoutSource,
   scanCurrentChat,
   setNodePinned,
@@ -135,6 +136,7 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
   );
   const [lastCheckout, setLastCheckout] = useState<HistoryCheckoutResult | null>(null);
   const [diagnosticCopyState, setDiagnosticCopyState] = useState('');
+  const [confirmLegacyRepair, setConfirmLegacyRepair] = useState(false);
   const [showAllLineages, setShowAllLineages] = useState(false);
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [renameDraft, setRenameDraft] = useState('');
@@ -398,6 +400,23 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
     }
   };
 
+  const handleLegacyRepair = async () => {
+    setWorkState({ type: 'loading', message: '正在核验来源见证并重新执行 ERA 全量恢复……' });
+    try {
+      const result = await repairLegacyCheckoutVerification();
+      setLastCheckout(result);
+      setJournal(readHistoryCheckoutJournal());
+      await refresh(false);
+      setConfirmLegacyRepair(false);
+      if (result.status !== 'commit') {
+        setWorkState({ type: 'error', message: result.error || '受控修复没有完成。' });
+      }
+    } catch (error) {
+      setJournal(readHistoryCheckoutJournal());
+      setWorkState({ type: 'error', message: error instanceof Error ? error.message : String(error) });
+    }
+  };
+
   const handleReturnSource = async () => {
     setWorkState({ type: 'loading', message: '正在返回来源聊天……' });
     try {
@@ -506,7 +525,23 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
                   <button type="button" className="history-secondary-action" disabled={recoveryActionDisabled} onClick={() => void handleReturnSource()}>
                     <Undo2 size={14} /> 返回来源聊天
                   </button>
+                  {journal.failure?.stage === 'verify' && /主干不一致|历史记录/.test(journal.failure.message) && (
+                    <button type="button" className="history-secondary-action" disabled={recoveryActionDisabled}
+                      onClick={() => setConfirmLegacyRepair(value => !value)}>
+                      <ShieldAlert size={14} /> 旧节点校验基准修复（高级）
+                    </button>
+                  )}
                 </div>
+                {confirmLegacyRepair && journal.failure?.stage === 'verify' && (
+                  <div className="history-confirm" role="group" aria-label="旧节点校验基准修复确认">
+                    <p>仅适用于旧封存缺少逐楼快照的历史节点。必须有本次分叉前自动保存的来源 MK 见证、当前全部消息与 MK 一致，且事件指纹完全相同。原指纹将保留在独立审计中；修复后仍需 ERA 完全同步与严格校验。若缺少来源证据，请先返回来源聊天并重新发起分叉。</p>
+                    <div className="history-confirm-actions">
+                      <button type="button" className="history-secondary-action" disabled={recoveryActionDisabled}
+                        onClick={() => void handleLegacyRepair()}>确认核验并修复</button>
+                      <button type="button" className="history-secondary-action" onClick={() => setConfirmLegacyRepair(false)}>取消</button>
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <p>失败发生在恢复事务建立之前，未产生待处理的历史恢复锁。可查看错误后重新选择节点。</p>
