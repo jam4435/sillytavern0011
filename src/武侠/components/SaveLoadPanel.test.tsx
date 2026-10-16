@@ -25,6 +25,7 @@ vi.mock('../utils/saveLoadManager', () => ({
   setNodePinned: vi.fn(),
   resumeCheckout: vi.fn(),
   retryCheckoutRecovery: vi.fn(),
+  repairLegacyCheckoutVerification: vi.fn(),
   returnToCheckoutSource: vi.fn(),
   abandonCheckoutRecovery: vi.fn(),
 }));
@@ -72,6 +73,23 @@ describe('SaveLoadPanel checkout error display', () => {
     expect(screen.getByText(/失败步骤：识别当前来源聊天/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '重试恢复' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '返回来源聊天' })).not.toBeInTheDocument();
+  });
+
+  it('只有 MK 恢复失败才展示旧节点显式修复确认，拒绝静默覆盖', async () => {
+    mocks.readJournal.mockReturnValue({
+      transactionId: 'txn-repair',
+      stage: 'verify',
+      targetNodeId: 'node-1',
+      targetLocator: { chatId: 'fork-1', chatName: '新分支', userMessageId: 1, assistantMessageId: 2, swipeId: 0 },
+      actionKind: 'fork_branch',
+      sourceChatId: 'chat-a', sourceChatName: '聊天 A',
+      failure: { stage: 'verify', message: '历史记录不匹配。', occurredAt: 1, details: '主干不一致' },
+    });
+    render(<SaveLoadPanel gameState={gameState} onClose={vi.fn()} />);
+    const advanced = await screen.findByRole('button', { name: /旧节点校验基准修复/ });
+    fireEvent.click(advanced);
+    expect(screen.getByRole('button', { name: '确认核验并修复' })).toBeInTheDocument();
+    expect(screen.getByText(/原指纹将保留在独立审计中/)).toBeInTheDocument();
   });
 
   it('已有 journal 失败仍提供重试和返回来源，技术诊断保留原始异常', async () => {
