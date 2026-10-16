@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { WuxiaHistoryTreeV2 } from '../types';
 import { summarizeHistoryNodeBranches } from './historyBranchStatus';
 
-const createTree = (statuses: Array<'broken' | 'active' | 'available' | 'recovery_failed'>): WuxiaHistoryTreeV2 => ({
+const createTree = (statuses: Array<'broken' | 'active' | 'available' | 'recovery_failed' | 'degraded'>): WuxiaHistoryTreeV2 => ({
   version: 2,
   updatedAt: 1,
   nodes: {},
@@ -24,6 +24,11 @@ describe('共享历史节点的分支可用性', () => {
   it('一个断链分支不能盖过其他仍然可用的分支', () => {
     expect(summarizeHistoryNodeBranches(createTree(['broken', 'available', 'active']), 'shared-node'))
       .toEqual({ status: 'active', brokenBranchCount: 1, usableBranchCount: 2 });
+  });
+
+  it('降级分支有独立状态，不能被其他 broken 分支覆盖', () => {
+    expect(summarizeHistoryNodeBranches(createTree(['broken', 'degraded']), 'shared-node'))
+      .toEqual({ status: 'degraded', brokenBranchCount: 1, usableBranchCount: 1 });
   });
 
   it('全部分支标记 broken 也只代表分支状态，不证明其它 locator 不可用', () => {

@@ -34,6 +34,7 @@ import {
   resumeCheckout,
   retryCheckoutRecovery,
   repairLegacyCheckoutVerification,
+  continueCheckoutWithEventDrift,
   returnToCheckoutSource,
   scanCurrentChat,
   setNodePinned,
@@ -135,6 +136,7 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
   const [lastCheckout, setLastCheckout] = useState<HistoryCheckoutResult | null>(null);
   const [diagnosticCopyState, setDiagnosticCopyState] = useState('');
   const [confirmLegacyRepair, setConfirmLegacyRepair] = useState(false);
+  const [confirmDegradedContinue, setConfirmDegradedContinue] = useState(false);
   const [showAllLineages, setShowAllLineages] = useState(false);
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [renameDraft, setRenameDraft] = useState('');
@@ -425,13 +427,36 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
     }
   };
 
+  const handleDegradedContinue = async () => {
+    setWorkState({ type: 'loading', message: '正在核验来源 MK、保存事件差异并创建降级恢复记录……' });
+    try {
+      const result = await continueCheckoutWithEventDrift();
+      setLastCheckout(result);
+      setJournal(readHistoryCheckoutJournal());
+      setConfirmDegradedContinue(false);
+      await refresh(false);
+      if (result.status !== 'commit') {
+        setWorkState({ type: 'error', message: result.error || '降级继续未完成。' });
+      } else {
+        setWorkState({ type: 'success', message: '已在独立分支降级继续；事件状态未精确还原，原历史节点和来源聊天均已保留。' });
+      }
+    } catch (error) {
+      setJournal(readHistoryCheckoutJournal());
+      setWorkState({ type: 'error', message: error instanceof Error ? error.message : String(error) });
+    }
+  };
+
   const handleReturnSource = async () => {
     setWorkState({ type: 'loading', message: '正在返回来源聊天……' });
     try {
-      await returnToCheckoutSource();
+      const result = await returnToCheckoutSource();
       setJournal(readHistoryCheckoutJournal());
       await refresh(false);
-      setWorkState({ type: 'success', message: '已返回来源聊天，分叉恢复记录已解除。' });
+      if (result?.status === 'commit') {
+        setWorkState({ type: 'success', message: '已返回来源聊天，分叉恢复记录已解除。' });
+      } else {
+        setWorkState({ type: 'error', message: result?.error || '返回来源聊天未完成，恢复锁仍将保留。' });
+      }
     } catch (error) {
       setWorkState({ type: 'error', message: error instanceof Error ? error.message : String(error) });
     }
@@ -533,6 +558,12 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
                   <button type="button" className="history-secondary-action" disabled={recoveryActionDisabled} onClick={() => void handleReturnSource()}>
                     <Undo2 size={14} /> 返回来源聊天
                   </button>
+                  {journal.actionKind === 'fork_branch' && journal.failure?.stage === 'verify' && (
+                    <button type="button" className="history-secondary-action" disabled={recoveryActionDisabled}
+                      onClick={() => setConfirmDegradedContinue(value => !value)}>
+                      <ShieldAlert size={14} /> 降级继续（事件状态可能偏离）
+                    </button>
+                  )}
                   {journal.failure?.stage === 'verify' && /主干不一致|历史记录/.test(journal.failure.message) && (
                     <button type="button" className="history-secondary-action" disabled={recoveryActionDisabled}
                       onClick={() => setConfirmLegacyRepair(value => !value)}>
@@ -540,6 +571,16 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
                     </button>
                   )}
                 </div>
+                {confirmDegradedContinue && journal.actionKind === 'fork_branch' && journal.failure?.stage === 'verify' && (
+                  <div className="history-confirm" role="group" aria-label="降级恢复风险确认">
+                    <p>只在来源与新分支的全部楼层、活动 swipe 和 MK 完全对齐时允许。将保留当前事件状态继续剧情，可能与原事件进度、人物登场或线索不同；不会修改来源聊天或覆盖历史节点封存指纹。当前分支将永久标记为“降级恢复”，留下事件差异审计。</p>
+                    <div className="history-confirm-actions">
+                      <button type="button" className="history-secondary-action" disabled={recoveryActionDisabled}
+                        onClick={() => void handleDegradedContinue()}>我了解事件偏差风险，仍要继续</button>
+                      <button type="button" className="history-secondary-action" onClick={() => setConfirmDegradedContinue(false)}>取消</button>
+                    </div>
+                  </div>
+                )}
                 {confirmLegacyRepair && journal.failure?.stage === 'verify' && (
                   <div className="history-confirm" role="group" aria-label="旧节点校验基准修复确认">
                     <p>仅适用于旧封存缺少逐楼快照的历史节点。必须有本次分叉前自动保存的来源 MK 见证、当前全部消息与 MK 一致，且事件指纹完全相同。原指纹将保留在独立审计中；修复后仍需 ERA 完全同步与严格校验。若缺少来源证据，请先返回来源聊天并重新发起分叉。</p>
@@ -652,6 +693,11 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
                   {!selectedNode.verification && <span className="history-flag warn">首次扫描 · 未校验</span>}
                   {selectedCurrentBranchActive && (
                     <span className="history-flag">当前分支正常</span>
+                  )}
+                  {selectedIsCurrent && selectedCurrentBranch?.status === 'degraded' && (
+                    <span className="history-flag warn" title="这是用户明确接受事件状态偏差的独立分支，原始封存指纹未修改">
+                      降级恢复 · 事件未精确还原
+                    </span>
                   )}
                   {selectedBranchStatus === 'recovery_failed' && <span className="history-flag danger">恢复失败</span>}
                   {(branchHealth?.brokenBranchCount ?? 0) > 0 && (

@@ -25,7 +25,9 @@ import {
   renameNode,
   retryCheckoutRecovery,
   repairLegacyCheckoutVerification,
+  continueCheckoutWithEventDrift,
   WUXIA_HISTORY_REPAIR_AUDIT_KEY,
+  WUXIA_HISTORY_DEGRADED_AUDIT_KEY,
   resumeCheckout,
   returnToCheckoutSource,
   scanCurrentChat,
@@ -1474,7 +1476,7 @@ describe('history checkout', () => {
   });
 
 
-  it('旧节点仅在来源见证、逐楼 MK 与事件状态一致时可明确修复，保留原始指纹审计', async () => {
+  it('旧节点的安全 MK 差异自动纠正，原封存指纹仍保留审计', async () => {
     currentChat().messages = [{
       message_id: 0, role: 'assistant',
       message: '<era_data>{"era-message-key"="mk-source","era-message-type"="assistant"}</era_data>第一回',
@@ -1493,13 +1495,7 @@ describe('history checkout', () => {
     tree.nodes[nodeId].verification = oldVerification;
     persistTreeDirect(tree);
 
-    const failed = await checkoutNode(nodeId, { forceBranch: true });
-    expect(failed.status).toBe('recovery_failed');
-    const journal = readHistoryCheckoutJournal()!;
-    expect(localStorage.getItem('wuxia_history_source_mk_witness_v1_' + journal.transactionId))
-      .toContain(stableHistoryHash(['mk-source']));
-
-    const committed = await repairLegacyCheckoutVerification();
+    const committed = await checkoutNode(nodeId, { forceBranch: true });
     expect(committed.status).toBe('commit');
     expect(readHistoryCheckoutJournal()).toBeNull();
     expect(loadHistoryTree().nodes[nodeId].verification).toMatchObject({
@@ -1511,6 +1507,7 @@ describe('history checkout', () => {
     expect(audit).toHaveLength(1);
     expect(audit[0].oldVerification.selectedMksHash).toBe('old-unverifiable-seal');
     expect(audit[0].newVerification.selectedMksHash).toBe(stableHistoryHash(['mk-source']));
+    expect((audit[0] as { status: string }).status).toBe('automatic-attempt');
   });
 
   it('旧节点修复没有分叉前来源见证时必须拒绝，并且不改原始指纹', async () => {
@@ -1530,12 +1527,102 @@ describe('history checkout', () => {
       }),
     };
     persistTreeDirect(tree);
+    eventOn('manual_full_sync', () => {
+      const journal = readHistoryCheckoutJournal();
+      if (journal) localStorage.removeItem('wuxia_history_source_mk_witness_v1_' + journal.transactionId);
+    });
     const result = await checkoutNode(nodeId, { forceBranch: true });
     expect(result.status).toBe('recovery_failed');
-    const journal = readHistoryCheckoutJournal()!;
-    localStorage.removeItem('wuxia_history_source_mk_witness_v1_' + journal.transactionId);
     await expect(repairLegacyCheckoutVerification()).rejects.toThrow('缺少分叉前的来源 MK 见证');
     expect(loadHistoryTree().nodes[nodeId].verification?.selectedMksHash).toBe('old-unverifiable-seal');
+  });
+
+
+  it('只有事件状态不同且有可信来源 MK 时，可经显式确认降级继续而不修改原节点封存', async () => {
+    currentChat().messages = [{
+      message_id: 0, role: 'assistant',
+      message: '<era_data>{"era-message-key"="mk-source","era-message-type"="assistant"}</era_data>第一回',
+    }];
+    currentChat().variables.ERAMetaData = { SelectedMks: ['mk-source'] };
+    const scan = await scanCurrentChat();
+    const nodeId = scan.currentNodeId!;
+    const oldEventState = {
+      事件系统: { 进行中事件: { '旧事件': { 阶段: 1 } } },
+      参与事件: null, 世界事件: null, 事件分支结果: null,
+      后续事件线索: null, 后续事件线索计数: null,
+    };
+    const tree = deepClone(scan.tree);
+    tree.nodes[nodeId].verification = {
+      selectedMksHash: stableHistoryHash(['mk-source']),
+      eventStateHash: stableHistoryHash(oldEventState),
+    };
+    persistTreeDirect(tree);
+    const oldHash = tree.nodes[nodeId].verification!.eventStateHash;
+    currentChat().variables.stat_data = { 事件系统: { 进行中事件: { '新事件': { 阶段: 3 } } } };
+    const failed = await checkoutNode(nodeId, { forceBranch: true });
+    expect(failed.status).toBe('recovery_failed');
+    const accepted = await continueCheckoutWithEventDrift();
+    expect(accepted.status).toBe('commit');
+    expect(readHistoryCheckoutJournal()).toBeNull();
+    expect(loadHistoryTree().nodes[nodeId].verification!.eventStateHash).toBe(oldHash);
+    expect(loadHistoryTree().branches[accepted.currentBranchId!].status).toBe('degraded');
+    const afterRefresh = await scanCurrentChat();
+    expect(afterRefresh.tree.branches[afterRefresh.currentBranchId].status).toBe('degraded');
+    const audit = JSON.parse(localStorage.getItem(WUXIA_HISTORY_DEGRADED_AUDIT_KEY) || '[]') as
+      Array<{ status: string; originalVerification: { eventStateHash: string } }>;
+    expect(audit).toHaveLength(1);
+    expect(audit[0].status).toBe('user-accepted-event-drift');
+    expect(audit[0].originalVerification.eventStateHash).toBe(oldHash);
+    expect(chats['chat-a'].messages).toHaveLength(1);
+  });
+
+  it('MK 与来源不一致时不能以降级继续绕过消息校验', async () => {
+    currentChat().messages = [{
+      message_id: 0, role: 'assistant',
+      message: '<era_data>{"era-message-key"="mk-source","era-message-type"="assistant"}</era_data>第一回',
+    }];
+    currentChat().variables.ERAMetaData = { SelectedMks: ['mk-source'] };
+    const scan = await scanCurrentChat();
+    const nodeId = scan.currentNodeId!;
+    const tree = deepClone(scan.tree);
+    tree.nodes[nodeId].verification = {
+      selectedMksHash: stableHistoryHash(['mk-source']),
+      eventStateHash: 'old-different-event',
+    };
+    persistTreeDirect(tree);
+    eventOn('manual_full_sync', () => {
+      if (currentChatId !== 'fork-1') return;
+      currentChat().variables.ERAMetaData = { SelectedMks: ['mk-forged'] };
+    });
+    const failed = await checkoutNode(nodeId, { forceBranch: true });
+    expect(failed.status).toBe('recovery_failed');
+    await expect(continueCheckoutWithEventDrift()).rejects.toThrow('MK 主干与活动消息不一致');
+    expect(readHistoryCheckoutJournal()).not.toBeNull();
+    expect(loadHistoryTree().nodes[nodeId].verification!.eventStateHash).toBe('old-different-event');
+  });
+
+  it('ERA 全量同步超时只自动补做一次，第二次真实 ACK 可完成恢复', async () => {
+    respondFullSyncWithResync = false;
+    configureHistoryEraSyncTiming({ timeoutMs: 25, quietMs: 0 });
+    currentChat().messages = [{
+      message_id: 0, role: 'assistant', swipe_id: 0, swipes: ['路线甲', '路线乙'], message: '路线甲',
+    }];
+    const scan = await scanCurrentChat();
+    const target = findNodeByPreview(scan.tree, '路线乙')!;
+    let attempts = 0;
+    eventOn('manual_full_sync', (detail?: { syncId?: string }) => {
+      attempts += 1;
+      if (attempts !== 2) return;
+      void eventEmit('era:writeDone', {
+        message_id: 0,
+        actions: { resync: true },
+        syncIds: [detail?.syncId],
+      });
+    });
+    const result = await checkoutNode(target.id);
+    expect(result.status).toBe('commit');
+    expect(attempts).toBe(2);
+    expect(readHistoryCheckoutJournal()).toBeNull();
   });
 
   it('新封存的 MK 基准在分支校验失败时能指出第一处差异及实际楼层 MK', async () => {

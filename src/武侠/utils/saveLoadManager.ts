@@ -53,6 +53,8 @@ export type CheckoutActionKind = 'existing_branch' | 'in_place_swipe' | 'fork_br
 export const WUXIA_HISTORY_CHECKOUT_LAST_FAILURE_KEY = 'wuxia_history_checkout_last_failure_v1';
 /** 旧节点验证基准受控修复：来源证据按事务存储，审计始终保留旧指纹。 */
 export const WUXIA_HISTORY_REPAIR_AUDIT_KEY = 'wuxia_history_verification_repair_audit_v1';
+/** 玩家明确允许事件状态不精确时，仅记录分支级降级审计，不修改共享节点原指纹。 */
+export const WUXIA_HISTORY_DEGRADED_AUDIT_KEY = 'wuxia_history_checkout_degraded_audit_v1';
 const HISTORY_REPAIR_WITNESS_PREFIX = 'wuxia_history_source_mk_witness_v1_';
 
 interface HistorySourceMkWitness {
@@ -171,7 +173,7 @@ export const HistoryBranchSchema = z
     originNodeId: z.string().nullable(),
     headNodeId: z.string().nullable(),
     createdAt: z.number().finite(),
-    status: z.enum(['active', 'available', 'recovery_failed', 'broken']),
+    status: z.enum(['active', 'available', 'recovery_failed', 'broken', 'degraded']),
   })
   .strict();
 
@@ -737,7 +739,8 @@ export async function scanCurrentChat(options: HistoryScanOptions = {}): Promise
     originNodeId: previousBranch?.originNodeId ?? options.originNodeId ?? null,
     headNodeId: currentParentId,
     createdAt: previousBranch?.createdAt ?? now,
-    status: 'active',
+    // 降级恢复代表此聊天的来源精确性已经让步，刷新页面不得悄悄清除标记。
+    status: previousBranch?.status === 'degraded' ? 'degraded' : 'active',
   };
 
   return buildViewState(persistHistoryTree(tree), currentChat);
@@ -1555,7 +1558,19 @@ async function restoreSealedEventBaseline(journal: HistoryCheckoutJournal | null
 async function runFullHistorySync(prepareVerification = false): Promise<void> {
   const traceJournal = prepareVerification ? readHistoryCheckoutJournal() : null;
   if (prepareVerification) recordCheckoutEventSystemAudit('before-full-sync', traceJournal);
-  await waitForEraFullResync();
+  try {
+    await waitForEraFullResync();
+  } catch (error) {
+    // 只针对超时自动补做一次带全新 syncId 的全量同步。
+    // ACK 仍必须真实携带匹配的 syncId；不能把固定延时或无关的 resync 当作成功。
+    if (!(error instanceof Error) || !error.message.includes('等待 ERA 完全重算完成超时')) throw error;
+    recordEraDiagnostic('wuxia-history-checkout', 'history-full-sync-timeout-auto-retry', {
+      transactionId: traceJournal?.transactionId ?? '',
+      nodeId: traceJournal?.targetNodeId ?? '',
+      maxExtraAttempts: 1,
+    });
+    await waitForEraFullResync();
+  }
   if (prepareVerification) recordCheckoutEventSystemAudit('after-full-sync', traceJournal);
   if (prepareVerification) {
     // 保留纯 ERA 重放后的证据，之后的事件基准恢复不得伪装成 ERA 自己回滚成功。
@@ -1791,6 +1806,92 @@ function describeCheckoutMkMismatch(sealedHash: string, node: HistoryNode | unde
   }
 }
 
+interface AppliedAutomaticMkRepair {
+  nodeId: string;
+  transactionId: string;
+  original: HistoryVerification;
+  repaired: HistoryVerification;
+}
+
+/**
+ * 对旧版不可信 MK 封存自动纠错：来源见证 + 完整逐楼对账 + 事件整体指纹必须同时成立。
+ * 存在可信旧 MK 快照时绝不自动改写；不能靠分支自身的哈希证明旧记录错误。
+ */
+function tryApplyAutomaticLegacyMkRepair(
+  journal: HistoryCheckoutJournal,
+  node: HistoryNode,
+  state: HistoryTreeViewState,
+): AppliedAutomaticMkRepair | null {
+  const original = node.verification;
+  if (!original || journal.actionKind !== 'fork_branch' || journal.stage !== 'verify' ||
+      state.currentNodeId !== node.id ||
+      state.currentChat.id !== journal.targetLocator.chatId) return null;
+
+  const current = readCurrentVerification();
+  if (current.selectedMksHash === original.selectedMksHash ||
+      current.eventStateHash !== original.eventStateHash) return null;
+
+  const witness = readCheckoutSourceMkWitness(journal.transactionId);
+  if (!witness ||
+      witness.targetNodeId !== node.id ||
+      witness.sourceChatId !== journal.sourceChatId ||
+      witness.targetMessageId !== journal.targetLocator.assistantMessageId ||
+      witness.targetSwipeId !== journal.targetLocator.swipeId ||
+      witness.targetMk !== node.messageKey ||
+      witness.originalSelectedMksHash !== original.selectedMksHash ||
+      witness.eventStateHash !== original.eventStateHash ||
+      current.selectedMksHash !== witness.alignedPrefixHash) return null;
+
+  // 旧快照可信时可能是真实旧聊天修改，绝不能将其误认成旧封存错误。
+  const originalSnapshot = loadHistoryMkSnapshot(original.selectedMksHash);
+  if (originalSnapshot && stableHistoryHash(originalSnapshot) === original.selectedMksHash) return null;
+
+  let aligned: (string | null)[];
+  try {
+    aligned = assertCurrentHistoryMksAligned(state.tree.nodes[node.id]);
+  } catch {
+    // 实际聊天 MK 未对齐时，保留严格校验失败；不将安全检查错误解释为可修复。
+    return null;
+  }
+  if (aligned.length !== witness.targetMessageId + 1 ||
+      stableHistoryHash(aligned) !== current.selectedMksHash) return null;
+
+  // 并发保护：记录和更新之间不能换节点或静默换指纹。
+  const tree = cloneTree(loadHistoryTree());
+  if (tree.nodes[node.id]?.verification?.selectedMksHash !== original.selectedMksHash ||
+      tree.nodes[node.id]?.verification?.eventStateHash !== original.eventStateHash) return null;
+  const repaired = { ...original, selectedMksHash: current.selectedMksHash };
+  // 保存审计失败则原历史树保持原样，不允许进行不可追溯的修复。
+  persistHistoryVerificationRepairAudit({
+    timestamp: Date.now(),
+    transactionId: journal.transactionId,
+    nodeId: node.id,
+    sourceChatId: journal.sourceChatId,
+    targetChatId: journal.targetLocator.chatId,
+    sourceWitness: witness,
+    oldVerification: original,
+    newVerification: repaired,
+    status: 'automatic-attempt',
+  });
+  tree.nodes[node.id] = { ...tree.nodes[node.id], verification: repaired };
+  persistHistoryTree(tree);
+  recordEraDiagnostic('wuxia-history-checkout', 'history-verification-auto-repair-applied', {
+    transactionId: journal.transactionId, nodeId: node.id,
+    oldHash: original.selectedMksHash, newHash: repaired.selectedMksHash,
+  });
+  return { nodeId: node.id, transactionId: journal.transactionId, original, repaired };
+}
+
+function rollbackAutomaticLegacyMkRepair(applied: AppliedAutomaticMkRepair): void {
+  const tree = cloneTree(loadHistoryTree());
+  if (tree.nodes[applied.nodeId]?.verification?.selectedMksHash !== applied.repaired.selectedMksHash) return;
+  tree.nodes[applied.nodeId] = { ...tree.nodes[applied.nodeId], verification: applied.original };
+  persistHistoryTree(tree);
+  recordEraDiagnostic('wuxia-history-checkout', 'history-verification-auto-repair-rolled-back', {
+    nodeId: applied.nodeId, transactionId: applied.transactionId,
+  });
+}
+
 function commitVerification(
   state: HistoryTreeViewState,
   targetNodeId: string,
@@ -1917,6 +2018,7 @@ async function executeCheckout(
   let state: HistoryTreeViewState | null = null;
   let actionKind: CheckoutActionKind = 'fork_branch';
   let failureStep = '读取目标历史节点';
+  let automaticMkRepair: AppliedAutomaticMkRepair | null = null;
   try {
     const tree = loadHistoryTree();
     const node = tree.nodes[nodeId];
@@ -2066,7 +2168,15 @@ async function executeCheckout(
           '恢复的聊天楼层与所选节点不匹配。',
         );
       }
-      state = commitVerification(state, nodeId, node.verification);
+      automaticMkRepair = tryApplyAutomaticLegacyMkRepair(journal, node, state);
+      if (automaticMkRepair) {
+        // 原 scanned.state 引用旧树；改为最新树继续使用原有严格校验，不绕过 verify。
+        state = buildViewState(loadHistoryTree(), state.currentChat);
+      }
+      state = commitVerification(
+        state, nodeId,
+        automaticMkRepair ? automaticMkRepair.repaired : node.verification,
+      );
       journal = updateHistoryCheckoutJournal({ stage: 'commit' }) ?? journal;
     }
 
@@ -2093,9 +2203,31 @@ async function executeCheckout(
     const postCommitChatName = actionKind === 'fork_branch' ? (journal.postCommitChatName ?? null) : null;
     clearHistoryCheckoutJournal();
     clearLastHistoryCheckoutFailure();
+    if (automaticMkRepair) {
+      try {
+        saveHistoryMkSnapshot(automaticMkRepair.repaired.selectedMksHash, assertCurrentHistoryMksAligned());
+      } catch (error) {
+        recordEraDiagnostic('wuxia-history-checkout', 'history-auto-repair-mk-snapshot-save-failed', {
+          nodeId: automaticMkRepair.nodeId,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+      }
+      recordEraDiagnostic('wuxia-history-checkout', 'history-verification-auto-repair-committed', {
+        transactionId: automaticMkRepair.transactionId,
+        nodeId: automaticMkRepair.nodeId,
+      });
+    }
     notifyHistoryCheckoutCommit(resumed, { postCommitChatName });
     return makeCheckoutResult('commit', actionKind, nodeId, state, null, postCommitChatName);
   } catch (error) {
+    // 失败时绝不遗留已经改变、却没被完整 checkout 验证的共享历史基准。
+    if (automaticMkRepair) {
+      try {
+        rollbackAutomaticLegacyMkRepair(automaticMkRepair);
+      } catch (rollbackError) {
+        console.error('[历史恢复] 自动 MK 修复回滚失败，需要人工核查历史审计', rollbackError);
+      }
+    }
     const message = error instanceof Error ? error.message : String(error);
     const userMessage = summarizeCheckoutFailure(error);
     const unavailableChat = error instanceof HistoryChatUnavailableError ? error : null;
@@ -2353,6 +2485,106 @@ export async function repairLegacyCheckoutVerification(): Promise<HistoryCheckou
     }
     throw error;
   }
+}
+
+
+/**
+ * 显式降级继续：允许分支事件状态与封存不一致，但仍硬性要求来源见证、
+ * 消息/活动 swipe/MK 与来源完全相同。永不覆盖共享历史节点的原始验证。
+ * 当前分支保留 degraded 标记和审计，其他聊天不会被改动。
+ */
+export async function continueCheckoutWithEventDrift(): Promise<HistoryCheckoutResult> {
+  if (activeCheckout) throw new Error('历史恢复仍在运行，请勿并发降级继续。');
+  const journal = readHistoryCheckoutJournal();
+  if (!journal || journal.actionKind !== 'fork_branch' ||
+      journal.stage !== 'verify' || journal.failure?.stage !== 'verify') {
+    throw new Error('只有分叉后的事件验证失败才允许选择降级继续。');
+  }
+  const activeChatId = String(SillyTavern.getCurrentChatId?.() ?? '');
+  if (activeChatId !== journal.targetLocator.chatId) {
+    throw new Error('当前聊天不是此事务建立的目标分支，禁止降级继续。');
+  }
+  const tree = loadHistoryTree();
+  const node = tree.nodes[journal.targetNodeId];
+  if (!node?.verification) throw new Error('历史节点缺失或未封存，禁止降级继续。');
+  const witness = readCheckoutSourceMkWitness(journal.transactionId);
+  if (!witness ||
+      witness.sourceChatId !== journal.sourceChatId ||
+      witness.targetNodeId !== node.id ||
+      witness.targetMessageId !== journal.targetLocator.assistantMessageId ||
+      witness.targetSwipeId !== journal.targetLocator.swipeId ||
+      witness.targetMk !== node.messageKey ||
+      witness.originalSelectedMksHash !== node.verification.selectedMksHash ||
+      witness.eventStateHash !== node.verification.eventStateHash) {
+    throw new Error('缺少本次分叉前的有效来源见证，不能降级继续；请选择返回来源聊天。');
+  }
+  const current = readCurrentVerification();
+  if (current.eventStateHash === node.verification.eventStateHash) {
+    throw new Error('事件状态已与原封存一致，不应采用降级继续；请重试正常恢复。');
+  }
+  // 不放宽聊天真实性校验：即使允许事件偏差，也不允许混入其他楼层/swipe/MK。
+  const aligned = assertCurrentHistoryMksAligned(node);
+  if (aligned.length !== witness.targetMessageId + 1 ||
+      stableHistoryHash(aligned) !== witness.alignedPrefixHash ||
+      current.selectedMksHash !== witness.alignedPrefixHash) {
+    throw new Error('来源与目标分支的完整 MK 主干不一致，禁止降级继续。');
+  }
+  const scanned = await scanCurrentChat({ originNodeId: node.id });
+  if (scanned.currentNodeId !== node.id || scanned.currentChat.id !== journal.targetLocator.chatId) {
+    throw new Error('目标活动历史节点与来源节点不同，禁止降级继续。');
+  }
+  const latest = cloneTree(loadHistoryTree());
+  const branch = latest.branches[scanned.currentBranchId];
+  if (!branch || branch.chatId !== journal.targetLocator.chatId ||
+      latest.nodes[node.id]?.verification?.selectedMksHash !== node.verification.selectedMksHash) {
+    throw new Error('目标分支或原始历史节点已改变，禁止降级继续。');
+  }
+  // 先持久化原始与当前哈希、关键事件差异；审计写入失败不能放行。
+  const rawAudit = localStorage.getItem(WUXIA_HISTORY_DEGRADED_AUDIT_KEY);
+  const old: unknown = rawAudit ? JSON.parse(rawAudit) : [];
+  if (!Array.isArray(old)) throw new Error('降级恢复审计格式异常，禁止继续。');
+  localStorage.setItem(WUXIA_HISTORY_DEGRADED_AUDIT_KEY, JSON.stringify([...old, {
+    occurredAt: Date.now(),
+    transactionId: journal.transactionId,
+    nodeId: node.id,
+    sourceChatId: journal.sourceChatId,
+    targetChatId: journal.targetLocator.chatId,
+    sourceWitness: witness,
+    originalVerification: node.verification,
+    resumedVerification: current,
+    changedEventPaths: journal.verificationTrace?.changedPaths ?? [],
+    status: 'user-accepted-event-drift',
+  }].slice(-100)));
+
+  latest.branches[scanned.currentBranchId] = {
+    ...branch,
+    headNodeId: node.id,
+    status: 'degraded',
+  };
+  const saved = persistHistoryTree(latest);
+  const postCommitChatName = journal.postCommitChatName ?? null;
+  if (journal.draftUserMessageId !== null && journal.draftUserMessageId !== undefined) {
+    writeHistoryCheckoutDraft({
+      transactionId: journal.transactionId,
+      chatId: journal.targetLocator.chatId,
+      message: journal.draftMessage ?? '',
+    });
+  }
+  clearHistoryCheckoutJournal();
+  clearLastHistoryCheckoutFailure();
+  recordEraDiagnostic('wuxia-history-checkout', 'history-event-drift-user-accepted', {
+    nodeId: node.id,
+    transactionId: journal.transactionId,
+    sourceEventStateHash: node.verification.eventStateHash,
+    resumedEventStateHash: current.eventStateHash,
+    preservedOriginalHistoryVerification: true,
+  });
+  notifyHistoryCheckoutCommit(true, { postCommitChatName });
+  return makeCheckoutResult(
+    'commit', 'fork_branch', node.id,
+    buildViewState(saved, scanned.currentChat),
+    null, postCommitChatName,
+  );
 }
 
 export interface CheckoutRecoveryState {

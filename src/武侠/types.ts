@@ -613,7 +613,7 @@ export interface HistoryBranch {
   originNodeId: string | null;
   headNodeId: string | null;
   createdAt: number;
-  status: 'active' | 'available' | 'recovery_failed' | 'broken';
+  status: 'active' | 'available' | 'recovery_failed' | 'broken' | 'degraded';
 }
 
 export interface WuxiaHistoryTreeV2 {

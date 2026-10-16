@@ -26,6 +26,7 @@ vi.mock('../utils/saveLoadManager', () => ({
   resumeCheckout: vi.fn(),
   retryCheckoutRecovery: vi.fn(),
   repairLegacyCheckoutVerification: vi.fn(),
+  continueCheckoutWithEventDrift: vi.fn(),
   returnToCheckoutSource: vi.fn(),
   abandonCheckoutRecovery: vi.fn(),
 }));
@@ -210,6 +211,22 @@ describe('SaveLoadPanel checkout error display', () => {
     expect(action).not.toBeDisabled();
     fireEvent.click(action);
     expect(screen.getByRole('button', { name: '确认继续' })).toBeInTheDocument();
+  });
+
+  it('事件验证失败时展示降级继续确认，警示偏差及不改原封存', async () => {
+    mocks.readJournal.mockReturnValue({
+      transactionId: 'txn-degrade',
+      stage: 'verify',
+      targetNodeId: 'node-1',
+      targetLocator: { chatId: 'fork-1', chatName: '新分支', userMessageId: null, assistantMessageId: 0, swipeId: 0 },
+      actionKind: 'fork_branch',
+      sourceChatId: 'chat-a', sourceChatName: '聊天 A',
+      failure: { stage: 'verify', message: '事件状态不匹配。', occurredAt: 1 },
+    });
+    render(<SaveLoadPanel gameState={gameState} onClose={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: /降级继续（事件状态可能偏离）/ }));
+    expect(screen.getByRole('button', { name: '我了解事件偏差风险，仍要继续' })).toBeInTheDocument();
+    expect(screen.getByText(/不会修改来源聊天或覆盖历史节点封存指纹/)).toBeInTheDocument();
   });
 
   it('已有 journal 失败仍提供重试和返回来源，技术诊断保留原始异常', async () => {

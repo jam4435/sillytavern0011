@@ -11,7 +11,7 @@ export function summarizeHistoryNodeBranches(tree: WuxiaHistoryTreeV2, nodeId: s
 } {
   const branches = Object.values(tree.branches).filter(branch => branch.headNodeId === nodeId);
   const brokenBranchCount = branches.filter(branch => branch.status === 'broken').length;
-  const healthy = (['active', 'available', 'recovery_failed'] as const)
+  const healthy = (['active', 'degraded', 'available', 'recovery_failed'] as const)
     .map(status => branches.find(branch => branch.status === status))
     .find((branch): branch is HistoryBranch => Boolean(branch));
   return {
