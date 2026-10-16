@@ -130,9 +130,55 @@ describe('SaveLoadPanel checkout error display', () => {
     render(<SaveLoadPanel gameState={gameState} onClose={vi.fn()} />);
     fireEvent.click(await screen.findByRole('button', { name: '选择测试历史节点' }));
     expect(screen.getByText('3 个实际聊天定位')).toBeInTheDocument();
-    expect(screen.getByText('部分分支失效')).toBeInTheDocument();
+    expect(screen.getByText('1 条旧分支标记不可用 · 仍有可用分支')).toBeInTheDocument();
     expect(screen.queryByText('路径断链')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '切换到该分支' })).not.toBeDisabled();
+  });
+
+  it('第109楼修复成功后显示当前分支正常，旧 broken 分支只保留历史提示', async () => {
+    const targetId = 'selected-node';
+    const activeChatId = '金庸群侠传 - 2026-10-11@00h11m45s · 第52段';
+    const node = {
+      id: targetId, parentId: null, messageKey: 'mk-109',
+      label: null, pinned: false, preview: '第109楼',
+      location: '大理/云南/官道/马车内', worldTimeText: '壬戌年 三月 十八',
+      createdAt: 1,
+      verification: { selectedMksHash: '86621d6c8b79a618', eventStateHash: '715034ccda2a6586' },
+      locators: [
+        { chatId: 'broken-old-1', chatName: 'Branch #109 A', userMessageId: 108, assistantMessageId: 109, swipeId: 0 },
+        { chatId: 'broken-old-2', chatName: 'Branch #109 B', userMessageId: 108, assistantMessageId: 109, swipeId: 0 },
+        { chatId: activeChatId, chatName: activeChatId, userMessageId: 108, assistantMessageId: 109, swipeId: 0 },
+      ],
+    };
+    mocks.scan.mockResolvedValue({
+      tree: {
+        version: 2, updatedAt: 1,
+        nodes: { [targetId]: node },
+        branches: {
+          old1: {
+            id: 'old1', chatId: 'broken-old-1', chatName: 'Branch #109 A',
+            originNodeId: targetId, headNodeId: targetId, createdAt: 1, status: 'broken',
+          },
+          old2: {
+            id: 'old2', chatId: 'broken-old-2', chatName: 'Branch #109 B',
+            originNodeId: targetId, headNodeId: targetId, createdAt: 2, status: 'broken',
+          },
+          repaired: {
+            id: 'repaired', chatId: activeChatId, chatName: activeChatId,
+            originNodeId: targetId, headNodeId: targetId, createdAt: 3, status: 'active',
+          },
+        },
+      },
+      currentChat: { id: activeChatId, name: activeChatId },
+      currentNodeId: targetId,
+      currentBranchId: 'repaired',
+    });
+    render(<SaveLoadPanel gameState={gameState} onClose={vi.fn()} />);
+    expect(await screen.findByText('当前分支正常')).toBeInTheDocument();
+    expect(screen.getByText('另有 2 条旧分支标记不可用')).toBeInTheDocument();
+    expect(screen.queryByText('部分分支失效')).not.toBeInTheDocument();
+    expect(screen.queryByText('恢复失败')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '当前进度' })).toBeDisabled();
   });
 
   it('即使唯一历史分支 broken，仍能尝试由后端逐个核验 locator', async () => {
@@ -159,7 +205,7 @@ describe('SaveLoadPanel checkout error display', () => {
     });
     render(<SaveLoadPanel gameState={gameState} onClose={vi.fn()} />);
     fireEvent.click(await screen.findByRole('button', { name: '选择测试历史节点' }));
-    expect(screen.getByText('旧分支失效 · 可尝试其他定位')).toBeInTheDocument();
+    expect(screen.getByText('1 条旧分支标记不可用 · 可尝试其他定位')).toBeInTheDocument();
     const action = screen.getByRole('button', { name: '从此处继续' });
     expect(action).not.toBeDisabled();
     fireEvent.click(action);

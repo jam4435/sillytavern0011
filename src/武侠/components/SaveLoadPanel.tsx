@@ -218,6 +218,13 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
     : null;
   const selectedBranchStatus = branchHealth?.status ?? null;
   const selectedIsCurrent = Boolean(selectedNode && selectedNode.id === view?.currentNodeId);
+  // 当前分支已经恢复时，不再用其他旧分支的 broken 状态覆盖当前成功状态。
+  const selectedCurrentBranch = view?.tree.branches[view.currentBranchId] ?? null;
+  const selectedCurrentBranchActive = Boolean(
+    selectedIsCurrent &&
+    selectedCurrentBranch?.headNodeId === selectedNode?.id &&
+    selectedCurrentBranch?.status === 'active',
+  );
   const selectedIsOtherBranchLeaf = Boolean(
     selectedNode &&
     !selectedIsCurrent &&
@@ -643,10 +650,20 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
                 <div className="history-detail-flags">
                   {selectedNode.pinned && <span className="history-flag">已钉住</span>}
                   {!selectedNode.verification && <span className="history-flag warn">首次扫描 · 未校验</span>}
+                  {selectedCurrentBranchActive && (
+                    <span className="history-flag">当前分支正常</span>
+                  )}
                   {selectedBranchStatus === 'recovery_failed' && <span className="history-flag danger">恢复失败</span>}
                   {(branchHealth?.brokenBranchCount ?? 0) > 0 && (
-                    <span className="history-flag warn" title="某条旧聊天分支失效不等于该节点的其他聊天定位不可用">
-                      {branchHealth?.usableBranchCount ? '部分分支失效' : '旧分支失效 · 可尝试其他定位'}
+                    <span
+                      className={`history-flag ${!selectedCurrentBranchActive && !branchHealth?.usableBranchCount ? 'warn' : ''}`.trim()}
+                      title="旧分支状态是各自聊天的历史记录，不代表当前分支失败，也不代表其他聊天定位全部不可用"
+                    >
+                      {selectedCurrentBranchActive
+                        ? `另有 ${branchHealth?.brokenBranchCount} 条旧分支标记不可用`
+                        : branchHealth?.usableBranchCount
+                          ? `${branchHealth?.brokenBranchCount} 条旧分支标记不可用 · 仍有可用分支`
+                          : `${branchHealth?.brokenBranchCount} 条旧分支标记不可用 · 可尝试其他定位`}
                     </span>
                   )}
                 </div>
