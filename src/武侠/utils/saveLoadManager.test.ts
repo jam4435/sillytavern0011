@@ -748,6 +748,12 @@ describe('history checkout', () => {
     };
     await finalizeCurrentTurn();
 
+    // 测试同步器默认只发 ACK；此处需模拟 ERA 真正按分支消息截断 SelectedMks。
+    eventOn('manual_full_sync', () => {
+      if (currentChatId !== 'fork-1') return;
+      const meta = currentChat().variables.ERAMetaData as { SelectedMks: (string | null)[] };
+      meta.SelectedMks = meta.SelectedMks.slice(0, currentChat().messages.length);
+    });
     const result = await checkoutNode(targetId, { forceBranch: true });
     expect(result.status).toBe('commit');
     expect(currentChat().variables.stat_data).toEqual(oldState);
