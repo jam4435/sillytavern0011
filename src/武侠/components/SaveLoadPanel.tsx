@@ -558,7 +558,8 @@ const SaveLoadPanel: React.FC<SaveLoadPanelProps> = ({ gameState, isBusy = false
                   <button type="button" className="history-secondary-action" disabled={recoveryActionDisabled} onClick={() => void handleReturnSource()}>
                     <Undo2 size={14} /> 返回来源聊天
                   </button>
-                  {journal.actionKind === 'fork_branch' && journal.failure?.stage === 'verify' && (
+                  {journal.actionKind === 'fork_branch' && journal.failure?.stage === 'verify' &&
+                    /事件状态|事件系统|参与事件|世界事件|事件分支结果|后续事件线索/.test(journal.failure.message) && (
                     <button type="button" className="history-secondary-action" disabled={recoveryActionDisabled}
                       onClick={() => setConfirmDegradedContinue(value => !value)}>
                       <ShieldAlert size={14} /> 降级继续（事件状态可能偏离）

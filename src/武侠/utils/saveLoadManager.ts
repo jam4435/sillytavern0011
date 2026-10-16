@@ -913,6 +913,18 @@ export async function finalizeCurrentTurn(options: FinalizeHistoryTurnOptions = 
   if (node.verification &&
       (node.verification.selectedMksHash !== sealedVerification.selectedMksHash ||
        node.verification.eventStateHash !== sealedVerification.eventStateHash)) {
+    // 旧节点的原 verification 永久不可改写。对经用户确认的降级分支，
+    // 重复保存当前楼层只重用已有节点；新一楼完成时仍按正常规则封存新节点。
+    if (scanned.tree.branches[scanned.currentBranchId]?.status === 'degraded') {
+      recordEraDiagnostic('wuxia-history-checkout', 'history-degraded-existing-node-preserved', {
+        nodeId: node.id, branchId: scanned.currentBranchId,
+        sealedMkHash: node.verification.selectedMksHash,
+        currentMkHash: sealedVerification.selectedMksHash,
+        sealedEventHash: node.verification.eventStateHash,
+        currentEventHash: sealedVerification.eventStateHash,
+      });
+      return scanned;
+    }
     recordEraDiagnostic('wuxia-history-checkout', 'history-seal-immutable-verification-rejected', {
       nodeId: node.id,
       original: node.verification,

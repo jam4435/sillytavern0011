@@ -1568,6 +1568,9 @@ describe('history checkout', () => {
     expect(loadHistoryTree().branches[accepted.currentBranchId!].status).toBe('degraded');
     const afterRefresh = await scanCurrentChat();
     expect(afterRefresh.tree.branches[afterRefresh.currentBranchId].status).toBe('degraded');
+    const resealed = await finalizeCurrentTurn();
+    expect(resealed.tree.nodes[nodeId].verification!.eventStateHash).toBe(oldHash);
+    expect(resealed.tree.branches[resealed.currentBranchId].status).toBe('degraded');
     const audit = JSON.parse(localStorage.getItem(WUXIA_HISTORY_DEGRADED_AUDIT_KEY) || '[]') as
       Array<{ status: string; originalVerification: { eventStateHash: string } }>;
     expect(audit).toHaveLength(1);
