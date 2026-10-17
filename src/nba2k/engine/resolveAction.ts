@@ -70,6 +70,7 @@ function situationalModifiers(input: ResolveInput, helpCount: number, helpWeight
     if (scheme === '延误') mods.push({ label: '夹击延误', value: -3 });
   }
   if (situation.advantageModifier) mods.push({ label: '前序创造优势', value: clamp(situation.advantageModifier, -6, 8) });
+  if (situation.creativeDifficulty) mods.push({ label: '创意动作风险', value: clamp(situation.creativeDifficulty, -12, 0) });
   if (situation.turnoverPressure && (family === '传球' || family === '挡拆' || input.action === '突破分球')) {
     mods.push({ label: '持球压力', value: -clamp(situation.turnoverPressure, 0, 8) });
   }
