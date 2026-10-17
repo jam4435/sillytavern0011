@@ -29,7 +29,9 @@ export function observeEraWriteDone(expectedAction = 'resync', expectedSyncId?: 
     if (stopped || !detail || typeof detail !== 'object' || Array.isArray(detail)) return;
     const writeDone = detail as EraWriteDoneDetail;
     if (!Number.isInteger(writeDone.message_id) || writeDone.actions?.[expectedAction] !== true) return;
-    if (expectedSyncId && !writeDone.syncIds?.includes(expectedSyncId)) return;
+    // 兼容旧版随卡打包的 ERA 脚本：若它还不会回传 syncIds，则退化为 message_id + action 匹配。
+    // 新版一旦提供 syncIds，仍严格排除其他事务的同步信号。
+    if (expectedSyncId && Array.isArray(writeDone.syncIds) && !writeDone.syncIds.includes(expectedSyncId)) return;
     const messageId = Number(writeDone.message_id);
     if (pending?.messageId === messageId) {
       const current = pending;
