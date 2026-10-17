@@ -653,7 +653,7 @@ const App: React.FC = () => {
       // v3 只允许控制主角；忽略任何伪造的 actorKey。
       const actorKey = career.附身球员;
       const actor = resolvePlayer(actorKey);
-      if (!actor) return;
+      if (!actor) throw new Error('找不到主角球员数据，已取消本次动作结算。');
       const partner = choice.partnerKey ? (resolvePlayer(choice.partnerKey) ?? null) : null;
 
       // 对位者：距行动人最近的对方球员
