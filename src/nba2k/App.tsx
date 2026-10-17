@@ -218,6 +218,11 @@ function actionHotZone(career: NonNullable<Nba2kStat['生涯']>, action: ActionC
   return state === '热' ? 4 : state === '冷' ? -4 : 0;
 }
 
+/** 前端已经完成直接变量写入的管理操作，仅保留演出，禁止重复生成 ERA 指令。 */
+function stripDirectWriteVariableBlocks(text: string): string {
+  return text.replace(/<NBASettlement>[\s\S]*?<\/NBASettlement>/gi, '').replace(/<Variable(Think|Insert|Edit|Delete)>[\s\S]*?<\/Variable\1>/gi, '').trim();
+}
+
 function stripMatchVariableBlocks(text: string, patch: Record<string, unknown>): string {
   const narrative = text.replace(/<NBASettlement>[\s\S]*?<\/NBASettlement>/gi, '').replace(/<Variable(Think|Insert|Edit|Delete)>[\s\S]*?<\/Variable\1>/gi, '').trim();
   return `${narrative}\n<VariableThink>确定性操作由前端完成。</VariableThink>\n<VariableEdit>${JSON.stringify(patch)}</VariableEdit>`;
@@ -855,7 +860,7 @@ const App: React.FC = () => {
       await sendTurn(
         `【比赛管理】${side}队已由前端确定性扣除一次暂停，当前剩余${nextMatch.暂停[side]}次。` +
           `请演出教练布置与球员反应；不得修改任何比赛数值。`,
-        { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 比赛: nextMatch }) },
+        { transformAssistant: async raw => stripDirectWriteVariableBlocks(raw) },
       );
     },
     [stat, sendTurn],
@@ -892,7 +897,7 @@ const App: React.FC = () => {
       await sendTurn(
         `【比赛管理】前端已完成${side}队换人：${resolvePlayer(outKey)?.cn ?? outKey}下，${resolvePlayer(inKey)?.cn ?? inKey}上。` +
           `请简短演出换人，不得修改比赛数值。`,
-        { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 比赛: nextMatch }) },
+        { transformAssistant: async raw => stripDirectWriteVariableBlocks(raw) },
       );
     },
     [stat, sendTurn],
@@ -931,7 +936,7 @@ const App: React.FC = () => {
     nextMatch = advancePeriodIfNeeded(nextMatch);
     await insertOrAssignVariables({ stat_data: { 比赛: nextMatch } }, { type: 'chat' });
     setStat(current => ({ ...current, 比赛: nextMatch }));
-    await sendTurn(`【罚球】前端按${shooter?.cn ?? pending.shooter}的罚球能力完成骰子判定：${made ? '命中' : '不中'}。请简短演出，不修改任何数值。`, { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 比赛: nextMatch }) });
+    await sendTurn(`【罚球】前端按${shooter?.cn ?? pending.shooter}的罚球能力完成骰子判定：${made ? '命中' : '不中'}。请简短演出，不修改任何数值。`, { transformAssistant: async raw => stripDirectWriteVariableBlocks(raw) });
   }, [stat, sendTurn]);
 
   const handleTacticRequest = useCallback(async (patch: Partial<StructuredTeamTactics>) => {
@@ -949,7 +954,7 @@ const App: React.FC = () => {
     };
     await insertOrAssignVariables({ stat_data: { 比赛: nextMatch } }, { type: 'chat' });
     setStat(current => ({ ...current, 比赛: nextMatch }));
-    await sendTurn(`【战术建议】我向教练提出${JSON.stringify(patch)}，按教练信任${career.教练信任}进行前端骰子后，结果为${accepted ? '接受' : '拒绝'}。请演出沟通，不修改数值。`, { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 比赛: nextMatch }) });
+    await sendTurn(`【战术建议】我向教练提出${JSON.stringify(patch)}，按教练信任${career.教练信任}进行前端骰子后，结果为${accepted ? '接受' : '拒绝'}。请演出沟通，不修改数值。`, { transformAssistant: async raw => stripDirectWriteVariableBlocks(raw) });
   }, [stat, sendTurn]);
 
   const handleUpgrade = useCallback(async (group: UpgradeGroupKey) => {
@@ -970,7 +975,7 @@ const App: React.FC = () => {
     if (!result.trained) { toastr.warning('今天已经完成训练'); return; }
     await insertOrAssignVariables({ stat_data: { 生涯: result.career, 场外: result.offCourt } }, { type: 'chat' });
     setStat(current => ({ ...current, 生涯: result.career, 场外: result.offCourt }));
-    await sendTurn('【训练】我完成了今天的专项训练，前端已确定性增加1成长点并推进日期。请简短描写训练内容与教练反馈，不再修改数值。', { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 生涯: result.career, 场外: result.offCourt }) });
+    await sendTurn('【训练】我完成了今天的专项训练，前端已确定性增加1成长点并推进日期。请简短描写训练内容与教练反馈，不再修改数值。', { transformAssistant: async raw => stripDirectWriteVariableBlocks(raw) });
   }, [stat, sendTurn]);
 
   const handlePrepareMarket = useCallback(async () => {
@@ -1023,7 +1028,7 @@ const App: React.FC = () => {
       if (draftNote) {
         await sendTurn(
           draftNote + '\n本次没有生成需要我处理的续约/自由市场正式报价。请只演出选秀夜和球队新秀加入后的联盟反应，不得改动选秀结果。',
-          { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 联盟: nextLeague }) },
+          { transformAssistant: async raw => stripDirectWriteVariableBlocks(raw) },
         );
       } else {
         toastr.info('当前没有满足球队需求与价值条件的正式报价。');
@@ -1035,7 +1040,7 @@ const App: React.FC = () => {
       `【${label}】前端根据球队位置需求、阵容深度、战绩、球员市场价值与合同条件生成了固定报价：\n` +
       offers.map(offer => `- ${offerSummary(offer)}`).join('\n') +
       '\n这些报价已经写入联盟状态，不得由叙事模型新增、删除或改价；只需演出经纪人/管理层如何把报价摆到我面前。',
-      { transformAssistant: async raw => stripMatchVariableBlocks(raw, { 联盟: nextLeague }) },
+      { transformAssistant: async raw => stripDirectWriteVariableBlocks(raw) },
     );
   }, [stat, sendTurn]);
 
@@ -1108,7 +1113,7 @@ const App: React.FC = () => {
     setStat(current => ({ ...current, ...patch }));
     await sendTurn(
       `【正式落地】我接受了这份${offer.type}报价：${offerSummary(offer)}。前端已经完成合同和Roster变更，当前球队为${getTeam(offer.teamId)?.cn ?? offer.teamId}，球队角色为${nextRole}。请演出签字、官宣或更衣室反应，不得改动交易/签约结果。`,
-      { transformAssistant: async raw => stripMatchVariableBlocks(raw, patch) },
+      { transformAssistant: async raw => stripDirectWriteVariableBlocks(raw) },
     );
   }, [stat, sendTurn]);
 
@@ -1153,7 +1158,7 @@ const App: React.FC = () => {
         '【自由市场必须决策】我的上一份合同已经到期，前端已完成其他球队的休赛期市场，并生成了固定的正式报价：\n' +
           offers.map(offer => `- ${offerSummary(offer)}`).join('\n') +
           '\n在接受其中一份合同前不能进入下一赛季。报价已写入存档，叙事模型不得重新报价。',
-        { transformAssistant: async raw => stripMatchVariableBlocks(raw, patch) },
+        { transformAssistant: async raw => stripDirectWriteVariableBlocks(raw) },
       );
       return;
     }
@@ -1226,7 +1231,7 @@ const App: React.FC = () => {
       agedCareer.退役状态 === '退役'
         ? `【休赛期结算】前端生命周期系统已判定我在${agedCareer.年龄}岁正式退役。请以生涯纪录片口吻总结，不得改变退役结论或能力数值。`
         : (drafted.newlyCompleted ? `【选秀夜】本届选秀已由前端完成：\n${draftSummary(drafted.picks, career.球队)}\n\n` : '') + `【新赛季】休赛期阵容市场与生命周期结算已经完成，进入${nextLeague.赛季}赛季。我现在${agedCareer.年龄}岁，总评${agedCareer.能力.overall}，效力${getTeam(nextCareer.球队)?.cn ?? nextCareer.球队}。请演出训练营报到和新赛季期待，不得重新计算合同、Roster或能力。`,
-      { transformAssistant: async raw => stripMatchVariableBlocks(raw, patch) },
+      { transformAssistant: async raw => stripDirectWriteVariableBlocks(raw) },
     );
   }, [stat, sendTurn]);
 
