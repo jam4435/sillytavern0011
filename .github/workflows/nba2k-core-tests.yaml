@@ -45,6 +45,7 @@ jobs:
           --reporter verbose
           src/nba2k/engine/positioning.test.ts
           src/nba2k/engine/resolveAction.test.ts
+          src/nba2k/engine/creativeAction.test.ts
           src/nba2k/engine/possession.test.ts
           src/nba2k/engine/possessionCalibration.test.ts
           src/nba2k/engine/rotation.test.ts
