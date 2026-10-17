@@ -349,6 +349,8 @@ export interface SituationContext {
   badgeModifier?: number;
   /** 上一阶段真正创造出的进攻优势，直接影响下一动作质量。 */
   advantageModifier?: number;
+  /** 创意动作中高风险表现的额外难度，非正值且由前端决定。 */
+  creativeDifficulty?: number;
   /** 传球/持球压力，正值提高失误风险。 */
   turnoverPressure?: number;
 }
