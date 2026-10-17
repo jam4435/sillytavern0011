@@ -4,6 +4,7 @@ export interface EraWriteDoneDetail {
   message_id?: number | null;
   actions?: Record<string, unknown>;
   statWithoutMeta?: Record<string, unknown>;
+  syncIds?: string[];
 }
 
 export interface EraWriteObserver {
@@ -12,7 +13,7 @@ export interface EraWriteObserver {
 }
 
 /** 先监听再创建 assistant，避免 ERA 写入过快导致丢失完成信号。 */
-export function observeEraWriteDone(expectedAction = 'resync'): EraWriteObserver {
+export function observeEraWriteDone(expectedAction = 'resync', expectedSyncId?: string): EraWriteObserver {
   const buffered = new Map<number, EraWriteDoneDetail>();
   let stopped = false;
   let pending:
@@ -28,6 +29,7 @@ export function observeEraWriteDone(expectedAction = 'resync'): EraWriteObserver
     if (stopped || !detail || typeof detail !== 'object' || Array.isArray(detail)) return;
     const writeDone = detail as EraWriteDoneDetail;
     if (!Number.isInteger(writeDone.message_id) || writeDone.actions?.[expectedAction] !== true) return;
+    if (expectedSyncId && !writeDone.syncIds?.includes(expectedSyncId)) return;
     const messageId = Number(writeDone.message_id);
     if (pending?.messageId === messageId) {
       const current = pending;
