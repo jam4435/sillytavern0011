@@ -763,8 +763,27 @@ body {
 // ---------- 自由输入 ----------
 .free-input {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+  .free-input-modes {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    button {
+      background: $panel-2;
+      color: $text;
+      border: 1px solid $line;
+      font-size: 12px;
+      padding: 7px 11px;
+      &.active {
+        border-color: $accent;
+        color: $accent;
+      }
+    }
+  }
   input {
+    min-width: 0;
     flex: 1;
     background: $panel;
     color: $text;
