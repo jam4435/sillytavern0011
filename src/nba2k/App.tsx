@@ -1290,11 +1290,13 @@ const App: React.FC = () => {
         await sendTurn(`<自由比赛动作>${trimmed}</自由比赛动作>`, {
           generateAssistant: async () => {
             // 第一次生成只解释意图，尚未掷骰也未写入任何变量。
-            const planText = generatedText(await generate({
+            const planText = generatedText(await generateRaw({
               should_stream: false,
-              user_input: buildCreativePlanPrompt({
-                input: trimmed, match, protagonist: career.附身球员, mySide, allowedActions: allowed,
-              }),
+              ordered_prompts: [
+                { role: 'user', content: buildCreativePlanPrompt({
+                  input: trimmed, match, protagonist: career.附身球员, mySide, allowedActions: allowed,
+                }) },
+              ],
             }));
             const teammates = match.阵容[mySide].场上.filter(key => key !== career.附身球员);
             const plan = parseCreativeActionPlan(planText, allowed, teammates, trimmed);
