@@ -13,6 +13,7 @@ import { CreatePlayer } from './components/CreatePlayer';
 import type { CustomPlayerForm } from './utils/customPlayer';
 import { buildCustomPlayer } from './utils/customPlayer';
 import { buildTurnPrompt } from './engine/promptBuilder';
+import { allowedCreativeActions, buildCreativePlanPrompt, parseCreativeActionPlan } from './engine/creativeAction';
 import { buildFormation } from './engine/positioning';
 import { resolveAction } from './engine/resolveAction';
 import { advancePeriodIfNeeded, buildCanonicalAssistant, settleAssistantResponse } from './engine/settlement';
@@ -325,6 +326,7 @@ const App: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [simulationMode, setSimulationMode] = useState<SimulationMode>(() => readSimulationMode());
   const [freeText, setFreeText] = useState('');
+  const [freeInputMode, setFreeInputMode] = useState<'action' | 'dialogue'>('action');
   const [showBoxScore, setShowBoxScore] = useState(false);
   const busyRef = useRef(false);
 
@@ -639,29 +641,13 @@ const App: React.FC = () => {
     );
   }, [stat, sendTurn]);
 
-  /** 场上动作：判定 → 拼指令 → 发送 */
-  const handleAction = useCallback(
-    async (choice: ActionChoice) => {
+  /** 复用按钮原有的数值与统计结算；自由输入仅在它前面增加 AI 动作解释。 */
+  const buildPlayerActionTurn = useCallback(
+    (choice: ActionChoice, playerNote = '', creativeDifficulty = 0) => {
       const match = stat.比赛;
       const career = stat.生涯;
-      if (!match || !career) return;
+      if (!match || !career || !match.进行中) throw new Error('比赛状态不可用。');
       const resolvePlayer = playerResolverForStat(stat);
-
-      if (choice.action === '观察' || choice.action === '模拟一个回合') {
-        const cpu = simulatePossession(match, resolvePlayer);
-        const rotated = cpu.possessionsCompleted ? applyAutomaticRotation(cpu.match, resolvePlayer) : cpu.match;
-        const patch: Record<string, unknown> = { 比赛: rotated };
-        if (match.进行中 && !rotated.进行中) {
-          const nextCareer = finishCareerGame(career, rotated);
-          Object.assign(patch, buildPostGamePatch(stat, nextCareer, rotated));
-        }
-        await sendTurn(
-          `【CPU回合模拟】主角当前不直接控制这一攻。前端已完整模拟一个 possession：${cpu.summary}。请用100-220字简要演出这次攻防，不得改判或修改数值。`,
-          { transformAssistant: async raw => stripMatchVariableBlocks(raw, patch) },
-        );
-        return;
-      }
-
       const mySide: Side = match.对阵.主队 === career.球队 ? '主' : '客';
       const oppSide: Side = mySide === '主' ? '客' : '主';
       // v3 只允许控制主角；忽略任何伪造的 actorKey。
@@ -727,11 +713,12 @@ const App: React.FC = () => {
         partnerDefender,
         actionSide: mySide,
         match,
-        situation,
+        situation: { ...situation, creativeDifficulty },
       });
 
-      await sendTurn(buildTurnPrompt({ match, resolution }), {
-        transformAssistant: async raw => {
+      return {
+        prompt: buildTurnPrompt({ match, resolution, playerNote }),
+        transformAssistant: async (raw: string): Promise<string> => {
           const settled = await settleAssistantResponse(
             raw,
             resolution.contract,
@@ -801,9 +788,38 @@ const App: React.FC = () => {
             : raw;
           return buildCanonicalAssistant(narrativeSource, settled.settlement, finalMatch, extras);
         },
-      });
+      };
     },
-    [stat, sendTurn],
+    [stat],
+  );
+
+  /** 场上动作：判定 → 拼指令 → 发送 */
+  const handleAction = useCallback(
+    async (choice: ActionChoice) => {
+      const match = stat.比赛;
+      const career = stat.生涯;
+      if (!match || !career) return;
+      const resolvePlayer = playerResolverForStat(stat);
+
+      if (choice.action === '观察' || choice.action === '模拟一个回合') {
+        const cpu = simulatePossession(match, resolvePlayer);
+        const rotated = cpu.possessionsCompleted ? applyAutomaticRotation(cpu.match, resolvePlayer) : cpu.match;
+        const patch: Record<string, unknown> = { 比赛: rotated };
+        if (match.进行中 && !rotated.进行中) {
+          const nextCareer = finishCareerGame(career, rotated);
+          Object.assign(patch, buildPostGamePatch(stat, nextCareer, rotated));
+        }
+        await sendTurn(
+          `【CPU回合模拟】主角当前不直接控制这一攻。前端已完整模拟一个 possession：${cpu.summary}。请用100-220字简要演出这次攻防，不得改判或修改数值。`,
+          { transformAssistant: async raw => stripMatchVariableBlocks(raw, patch) },
+        );
+        return;
+      }
+
+      const turn = buildPlayerActionTurn(choice);
+      await sendTurn(turn.prompt, { transformAssistant: turn.transformAssistant });
+    },
+    [stat, sendTurn, buildPlayerActionTurn],
   );
 
   const handleAutoSimulation = useCallback(async () => {
@@ -1253,14 +1269,53 @@ const App: React.FC = () => {
       const trimmed = text.trim();
       if (!trimmed) return;
       if (isInMatch(stat)) {
-        await sendTurn(
-          `<场上对话>${trimmed}</场上对话>\n这是对话、垃圾话或战术表达，不是比赛动作；只回应交流，不推进时钟、比分、球权、体力、站位或其他比赛变量。`,
-        );
+        if (freeInputMode === 'dialogue') {
+          await sendTurn(
+            `<场上对话>${trimmed}</场上对话>\n这轮只是交流，不推进比赛时钟、比分或其他正式比赛状态，也不输出变量块。`,
+            { transformAssistant: async raw => stripDirectWriteVariableBlocks(raw) },
+          );
+          return;
+        }
+        const match = stat.比赛;
+        const career = stat.生涯;
+        if (!match || !career) return;
+        const mySide: Side = match.对阵.主队 === career.球队 ? '主' : '客';
+        let allowed: ReturnType<typeof allowedCreativeActions>;
+        try {
+          allowed = allowedCreativeActions(match, mySide, career.附身球员);
+        } catch (error) {
+          toastr.warning(error instanceof Error ? error.message : '当前无法使用自由动作');
+          return;
+        }
+        await sendTurn(`<自由比赛动作>${trimmed}</自由比赛动作>`, {
+          generateAssistant: async () => {
+            // 第一次生成只解释意图，尚未掷骰也未写入任何变量。
+            const planText = generatedText(await generate({
+              should_stream: false,
+              user_input: buildCreativePlanPrompt({
+                input: trimmed, match, protagonist: career.附身球员, mySide, allowedActions: allowed,
+              }),
+            }));
+            const teammates = match.阵容[mySide].场上.filter(key => key !== career.附身球员);
+            const plan = parseCreativeActionPlan(planText, allowed, teammates, trimmed);
+            const choice: ActionChoice = {
+              action: plan.action, actorKey: career.附身球员, partnerKey: plan.partnerKey,
+            };
+            const turn = buildPlayerActionTurn(
+              choice,
+              `玩家原始动作：${trimmed}\nAI解释：${plan.description}。这只是动作意图，不代表已经成功。\n请忠实演出创意步骤，但必须服从前端判定、合法结果与比分；不可额外创造统计。`,
+              plan.difficultyPenalty,
+            );
+            // 第二次生成才演出前端实际判定；落楼前沿用按钮结算器校验并规范化。
+            const narrative = generatedText(await generate({ should_stream: false, user_input: turn.prompt }));
+            return turn.transformAssistant(narrative);
+          },
+        });
         return;
       }
       await sendTurn(trimmed);
     },
-    [stat, sendTurn],
+    [stat, sendTurn, freeInputMode, buildPlayerActionTurn],
   );
 
   const currentTeamPower = useMemo(() => {
@@ -1384,9 +1439,15 @@ const App: React.FC = () => {
       </div>
 
       <div className="free-input">
+        {inMatch && (
+          <div className="free-input-modes" role="group" aria-label="比赛自由输入模式">
+            <button type="button" className={freeInputMode === 'action' ? 'active' : ''} disabled={busy} onClick={() => setFreeInputMode('action')}>自由动作（会结算）</button>
+            <button type="button" className={freeInputMode === 'dialogue' ? 'active' : ''} disabled={busy} onClick={() => setFreeInputMode('dialogue')}>场上对话（不推进）</button>
+          </div>
+        )}
         <input
           value={freeText}
-          placeholder="自由行动 / 对话（垃圾话回应、战术要求…）"
+          placeholder={inMatch ? freeInputMode === 'action' ? '描述自由动作（将进入AI理解与规则判定）' : '场上对白、垃圾话或战术交流（不推进比分）' : '自由行动 / 对话…'}
           disabled={busy}
           onChange={e => setFreeText(e.target.value)}
           onKeyDown={e => {
