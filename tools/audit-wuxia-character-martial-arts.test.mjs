@@ -622,6 +622,34 @@ describe('wuxia character martial arts audit', () => {
     expect(recollection.delete).toEqual({});
   });
 
+  it('第五批第一组：太祖长拳单独入库，已确认同义功法键在事件内精确匹配', () => {
+    const root = path.join(process.cwd(), '世界书', '金庸群侠传1', '世界书');
+    const read = filename => parseYaml(readFileSync(path.join(root, filename), 'utf8'));
+    const db = JSON.parse(readFileSync(path.join(process.cwd(), 'src', '武侠', 'data', '_合并后功法.json'), 'utf8'));
+    const names = new Set(db.功法.map(item => item.功法名称));
+    const basic = db.功法.filter(item => item.功法名称 === '太祖长拳');
+    expect(basic).toHaveLength(1);
+    expect(basic[0].功法品阶).toBe('粗浅');
+    expect(basic[0].来源类型).toBe('原著明示');
+    expect(names.has('太祖棍')).toBe(true);
+    const tianlong = read('天龙第十四回00-人物登场.yaml');
+    for (const npc of ['乔峰', '全冠清', '徐长老', '奚长老']) {
+      expect(tianlong.insert[npc].功法.太祖长拳).toBeDefined();
+    }
+    const guanying = read('射雕第十三回00-人物登场.yaml');
+    expect(guanying.insert.陆冠英.功法.仙霞派外家拳法.掌握程度).toBe('融会贯通');
+    expect(guanying.insert.陆冠英.功法.仙霞门外家拳法).toBeUndefined();
+    const chengfeng = read('射雕第十四回03-黄药师现身归云庄.yaml');
+    expect(chengfeng.insert.陆乘风.功法.旋风扫叶腿.掌握程度).toBe('初窥门径');
+    expect(chengfeng.insert.陆乘风.功法.旋风扫叶腿法).toBeUndefined();
+    const botong = read('射雕第十六回00-人物登场.yaml');
+    expect(botong.insert.周伯通.功法.左右互搏之术.掌握程度).toBe('出神入化');
+    expect(botong.insert.周伯通.功法.左右互搏).toBeUndefined();
+    for (const name of ['太祖长拳', '仙霞派外家拳法', '旋风扫叶腿', '左右互搏之术']) {
+      expect(names.has(name)).toBe(true);
+    }
+  });
+
   it('生成门派谱系时遵守层级上限、指定传人与关系排除规则', () => {
     const materialized = materializeCharacterMartialArts([
       event(
