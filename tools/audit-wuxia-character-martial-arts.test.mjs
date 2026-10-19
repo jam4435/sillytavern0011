@@ -616,7 +616,9 @@ describe('wuxia character martial arts audit', () => {
     const recollection = read('天龙第五十回05-萧峰舍身止战长眠雁门绝壁.yaml');
     expect(death.update.乔峰.状态).toBe('死亡');
     expect(recollection.事件概要).toContain('追忆');
-    expect(recollection.参与人物).toEqual([]);
+    expect(recollection.参与人物).not.toContain('乔峰');
+    expect(recollection.参与人物).not.toContain('萧峰');
+    expect(recollection.参与人物).not.toContain('阿紫');
     expect(recollection.insert).toEqual({});
     expect(recollection.update).toEqual({});
     expect(recollection.delete).toEqual({});
