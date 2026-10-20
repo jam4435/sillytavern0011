@@ -15,6 +15,9 @@ describe('wuxia martial arts audit batch 2', () => {
     const db = JSON.parse(readFileSync(dbPath, 'utf8'));
     const byName = new Map(db.功法.map(item => [item.功法名称, item]));
 
+    expect(db.功法).toHaveLength(494);
+    expect(byName.size).toBe(db.功法.length);
+
     const whiteSnake = byName.get('白蟒鞭法');
     expect(whiteSnake).toBeDefined();
     expect(whiteSnake.类型).toBe('鞭法');
