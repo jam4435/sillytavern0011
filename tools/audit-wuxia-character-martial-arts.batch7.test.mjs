@@ -22,7 +22,8 @@ describe('NPC martial arts distinction between manuals, moves, and effects',()=>
   it('records the sweeping monk’s invisible inner-force barrier without inventing a scripture',()=>{
     const monk=get('天龙第四十一回00-人物登场.yaml').insert.扫地僧;
     expect(monk.功法.无形气墙).toBeUndefined();
-    expect(monk.功法.少林神功).toBeTruthy();
+    expect(monk.功法?.少林神功).toBeUndefined();
+    expect(monk.人物经历['天龙第四十一回00-人物登场']).toContain('少林神功');
     expect(monk.人物经历['天龙第四十一回00-人物登场']).toContain('出神入化');
   });
   it('distinguishes Guo Jing throwing arrows by hand from a named archery style, and avoids overwriting event history',()=>{

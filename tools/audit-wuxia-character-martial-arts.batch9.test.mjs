@@ -25,7 +25,8 @@ describe('fifth batch continued: distinguish practices and skill collections',()
    expect(c.人物经历['天龙第四十一回00-人物登场']).toContain('七十二');
   }
   expect(e.insert.慕容博.功法.斗转星移).toBeTruthy();
-  expect(e.insert.扫地僧.功法.少林神功).toBeTruthy();
+  expect(e.insert.扫地僧.功法?.少林神功).toBeUndefined();
+  expect(e.insert.扫地僧.人物经历['天龙第四十一回00-人物登场']).toContain('少林神功');
  });
  it('Xiaolongnu plays the zither but does not gain an invented named sonic attack',()=>{
   const c=read('神雕第四回00-人物登场.yaml').insert.小龙女;
