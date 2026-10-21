@@ -42,7 +42,7 @@ describe('fifth batch continued NPC martial-art normalization', () => {
   it('records Ouyang Feng teaching Toad Skill formulas as a later update', () => {
     const start = readEvent('神雕第二回00-人物登场.yaml');
     const event = readEvent('神雕第七回10-欧阳锋传神功点穴尹志平趁隙侵犯.yaml');
-    expect(start.insert.杨过.功法.蛤蟆功).toBeTruthy();
+    expect(start.update.杨过.功法.蛤蟆功).toBeTruthy();
     expect(event.insert.杨过.功法.蛤蟆功诀窍).toBeUndefined();
     expect(event.insert.杨过.功法.九阴假经).toBeTruthy();
     expect(event.update.杨过.功法.蛤蟆功.掌握程度).toMatch(/^初窥门径（得欧阳锋尽数传授蛤蟆功全部诀窍/);
