@@ -54,6 +54,26 @@ function compilePromptRenderer(source = promptSource): PromptRenderer {
 }
 
 describe('武侠输出提示词契约', () => {
+  it('正文模型状态数据统一包裹在<系统信息>中', () => {
+    const render = compilePromptRenderer();
+    const output = render({
+      stat_data: {
+        世界信息: { 时间: { 年: 1200, 月: 1, 日: 2, 时: 3, 分: 4 } },
+        user数据: { 所在位置: '大理/无量山/山脚废农舍/屋内' },
+        角色数据: {},
+      },
+    }, () => undefined).trim();
+    expect(output.startsWith('<系统信息>')).toBe(true);
+    expect(output.endsWith('</系统信息>')).toBe(true);
+    expect(output.match(/<系统信息>/g)).toHaveLength(1);
+    expect(output.match(/<\\/系统信息>/g)).toHaveLength(1);
+    expect(output).toContain('<时间>');
+    expect(output).toContain('<玩家>');
+    expect(output).toContain('<可用地点>');
+    expect(output.indexOf('<时间>')).toBeGreaterThan(output.indexOf('<系统信息>'));
+    expect(output.indexOf('</可用地点>')).toBeLessThan(output.indexOf('</系统信息>'));
+  });
+
   it('递归过滤所有 $ 前缀键，并用严格 JSON 转义特殊字符', () => {
     const toStrictJson = loadPromptSerializer();
     const fixture = {
