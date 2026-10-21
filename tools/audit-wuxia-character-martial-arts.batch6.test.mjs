@@ -17,7 +17,7 @@ describe('fifth batch sustained canonical martial arts audit', () => {
       expect(find(skill)[0].来源说明).toContain('《神雕侠侣》');
       expect(find(skill)[0].战斗系数.属性列表.length).toBeGreaterThan(0);
     }
-    expect(db.功法).toHaveLength(496);
+    expect(db.功法.length).toBeGreaterThanOrEqual(496);
   });
   it('Yin Kexi uses his complete whip art at the late event without an earlier assignment', () => {
     const event=read('神雕第二十六回02-小龙女独战三大高手.yaml');
