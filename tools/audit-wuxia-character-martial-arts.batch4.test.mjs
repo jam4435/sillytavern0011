@@ -78,4 +78,16 @@ describe('fifth batch fourth group canonical martial-art aliases', () => {
       expect(official.filter(skill => skill.功法名称 === item.canonical)).toHaveLength(1);
     });
   }
+
+  it('does not reintroduce the obsolete jujube-kernel alias in Qiu Qianchi later combat updates', () => {
+    for (const file of [
+      '神雕第十九回00-人物登场.yaml',
+      '神雕第二十回01-杨过小龙女联手斗公孙止血茶破闭穴功.yaml',
+    ]) {
+      const eventData = parseYaml(fs.readFileSync(path.join(dir, file), 'utf8'));
+      const arts = eventData.insert?.裘千尺?.功法 ?? eventData.update?.裘千尺?.功法;
+      expect(arts?.枣核吐射).toBeUndefined();
+      expect(arts?.枣核钉?.掌握程度).toMatch(/^出神入化/);
+    }
+  });
 });
