@@ -518,7 +518,7 @@ describe('wuxia character martial arts audit', () => {
     const db = JSON.parse(readFileSync(path.join(process.cwd(), 'src', '武侠', 'data', '_合并后功法.json'), 'utf8'));
     const skill = db.功法.find(item => item.功法名称 === '空手夺白刃');
     expect(skill.功法描述).toContain('全真派');
-    expect(debut.insert.耶律燕.功法.空手夺白刃).toBeUndefined();
+    expect(debut.insert.耶律燕.功法?.空手夺白刃).toBeUndefined();
     expect(encounter.事件详情).toContain('左手以空手夺白刃手法去抢她刀子');
     const narration = '耶律燕右手出掌劈向刺客脸颊，左手以空手夺白刃手法去抢她刀子';
     expect(isActiveUseSentence(narration, ['耶律燕'], '空手夺白刃')).toBe(false);
