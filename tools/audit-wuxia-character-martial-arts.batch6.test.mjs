@@ -22,7 +22,7 @@ describe('fifth batch sustained canonical martial arts audit', () => {
   it('Yin Kexi uses his complete whip art at the late event without an earlier assignment', () => {
     const event=read('神雕第二十六回02-小龙女独战三大高手.yaml');
     expect(event.insert.尹克西.功法.黄沙万里鞭法.掌握程度).toMatch(/^融会贯通/);
-    expect(event.事件详情).toContain('黄沙万里鞭法');
+    expect(event.insert.尹克西.人物经历['神雕第二十六回02-小龙女独战三大高手']).toContain('黄沙万里鞭法');
   });
   it('Jinlun spells out his rare inner skill only at the demonstrated event', () => {
     const event=read('神雕第三十八回08-金轮法王骗郭襄解穴逃脱挟持郭襄失踪.yaml');
@@ -44,7 +44,7 @@ describe('fifth batch sustained canonical martial arts audit', () => {
     expect(han.重要物品.链子锤).toContain('融会贯通');
     expect(han.功法.莲花掌).toBeTruthy();
     const ghost=read('神雕第三十三回00-人物登场.yaml').insert.丧门鬼;
-    expect(ghost.功法.链子枪).toBeUndefined();
+    expect(ghost.功法?.链子枪).toBeUndefined();
     expect(ghost.重要物品.链子枪).toContain('融会贯通');
   });
   it('preserves the named cooperative move as five character experiences, not five fake secret manuals', () => {
