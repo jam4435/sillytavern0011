@@ -41,14 +41,19 @@ jobs:
               },
           }
 
+          expected_counts = {
+              ('世界书/金庸群侠传1/世界书/神雕第三十六回07-何师我暗算击败耶律齐.yaml', '大风袖'): 2,
+          }
+
           for raw_path, mapping in replacements.items():
               path = Path(raw_path)
               text = path.read_text(encoding='utf-8')
               original = text
               for old, new in mapping.items():
                   count = text.count(old)
-                  if count != 1:
-                      raise SystemExit(f'{path}: expected exactly one {old!r}, found {count}')
+                  expected = expected_counts.get((raw_path, old), 1)
+                  if count != expected:
+                      raise SystemExit(f'{path}: expected exactly {expected} {old!r}, found {count}')
                   text = text.replace(old, new)
               path.write_text(text, encoding='utf-8')
               if text == original:
