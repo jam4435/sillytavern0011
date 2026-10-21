@@ -58,4 +58,24 @@ describe('fifth batch fourth group canonical martial-art aliases', () => {
     expect(keys.filter(key => key === '玉女心经')).toHaveLength(1);
     expect(eventData.update.杨过.功法.玉女心经.掌握程度).toContain('内外功全部练成');
   });
+
+  const furtherAliases = [
+    { file: '神雕第九回00-人物登场.yaml', operation: 'insert', actor: '耶律齐', old: '全真派掌法', canonical: '全真掌法', mastery: '炉火纯青' },
+    { file: '神雕第十九回00-人物登场.yaml', operation: 'insert', actor: '裘千尺', old: '枣核吐射', canonical: '枣核钉', mastery: '出神入化' },
+    { file: '神雕第三十回00-人物登场.yaml', operation: 'update', actor: '一灯大师', old: '先天气功', canonical: '先天功', mastery: '出神入化' },
+  ];
+
+  for (const item of furtherAliases) {
+    it(`uses existing official skill ${item.canonical} for ${item.actor}`, () => {
+      const document = parseYaml(fs.readFileSync(path.join(dir, item.file), 'utf8'));
+      const arts = document[item.operation][item.actor].功法;
+      const official = JSON.parse(fs.readFileSync(
+        path.join(root, 'src/武侠/data/_合并后功法.json'), 'utf8',
+      )).功法;
+      expect(arts[item.old]).toBeUndefined();
+      expect(Object.keys(arts)).toContain(item.canonical);
+      expect(arts[item.canonical].掌握程度).toMatch(new RegExp(`^${item.mastery}`));
+      expect(official.filter(skill => skill.功法名称 === item.canonical)).toHaveLength(1);
+    });
+  }
 });
