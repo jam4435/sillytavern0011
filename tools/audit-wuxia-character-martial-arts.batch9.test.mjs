@@ -21,7 +21,7 @@ describe('fifth batch continued: distinguish practices and skill collections',()
   const e=read('天龙第四十一回00-人物登场.yaml');
   for(const actor of ['慕容博','扫地僧']){
    const c=e.insert[actor];
-   expect(c.功法['少林七十二绝技']).toBeUndefined();
+   expect(c.功法?.['少林七十二绝技']).toBeUndefined();
    expect(c.人物经历['天龙第四十一回00-人物登场']).toContain('七十二');
   }
   expect(e.insert.慕容博.功法.斗转星移).toBeTruthy();
