@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   VARIABLE_PROMPT_SLOT_META,
@@ -75,5 +77,44 @@ describe('variablePromptTemplateEngine', () => {
       expect(meta.source).toBeTruthy();
       expect(meta.emptyBehavior).toBeTruthy();
     }
+  });
+});
+
+
+describe('变量模型显式分点检查契约', () => {
+  const guidance = readFileSync(resolve(process.cwd(), 'src/武侠/prompts/变量指导.txt'), 'utf8');
+  const checkNumbers = (text: string) => [...text.matchAll(/^(\d{2})\./gm)].map(match => Number(match[1]));
+
+  it('有参与事件时仅保留 01～08，采信正文事件记录而不重判完成状态', () => {
+    const rendered = renderVariableConditionalTemplate(guidance, makeSlots({ participationEvents: '参与事件.测试' }));
+    expect(checkNumbers(rendered)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(rendered).toContain('不自行重判完成情况');
+    expect(rendered).toContain('缺失或不匹配时不臆造阶段进度');
+    expect(rendered).toContain('按记录的阶段总数等分事件时间窗口');
+    expect(rendered).toContain('参与事件按第4节阶段规则推进');
+  });
+
+  it('无参与事件时仅保留 01～06，时间根据正文实际耗时判断', () => {
+    const rendered = renderVariableConditionalTemplate(guidance, makeSlots());
+    expect(checkNumbers(rendered)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(rendered).toContain('旧完整时间加实际耗时计算新时间');
+    expect(rendered).not.toContain('不自行重判完成情况');
+    expect(rendered).not.toContain('按记录的阶段总数等分事件时间窗口');
+  });
+
+  it('要求完整非空 VariableThink、正向判断与操作一致', () => {
+    expect(guidance).toContain('“编号｜是/否｜简短依据”');
+    expect(guidance).toContain('“是”表示该项判断与拟写操作符合规则');
+    expect(guidance).toContain('不得漏项、跳号、合并或复述题目');
+    expect(guidance).toContain('最终操作须与检查结果一致');
+    expect(guidance).toContain('唯一非空<VariableThink>');
+    expect(guidance).not.toContain('只输出一个闭合的<VariableThink></VariableThink>');
+  });
+
+  it('时间规则按事件和非事件区分，不再反对按事件阶段等分', () => {
+    expect(guidance).toContain('参与事件按第4节阶段规则推进');
+    expect(guidance).toContain('无参与事件时按正文实际过程判断耗时');
+    expect(guidance).not.toContain('事件总时长机械均摊');
+    expect(guidance).toContain('不按回复篇幅或回合数机械推算');
   });
 });
