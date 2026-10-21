@@ -31,51 +31,49 @@ function renderCot(参与事件: unknown, 后续事件线索: unknown): string {
 }
 
 describe('武侠 COT 条件审查契约', () => {
-  it('引用实际正文模型上下文而不是不存在的输入与变量模型标签', () => {
-    expect(cotSource).toContain('本轮最新的 User 消息');
+  it('公共检查引用真实上下文，使用正向是/否判定', () => {
+    expect(cotSource).toContain('本轮最新 User 消息');
     expect(cotSource).not.toContain('<user输入>');
-    expect(cotSource).toContain('<时间>、<玩家>、<角色数据>、<可用地点>');
     expect(cotSource).not.toContain('<variable>');
     expect(cotSource).toContain('<合理性审查>');
-    expect(cotSource).toContain('<card_thinking>');
+    expect(cotSource).toContain('读取<合理性审查>及<系统信息>中的<玩家>、<角色数据>、<时间>、<可用地点>');
+    expect(cotSource).toContain('<card_thinking要求>');
+    expect(cotSource).toContain('“是”表示满足条件；“否”表示未满足');
+    expect(cotSource).toContain('无对应情形时记“是”');
+    expect(cotSource).toContain('04. 本轮拟发生打斗/比试时');
   });
 
-  it('有参与事件时仅注入事件记录规则和连续 01～07 审查', () => {
+  it('参与事件仅注入 01～08 审查，正文之后逐阶段验收', () => {
     const output = renderCot({ '天龙第二回06-测试': { 描述: '入秘洞' } }, { 下一回: '后续线索' });
     expect(output).toContain('<事件记录规则>');
-    expect(output).toContain('正文之后，根据实际发生的事实输出完整<事件记录>');
-    expect(output).toContain('正文 → <事件记录> → <summary>');
-    for (let i = 1; i <= 7; i += 1) {
-      expect(output).toMatch(new RegExp('^' + String(i).padStart(2, '0') + '\\.', 'm'));
-    }
-    expect(output).not.toMatch(/^08\./m);
-    expect(output).not.toContain('04. 读取<后续事件线索>');
-    expect(output).not.toContain('自由探索边界：');
-    expect(output).not.toContain('接驳边界：');
-    expect(output).toContain('<card_thinking>');
+    expect(output).toContain('每阶段对应一个独立完成结果');
+    expect(output).toContain('准备不等于完成');
+    expect(output).toContain('全部必要结果成立才可标记已完成');
+    expect(output).toContain('正文后输出<事件记录>时');
+    expect(output).toContain('保持历史阶段名称、数量与顺序');
+    expect(output).toContain('07. 是否仅根据历史已确认事实判断起始进度');
+    expect(output.match(/^\\d{2}\\./gm)?.map(x => Number(x.slice(0, 2)))).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(output).not.toContain('05. 读取<后续事件线索>');
   });
 
-  it('仅有后续线索时注入 01～05 审查，不要求事件记录', () => {
+  it('仅有后续线索时注入 01～07 审查，保持接驳边界与自然推进', () => {
     const output = renderCot({}, { '天龙第二回07-测试': '前往后续地点' });
     expect(output).not.toContain('<事件记录规则>');
-    expect(output).toContain('04. 读取<后续事件线索>');
-    expect(output).toContain('05. 是否存在玩家尚未参与目标事件');
-    expect(output).not.toMatch(/^06\./m);
-    expect(output).toContain('当前没有参与事件，不得生成<事件记录>');
-    expect(output).toContain('接驳边界：线索不等于已参与目标事件');
-    expect(output).not.toContain('自由探索边界：');
+    expect(output).toContain('05. 读取<后续事件线索>、本轮最新 User 消息及<可用地点>');
+    expect(output).toContain('未主动干预且未明确拒绝时');
+    expect(output).toContain('06. 是否仅将<后续事件线索>视为待触发线索');
+    expect(output).toContain('07. 读取<系统信息>中的<时间>、<可用地点>及最近正文');
+    expect(output.match(/^\\d{2}\\./gm)?.map(x => Number(x.slice(0, 2)))).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(output).not.toContain('每阶段对应一个独立完成结果');
   });
 
-  it('自由探索和只有 $template 的参与事件均只保留 01～03', () => {
+  it('自由探索与仅有模板变量时注入 01～05，不生成参与事件规则', () => {
     for (const participation of [{}, { $template: {} }, null]) {
       const output = renderCot(participation, {});
-      expect(output).toContain('01. 读取<合理性审查>');
-      expect(output).toContain('02. 是否存在过滤玩家输入时');
-      expect(output).toContain('03. 读取正文当前状态');
-      expect(output).not.toMatch(/^04\./m);
       expect(output).not.toContain('<事件记录规则>');
-      expect(output).toContain('自由探索边界：仅围绕玩家本轮行动');
-      expect(output).not.toContain('接驳边界：');
+      expect(output).toContain('05. 读取<合理性审查>、本轮最新 User 消息和最近正文');
+      expect(output.match(/^\\d{2}\\./gm)?.map(x => Number(x.slice(0, 2)))).toEqual([1, 2, 3, 4, 5]);
+      expect(output).not.toContain('05. 读取<后续事件线索>');
     }
   });
 });
