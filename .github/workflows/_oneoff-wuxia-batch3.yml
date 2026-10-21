@@ -1,0 +1,127 @@
+name: _oneoff-wuxia-batch3
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/_oneoff-wuxia-batch3.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Normalize five high-confidence NPC martial-art aliases
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              '世界书/金庸群侠传1/世界书/神雕第六回00-人物登场.yaml': {
+                  '古墓派剑法': '玉女剑法',
+                  '古墓派轻功': '捕雀功',
+              },
+              '世界书/金庸群侠传1/世界书/神雕第一回00-人物登场.yaml': {
+                  '古墓派剑法': '玉女剑法',
+              },
+              '世界书/金庸群侠传1/世界书/神雕第三十六回07-何师我暗算击败耶律齐.yaml': {
+                  '大风袖': '狂风迅雷功',
+              },
+              '世界书/金庸群侠传1/世界书/天龙第十回00-人物登场.yaml': {
+                  '密宗心法': '西藏密宗内功',
+              },
+          }
+
+          for raw_path, mapping in replacements.items():
+              path = Path(raw_path)
+              text = path.read_text(encoding='utf-8')
+              original = text
+              for old, new in mapping.items():
+                  count = text.count(old)
+                  if count != 1:
+                      raise SystemExit(f'{path}: expected exactly one {old!r}, found {count}')
+                  text = text.replace(old, new)
+              path.write_text(text, encoding='utf-8')
+              if text == original:
+                  raise SystemExit(f'{path}: no change made')
+          PY
+      - name: Add focused regression test
+        run: |
+          cat > tools/audit-wuxia-character-martial-arts.batch3.test.mjs <<'EOF'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import { describe, expect, it } from 'vitest';
+
+          const root = process.cwd();
+          const cases = [
+            {
+              file: '世界书/金庸群侠传1/世界书/神雕第六回00-人物登场.yaml',
+              oldNames: ['古墓派剑法', '古墓派轻功'],
+              newNames: ['玉女剑法', '捕雀功'],
+            },
+            {
+              file: '世界书/金庸群侠传1/世界书/神雕第一回00-人物登场.yaml',
+              oldNames: ['古墓派剑法'],
+              newNames: ['玉女剑法'],
+            },
+            {
+              file: '世界书/金庸群侠传1/世界书/神雕第三十六回07-何师我暗算击败耶律齐.yaml',
+              oldNames: ['大风袖'],
+              newNames: ['狂风迅雷功'],
+            },
+            {
+              file: '世界书/金庸群侠传1/世界书/天龙第十回00-人物登场.yaml',
+              oldNames: ['密宗心法'],
+              newNames: ['西藏密宗内功'],
+            },
+          ];
+
+          describe('fifth batch third group canonical martial-art aliases', () => {
+            for (const item of cases) {
+              it(`normalizes ${item.file}`, () => {
+                const text = fs.readFileSync(path.join(root, item.file), 'utf8');
+                for (const oldName of item.oldNames) expect(text).not.toContain(oldName);
+                for (const newName of item.newNames) expect(text).toContain(newName);
+              });
+            }
+          });
+          EOF
+      - name: Install dependencies and run focused regression plus audit
+        run: |
+          pnpm install
+          pnpm exec vitest run --configLoader native --pool threads --reporter verbose tools/audit-wuxia-character-martial-arts.batch3.test.mjs
+          rm -rf "$RUNNER_TEMP/wuxia-npc-martial-arts-audit"
+          node scripts/audit-wuxia-character-martial-arts.mjs --output-dir "$RUNNER_TEMP/wuxia-npc-martial-arts-audit"
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const file = path.join(process.env.RUNNER_TEMP, 'wuxia-npc-martial-arts-audit', 'NPC功法四类专项审计.json');
+          const report = JSON.parse(fs.readFileSync(file, 'utf8'));
+          const stats = report.统计;
+          console.log(JSON.stringify(stats, null, 2));
+          if (stats['功法名称不一致'] !== 145) {
+            throw new Error(`expected 功法名称不一致=145, got ${stats['功法名称不一致']}`);
+          }
+          NODE
+      - name: Commit normalized events and regression test, then remove one-off workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rm -f .github/workflows/_oneoff-wuxia-batch3.yml
+          git add '世界书/金庸群侠传1/世界书/神雕第六回00-人物登场.yaml' \
+                  '世界书/金庸群侠传1/世界书/神雕第一回00-人物登场.yaml' \
+                  '世界书/金庸群侠传1/世界书/神雕第三十六回07-何师我暗算击败耶律齐.yaml' \
+                  '世界书/金庸群侠传1/世界书/天龙第十回00-人物登场.yaml' \
+                  tools/audit-wuxia-character-martial-arts.batch3.test.mjs \
+                  .github/workflows/_oneoff-wuxia-batch3.yml
+          git commit -m 'fix(wuxia): normalize five NPC martial-art aliases'
+          git push origin HEAD:main
