@@ -10,6 +10,7 @@ on:
       - 'scripts/lib/wuxia-character-martial-arts.mjs'
       - 'tools/audit-wuxia-character-martial-arts.test.mjs'
       - 'tools/audit-wuxia-character-martial-arts.batch2.test.mjs'
+      - 'tools/audit-wuxia-character-martial-arts.batch3.test.mjs'
       - '.github/workflows/wuxia-npc-martial-arts-audit.yaml'
   workflow_dispatch:
 
@@ -29,7 +30,7 @@ jobs:
           version: 10
       - run: pnpm install
       - name: NPC martial arts regression tests
-        run: pnpm exec vitest run --configLoader native --pool threads --reporter verbose tools/audit-wuxia-character-martial-arts.test.mjs tools/audit-wuxia-character-martial-arts.batch2.test.mjs
+        run: pnpm exec vitest run --configLoader native --pool threads --reporter verbose tools/audit-wuxia-character-martial-arts.test.mjs tools/audit-wuxia-character-martial-arts.batch2.test.mjs tools/audit-wuxia-character-martial-arts.batch3.test.mjs
       - name: Replay deterministic worldbook events
         run: node scripts/audit-wuxia-character-martial-arts.mjs --output-dir "$RUNNER_TEMP/wuxia-npc-martial-arts-audit"
       - name: Print refreshed audit statistics
