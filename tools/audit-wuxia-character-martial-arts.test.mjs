@@ -383,8 +383,11 @@ describe('wuxia character martial arts audit', () => {
       expect(definition?.修炼限制).toBeTruthy();
     }
     const shaolin = parseYaml(readFileSync(path.join(root, '天龙第十八回00-人物登场.yaml'), 'utf8'));
-    expect(shaolin.insert.薛慕华.功法.金匮针法).toBeTruthy();
-    expect(shaolin.insert.薛慕华.功法.本草医道).toBeTruthy();
+    expect(shaolin.insert.薛慕华.功法.金匮针法).toBeUndefined();
+    expect(shaolin.insert.薛慕华.功法.本草医道).toBeUndefined();
+    expect(shaolin.insert.薛慕华.功法.百家杂手).toBeTruthy();
+    expect(shaolin.insert.薛慕华.人物经历['天龙第十八回00-人物登场']).toContain('金匮针法');
+    expect(shaolin.insert.薛慕华.人物经历['天龙第十八回00-人物登场']).toContain('本草医道');
     const rodEvent = parseYaml(readFileSync(path.join(root, '神雕第十六回00-人物登场.yaml'), 'utf8'));
     expect(rodEvent.insert.潇湘子.重要物品.毒烟哭丧棒).toContain('兵器装置');
   });
