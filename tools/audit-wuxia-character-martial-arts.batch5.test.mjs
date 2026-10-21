@@ -34,8 +34,10 @@ describe('fifth batch continued NPC martial-art normalization', () => {
     expect(arts.捕雀功.掌握程度).toBe('融会贯通');
     expect(e.update.杨过.功法.天罗地网势.掌握程度).toBe('融会贯通');
     for(const name of ['美女拳法','捕雀功','天罗地网势']) expect(officialNames.has(name)).toBe(true);
-    expect(arts.古墓派兵刃功夫).toBeTruthy();
-    expect(arts.古墓派暗器功夫).toBeTruthy();
+    expect(arts.古墓派兵刃功夫).toBeUndefined();
+    expect(arts.古墓派暗器功夫).toBeUndefined();
+    expect(e.insert.杨过.人物经历['神雕第六回04-杨过两年学遍古墓武功']).toContain('古墓派兵刃功夫');
+    expect(e.insert.杨过.人物经历['神雕第六回04-杨过两年学遍古墓武功']).toContain('古墓派暗器功夫');
     expect(e.事件详情).toContain('拳法掌法、兵刃暗器');
     expect(before.触发条件.年).toBeLessThanOrEqual(e.触发条件.年);
   });
