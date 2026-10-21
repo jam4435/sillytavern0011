@@ -20,16 +20,10 @@ function worldbookFiles(dir) {
   return out;
 }
 
-function martialArtKeys(text) {
-  const lines = text.split(/\r?\n/);
-  const keys = new Set(); let inMartialArts = false; let sectionIndent = -1;
-  for (const line of lines) {
-    const match = line.match(/^(\s*)功法:\s*$/);
-    if (match) { inMartialArts = true; sectionIndent = match[1].length; continue; }
-    if (!inMartialArts) continue;
-    const indent = line.match(/^(\s*)/)?.[1].length ?? 0;
-    if (line.trim() && indent <= sectionIndent) { inMartialArts = false; continue; }
-    const key = line.match(/^\s+(?:["']?)([^\s"':]+)(?:["']?):\s*$/)?.[1];
+function keyNames(text) {
+  const keys = new Set();
+  for (const line of text.split(/\r?\n/)) {
+    const key = line.match(/^\s*(?:["']?)([^\s"':]+)(?:["']?):(?:\s|$)/)?.[1];
     if (key) keys.add(key);
   }
   return keys;
@@ -38,9 +32,9 @@ function martialArtKeys(text) {
 describe('fifth batch fourth group canonical martial-art aliases', () => {
   const files = worldbookFiles(path.join(root, '世界书/金庸群侠传1/世界书'));
   const allKeys = new Set();
-  for (const file of files) for (const key of martialArtKeys(fs.readFileSync(file, 'utf8'))) allKeys.add(key);
+  for (const file of files) for (const key of keyNames(fs.readFileSync(file, 'utf8'))) allKeys.add(key);
   for (const [oldName, newName] of mappings) {
-    it(`removes ${oldName} martial-art key and preserves ${newName}`, () => {
+    it(`removes ${oldName} key and preserves ${newName}`, () => {
       expect(allKeys.has(oldName)).toBe(false);
       expect(allKeys.has(newName)).toBe(true);
     });
