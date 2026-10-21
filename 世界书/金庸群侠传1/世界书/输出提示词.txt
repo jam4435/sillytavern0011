@@ -122,6 +122,7 @@ function formatReachableLocationYaml(paths) {
 }
 -%>
 
+<系统信息>
 <%
 const promptWorldTime = variables.stat_data.世界信息?.时间;
 if (promptWorldTime && typeof promptWorldTime === 'object') {
@@ -310,3 +311,4 @@ if (Object.keys(presentCharacters).length > 0) {
 <%- toPromptYaml(presentCharacters) %>
 </角色数据>
 <% } -%>
+</系统信息>
