@@ -29,6 +29,7 @@ jobs:
         with:
           version: 10
       - run: pnpm install
+      # Batch 3 canonical alias audit; the source worldbook remains the final truth.
       - name: NPC martial arts regression tests
         run: pnpm exec vitest run --configLoader native --pool threads --reporter verbose tools/audit-wuxia-character-martial-arts.test.mjs tools/audit-wuxia-character-martial-arts.batch2.test.mjs tools/audit-wuxia-character-martial-arts.batch3.test.mjs
       - name: Replay deterministic worldbook events
