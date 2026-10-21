@@ -18,6 +18,7 @@ on:
       - 'tools/audit-wuxia-character-martial-arts.batch8.test.mjs'
       - 'tools/audit-wuxia-character-martial-arts.batch9.test.mjs'
       - 'tools/audit-wuxia-character-martial-arts.batch10.test.mjs'
+      - 'tools/audit-wuxia-character-martial-arts.batch11.test.mjs'
       - '.github/workflows/wuxia-npc-martial-arts-audit.yaml'
   workflow_dispatch:
 
@@ -38,7 +39,7 @@ jobs:
       - run: pnpm install
       # Batch 3 canonical alias audit; the source worldbook remains the final truth.
       - name: NPC martial arts regression tests
-        run: pnpm exec vitest run --configLoader native --pool threads --reporter verbose tools/audit-wuxia-character-martial-arts.test.mjs tools/audit-wuxia-character-martial-arts.batch2.test.mjs tools/audit-wuxia-character-martial-arts.batch3.test.mjs tools/audit-wuxia-character-martial-arts.batch4.test.mjs tools/audit-wuxia-character-martial-arts.batch5.test.mjs tools/audit-wuxia-character-martial-arts.batch6.test.mjs tools/audit-wuxia-character-martial-arts.batch7.test.mjs tools/audit-wuxia-character-martial-arts.batch8.test.mjs tools/audit-wuxia-character-martial-arts.batch9.test.mjs tools/audit-wuxia-character-martial-arts.batch10.test.mjs
+        run: pnpm exec vitest run --configLoader native --pool threads --reporter verbose tools/audit-wuxia-character-martial-arts.test.mjs tools/audit-wuxia-character-martial-arts.batch2.test.mjs tools/audit-wuxia-character-martial-arts.batch3.test.mjs tools/audit-wuxia-character-martial-arts.batch4.test.mjs tools/audit-wuxia-character-martial-arts.batch5.test.mjs tools/audit-wuxia-character-martial-arts.batch6.test.mjs tools/audit-wuxia-character-martial-arts.batch7.test.mjs tools/audit-wuxia-character-martial-arts.batch8.test.mjs tools/audit-wuxia-character-martial-arts.batch9.test.mjs tools/audit-wuxia-character-martial-arts.batch10.test.mjs tools/audit-wuxia-character-martial-arts.batch11.test.mjs
       - name: Replay deterministic worldbook events
         run: node scripts/audit-wuxia-character-martial-arts.mjs --output-dir "$RUNNER_TEMP/wuxia-npc-martial-arts-audit"
       - name: Print refreshed audit statistics
