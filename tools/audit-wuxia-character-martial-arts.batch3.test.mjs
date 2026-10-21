@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { parse as parseYaml } from 'yaml';
 
 const root = process.cwd();
 const cases = [
@@ -26,12 +27,25 @@ const cases = [
   },
 ];
 
+function martialArtKeys(eventData) {
+  const keys = [];
+  for (const operation of ['insert', 'update', 'delete']) {
+    for (const change of Object.values(eventData?.[operation] ?? {})) {
+      if (change && typeof change === 'object' && change.功法 && typeof change.功法 === 'object') {
+        keys.push(...Object.keys(change.功法));
+      }
+    }
+  }
+  return keys;
+}
+
 describe('fifth batch third group canonical martial-art aliases', () => {
   for (const item of cases) {
-    it(`normalizes ${item.file}`, () => {
+    it(`normalizes martial-art variable keys in ${item.file}`, () => {
       const text = fs.readFileSync(path.join(root, item.file), 'utf8');
-      for (const oldName of item.oldNames) expect(text).not.toContain(oldName);
-      for (const newName of item.newNames) expect(text).toContain(newName);
+      const keys = martialArtKeys(parseYaml(text));
+      for (const oldName of item.oldNames) expect(keys).not.toContain(oldName);
+      for (const newName of item.newNames) expect(keys).toContain(newName);
     });
   }
 });
