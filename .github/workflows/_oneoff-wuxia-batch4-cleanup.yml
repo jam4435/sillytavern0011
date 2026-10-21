@@ -1,6 +1,8 @@
 name: _oneoff-wuxia-batch4-cleanup
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -16,55 +18,30 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           mappings = {
-              '玉女心经口诀': '玉女心经',
-              '全真入门拳法': '全真掌法',
-              '丐帮心法': '叫花行气诀',
-              '九阴真经(逆)': '九阴假经',
-              '水上飘轻功': '铁掌水上飘',
-              '叫化棒法': '打狗棒法',
-              '一阳指基础': '段氏基础指法',
-              '玉女心经内功': '玉女心经',
-              '玉女心经外功': '玉女心经',
+              '玉女心经口诀': '玉女心经', '全真入门拳法': '全真掌法', '丐帮心法': '叫花行气诀',
+              '九阴真经(逆)': '九阴假经', '水上飘轻功': '铁掌水上飘', '叫化棒法': '打狗棒法',
+              '一阳指基础': '段氏基础指法', '玉女心经内功': '玉女心经', '玉女心经外功': '玉女心经',
               '北冥真气': '北冥神功',
           }
           root = Path('世界书/金庸群侠传1/世界书')
           changed = []
           for path in root.rglob('*.yaml'):
               lines = path.read_text(encoding='utf-8').splitlines(keepends=True)
-              out = []
-              in_martial = False
-              section_indent = -1
-              dirty = False
+              out = []; in_martial = False; section_indent = -1; dirty = False
               for line in lines:
-                  stripped = line.strip()
-                  indent = len(line) - len(line.lstrip(' '))
-                  if stripped == '功法:':
-                      in_martial = True
-                      section_indent = indent
-                      out.append(line)
-                      continue
-                  if in_martial and stripped and indent <= section_indent:
-                      in_martial = False
+                  stripped = line.strip(); indent = len(line) - len(line.lstrip(' '))
+                  if stripped == '功法:': in_martial = True; section_indent = indent; out.append(line); continue
+                  if in_martial and stripped and indent <= section_indent: in_martial = False
                   if in_martial:
+                      prefix = line[:len(line)-len(line.lstrip(' '))]
                       for old, new in mappings.items():
-                          prefix = line[:len(line)-len(line.lstrip(' '))]
                           for quote in ('"', "'"):
-                              old_key = f'{prefix}{quote}{old}{quote}:'
-                              new_key = f'{prefix}{quote}{new}{quote}:'
-                              if old_key in line:
-                                  line = line.replace(old_key, new_key)
-                                  dirty = True
-                          old_key = f'{prefix}{old}:'
-                          new_key = f'{prefix}{new}:'
-                          if old_key in line:
-                              line = line.replace(old_key, new_key)
-                              dirty = True
+                              line = line.replace(f'{prefix}{quote}{old}{quote}:', f'{prefix}{quote}{new}{quote}:')
+                          line = line.replace(f'{prefix}{old}:', f'{prefix}{new}:')
                   out.append(line)
-              if dirty:
-                  path.write_text(''.join(out), encoding='utf-8')
-                  changed.append(str(path))
-          print('changed files:', len(changed))
-          for item in changed: print(item)
+              text = ''.join(out)
+              if text != ''.join(lines): path.write_text(text, encoding='utf-8'); changed.append(str(path))
+          print('changed files:', len(changed)); [print(x) for x in changed]
           PY
       - name: Verify regression
         run: |
