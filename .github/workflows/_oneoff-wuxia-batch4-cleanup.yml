@@ -26,21 +26,18 @@ jobs:
           root = Path('世界书/金庸群侠传1/世界书')
           changed = []
           for path in root.rglob('*.yaml'):
-              lines = path.read_text(encoding='utf-8').splitlines(keepends=True)
-              out = []; in_martial = False; section_indent = -1; dirty = False
+              original = path.read_text(encoding='utf-8')
+              lines = original.splitlines(keepends=True)
+              out = []
               for line in lines:
-                  stripped = line.strip(); indent = len(line) - len(line.lstrip(' '))
-                  if stripped == '功法:': in_martial = True; section_indent = indent; out.append(line); continue
-                  if in_martial and stripped and indent <= section_indent: in_martial = False
-                  if in_martial:
-                      prefix = line[:len(line)-len(line.lstrip(' '))]
-                      for old, new in mappings.items():
-                          for quote in ('"', "'"):
-                              line = line.replace(f'{prefix}{quote}{old}{quote}:', f'{prefix}{quote}{new}{quote}:')
-                          line = line.replace(f'{prefix}{old}:', f'{prefix}{new}:')
+                  for old, new in mappings.items():
+                      line = line.replace(f'"{old}":', f'"{new}":').replace(f"'{old}':", f"'{new}':")
+                      line = line.replace(f'  {old}:', f'  {new}:').replace(f'    {old}:', f'    {new}:').replace(f'      {old}:', f'      {new}:').replace(f'        {old}:', f'        {new}:').replace(f'          {old}:', f'          {new}:')
                   out.append(line)
               text = ''.join(out)
-              if text != ''.join(lines): path.write_text(text, encoding='utf-8'); changed.append(str(path))
+              if text != original:
+                  path.write_text(text, encoding='utf-8')
+                  changed.append(str(path))
           print('changed files:', len(changed)); [print(x) for x in changed]
           PY
       - name: Verify regression
