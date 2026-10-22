@@ -1,9 +1,10 @@
 # 第十批 NPC 武学修复记录｜窗口 C
 
 - 工作分支：`wuxia-npc-wave10-c`
-- 代码变更提交：[`c396496d6f0e6449551e9afec2b35a182b3a665c`](https://github.com/jam4435/sillytavern0011/commit/c396496d6f0e6449551e9afec2b35a182b3a665c)
+- 核心实现提交：[`c396496d`](https://github.com/jam4435/sillytavern0011/commit/c396496d6f0e6449551e9afec2b35a182b3a665c)。
+- 后续审查校正提交：[`3b5f6c4`](https://github.com/jam4435/sillytavern0011/commit/3b5f6c4f17d35b2f820813a75253269a6d42f21d)（原著出处元数据）、[`2387a2b`](https://github.com/jam4435/sillytavern0011/commit/2387a2bccd81f27e689075e14b760226ce8bdc59)（对应测试）、[`7c0a8ea`](https://github.com/jam4435/sillytavern0011/commit/7c0a8ea2b92417910ba46dff8080fce2cf12a967)（修复记录）、[`8814ba9`](https://github.com/jam4435/sillytavern0011/commit/8814ba9404cd152f6b23d967e4b4c04cef949e92)（等级标签说明）、[`f30d024`](https://github.com/jam4435/sillytavern0011/commit/f30d024d69f750130c9fb2eaef71bb640bfd3814)（郭靖后续真经总纲测试）、[`94ad050`](https://github.com/jam4435/sillytavern0011/commit/94ad050088cd7518744d4a605cab8e16ddd3bc55)（对应修复记录）。
 - 责任范围：审计编号 7、12、13、18、19、21、23、27、34、37、39、40、41、43、45、46（共 16 条）。
-- 变更 SHA 说明：下表中所有源数据、功法库、语义审查标记与专属测试的代码改动均包含在上述同一个代码提交中；每一条的代码变更 SHA 均为 `c396496d6f0e6449551e9afec2b35a182b3a665c`。
+- 下表列出每项的源文件和处理结论；核心实现与后续校正均保留在本分支历史中，不再声称全部变更都来自同一个提交。
 
 ## 逐条证据与判定
 
