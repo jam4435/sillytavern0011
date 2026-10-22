@@ -34,7 +34,6 @@ type Context = {
   chatId?: string | number | null;
   getCurrentChatId?: () => string | number | null | undefined;
   saveChat: () => Promise<unknown>;
-  updateMessageBlock?: (index: number, message: Message) => void;
   eventSource: {
     on: (name: string, fn: (id: number) => Promise<void>) => void;
     removeListener: (name: string, fn: (id: number) => Promise<void>) => void;
@@ -156,16 +155,12 @@ async function onMessageSent(messageId: number): Promise<void> {
     await ctx.saveChat();
     saved = true;
 
-    // 用户楼层在原生 MESSAGE_SENT 返回后由 SillyTavern 自行渲染。
-    // 对已存在的 assistant 气泡只做一次同步刷新。
-    try {
-      const fresh = context();
-      if (fresh?.chat === ctx.chat && identity(fresh) === chatId) {
-        fresh.updateMessageBlock?.(messageId - 1, assistant);
-      }
-    } catch (renderError) {
-      console.warn('[AI正文追加] 聊天已保存，气泡重绘失败', renderError);
-    }
+    // 不强制重绘上一条 AI 的 .mes_text：
+    // 此时新 User 已存在，旧 AI 在显示正则中的 depth 从 0 变为 1。
+    // updateMessageBlock 会重跑 Markdown/显示正则并替换整个 DOM，
+    // 深度限定的美化正则可能失效，导致已经渲染好的 HTML 状态栏显示成源码。
+    // 实际 mes + active swipe 已写入并保存，下一轮模型仍会读到修改后的正文。
+    // 旧气泡保持原 DOM；刷新页面时由酒馆自身按当前正则设置正常渲染。
   } catch (error) {
     if (!saved && ctx.chat[messageId] === user && ctx.chat[messageId - 1] === assistant) {
       user.mes = oldUser;
