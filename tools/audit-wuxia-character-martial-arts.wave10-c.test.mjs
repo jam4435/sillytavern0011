@@ -23,6 +23,11 @@ describe('wave10-c NPC martial arts evidence and timeline', () => {
     expect(history).toContain('《九阴真经》下卷');
     expect(history).toContain('略有小成');
     expect(history).toContain('不把两卷的记忆进度合并');
+
+    // The later event grants the translated outline, not a fabricated full-manual skill.
+    const later = readEvent('射雕第三十一回05-真经总纲.yaml');
+    expect(later.insert.郭靖.功法['九阴真经总纲'].掌握程度).toBe('初窥门径');
+    expect(later.insert.郭靖.功法).not.toHaveProperty('九阴真经');
   });
 
   it('records Mei Chaofeng’s remnant lower-volume text as an item, not mastery of the full manual', () => {
