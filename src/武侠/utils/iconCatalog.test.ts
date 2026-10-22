@@ -81,7 +81,7 @@ describe('iconCatalog', () => {
       resolveMartialArtIcon(art.功法名称, { ...baseArt, type: art.类型 }),
     );
 
-    expect(resolved).toHaveLength(373);
+    expect(resolved).toHaveLength(martialArtsDatabase.功法.length);
     expect(resolved.every(icon => Boolean(icon.src))).toBe(true);
     expect(resolved.every(icon => icon.matchedBy !== 'fallback')).toBe(true);
     expect(new Set(resolved.map(icon => icon.src)).size).toBeGreaterThanOrEqual(20);
