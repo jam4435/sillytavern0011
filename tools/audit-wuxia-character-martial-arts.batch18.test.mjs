@@ -13,7 +13,9 @@ describe('batch 18: equipment, scouting and disguise belong outside combat manua
  it('Hua Hegen remains a martial artist with documented scouting experience',()=>{
  const c=read('天龙第九回00-人物登场.yaml').insert.华赫艮;
  expect(c.功法.伏地听声).toBeUndefined();
- expect(c.功法.地灵铲法).toBeTruthy();
+ expect(c.功法.地灵铲法).toBeUndefined();
+ expect(c.人物经历['天龙第九回00-人物登场']).toContain('地灵铲法');
+ expect(c.人物经历['天龙第九回00-人物登场']).toContain('略有小成');
  expect(c.人物经历['天龙第九回00-人物登场']).toContain('融会贯通');
  });
  it('Azhu keeps genuine disguise and voice specialties, not martial skills',()=>{
