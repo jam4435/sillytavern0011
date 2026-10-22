@@ -68,7 +68,6 @@ export const MARTIAL_ART_ALIASES_REQUIRING_SEMANTIC_REVIEW = new Set([
   '太祖长拳',
   '少林七十二绝技',
   '少林神功',
-  '逆行经脉之法',
   '慕容氏家传掌法',
   '全真教武功',
   '古墓派武功',
