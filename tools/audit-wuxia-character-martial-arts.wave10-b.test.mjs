@@ -169,7 +169,7 @@ describe('wave10-b: distinguish canon martial arts from weapon names and generic
  for(const row of findings){
   it(`#${row.id} ${row.npc}: ${row.old} is not left as an unsupported formal art`,()=>{
    const c=read(row.file).insert[row.npc];
-   const history=c.人物经历?.[row.file.replace(/\\.yaml$/,'')];
+   const history=c.人物经历?.[row.file.replace('.yaml','')];
    expect(c.功法?.[row.old]).toBeUndefined();
    expect(history).toContain(row.old);
    expect(history).toContain(`原熟练度：${row.level}`);
