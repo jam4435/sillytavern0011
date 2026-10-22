@@ -133,7 +133,9 @@ describe('wave10-c NPC martial arts evidence and timeline', () => {
     expect(first.insert.瑛姑.功法.七绝针.掌握程度).toBe('融会贯通');
     expect(first.insert.瑛姑.重要物品.金针指环).toContain('喂毒金针');
     expect(first.insert.瑛姑.人物经历['射雕第二十九回00-人物登场']).toContain('全真点穴术');
-    expect(artByName.get('七绝针').来源类型).toBe('合理补全');
+    expect(artByName.get('七绝针').来源类型).toBe('原著明示');
+    expect(artByName.get('七绝针').来源说明).toContain('第二十九回');
+    expect(artByName.get('七绝针').来源说明).toContain('七绝针');
 
     const later = readEvent('神雕第三十四回00-人物登场.yaml');
     expect(later.触发条件).toEqual({ 类型: '时间', 年: 1259, 月: 9, 日: 8, 时: 1 });
