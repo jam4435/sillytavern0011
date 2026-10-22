@@ -36,6 +36,8 @@ jobs:
       - run: pnpm install
       - name: Core variable, event, save and history safety checks
         run: pnpm test:wuxia:smoke
+      - name: Build source bundle
+        run: pnpm build:src:fast
       # Heavy mock-based regressions are opt-in, not daily merge gates.
       - name: Extended mock and message regressions (manual)
         if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -48,5 +50,3 @@ jobs:
           src/武侠/utils/variableReader.test.ts
           src/武侠/utils/activeFollowupPrompt.test.ts
           src/武侠/utils/messageActions.test.ts
-      - name: Build source bundle
-        run: pnpm build:src:fast
