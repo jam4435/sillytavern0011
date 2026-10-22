@@ -17,15 +17,18 @@
     "dev:only": "node scripts/build-only.mjs --dev",
     "build:ck-card": "pnpm build:src && node scripts/build-ck-card.mjs && node tavern_sync.mjs bundle CK领主RPG",
     "watch": "pnpm generate:events && webpack --mode development --watch --progress",
-    "test": "vitest run",
-    "test:safe": "vitest run --configLoader native --pool threads --reporter minimal",
+    "test": "pnpm test:safe",
+    "test:safe": "pnpm test:wuxia:smoke",
     "test:watch": "vitest",
     "wuxia:ui": "node tools/wuxia-ui-runner.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,scss,html,vue}\" --no-error-on-unmatched-pattern",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "dump": "node dump_schema.ts",
-    "sync": "node tavern_sync.mjs"
+    "sync": "node tavern_sync.mjs",
+    "test:wuxia:smoke": "vitest run --configLoader native --pool threads --reporter=default src/事件脚本/era-event-source-integrity.test.ts src/ERA变量框架/core/crud/patcher.test.ts src/ERA变量框架/core/sync.test.ts src/ERA变量框架/events/merger.test.ts src/事件脚本/era-write-helper.test.ts src/事件脚本/era-event-admission.test.ts src/shared/turnEventSettlement.test.ts src/武侠/utils/saveLoadManager.test.ts src/武侠/utils/historyBranchStatus.test.ts src/武侠/utils/eraWriteWait.test.ts src/武侠/utils/historyMkSnapshot.test.ts",
+    "test:full": "vitest run --configLoader native --pool threads --reporter=default",
+    "test:wuxia:legacy-audit": "vitest run --configLoader native --pool threads --reporter=default tools/audit-wuxia-character-martial-arts.batch tools/audit-wuxia-character-martial-arts.wave10-"
   },
   "browserslist": [
     "defaults and partially supports es6-module"

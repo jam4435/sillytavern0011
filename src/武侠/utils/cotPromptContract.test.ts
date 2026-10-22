@@ -52,7 +52,7 @@ describe('武侠 COT 条件审查契约', () => {
     expect(output).toContain('正文后输出<事件记录>时');
     expect(output).toContain('保持历史阶段名称、数量与顺序');
     expect(output).toContain('07. 是否仅根据历史已确认事实判断起始进度');
-    expect(output.match(/^\\d{2}\\./gm)?.map(x => Number(x.slice(0, 2)))).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(output.match(/^\d{2}\./gm)?.map(x => Number(x.slice(0, 2)))).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect(output).not.toContain('05. 读取<后续事件线索>');
   });
 
@@ -63,7 +63,7 @@ describe('武侠 COT 条件审查契约', () => {
     expect(output).toContain('未主动干预且未明确拒绝时');
     expect(output).toContain('06. 是否仅将<后续事件线索>视为待触发线索');
     expect(output).toContain('07. 读取<系统信息>中的<时间>、<可用地点>及最近正文');
-    expect(output.match(/^\\d{2}\\./gm)?.map(x => Number(x.slice(0, 2)))).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(output.match(/^\d{2}\./gm)?.map(x => Number(x.slice(0, 2)))).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(output).not.toContain('每阶段对应一个独立完成结果');
   });
 
@@ -72,7 +72,7 @@ describe('武侠 COT 条件审查契约', () => {
       const output = renderCot(participation, {});
       expect(output).not.toContain('<事件记录规则>');
       expect(output).toContain('05. 读取<合理性审查>、本轮最新 User 消息和最近正文');
-      expect(output.match(/^\\d{2}\\./gm)?.map(x => Number(x.slice(0, 2)))).toEqual([1, 2, 3, 4, 5]);
+      expect(output.match(/^\d{2}\./gm)?.map(x => Number(x.slice(0, 2)))).toEqual([1, 2, 3, 4, 5]);
       expect(output).not.toContain('05. 读取<后续事件线索>');
     }
   });

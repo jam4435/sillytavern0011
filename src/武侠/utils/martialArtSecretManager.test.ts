@@ -320,7 +320,7 @@ describe('martialArtSecretManager', () => {
       expect.objectContaining({
         detail: expect.objectContaining({
           operations: expect.arrayContaining([
-            { type: 'delete', payload: { user数据: { 包裹: { [itemName]: {} } } },
+            { type: 'delete', payload: { user数据: { 包裹: { [itemName]: {} } } } },
           ]),
         }),
       }),

@@ -66,7 +66,7 @@ describe('武侠输出提示词契约', () => {
     expect(output.startsWith('<系统信息>')).toBe(true);
     expect(output.endsWith('</系统信息>')).toBe(true);
     expect(output.match(/<系统信息>/g)).toHaveLength(1);
-    expect(output.match(/<\\/系统信息>/g)).toHaveLength(1);
+    expect(output.match(/<\/系统信息>/g)).toHaveLength(1);
     expect(output).toContain('<时间>');
     expect(output).toContain('<玩家>');
     expect(output).toContain('<可用地点>');

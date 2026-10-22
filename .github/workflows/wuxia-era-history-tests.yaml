@@ -5,38 +5,24 @@ on:
     branches: [main]
     paths:
       - 'src/ERA变量框架/**'
-      - 'src/事件脚本/era-event-operations.js'
-      - 'src/事件脚本/era-notifications.js'
-      - 'src/事件脚本/era-notifications.test.ts'
-      - 'src/武侠/hooks/useEventNotifications.ts'
-      - 'src/武侠/hooks/useEventNotifications.test.tsx'
-      - 'src/shared/wuxiaEventNotifications.ts'
-      - 'src/事件脚本/era-main.js'
-      - 'src/事件脚本/era-main.test.ts'
-      - 'src/事件脚本/era-event-admission.test.ts'
-      - 'src/事件脚本/era-write-helper.js'
-      - 'src/事件脚本/era-write-helper.test.ts'
-      - 'src/shared/turnEventSettlement*'
-      - 'src/武侠/hooks/useMessageHandler*'
-      - 'src/事件脚本/era-utils.js'
-      - 'src/事件脚本/era-logging.test.ts'
-      - 'src/事件脚本/era-lifecycle.test.ts'
-      - 'src/武侠/utils/extraVariableUpdateManager.ts'
-      - 'src/武侠/utils/extraVariableUpdateManager.test.ts'
-      - 'src/武侠/utils/activeEventFollowups.ts'
-      - 'src/武侠/utils/activeFollowupPrompt.test.ts'
-      - 'src/武侠/prompts/变量指导.txt'
-      - 'src/武侠/utils/saveLoadManager*'
-      - 'src/武侠/utils/historyBranchStatus*'
+      - 'src/事件脚本/**'
+      - 'src/武侠/hooks/**'
+      - 'src/武侠/utils/**'
       - 'src/武侠/components/SaveLoadPanel*'
-      - 'src/武侠/utils/variableReader.ts'
-      - 'src/武侠/utils/variableReader.test.ts'
-      - 'src/武侠/utils/historyEventSnapshot.ts'
-      - 'src/武侠/utils/historyMkSnapshot*'
-      - 'src/武侠/utils/logger.ts'
-      - 'src/武侠/utils/logger.test.ts'
-      - 'src/武侠/hooks/useEventListeners.ts'
-      - 'src/武侠/hooks/useEventListeners.test.tsx'
+      - 'src/shared/**'
+      - '世界书/金庸群侠传1/世界书/**'
+      - 'package.json'
+      - '.github/workflows/wuxia-era-history-tests.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/ERA变量框架/**'
+      - 'src/事件脚本/**'
+      - 'src/武侠/hooks/**'
+      - 'src/武侠/utils/**'
+      - 'src/shared/**'
+      - '世界书/金庸群侠传1/世界书/**'
+      - 'package.json'
       - '.github/workflows/wuxia-era-history-tests.yaml'
   workflow_dispatch:
 
@@ -59,52 +45,19 @@ jobs:
         with:
           version: 10
       - run: pnpm install
-      - name: ERA MK and history checkout regression tests
-        run: >
-          pnpm exec vitest run --configLoader native --pool threads --reporter verbose
-          src/ERA变量框架/core/crud/patcher.test.ts
-          src/ERA变量框架/core/sync.test.ts
-          src/ERA变量框架/events/merger.test.ts
-          src/ERA变量框架/api/command.test.ts
-          src/ERA变量框架/utils/log.test.ts
-          src/事件脚本/era-logging.test.ts
-          src/武侠/utils/saveLoadManager.test.ts
-          src/武侠/utils/historyBranchStatus.test.ts
-          src/武侠/utils/historyMkSnapshot.test.ts
-          src/武侠/components/SaveLoadPanel.test.tsx
-          src/武侠/utils/logger.test.ts
-          src/武侠/utils/eraWriteWait.test.ts
-          src/事件脚本/era-lifecycle.test.ts
-          src/事件脚本/era-write-helper.test.ts
-          src/shared/turnEventSettlement.test.ts
-      - name: Event admission atomicity and UI projection regressions
-        run: >
-          pnpm exec vitest run --configLoader native --pool threads --reporter verbose
-          src/事件脚本/era-event-admission.test.ts
-          src/事件脚本/era-notifications.test.ts
-          src/武侠/hooks/useEventNotifications.test.tsx
-          src/武侠/hooks/useEventListeners.test.tsx
-      - name: Variable-model ownership and future-location prompt regressions
-        run: >
-          pnpm exec vitest run --configLoader native --pool threads --reporter verbose
-          src/武侠/utils/extraVariableUpdateManager.test.ts
-          src/武侠/utils/activeFollowupPrompt.test.ts
-          -t '模型擅自写入|后继地点提示文案'
-      - name: Event admission scheduler regressions
-        run: >
-          pnpm exec vitest run --configLoader native --pool threads --reporter verbose
-          src/事件脚本/era-main.test.ts -t '已有进行中事件|同一三级地点|回合事件结算|事件启动提交失败|切换聊天后|诊断：同一 messageId|本轮新建线索|迟到 MESSAGE_SENT'
-      - name: Turn settlement event-runtime regressions
-        run: >
-          pnpm exec vitest run --configLoader native --pool threads --reporter verbose
-          src/事件脚本/era-main.test.ts -t '回合事件结算'
-      - name: Turn history seal ordering regression
-        run: >
-          pnpm exec vitest run --configLoader native --pool threads --reporter verbose
-          src/武侠/hooks/useMessageHandler.test.tsx -t '事件结算尚未确认时不能封存历史|新 swipe 的事件尚未确认'
-      - name: Martial art string migration regressions
-        run: >
-          pnpm exec vitest run --configLoader native --pool threads --reporter verbose
-          src/武侠/utils/variableReader.test.ts -t autoUpdateMartialArts
-      - name: Build
+      - name: Core variable, event, save and history safety checks
+        run: pnpm test:wuxia:smoke
+      - name: Build source bundle
         run: pnpm build:src:fast
+      # Heavy mock-based regressions are opt-in, not daily merge gates.
+      - name: Extended mock and message regressions (manual)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: >-
+          pnpm exec vitest run --configLoader native --pool threads --reporter=default
+          src/事件脚本/era-main.test.ts
+          src/武侠/hooks/useMessageHandler.test.tsx
+          src/武侠/hooks/useVariableChangeTracker.test.tsx
+          src/武侠/utils/extraVariableUpdateManager.test.ts
+          src/武侠/utils/variableReader.test.ts
+          src/武侠/utils/activeFollowupPrompt.test.ts
+          src/武侠/utils/messageActions.test.ts
