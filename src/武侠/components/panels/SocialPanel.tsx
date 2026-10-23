@@ -1,7 +1,7 @@
 import React, { CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import AvatarImage from '../AvatarImage';
 import AvatarPreviewModal from '../AvatarPreviewModal';
-import { ActivePanel, type NPC, type NPCMartialArt } from '../../types';
+import { ActivePanel, type NPC, type NPCMartialArt, type WorldTime } from '../../types';
 import { toCustomAvatarRef, toPresetAvatarRef } from '../../utils/avatarCatalog';
 import {
   clearCustomAvatar,
