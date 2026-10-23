@@ -1028,7 +1028,8 @@
         isEmptyObject(statForCheckpoint.世界事件 || {}) &&
         isEmptyObject(statForCheckpoint.前端变量?.事件结算进度 || {}) &&
         // 初始化模板键不是已登场人物；不能因此错过历史检查点。
-        !Object.keys(statForCheckpoint.角色数据 || {}).some(key => !key.startsWith('      const checkpoint = canApplyOpeningCheckpoint
+        !Object.keys(statForCheckpoint.角色数据 || {}).some(key => key.charCodeAt(0) !== 36);
+      const checkpoint = canApplyOpeningCheckpoint
         ? await loadEventCheckpointAtOrBefore(statForCheckpoint.世界信息.时间)
         : null;
       eventManifest = manifest;
