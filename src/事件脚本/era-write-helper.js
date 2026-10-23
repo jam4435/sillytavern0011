@@ -481,6 +481,48 @@ async function waitForTransactionWriteDone(transactionId, transactionSignature, 
   return waitForWriteDone;
 }
 
+/**
+ * manual_sync 仅入 ERA 的异步队列；eventEmit 完成并不意味着变量重放已完成。
+ * 通过唯一 syncId 等待同一笔同步的 writeDone，避免误认其他 resync。
+ */
+async function waitForManualSyncWriteDone(reason, timeoutMs = 5000) {
+  const syncId = `event-script-sync-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return new Promise(resolve => {
+    let finished = false;
+    let listener = null;
+    let timer = null;
+    const finish = confirmed => {
+      if (finished) return;
+      finished = true;
+      listener?.stop();
+      if (timer !== null) clearTimeout(timer);
+      resolve(confirmed);
+    };
+
+    listener = eventOn('era:writeDone', detail => {
+      if (detail?.actions?.resync !== true) return;
+      if (detail?.syncId !== syncId && !(
+        Array.isArray(detail?.syncIds) && detail.syncIds.includes(syncId)
+      )) return;
+      finish(true);
+    });
+    timer = setTimeout(() => {
+      logWarning(`ERA 事务兜底 manual_sync 未收到匹配确认: ${reason}`);
+      finish(false);
+    }, timeoutMs);
+
+    try {
+      void Promise.resolve(eventEmit('manual_sync', { syncId })).catch(error => {
+        logWarning(`ERA 事务兜底 manual_sync 派发失败: ${reason}`, error);
+        finish(false);
+      });
+    } catch (error) {
+      logWarning(`ERA 事务兜底 manual_sync 发送失败: ${reason}`, error);
+      finish(false);
+    }
+  });
+}
+
 async function rereadTransactionState(expectedStat, effectiveOperations, reason) {
   let latestMessage = null;
   try {
@@ -570,7 +612,7 @@ export async function writeEraTransaction(operations, reason = 'era-transaction'
       transactionId,
       transactionSignature,
       detail,
-      options.timeoutMs ?? 10000,
+      options.timeoutMs ?? 20000,
       options.timeoutMessage ?? `ERA 事务写入完成信号超时: ${reason}`,
     );
     const finalVariables = await getVariables({ type: 'chat' });
@@ -620,13 +662,20 @@ export async function writeEraTransaction(operations, reason = 'era-transaction'
         `ERA 事务${reread.persisted ? '最终变量已落库' : '变量块已写入消息'}但 writeDone 未确认，` +
           `执行 manual_sync 且禁止自动重发: ${reason}`,
       );
-      try {
-        await eventEmit('manual_sync');
-      } catch (syncError) {
-        logWarning(`ERA 事务兜底 manual_sync 失败: ${reason}`, syncError);
-      }
       if (!reread.persisted) {
+        // 消息变量块已经落下时，必须等待 ERA 同一笔同步真正结束后再回读。
+        // 超时也只读最终状态，不自动重放不确定的事务。
+        await waitForManualSyncWriteDone(reason, options.syncTimeoutMs ?? 5000);
         reread = await rereadTransactionState(expectedStat, effectiveOperations, reason);
+      } else {
+        // 最终 stat 已可直接证明落地；后台同步仅用于对齐 ERA，不阻塞确认。
+        try {
+          void Promise.resolve(eventEmit('manual_sync')).catch(syncError => {
+            logWarning(`ERA 已落库事务的后台 manual_sync 失败: ${reason}`, syncError);
+          });
+        } catch (syncError) {
+          logWarning(`ERA 已落库事务的后台 manual_sync 发送失败: ${reason}`, syncError);
+        }
       }
     }
 
