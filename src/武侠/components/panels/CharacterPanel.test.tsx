@@ -59,6 +59,28 @@ describe('CharacterPanel avatar controls', () => {
     expect(sheet.querySelector('.character-attribute-card')).not.toBeInTheDocument();
   });
 
+  it('人物总览展示天赋名称与描述', () => {
+    const stats: CharacterProfile = {
+      ...baseStats,
+      traits: {
+        天生神力: '气力远胜常人。',
+        百毒不侵: '寻常毒物难以伤身。',
+        $meta: '不应展示的元数据',
+        无描述天赋: '',
+      },
+    };
+
+    render(<CharacterPanel stats={stats} />);
+
+    expect(screen.getByText('人物天赋')).toBeInTheDocument();
+    expect(screen.getByText('天生神力')).toBeInTheDocument();
+    expect(screen.getByText('气力远胜常人。')).toBeInTheDocument();
+    expect(screen.getByText('百毒不侵')).toBeInTheDocument();
+    expect(screen.getByText('寻常毒物难以伤身。')).toBeInTheDocument();
+    expect(screen.queryByText('不应展示的元数据')).not.toBeInTheDocument();
+    expect(screen.queryByText('无描述天赋')).not.toBeInTheDocument();
+  });
+
   beforeEach(() => {
     localStorage.clear();
     setPlayerAvatarRefMock.mockClear();
