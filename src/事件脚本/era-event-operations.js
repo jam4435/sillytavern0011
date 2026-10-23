@@ -885,7 +885,9 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
     return true;
   } catch (error) {
     logError(`批量完成登场事件失败`, error);
-    return false;
+    // 保留原始失败原因，供严格回合结算握手和界面提示定位。
+    // 事务本身仍禁止在结果未知时自动重试。
+    throw error;
   } finally {
     debugGroupEnd();
   }
