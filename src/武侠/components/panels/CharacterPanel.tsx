@@ -553,8 +553,6 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
                 )}
               </div>
 
-              {networkEntries.length > 0 && (
-
               <div className="character-status-effects-section">
                 <h4 className="section-header">
                   <DiamondBullet /> 当前状态效果
@@ -597,6 +595,7 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
                 )}
               </div>
 
+              {networkEntries.length > 0 && (
                 <div className="character-network-section">
                   <h4 className="section-header">
                     <DiamondBullet /> 人情往来
