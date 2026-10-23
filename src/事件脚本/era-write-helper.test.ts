@@ -101,7 +101,7 @@ describe('writeEraTransaction', () => {
     vi.useFakeTimers();
     vi.mocked(globalThis.getChatMessages).mockReturnValue([
       { message_id: 8, message: [
-        '正文', '<VariableInsert>', JSON.stringify({ 消息块兜底标记: 'written' }), '</VariableInsert>',
+        '正文', '<VariableInsert>', JSON.stringify({ 匹配同步测试标记: 'written' }), '</VariableInsert>',
       ].join('\n') },
     ] as never);
 
@@ -109,7 +109,7 @@ describe('writeEraTransaction', () => {
       // Other resync events must not be mistaken for this request's completion.
       void eventEmit('era:writeDone', { actions: { resync: true }, syncIds: ['unrelated-sync'] });
       setTimeout(() => {
-        variables.stat_data.消息块兜底标记 = 'written';
+        variables.stat_data.匹配同步测试标记 = 'written';
         void eventEmit('era:writeDone', {
           actions: { resync: true }, syncId, syncIds: [syncId],
         });
@@ -118,7 +118,7 @@ describe('writeEraTransaction', () => {
 
     let settled = false;
     const write = writeEraTransaction(
-      [{ type: 'insert', payload: { 消息块兜底标记: 'written' } }],
+      [{ type: 'insert', payload: { 匹配同步测试标记: 'written' } }],
       'test-manual-sync-awaits-matching-id',
       { timeoutMs: 5, syncTimeoutMs: 100 },
     ).then(result => {
