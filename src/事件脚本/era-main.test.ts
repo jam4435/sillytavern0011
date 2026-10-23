@@ -153,6 +153,7 @@ describe('ERA 主线初始化控制', () => {
 
   it('applies an opening checkpoint when character data contains only schema templates', async () => {
     const variables = validVariables() as any;
+    variables.stat_data.事件系统.已失效事件 = {};
     variables.stat_data.角色数据 = { [String.fromCharCode(36) + 'template']: { 性别: '' } };
     getVariablesMock.mockReturnValue(variables);
     const loader = await import('./era-event-loader.js');
@@ -181,6 +182,7 @@ describe('ERA 主线初始化控制', () => {
 
   it('does not overwrite existing NPCs with an opening checkpoint', async () => {
     const variables = validVariables() as any;
+    variables.stat_data.事件系统.已失效事件 = {};
     variables.stat_data.角色数据 = {
       [String.fromCharCode(36) + 'template']: {},
       郭靖: { 状态: '已经存在' },
