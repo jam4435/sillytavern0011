@@ -1637,7 +1637,8 @@ function createCharacterNpc(
         : typeof legacyNpc?.修为 === 'number'
           ? legacyNpc.修为
           : undefined,
-    identities: characterData.身份
+    identities: characterData.身份 &&
+      Object.keys(characterData.身份).some(identity => Boolean(identity) && !identity.startsWith('$'))
       ? Object.fromEntries(Object.entries(characterData.身份).filter(
           ([identity, description]) => Boolean(identity) && !identity.startsWith('$') && typeof description === 'string',
         ))
@@ -1651,7 +1652,7 @@ function createCharacterNpc(
     personality: characterData.性格?.trim() || legacyNpc?.性格?.trim() || undefined,
     initialAttributes: parseNpcInitialAttributes(characterData) || parseNpcInitialAttributes(legacyNpc),
     attributes: parseNpcCurrentAttributes(characterData) || parseNpcCurrentAttributes(legacyNpc),
-    role: getPrimaryIdentityTitle(characterData.身份 || legacyNpc?.身份),
+    role: getPrimaryIdentityTitle(characterData.身份, getPrimaryIdentityTitle(legacyNpc?.身份)),
     template: getPrimaryMartialArtTemplate(characterData, legacyNpc),
     keyItems: getCharacterKeyItems(characterData, legacyNpc),
     keyItemDetails: getCharacterKeyItemDetails(characterData, legacyNpc),
