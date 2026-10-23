@@ -47,6 +47,12 @@ jobs:
       - run: pnpm install
       - name: Core variable, event, save and history safety checks
         run: pnpm test:wuxia:smoke
+      - name: First-turn opening and debut settlement regressions
+        run: >-
+          pnpm exec vitest run --configLoader native --pool threads --reporter=default
+          src/事件脚本/era-main.test.ts
+          src/事件脚本/era-lifecycle.test.ts
+          -t "does not lose GameInitialized|applies an opening checkpoint|does not overwrite existing NPCs|preserves the original debut settlement error"
       - name: Build source bundle
         run: pnpm build:src:fast
       # Heavy mock-based regressions are opt-in, not daily merge gates.
