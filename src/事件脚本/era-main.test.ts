@@ -133,6 +133,82 @@ describe('ERA 主线初始化控制', () => {
     });
   });
 
+  it('does not lose GameInitialized fired while first initialization is awaiting', async () => {
+    initializeEventListMock.mockImplementation(async () => {
+      if (initializeEventListMock.mock.calls.length === 1) {
+        // Frontend can finish creating a game before initial initialize() returns.
+        await eventEmit('GameInitialized', { timestamp: Date.now() + 100_000 });
+      }
+    });
+
+    // @ts-expect-error Vite query isolates the event-script singleton.
+    await import('./era-main.js?game-initialized-during-first-init');
+    await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(2));
+    expect(initializeEventListMock).toHaveBeenNthCalledWith(
+      2,
+      expect.any(Object),
+      expect.objectContaining({ rootBootstrap: true }),
+    );
+  });
+
+  it('applies an opening checkpoint when character data contains only schema templates', async () => {
+    const variables = validVariables() as any;
+    variables.stat_data.事件系统.已失效事件 = {};
+    variables.stat_data.角色数据 = { [String.fromCharCode(36) + 'template']: { 性别: '' } };
+    getVariablesMock.mockReturnValue(variables);
+    const loader = await import('./era-event-loader.js');
+    vi.mocked(loader.loadEventCheckpointAtOrBefore).mockClear();
+    vi.mocked(loader.loadEventCheckpointAtOrBefore).mockResolvedValueOnce({
+      completedRuntimeKeys: [], characterState: {},
+    } as never);
+    initializeEventListMock.mockResolvedValue(undefined);
+
+    // @ts-expect-error Vite query isolates the event-script singleton.
+    await import('./era-main.js?checkpoint-with-character-template');
+    await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(1));
+    const gameInitializedListener = eventOnMock.mock.calls
+      .filter(([name]) => name === 'GameInitialized')
+      .at(-1)?.[1] as ((detail: { timestamp: number }) => unknown) | undefined;
+    gameInitializedListener?.({ timestamp: Date.now() + 100_000 });
+
+    await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(2));
+    expect(loader.loadEventCheckpointAtOrBefore).toHaveBeenCalledWith(variables.stat_data.世界信息.时间);
+    expect(initializeEventListMock).toHaveBeenNthCalledWith(
+      2,
+      expect.any(Object),
+      expect.objectContaining({ rootBootstrap: true, applyCheckpoint: true }),
+    );
+  });
+
+  it('does not overwrite existing NPCs with an opening checkpoint', async () => {
+    const variables = validVariables() as any;
+    variables.stat_data.事件系统.已失效事件 = {};
+    variables.stat_data.角色数据 = {
+      [String.fromCharCode(36) + 'template']: {},
+      郭靖: { 状态: '已经存在' },
+    };
+    getVariablesMock.mockReturnValue(variables);
+    const loader = await import('./era-event-loader.js');
+    vi.mocked(loader.loadEventCheckpointAtOrBefore).mockClear();
+    initializeEventListMock.mockResolvedValue(undefined);
+
+    // @ts-expect-error Vite query isolates the event-script singleton.
+    await import('./era-main.js?checkpoint-skips-existing-character');
+    await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(1));
+    const gameInitializedListener = eventOnMock.mock.calls
+      .filter(([name]) => name === 'GameInitialized')
+      .at(-1)?.[1] as ((detail: { timestamp: number }) => unknown) | undefined;
+    gameInitializedListener?.({ timestamp: Date.now() + 100_000 });
+
+    await vi.waitFor(() => expect(initializeEventListMock).toHaveBeenCalledTimes(2));
+    expect(loader.loadEventCheckpointAtOrBefore).not.toHaveBeenCalled();
+    expect(initializeEventListMock).toHaveBeenNthCalledWith(
+      2,
+      expect.any(Object),
+      expect.objectContaining({ rootBootstrap: true, applyCheckpoint: false }),
+    );
+  });
+
   it('history checkout journal pending 时暂停初始化，commit 后恢复', async () => {
     vi.useFakeTimers();
     initializeEventListMock.mockResolvedValue(undefined);

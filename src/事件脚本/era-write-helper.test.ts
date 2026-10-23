@@ -73,6 +73,68 @@ describe('writeEraTransaction', () => {
     );
   });
 
+  it('accepts a writeDone after 16 seconds, beyond the old 10-second window', async () => {
+    vi.useFakeTimers();
+    eventOn('era:transactionByObject', ({ transactionId }: any) => {
+      setTimeout(() => {
+        variables.stat_data.事件系统.进行中事件.测试事件 = { 年: 2 };
+        void eventEmit('era:writeDone', {
+          transactionId, transactionIds: [transactionId], actions: { apiWrite: true },
+        });
+      }, 16_000);
+    });
+
+    const write = writeEraTransaction([
+      { type: 'insert', payload: { 事件系统: { 进行中事件: { 测试事件: { 年: 2 } } } } },
+    ], 'test-ack-within-era-internal-window');
+
+    await vi.advanceTimersByTimeAsync(16_001);
+    await expect(write).resolves.toBe(true);
+    const entries = JSON.parse(localStorage.getItem(HISTORY_EVENT_FORENSICS_STORAGE_KEY) || '[]');
+    expect(entries.some((entry: any) =>
+      entry.details?.reason === 'test-ack-within-era-internal-window' &&
+      entry.details?.stage === 'era-transaction-unconfirmed'
+    )).toBe(false);
+  });
+
+  it('waits for a matching manual_sync writeDone before deciding a message block failed', async () => {
+    vi.useFakeTimers();
+    vi.mocked(globalThis.getChatMessages).mockReturnValue([
+      { message_id: 8, message: [
+        '正文', '<VariableInsert>', JSON.stringify({ 匹配同步测试标记: 'written' }), '</VariableInsert>',
+      ].join('\n') },
+    ] as never);
+
+    eventOn('manual_sync', ({ syncId }: any) => {
+      // Other resync events must not be mistaken for this request's completion.
+      void eventEmit('era:writeDone', { actions: { resync: true }, syncIds: ['unrelated-sync'] });
+      setTimeout(() => {
+        variables.stat_data.匹配同步测试标记 = 'written';
+        void eventEmit('era:writeDone', {
+          actions: { resync: true }, syncId, syncIds: [syncId],
+        });
+      }, 50);
+    });
+
+    let settled = false;
+    const write = writeEraTransaction(
+      [{ type: 'insert', payload: { 匹配同步测试标记: 'written' } }],
+      'test-manual-sync-awaits-matching-id',
+      { timeoutMs: 5, syncTimeoutMs: 100 },
+    ).then(result => {
+      settled = true;
+      return result;
+    });
+
+    await vi.advanceTimersByTimeAsync(10);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(50);
+    await expect(write).resolves.toBe(true);
+    expect(eventEmitMock.mock.calls.some(([name, payload]) =>
+      name === 'manual_sync' && typeof payload?.syncId === 'string'
+    )).toBe(true);
+  });
+
   it('does not auto-resend an applied timeout but can reapply after ERA rollback', async () => {
     vi.useFakeTimers();
     eventOn('era:transactionByObject', ({ operations }: any) => {
@@ -164,8 +226,11 @@ describe('writeEraTransaction', () => {
         ),
       },
     ] as never);
-    eventOn('manual_sync', () => {
+    eventOn('manual_sync', async ({ syncId }: any) => {
       variables.stat_data.消息块兜底标记 = 'written';
+      await eventEmit('era:writeDone', {
+        actions: { resync: true }, syncId, syncIds: [syncId],
+      });
     });
 
     const write = writeEraTransaction(

@@ -1027,7 +1027,8 @@
         isEmptyObject(statForCheckpoint.参与事件 || {}) &&
         isEmptyObject(statForCheckpoint.世界事件 || {}) &&
         isEmptyObject(statForCheckpoint.前端变量?.事件结算进度 || {}) &&
-        Object.keys(statForCheckpoint.角色数据 || {}).length === 0;
+        // 模板结构键不属于已登场人物，不能因此跳过历史检查点。
+        !Object.keys(statForCheckpoint.角色数据 || {}).some(key => key.charCodeAt(0) !== 36);
       const checkpoint = canApplyOpeningCheckpoint
         ? await loadEventCheckpointAtOrBefore(statForCheckpoint.世界信息.时间)
         : null;
@@ -1138,6 +1139,11 @@
     });
   }
 
+  // 必须在首次异步 initialize() 前订阅，避免漏掉创建新游戏信号。
+  eventOn('GameInitialized', signal => {
+    scheduleFrontendInitialization('GameInitialized-event', signal);
+  });
+
   // ==================== 启动系统 ====================
   const initialSuccess = await initialize();
   if (initialSuccess && !getPendingHistoryCheckoutJournal()) {
@@ -1205,10 +1211,6 @@
         allowPendingHistoryCheckout: true,
       });
     });
-  });
-
-  eventOn('GameInitialized', signal => {
-    scheduleFrontendInitialization('GameInitialized-event', signal);
   });
 
   eventOn('wuxia:turn-lifecycle', detail => {

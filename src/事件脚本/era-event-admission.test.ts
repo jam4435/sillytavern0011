@@ -393,7 +393,7 @@ describe('事件开始 / 玩家入场 ERA 单事务', () => {
         性别: '男', 境界: '二流-中期', 出生年份: 1168,
         初始属性: { 臂力: 11, 根骨: 10, 机敏: 15, 悟性: 7, 洞察: 5 },
       } } },
-    })).resolves.toBe(false);
+    })).rejects.toThrow('登场事件事务回读未通过');
     expect(notifyMock).not.toHaveBeenCalled();
   });
 
@@ -406,10 +406,10 @@ describe('事件开始 / 玩家入场 ERA 单事务', () => {
     variables.stat_data.事件系统.未发生事件[first] = TIME;
     delete variables.stat_data.事件系统.已完成事件[first];
     transactionMock.mockReset().mockResolvedValueOnce(false);
-    await expect(batchCompleteDebutEvents([first], definitions)).resolves.toBe(false);
+    await expect(batchCompleteDebutEvents([first], definitions)).rejects.toThrow('人物登场事件事务未确认提交');
     expect(notifyMock).not.toHaveBeenCalled();
     transactionMock.mockReset().mockResolvedValueOnce(true);
-    await expect(batchCompleteDebutEvents([first], definitions)).resolves.toBe(false);
+    await expect(batchCompleteDebutEvents([first], definitions)).rejects.toThrow('登场事件事务回读未通过');
     expect(notifyMock).not.toHaveBeenCalled();
   });
 
