@@ -102,7 +102,7 @@ describe('writeEraTransaction', () => {
     vi.mocked(globalThis.getChatMessages).mockReturnValue([
       { message_id: 8, message: [
         '正文', '<VariableInsert>', JSON.stringify({ 消息块兜底标记: 'written' }), '</VariableInsert>',
-      ].join('\\n') },
+      ].join('\n') },
     ] as never);
 
     eventOn('manual_sync', ({ syncId }: any) => {
