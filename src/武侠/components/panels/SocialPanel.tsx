@@ -19,6 +19,7 @@ import { EmptyState } from './EmptyState';
 
 interface SocialPanelProps {
   npcs: NPC[];
+  worldTime?: WorldTime;
 }
 
 type SocialSectionKey = NPC['category'];
@@ -115,7 +116,7 @@ function renderFallbackList(items: string[], emptyText: string) {
   );
 }
 
-export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
+export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs, worldTime }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [avatarPickerId, setAvatarPickerId] = useState<string | null>(null);
@@ -201,6 +202,49 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
         : [],
     [avatarVersion, selectedNpc, selectedNpcAvatarRef],
   );
+ 
+
+  const selectedNpcIdentityEntries = useMemo(() => {
+    if (!selectedNpc?.identities) return [] as Array<[string, string]>;
+    return Object.entries(selectedNpc.identities).filter(
+      ([identity, description]) =>
+        Boolean(identity.trim()) && !identity.startsWith('$') && typeof description === 'string',
+    );
+  }, [selectedNpc]);
+
+  const selectedNpcInitialAttributeEntries = useMemo(() => {
+    if (!selectedNpc?.initialAttributes) return [] as Array<[string, number]>;
+    const attrs = selectedNpc.initialAttributes;
+    const entries: Array<[string, number | undefined]> = [
+      ['臂力', attrs.臂力],
+      ['根骨', attrs.根骨],
+      ['机敏', attrs.机敏],
+      ['悟性', attrs.悟性],
+      ['洞察', attrs.洞察],
+    ];
+    return entries.filter((entry): entry is [string, number] =>
+      typeof entry[1] === 'number' && Number.isFinite(entry[1]),
+    );
+  }, [selectedNpc]);
+
+  const selectedNpcCurrentAttributeEntries = useMemo(() => {
+    const attrs = selectedNpc?.attributes;
+    if (!attrs) return [] as Array<[string, string | number]>;
+    const entries: Array<[string, string | number]> = [];
+    if (attrs.hp !== undefined) entries.push(['气血', `${attrs.hpCurrent ?? attrs.hp}/${attrs.hp}`]);
+    if (attrs.mp !== undefined) entries.push(['内力', `${attrs.mpCurrent ?? attrs.mp}/${attrs.mp}`]);
+    if (attrs.臂力 !== undefined) entries.push(['臂力', attrs.臂力]);
+    if (attrs.根骨 !== undefined) entries.push(['根骨', attrs.根骨]);
+    if (attrs.机敏 !== undefined) entries.push(['机敏', attrs.机敏]);
+    if (attrs.洞察 !== undefined) entries.push(['洞察', attrs.洞察]);
+    return entries;
+  }, [selectedNpc]);
+
+  const selectedNpcAge =
+    selectedNpc && worldTime && typeof selectedNpc.birthYear === 'number' &&
+    selectedNpc.birthYear > 0 && worldTime.year >= selectedNpc.birthYear
+      ? worldTime.year - selectedNpc.birthYear
+      : null;
 
   useEffect(() => {
     if (!selectedNpc || !Object.hasOwn(optimisticAvatarRefs, selectedNpc.name)) {
@@ -522,6 +566,64 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
                 </section>
               )}
 
+              <section className="social-detail-card social-character-info-card">
+                <div className="social-detail-card-head">
+                  <Icons.Character size={16} />
+                  <span>人物档案</span>
+                </div>
+                <div className="social-character-info-grid">
+                  <div className="social-character-info-item">
+                    <span className="social-character-info-label">性别</span>
+                    <strong className="social-character-info-value">{selectedNpc.gender || '未载'}</strong>
+                  </div>
+                  <div className="social-character-info-item">
+                    <span className="social-character-info-label">出生年份</span>
+                    <strong className="social-character-info-value">
+                      {typeof selectedNpc.birthYear === 'number' ? `${selectedNpc.birthYear} 年` : '未载'}
+                    </strong>
+                  </div>
+                  {selectedNpcAge !== null && (
+                    <div className="social-character-info-item">
+                      <span className="social-character-info-label">当前年龄</span>
+                      <strong className="social-character-info-value">{selectedNpcAge} 岁</strong>
+                    </div>
+                  )}
+                  <div className="social-character-info-item">
+                    <span className="social-character-info-label">状态</span>
+                    <strong className="social-character-info-value">{selectedNpc.status || '未载'}</strong>
+                  </div>
+                  <div className="social-character-info-item">
+                    <span className="social-character-info-label">境界</span>
+                    <strong className="social-character-info-value">{selectedNpc.realm || '未载'}</strong>
+                  </div>
+                  <div className="social-character-info-item">
+                    <span className="social-character-info-label">修为</span>
+                    <strong className="social-character-info-value">
+                      {typeof selectedNpc.cultivation === 'number' ? selectedNpc.cultivation.toLocaleString() : '未载'}
+                    </strong>
+                  </div>
+                  <div className="social-character-info-item social-character-info-item-wide">
+                    <span className="social-character-info-label">所在位置</span>
+                    <strong className="social-character-info-value">{selectedNpc.location || '未载'}</strong>
+                  </div>
+                </div>
+                <div className="social-identities-block">
+                  <div className="social-identities-title">身份与称谓</div>
+                  {selectedNpcIdentityEntries.length > 0 ? (
+                    <div className="social-identity-grid">
+                      {selectedNpcIdentityEntries.map(([identity, description]) => (
+                        <div className="social-identity-entry" key={identity}>
+                          <strong className="social-identity-name">{identity}</strong>
+                          <p className="social-identity-description">{description.trim() || '未载明身份描述。'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="social-detail-empty">未记录其他身份详情；当前称谓：{getNpcRole(selectedNpc)}</div>
+                  )}
+                </div>
+              </section>
+
               <div className="social-detail-columns social-profile-columns">
                 <section className="social-detail-card">
                   <div className="social-detail-card-head">
@@ -539,6 +641,45 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
                   <p className="social-detail-text">{selectedNpc.personality || '暂无性格记录。'}</p>
                 </section>
               </div>
+
+              <section className="social-detail-card social-character-attributes-card">
+                <div className="social-detail-card-head">
+                  <Icons.Combat size={16} />
+                  <span>人物属性</span>
+                </div>
+                <div className="social-npc-attribute-groups">
+                  <section className="social-npc-attribute-group" aria-label="先天资质">
+                    <h4 className="social-npc-attribute-group-title">先天资质</h4>
+                    {selectedNpcInitialAttributeEntries.length > 0 ? (
+                      <div className="social-npc-attribute-grid">
+                        {selectedNpcInitialAttributeEntries.map(([name, value]) => (
+                          <div className="social-npc-attribute-cell" key={name}>
+                            <span className="social-npc-attribute-label">{name}</span>
+                            <strong className="social-npc-attribute-value">{value}</strong>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="social-detail-empty">暂无初始属性记录</div>
+                    )}
+                  </section>
+                  <section className="social-npc-attribute-group" aria-label="当前属性">
+                    <h4 className="social-npc-attribute-group-title">当前属性</h4>
+                    {selectedNpcCurrentAttributeEntries.length > 0 ? (
+                      <div className="social-npc-attribute-grid">
+                        {selectedNpcCurrentAttributeEntries.map(([name, value]) => (
+                          <div className="social-npc-attribute-cell" key={name}>
+                            <span className="social-npc-attribute-label">{name}</span>
+                            <strong className="social-npc-attribute-value">{value}</strong>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="social-detail-empty">暂无当前属性记录</div>
+                    )}
+                  </section>
+                </div>
+              </section>
 
               <section className="social-detail-card social-martial-list-card">
                 <div className="social-detail-card-head social-martial-list-head">
@@ -597,7 +738,25 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ npcs }) => {
                     <Icons.Inventory size={16} />
                     <span>重要物品</span>
                   </div>
-                  {renderFallbackList(selectedNpc.keyItems, '无可记载物品')}
+                  {selectedNpc.keyItemDetails && selectedNpc.keyItemDetails.length > 0 ? (
+                    <ul className="social-detail-list social-key-item-list">
+                      {selectedNpc.keyItemDetails.map(item => (
+                        <li className="social-key-item" key={item.name}>
+                          <div className="social-key-item-head">
+                            <strong className="social-key-item-name">{item.name}</strong>
+                            {item.type && <span className="social-key-item-meta">{item.type}</span>}
+                            {item.rank && <span className="social-key-item-meta">{item.rank}</span>}
+                            {typeof item.count === 'number' && (
+                              <span className="social-key-item-meta">数量 {item.count}</span>
+                            )}
+                          </div>
+                          {item.description && <p className="social-key-item-description">{item.description}</p>}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    renderFallbackList(selectedNpc.keyItems, '无可记载物品')
+                  )}
                 </section>
 
                 <section className="social-detail-card compact">
