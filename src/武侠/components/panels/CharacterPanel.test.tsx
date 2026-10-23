@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CharacterProfile } from '../../types';
+import type { ActiveStatusEffect, CharacterProfile } from '../../types';
 import { setPlayerAvatarRef } from '../../utils/avatarState';
 import { CharacterPanel } from './CharacterPanel';
 
@@ -79,6 +79,51 @@ describe('CharacterPanel avatar controls', () => {
     expect(screen.getByText('寻常毒物难以伤身。')).toBeInTheDocument();
     expect(screen.queryByText('不应展示的元数据')).not.toBeInTheDocument();
     expect(screen.queryByText('无描述天赋')).not.toBeInTheDocument();
+  });
+  it('人物总览展示天赋名称与描述', () => {
+    const stats: CharacterProfile = {
+      ...baseStats,
+      traits: {
+        天生神力: '气力远胜常人。',
+        百毒不侵: '寻常毒物难以伤身。',
+        $meta: '不应展示的元数据',
+        无描述天赋: '',
+      },
+    };
+
+    render(<CharacterPanel stats={stats} />);
+
+    expect(screen.getByText('人物天赋')).toBeInTheDocument();
+    expect(screen.getByText('天生神力')).toBeInTheDocument();
+    expect(screen.getByText('气力远胜常人。')).toBeInTheDocument();
+    expect(screen.getByText('百毒不侵')).toBeInTheDocument();
+    expect(screen.getByText('寻常毒物难以伤身。')).toBeInTheDocument();
+    expect(screen.queryByText('不应展示的元数据')).not.toBeInTheDocument();
+    expect(screen.queryByText('无描述天赋')).not.toBeInTheDocument();
+  });
+
+  it('人物总览展示所在地和当前状态效果', () => {
+    const statusEffects: ActiveStatusEffect[] = [
+      {
+        id: 'poison',
+        type: '中毒',
+        effectType: '负面',
+        source: '五毒散',
+        rank: '剧毒',
+        duration: 5,
+        remaining: 3,
+        modifiers: { 臂力: -10 },
+      },
+    ];
+
+    render(<CharacterPanel stats={baseStats} statusEffects={statusEffects} />);
+
+    expect(screen.getByText('所在地')).toBeInTheDocument();
+    expect(screen.getByText('襄阳')).toBeInTheDocument();
+    expect(screen.getByText('当前状态效果')).toBeInTheDocument();
+    expect(screen.getByText('中毒')).toBeInTheDocument();
+    expect(screen.getByText('来源：五毒散')).toBeInTheDocument();
+    expect(screen.getByText('臂力 -10%')).toBeInTheDocument();
   });
 
   beforeEach(() => {
