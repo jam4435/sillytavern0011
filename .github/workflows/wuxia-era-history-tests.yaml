@@ -8,6 +8,11 @@ on:
       - 'src/事件脚本/**'
       - 'src/武侠/hooks/**'
       - 'src/武侠/utils/**'
+      - 'src/武侠/components/panels/CharacterPanel*'
+      - 'src/武侠/components/panels/SocialPanel*'
+      - 'src/武侠/styles/_panels.scss'
+      - 'src/武侠/styles/_social.scss'
+      - 'src/武侠/types.ts'
       - 'src/武侠/components/SaveLoadPanel*'
       - 'src/shared/**'
       - '世界书/金庸群侠传1/世界书/**'
@@ -53,6 +58,13 @@ jobs:
           src/事件脚本/era-main.test.ts
           src/事件脚本/era-lifecycle.test.ts
           -t "does not lose GameInitialized|applies an opening checkpoint|does not overwrite existing NPCs|preserves the original debut settlement error"
+      - name: Wuxia character and social profile regressions
+        run: >-
+          pnpm exec vitest run --configLoader native --pool threads --reporter=default
+          src/武侠/components/panels/CharacterPanel.test.tsx
+          src/武侠/components/panels/SocialPanel.test.tsx
+          src/武侠/utils/variableReader.test.ts
+          -t "人物总览展示天赋名称与描述|展示人物档案、身份描述、初始与当前属性及重要物品详情|侠缘投影保留完整人物档案、属性和重要物品详情"
       - name: Build source bundle
         run: pnpm build:src:fast
       # Heavy mock-based regressions are opt-in, not daily merge gates.
