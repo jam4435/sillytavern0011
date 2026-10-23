@@ -5,7 +5,6 @@ import { Icons } from '../Icons';
 import { MeridianPanel } from '../MeridianPanel';
 import {
   ActivePanel,
-  type ActiveStatusEffect,
   CharacterProfile,
   type MeridianNodeId,
   type MeridianUpgradeQuote,
@@ -98,7 +97,6 @@ const renderBiography = (biography: CharacterProfile['biography']) => {
 interface CharacterPanelProps {
   stats: CharacterProfile;
   worldTime?: WorldTime;
-  statusEffects?: ActiveStatusEffect[];
   onBreakthrough?: (result: { success: boolean; newRealm?: string; newCultivation?: number; error?: string }) => void;
   onAvatarUpdated?: () => void;
   isBusy?: boolean;
@@ -108,7 +106,6 @@ interface CharacterPanelProps {
 export const CharacterPanel: React.FC<CharacterPanelProps> = ({
   stats,
   worldTime,
-  statusEffects = [],
   onBreakthrough,
   onAvatarUpdated,
   isBusy = false,
@@ -427,10 +424,6 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
                     <span className="character-info-label">性别</span>
                     <span className="character-info-value">{stats.gender}</span>
                   </div>
-                  <div className="info-row character-info-row">
-                    <span className="character-info-label">所在地</span>
-                    <span className="character-info-value">{stats.location || '未知位置'}</span>
-                  </div>
                   {age !== null && (
                     <div className="info-row character-info-row">
                       <span className="character-info-label">年龄</span>
@@ -550,48 +543,6 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
                   </div>
                 ) : (
                   <p className="character-panel-empty-note">尚未记录特殊天赋。</p>
-                )}
-              </div>
-
-              <div className="character-status-effects-section">
-                <h4 className="section-header">
-                  <DiamondBullet /> 当前状态效果
-                </h4>
-                {statusEffects.length > 0 ? (
-                  <div className="character-status-effect-list">
-                    {statusEffects.map(effect => {
-                      const modifierEntries = Object.entries(effect.modifiers || {}).filter(
-                        ([, value]) => typeof value === 'number' && Number.isFinite(value),
-                      );
-
-                      return (
-                        <article className="character-status-effect-card" key={effect.id}>
-                          <div className="character-status-effect-head">
-                            <strong>{effect.type || '状态效果'}</strong>
-                            {effect.rank && <span className="character-status-effect-rank">{effect.rank}</span>}
-                            {effect.effectType && <span className="character-status-effect-rank">{effect.effectType}</span>}
-                          </div>
-                          <p className="character-status-effect-source">来源：{effect.source || '未知'}</p>
-                          <div className="character-status-effect-timing">
-                            <span>剩余 {effect.remaining}</span>
-                            {effect.duration > 0 && <span>持续 {effect.duration}</span>}
-                          </div>
-                          {modifierEntries.length > 0 && (
-                            <div className="character-status-effect-modifiers">
-                              {modifierEntries.map(([attribute, value]) => (
-                                <span className="character-status-effect-modifier" key={attribute}>
-                                  {attribute} {value > 0 ? '+' : ''}
-                                  {value}%
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </article>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="character-panel-empty-note">当前没有持续状态效果。</p>
                 )}
               </div>
 
