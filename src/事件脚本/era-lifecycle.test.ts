@@ -3,6 +3,7 @@ import { eventEmitMock } from '../武侠/test/setup';
 
 import { isEventDiscoverable, isTimeAfterEventEnd, isTimeForEvent } from './era-event-checker.js';
 import {
+  batchCompleteDebutEvents,
   batchEndEvents,
   batchStartEvents,
   buildActualEventWindow,
@@ -168,6 +169,19 @@ describe('completion persistence and follow-up pairs', () => {
     Object.assign(globalThis, {
       toastr: { success: vi.fn(), info: vi.fn(), warning: vi.fn(), error: vi.fn() },
     });
+  });
+
+  it('preserves the original debut settlement error for strict turn confirmation', async () => {
+    const originalError = new Error('读取登场事件快照失败');
+    vi.mocked(globalThis.getVariables).mockImplementationOnce(() => {
+      throw originalError;
+    });
+
+    await expect(batchCompleteDebutEvents(
+      [sourceName],
+      { [sourceName]: eventDefinition },
+    )).rejects.toBe(originalError);
+    expect(eventEmitMock.mock.calls.some(([name]) => name === 'era:transactionByObject')).toBe(false);
   });
 
   it('事件启动、NPC 一次性入场和未发生清理仅产生一次 ERA 事务', async () => {
