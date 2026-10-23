@@ -31,6 +31,7 @@ import type {
   InventoryItemVariableData,
   MartialArt,
   NPC,
+  NPCKeyItem,
   UserFactionEntry,
   UserFactionsMap,
   WorldEventVariableData,
@@ -228,6 +229,29 @@ interface GameVariables {
   // 社交/NPC
   侠缘?: Array<{
     姓名?: string;
+    性别?: string;
+    出生年份?: number;
+    状态?: string;
+    境界?: string;
+    修为?: number;
+    所在位置?: string;
+    外貌?: string;
+    身份?: Record<string, string>;
+    初始属性?: {
+      臂力?: number;
+      根骨?: number;
+      机敏?: number;
+      悟性?: number;
+      洞察?: number;
+    };
+    属性?: {
+      气血?: string | number;
+      内力?: string | number;
+      臂力?: number;
+      根骨?: number;
+      机敏?: number;
+      洞察?: number;
+    };
     性格?: string;
     关系值?: number;
     武功描述?: string;
@@ -1509,6 +1533,76 @@ function getCharacterKeyItems(characterData?: CharacterData, legacyNpc?: LegacyS
 
   return legacyNpc?.重要物品 || [];
 }
+ 
+
+function parseNpcInitialAttributes(
+  characterData?: { 初始属性?: CharacterData['初始属性'] },
+): NPC['initialAttributes'] {
+  const attrs = characterData?.初始属性;
+  if (!attrs) return undefined;
+  const result: NonNullable<NPC['initialAttributes']> = {};
+  const keys = ['臂力', '根骨', '机敏', '悟性', '洞察'] as const;
+  for (const key of keys) {
+    const value = attrs[key];
+    if (typeof value === 'number' && Number.isFinite(value)) result[key] = value;
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function parseNpcCurrentAttributes(
+  characterData?: { 属性?: CharacterData['属性'] },
+): NPC['attributes'] {
+  const attrs = characterData?.属性;
+  if (!attrs) return undefined;
+  const result: NonNullable<NPC['attributes']> = {};
+  const hpPair = parseResourcePair(attrs.气血, 0);
+  const mpPair = parseResourcePair(attrs.内力, 0);
+  if (hpPair.exists) {
+    result.hp = hpPair.max;
+    result.hpCurrent = hpPair.current;
+  }
+  if (mpPair.exists) {
+    result.mp = mpPair.max;
+    result.mpCurrent = mpPair.current;
+  }
+  const keys = ['臂力', '根骨', '机敏', '洞察'] as const;
+  for (const key of keys) {
+    const value = attrs[key];
+    if (typeof value === 'number' && Number.isFinite(value)) result[key] = value;
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function getCharacterKeyItemDetails(
+  characterData?: CharacterData,
+  legacyNpc?: LegacySocialNpc,
+): NPCKeyItem[] {
+  const items = characterData?.重要物品;
+  if (items && typeof items === 'object' && !Array.isArray(items)) {
+    const entries = Object.entries(items).filter(([name]) => Boolean(name) && !name.startsWith('$'));
+    if (entries.length > 0) {
+      return entries.map(([name, value]) => {
+        const record = isRecord(value) ? value : undefined;
+        const description =
+          typeof record?.物品描述 === 'string'
+            ? record.物品描述.trim()
+            : typeof value === 'string'
+              ? value.trim()
+              : '';
+        return {
+          name,
+          ...(typeof record?.类型 === 'string' && record.类型.trim() ? { type: record.类型.trim() } : {}),
+          ...(typeof record?.品阶 === 'string' && record.品阶.trim() ? { rank: record.品阶.trim() } : {}),
+          ...(description ? { description } : {}),
+          ...(typeof record?.数量 === 'number' && Number.isFinite(record.数量) ? { count: record.数量 } : {}),
+        };
+      });
+    }
+  }
+  return (legacyNpc?.重要物品 || [])
+    .filter(name => typeof name === 'string' && name.trim().length > 0)
+    .map(name => ({ name: name.trim() }));
+}
 
 function createCharacterNpc(
   name: string,
@@ -1528,12 +1622,40 @@ function createCharacterNpc(
     relationship: normalizedRelationship.relationship ?? legacyNpc?.关系值 ?? 0,
     relationshipLabel: normalizedRelationship.relationshipLabel,
     category,
-    role: getPrimaryIdentityTitle(characterData.身份),
-    location: characterData.所在位置 || undefined,
-    appearance: characterData.外貌?.trim() || undefined,
+    gender: characterData.性别 || legacyNpc?.性别 || undefined,
+    birthYear:
+      typeof characterData.出生年份 === 'number'
+        ? characterData.出生年份
+        : typeof legacyNpc?.出生年份 === 'number'
+          ? legacyNpc.出生年份
+          : undefined,
+    status: characterData.状态 || legacyNpc?.状态 || undefined,
+    realm: characterData.境界 || legacyNpc?.境界 || undefined,
+    cultivation:
+      typeof characterData.修为 === 'number'
+        ? characterData.修为
+        : typeof legacyNpc?.修为 === 'number'
+          ? legacyNpc.修为
+          : undefined,
+    identities: characterData.身份 &&
+      Object.keys(characterData.身份).some(identity => Boolean(identity) && !identity.startsWith('$'))
+      ? Object.fromEntries(Object.entries(characterData.身份).filter(
+          ([identity, description]) => Boolean(identity) && !identity.startsWith('$') && typeof description === 'string',
+        ))
+      : legacyNpc?.身份
+        ? Object.fromEntries(Object.entries(legacyNpc.身份).filter(
+            ([identity, description]) => Boolean(identity) && !identity.startsWith('$') && typeof description === 'string',
+          ))
+        : undefined,
+    location: characterData.所在位置 || legacyNpc?.所在位置 || undefined,
+    appearance: characterData.外貌?.trim() || legacyNpc?.外貌?.trim() || undefined,
     personality: characterData.性格?.trim() || legacyNpc?.性格?.trim() || undefined,
+    initialAttributes: parseNpcInitialAttributes(characterData) || parseNpcInitialAttributes(legacyNpc),
+    attributes: parseNpcCurrentAttributes(characterData) || parseNpcCurrentAttributes(legacyNpc),
+    role: getPrimaryIdentityTitle(characterData.身份, getPrimaryIdentityTitle(legacyNpc?.身份)),
     template: getPrimaryMartialArtTemplate(characterData, legacyNpc),
     keyItems: getCharacterKeyItems(characterData, legacyNpc),
+    keyItemDetails: getCharacterKeyItemDetails(characterData, legacyNpc),
     biography: formatBiographySummary(characterData.人物经历) || legacyNpc?.人物经历 || '',
     network: network.length > 0 ? network : formatNetworkSummary(legacyNpc?.关系网),
   };
@@ -1554,7 +1676,21 @@ function createLegacySocialNpc(
     relationship: normalizedRelationship.relationship ?? legacyNpc.关系值 ?? 0,
     relationshipLabel: normalizedRelationship.relationshipLabel,
     category,
-    role: '江湖人士',
+    gender: legacyNpc.性别 || undefined,
+    birthYear: typeof legacyNpc.出生年份 === 'number' ? legacyNpc.出生年份 : undefined,
+    status: legacyNpc.状态 || undefined,
+    realm: legacyNpc.境界 || undefined,
+    cultivation: typeof legacyNpc.修为 === 'number' ? legacyNpc.修为 : undefined,
+    identities: legacyNpc.身份
+      ? Object.fromEntries(Object.entries(legacyNpc.身份).filter(
+          ([identity, description]) => Boolean(identity) && !identity.startsWith('$') && typeof description === 'string',
+        ))
+      : undefined,
+    location: legacyNpc.所在位置 || undefined,
+    appearance: legacyNpc.外貌?.trim() || undefined,
+    initialAttributes: parseNpcInitialAttributes(legacyNpc),
+    attributes: parseNpcCurrentAttributes(legacyNpc),
+    role: getPrimaryIdentityTitle(legacyNpc.身份),
     personality: legacyNpc.性格?.trim() || undefined,
     template: {
       type: '',
@@ -1564,6 +1700,7 @@ function createLegacySocialNpc(
       traits: legacyNpc.特性 || {},
     },
     keyItems: legacyNpc.重要物品 || [],
+    keyItemDetails: getCharacterKeyItemDetails(undefined, legacyNpc),
     biography: legacyNpc.人物经历 || '',
     network: formatNetworkSummary(legacyNpc.关系网),
   };

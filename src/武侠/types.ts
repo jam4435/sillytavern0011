@@ -485,10 +485,27 @@ export interface ChronicleEntry {
   personal: boolean;
 }
 
+export interface NPCKeyItem {
+  name: string;
+  type?: string;
+  rank?: string;
+  description?: string;
+  count?: number;
+}
+
 export interface NPC {
   id: string;
   name: string;
   avatarRef?: string; // 头像引用：preset:<id> 或 custom:<entityKey>
+  gender?: string;
+  birthYear?: number;
+  status?: string;
+  realm?: string;
+  cultivation?: number;
+  identities?: Record<string, string>;
+  initialAttributes?: Partial<Pick<InitialAttributes, '臂力' | '根骨' | '机敏' | '悟性' | '洞察'>>;
+  attributes?: Partial<CurrentAttributes>;
+  keyItemDetails?: NPCKeyItem[];
   relationship: number;
   relationshipLabel?: string;
   category: 'acquaintance' | 'local';

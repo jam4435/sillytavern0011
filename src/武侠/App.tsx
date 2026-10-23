@@ -1743,7 +1743,7 @@ const App: React.FC = () => {
           />
         );
       case ActivePanel.SOCIAL:
-        return <SocialPanel npcs={gameState.social} />;
+        return <SocialPanel npcs={gameState.social} worldTime={gameState.worldTime} />;
       case ActivePanel.SETTINGS:
         return (
           <SettingsPanel

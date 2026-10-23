@@ -518,6 +518,34 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({
                 </div>
               </div>
 
+              <div className="character-traits-section">
+                <h4 className="section-header">
+                  <DiamondBullet /> 人物天赋
+                </h4>
+                {Object.entries(stats.traits || {}).some(
+                  ([name, description]) =>
+                    Boolean(name.trim()) && !name.startsWith('$') &&
+                    typeof description === 'string' && Boolean(description.trim()),
+                ) ? (
+                  <div className="character-trait-grid">
+                    {Object.entries(stats.traits || {})
+                      .filter(
+                        ([name, description]) =>
+                          Boolean(name.trim()) && !name.startsWith('$') &&
+                          typeof description === 'string' && Boolean(description.trim()),
+                      )
+                      .map(([name, description]) => (
+                        <article className="character-trait-card" key={name}>
+                          <span className="character-trait-name">{name}</span>
+                          <p className="character-trait-description">{description}</p>
+                        </article>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="character-panel-empty-note">尚未记录特殊天赋。</p>
+                )}
+              </div>
+
               {networkEntries.length > 0 && (
                 <div className="character-network-section">
                   <h4 className="section-header">
