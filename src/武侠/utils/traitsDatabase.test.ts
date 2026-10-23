@@ -38,7 +38,7 @@ describe('traitsDatabase 结构化天赋机制', () => {
   });
 
   it('采用重构后的正式天赋池，并且不再保留废弃的 flavorPrompt 字段', () => {
-    expect(CHARACTER_TRAITS).toHaveLength(100);
+    expect(CHARACTER_TRAITS).toHaveLength(112);
     expect(getTraitByName('绿帽神功')).toMatchObject({ rank: '传说', cost: 30 });
     expect(getTraitByName('身如鬼魅')).toMatchObject({
       rank: '镇派',
@@ -54,6 +54,30 @@ describe('traitsDatabase 结构化天赋机制', () => {
     expect(getTraitByName('祸福相依')).toMatchObject({ rank: '镇派', category: '命格', cost: 18 });
     expect(getTraitByName('气运篡夺者')).toMatchObject({ rank: '传说', category: '命格', cost: 30 });
     expect(getTraitByName('桃花劫主')).toMatchObject({ rank: '缺陷', category: '缺陷', cost: -6 });
+  });
+
+  it('新增十二项小说金手指与情缘天赋可查询且品阶点数正确', () => {
+    expect(getTraitByName('入梦演武')).toMatchObject({ rank: '镇派', category: '天资', cost: 18 });
+    expect(getTraitByName('周游六虚')).toMatchObject({ rank: '绝世', category: '体质', cost: 24 });
+    expect(getTraitByName('真气熔炉')).toMatchObject({ rank: '绝世', category: '体质', cost: 24 });
+    expect(getTraitByName('金刚无漏')).toMatchObject({ rank: '镇派', category: '体质', cost: 18 });
+    expect(getTraitByName('回春灵髓')).toMatchObject({ rank: '镇派', category: '体质', cost: 18 });
+    expect(getTraitByName('洞幽神眸')).toMatchObject({ rank: '镇派', category: '天资', cost: 18 });
+    expect(getTraitByName('万兽通灵')).toMatchObject({ rank: '绝世', category: '天资', cost: 24 });
+    expect(getTraitByName('随身残魂')).toMatchObject({ rank: '绝世', category: '命格', cost: 24 });
+    expect(getTraitByName('写轮眼')).toMatchObject({ rank: '传说', category: '天资', cost: 30 });
+    expect(getTraitByName('白眼')).toMatchObject({ rank: '传说', category: '天资', cost: 30 });
+    expect(getTraitByName('爱屋及乌')).toMatchObject({ rank: '镇派', category: '命格', cost: 18 });
+    expect(getTraitByName('帝王引擎')).toMatchObject({ rank: '上乘', category: '气质', cost: 14 });
+  });
+
+  it('新增天赋复用现有属性与修炼折扣逻辑', () => {
+    expect(getTraitDiscounts(['周游六虚']).globalUpgradeDiscount).toBe(0.15);
+    const sources = getTraitModifierSources(['真气熔炉', '洞幽神眸', '写轮眼', '白眼']);
+    expect(sources).toHaveLength(4);
+    expect(sources[0].modifiers?.内力).toBe(20);
+    expect(sources.slice(1).every(source => source.modifiers?.洞察 === 15)).toBe(true);
+    expect(getTraitModifierSources(['帝王引擎'])).toHaveLength(0);
   });
 
   it('提取属性修正源：正确包含天赋修正并支持正负百分比', () => {
