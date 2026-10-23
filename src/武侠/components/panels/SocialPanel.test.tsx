@@ -148,6 +148,47 @@ describe('SocialPanel role and appearance', () => {
   });
 });
 
+describe('SocialPanel complete character profile', () => {
+  it('展示人物档案、身份描述、初始与当前属性及重要物品详情', () => {
+    const npc = createNpc('黄蓉');
+    npc.gender = '女';
+    npc.birthYear = 1180;
+    npc.status = '轻伤';
+    npc.realm = '一流初期';
+    npc.cultivation = 2345;
+    npc.identities = { 桃花岛: '岛主之女', 丐帮: '掌棒龙头' };
+    npc.initialAttributes = { 臂力: 8, 根骨: 11, 机敏: 17, 悟性: 18, 洞察: 15 };
+    npc.attributes = {
+      hp: 100, hpCurrent: 80, mp: 60, mpCurrent: 25,
+      臂力: 12, 根骨: 14, 机敏: 19, 洞察: 16,
+    };
+    npc.keyItems = ['软猬甲'];
+    npc.keyItemDetails = [
+      { name: '软猬甲', type: '护甲', rank: '珍品', description: '贴身软甲，可卸去部分外力。', count: 1 },
+    ];
+
+    render(<SocialPanel npcs={[npc]} worldTime={{ year: 1219, month: 3, day: 12, hour: 10, minute: 0 }} />);
+
+    expect(screen.getByText('人物档案')).toBeInTheDocument();
+    expect(screen.getByText('女')).toBeInTheDocument();
+    expect(screen.getByText('1180 年')).toBeInTheDocument();
+    expect(screen.getByText('39 岁')).toBeInTheDocument();
+    expect(screen.getByText('轻伤')).toBeInTheDocument();
+    expect(screen.getByText('一流初期')).toBeInTheDocument();
+    expect(screen.getByText('2,345')).toBeInTheDocument();
+    expect(screen.getByText('岛主之女')).toBeInTheDocument();
+    expect(screen.getByText('掌棒龙头')).toBeInTheDocument();
+    expect(screen.getByText('先天资质')).toBeInTheDocument();
+    expect(screen.getByText('当前属性')).toBeInTheDocument();
+    expect(document.querySelector('.social-npc-attribute-group[aria-label="先天资质"]')).toHaveTextContent('18');
+    expect(document.querySelector('.social-npc-attribute-group[aria-label="当前属性"]')).toHaveTextContent('80/100');
+    expect(document.querySelector('.social-npc-attribute-group[aria-label="当前属性"]')).toHaveTextContent('25/60');
+    expect(screen.getByText('软猬甲')).toBeInTheDocument();
+    expect(screen.getByText('贴身软甲，可卸去部分外力。')).toBeInTheDocument();
+    expect(screen.getByText('数量 1')).toBeInTheDocument();
+  });
+});
+
 describe('SocialPanel martial-art details', () => {
   it('逐项展示角色的完整功法，并忽略空特性', () => {
     const npc = createNpc('郭靖');
