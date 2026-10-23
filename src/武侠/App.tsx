@@ -1680,7 +1680,6 @@ const App: React.FC = () => {
           <CharacterPanel
             stats={gameState.stats}
             worldTime={gameState.worldTime}
-            statusEffects={gameState.statusEffects}
             isBusy={isLoading || historyMutationPending || isMeridianUpgradePending}
             onUpgradeMeridian={handleMeridianUpgrade}
             onAvatarUpdated={() => setPlayerAvatarVersion(version => version + 1)}
