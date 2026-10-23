@@ -99,8 +99,30 @@ function uniqueFullLocationPaths(value) {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.map(normalizeFullLocationPath).filter(Boolean))];
 }
+// 只在送模文本中折叠相同的一级、二级前缀；不改动路径白名单和真实变量。
+function compactLocationYamlAtom(value) {
+  const atom = String(value);
+  return /^[\p{L}\p{N}_.\/-]+$/u.test(atom) ? atom : JSON.stringify(atom);
+}
+function formatReachableLocationYaml(paths) {
+  const areas = new Map();
+  for (const path of uniqueFullLocationPaths(paths)) {
+    const segments = path.split('/');
+    const [area, region] = segments;
+    if (!areas.has(area)) areas.set(area, new Map());
+    const regions = areas.get(area);
+    if (!regions.has(region)) regions.set(region, []);
+    regions.get(region).push(segments.slice(2).join('/'));
+  }
+  return [...areas].flatMap(([area, regions]) => [
+    '  ' + compactLocationYamlAtom(area) + ':',
+    ...[...regions].map(([region, locations]) =>
+      '    ' + compactLocationYamlAtom(region) + ': [' + locations.map(compactLocationYamlAtom).join(', ') + ']'),
+  ]).join('\n');
+}
 -%>
 
+<系统信息>
 <%
 const promptWorldTime = variables.stat_data.世界信息?.时间;
 if (promptWorldTime && typeof promptWorldTime === 'object') {
@@ -247,9 +269,7 @@ const unnamedEventTargets = hasActiveParticipation && Object.keys(activeFollowup
 活动区: <%- currentScope || '无效' %>
 <% if (reachableLocations.length > 0) { -%>
 可前往:
-<% for (const location of reachableLocations) { -%>
-  - <%- location %>
-<% } -%>
+<%- formatReachableLocationYaml(reachableLocations) %>
 <% } else { -%>
 可前往: 无
 <% } -%>
@@ -266,7 +286,7 @@ const unnamedEventTargets = hasActiveParticipation && Object.keys(activeFollowup
 <% } -%>
 地点接驳指引: 当前参与事件全阶段完成且玩家有继续推进想法时，可参考以上目标地点继续行程；这些地点尚未确认与后续事件的对应关系，不得据此强制触发事件、直接传送或覆盖玩家选择。
 <% } -%>
-规则: 路径=一级/二级/三级[/四级]；前三段相同仅表示同一活动区，不代表人物面对面同场。
+规则: 可前往按一级、二级分组，列表项为三级或三级/四级；移动时须拼回完整一级/二级/三级[/四级]路径；前三段相同仅表示同一活动区，不代表人物面对面同场。
 </可用地点>
 
 <%
@@ -291,3 +311,4 @@ if (Object.keys(presentCharacters).length > 0) {
 <%- toPromptYaml(presentCharacters) %>
 </角色数据>
 <% } -%>
+</系统信息>
