@@ -2,12 +2,12 @@
   "pid": 48316,
   "status": "running",
   "phase": "source",
-  "updated_at": "2026-10-25T02:25:23+0800",
+  "updated_at": "2026-10-25T02:26:56+0800",
   "usage": {
-    "inputTokens": 244634,
-    "cacheReadTokens": 10112,
-    "outputTokens": 343829,
-    "total": 598575
+    "inputTokens": 256416,
+    "cacheReadTokens": 10624,
+    "outputTokens": 357978,
+    "total": 625018
   },
   "book": "鹿鼎记"
 }
