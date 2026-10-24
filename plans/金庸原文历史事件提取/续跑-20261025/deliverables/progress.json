@@ -1,7 +1,7 @@
 {
   "statuses": {
-    "reviewed": 39,
-    "pending": 561,
+    "reviewed": 40,
+    "pending": 560,
     "needs_repair": 5
   },
   "by_book": {
@@ -22,18 +22,18 @@
       "pending": 96
     },
     "鹿鼎记": {
-      "reviewed": 38,
+      "reviewed": 39,
       "needs_repair": 5,
-      "pending": 80
+      "pending": 79
     }
   },
   "usage": {
-    "inputTokens": 465378,
-    "cacheReadTokens": 22400,
-    "outputTokens": 705908,
-    "total": 1193686
+    "inputTokens": 469328,
+    "cacheReadTokens": 22912,
+    "outputTokens": 716284,
+    "total": 1208524
   },
-  "events": 463,
+  "events": 468,
   "reviewed_legacy": 4,
   "legacy_verdicts": {
     "supported": 3,
