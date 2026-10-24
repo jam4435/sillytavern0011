@@ -1,0 +1,291 @@
+dsh: reasoning:
+We need answer only JSON. Need parse task: verify legacy cards none. coverage start 32 end 222 complete true? We must only cover given lines; chapter range 32-222, we have full lines 32-222. Need extract past historical events. Need output new_events with evidence anchors from given lines. No old reviews because legacy empty. Need decide events. Need be careful not over-extract. Lines 32-222 include many past events. Need identify concrete past events: 清兵押囚车, 明史案 history, 吕留良 refusing office/becoming monk, 查伊璜 story beginning. But task is "过去历史事件" within chapter. We need cards from narrative past, not current scene. Narrative present includes 囚车 procession (line 36-44) maybe current, not past? It is current narrative scene, not past event. "叙事当下打斗/讲述/揭密行为本身不是过去事件；可把讲述当证据." So the conversation in 吕家 is present; the 明史案 backstory is past, told in narration. Need extract individual causal nodes of complex history.
+
+Need no external knowledge. Need exactly events with fields. Need line anchors continuous 4-40 chars. Need ensure anchors exist. Need use line numbers exactly. Need maybe title, when, place, people, relationships, description, cause, effect, nature, evidence, uncertain.
+
+Let's enumerate significant past events:
+1. 清廷逮捕浙江读书人/明史案株连: line 42 says 昨日和今朝已逮去三十几人，都是浙江有名读书人，无辜株连. This is reported speech by 吕留良, past two days, place unknown? 浙江. People unnamed 浙江读书人. Nature 人物自述. Event: 清廷连续逮捕浙江读书人三十余人. Cause: 明史案? At line 42 not yet named? says "又犯了什么罪" implied. But could be general. Maybe this is part of 明史案. Include with uncertain. However line 42 "昨日和今朝，已逮去了三十几人" from 吕. Evidence line 42 anchor "昨日和今朝，已逮去了三十几人". Yes.
+
+2. 吕留良拒荐不出仕，削发为僧: lines 72. Event. People 吕留良, 大吏, 大官. When 明亡后/清初, unknown. Place 崇德? local. Cause: 心怀故国不肯做官; 大吏保荐山林隐逸, 誓死相拒; 后又保荐博学鸿儒, 怕拒则杀身, 削发为僧假和尚. Effect: 地方官员不再劝. Nature 客观叙述. Good.
+
+3. 顾炎武、黄宗羲到海宁袁花镇找查伊璜，嘱家人躲避, 题诗壁上: lines 88-90. Past few days. This is part of current backstory, but event happened "前日晚上". People 黄宗羲 顾炎武 查伊璜家人. Place 海宁袁花镇. Cause 明史案牵连查伊璜. Effect 家人连夜躲避, 题诗. This is a concrete past event. Could include. But not central? Yes. Need not split too much. Event: 黄顾夜访查家扑空，嘱其家人躲避并题诗示警. Evidence line 90 anchor "我二人前日晚上匆匆赶到海宁袁花镇" or "忙嘱伊璜先生家人连夜躲避". Need anchor 4-40. Good.
+
+4. 庄廷鑨眼盲: line 116. Event: 庄廷鑨因读书过勤忽然眼盲，寻医不愈. When 顺治年间. Place 湖州南浔. People 庄廷鑨. Cause 读书过勤. Effect 郁郁不欢, later 修史. This is past event. Good.
+
+5. 朱姓少年携朱国桢明史遗稿抵押/寄存庄家: lines 118. Event. People 朱姓少年, 庄允城, 朱国桢. When 忽有一日 after 眼盲. Place 庄家. Cause 求借数百两银子; 要远游，遗稿寄存. Effect 庄允城答应，叫清客读给庄廷鑨听. Good.
+
+6. 庄廷鑨聘士人增删修订明史稿，书成不久去世: lines 120-124. This is a complex process, maybe one event "庄廷鑨主持增修明史". Cause 眼盲无聊，想效左丘明著史; effect 书成，庄廷鑨去世. People 庄廷鑨, 宾客, 通士鸿儒. Place 庄家. When 顺治年间? 书成不久. Nature 客观叙述. Good. Maybe separate "庄廷鑨去世" could be separate? It's effect of book. But event object can include.
+
+7. 庄允城刊印《明书辑略》，列名李令晰及十八人: lines 126. Event. Cause 伤爱子之逝. Effect 书成，列名. Place 南浔. People 庄允城, 李令晰, 茅元锡 etc. Could list key names; people field original appellations. Need not all? But description. This is past event. Good.
+
+8. 吴之荣贪赃被革职: line 130. Event. People 吴之荣. Place 湖州归安县. Cause 贪赃枉法被告发; effect 革职, 贿赂免抄家，赃款尽失. Good.
+
+9. 吴之荣向朱佑明打秋风被拒/讥刺: line 130. Event. People 吴之荣 朱佑明. Place 朱家. Cause 丢官无盘缠; effect 怀恨. This is separate causal node important later. Include.
+
+10. 吴之荣向庄允城求索，庄赠一两银子并讥讽: lines 132. Event. People 吴之荣 庄允城. Place 庄家. Cause 求索; effect 吴怒，见《明书辑略》起意奉承. Hmm line 132 is event, line 134 follows. Could include maybe "庄允城赠银讥讽吴之荣". Important cause of 吴之荣告发? Actually he then flatters. Include.
+
+11. 吴之荣获赠《明书辑略》及湖州三宝，发现金叶: lines 142-148. Event? He asked for book, 庄赠包裹 with book, silk, brushes, and gold leaves hidden. Why gold? 庄允城 maybe intentionally? Text says 吴之荣 thinks 庄故意夹金叶; narration doesn't confirm? Line 150 "寻思" his speculation. We can include factual: 庄允城赠包裹，内有《明书辑略》、蚕丝、毛笔，书中夹十张金叶. Cause 吴之荣求书; effect 吴大喜，夜读. Nature 客观叙述 for gift and discovery, but gold hidden motive uncertain. Include? Maybe not central but a concrete event. Need avoid over-number. Could combine with "吴之荣读《明书辑略》发现违禁年号". Actually gold discovery leads to reading. Event: 吴之荣得赠书并发现金叶，夜读发现违禁. Could split because reading and discovery is key. Let's do "吴之荣获赠《明书辑略》并发现书中金叶" and "吴之荣夜读《明书辑略》，发现沿用明朝年号等违禁内容". The second is the key.
+
+12. 吴之荣向杭州将军松魁告发: lines 162. Event. People 吴之荣 松魁. Place 杭州. Cause 发现违禁; effect 等大半年无结果. Nature 客观. Good.
+
+13. 程维藩见禀帖后告假赴南浔告知庄允城，并献毁书重刊计: lines 170-176. This is a complex event: 程维藩（松魁幕客）见吴之荣禀帖，知道牵连重大，赴南浔告知庄允城，教其收购旧书销毁、重刊删改新版、行贿官府. Cause 避免大狱. Effect 庄允城照办，层层官府敷衍，案子暂息. Could be one event, maybe separate "程维藩献釜底抽薪计" and "庄允城行贿、重刊新版导致层层申复不了了之". But complex independent nodes. Need not over split. Maybe two:
+- 程维藩向庄允城泄信并献毁书重刊、行贿之计 (line 172,176)
+- 庄允城依计收回旧书、重刊新版并贿赂官府，浙江查究不了了之 (lines 176,180). But line 180 describes process. Good.
+
+14. 吴之荣在客店偷得原版《明书辑略》，赴北京告发: lines 182-184. Event. Cause 新版销毁证据，搜寻原版不得，偶见客店原版; effect 偷书，赴京告礼部等. Good.
+
+15. 北京三衙门驳回吴之荣，因庄允城已送新版及厚礼: lines 184-186. Event. Cause 庄行贿; effect 吴碰壁. Good.
+
+16. 吴之荣张贴招纸、分呈四顾命大臣，鳌拜查究: lines 188-194. Complex: 吴之荣写四张禀帖给索尼、苏克萨哈、遏必隆、鳌拜，并贴招纸揭露; 鳌拜得报召见吴，查实后派钦差赴浙江查究，庄家及官员入狱. Could split:
+- 吴之荣向四顾命大臣呈禀并在京城张贴招纸 (line 188)
+- 鳌拜查究并派钦差，庄家及浙江官员被逮 (lines 190-194)
+Need include 鳌拜掌权背景? line 190 says 四大臣辅政, 鳌拜凶横. That's background, maybe event: 顺治遗诏命四臣辅政, 鳌拜掌权. But this is political past. Could include? It is a past event and causally important. But task says avoid泛背景. Yet it's specific: 顺治逝世遗诏四臣辅政. Maybe include as event? "顺治帝遗诏四大臣辅政，鳌拜专权" line 190. It is past political event. But perhaps too background; however complex history includes political context. We can include one card. Need not be泛? It has specific people. Could include with nature 客观叙述. But old cards none,補漏. Hmm.
+
+17. 明史案判决: line 202. Event: 清廷处决/惩罚涉案人员: 庄廷鑨开棺戮尸, 庄允城狱死, 庄家十五以上处斩妻女发配, 李令晰凌迟四子处斩, 幼子不愿减供同斩, 松魁朱昌祚候审, 程维藩凌迟, 学官处斩, 谭希闵等绞. This is one big event? Could be too many independent causal nodes. The task says complex history independent causal nodes should be separated. But a single judgment event with multiple punishments may be okay. However cards should be specific actions. Maybe create "明史案定谳，庄家及涉案官员士人遭严惩" describing main punishments. Evidence line 202. It's a past event. Good.
+
+18. 吴之荣诬指朱佑明为“朱氏原稿”并曲解其名，导致朱家父子斩首、财产赏吴: line 204. Event. People 吴之荣 朱佑明. Cause 怀恨; effect 朱佑明五子斩首，家产赏吴. Good.
+
+19. 刻工、印工、书贾、读者等因买书/卖书被处斩; 李尚白案例: line 206. This is part of judgment but separate causal node: 大规模株连书商读者. Could create "明史案株连刻印书贾读者，李尚白等因购书被杀". Evidence line 206. Good. Maybe not too many.
+
+20. 江南名士列名参校者十四人凌迟: line 208. Part of judgment. Could be included in main judgment, or separate "列名参校的江南名士十四人凌迟". But already line 202 mentions 列名文学之士入狱, line 208 specific. Maybe combine in judgment. Avoid duplication.
+
+21. 查继佐、范骧、陆圻免罪: line 212. Event: 上谕以三人虽列名参校但事先未见其书免罪. Cause? "必是大力将军所为" is 黄宗羲推断, not confirmed. Important: nature 客观叙述 for 上谕; effect. Could include. Then line 214 mentions 查伊璜府第焕然一新 and 大力将军 story; 黄宗羲转述. This is a past event but not fully in window? Lines 218-222 start 查继佐遇乞丐 (future 大力将军?) The story is being told, but the actual past event (查继佐雪天邀乞丐饮酒) is narrated within lines 218-222. Is it a past event? Yes, a flashback. It continues beyond 222. We can include beginning: 查继佐雪夜邀乞丐饮酒，见其酒量奇高. But incomplete; uncertain. Should we include? It is a past event, but chapter range ends mid-story. The task says coverage complete to 222. We can include event with uncertain "故事未在本回范围完". But maybe not necessary? User asks extract past history. This is a past event in flashback. Need include if concrete. But event is just initial encounter, no causal conclusion. Could include "查继佐雪天邀乞丐进屋饮酒" with evidence line 218. It is a past event. But "乞丐" later 大力将军? Not in text yet. Avoid asserting. Good.
+
+22. 吕留良与黄顾商议避祸、去扬州: lines 102-106. This is present planning, not past event. Don't include. The decision to flee is current, not past.
+
+23. 顾炎武、黄宗羲到吕家告知明史案: current conversation, not past. Don't include as event. But the fact they came from 海宁 is past; included #3.
+
+24. 吕留良题画诗: current, not past.
+
+25. 明史案起因: 朱国桢原稿, 庄家买稿刊行. Covered #5/#7. Also line 110 顾炎武 says 此书出于朱国桢; line 110 吕 says 庄家花几千两从朱相国后人买原稿以己名刊行. Wait this conflicts with line 118: 朱姓少年抵押遗稿, 庄允城不要抵押, 寄存; line 126 says 根据朱氏原稿增删. The line 110 is 听说, may be inaccurate. Important: old card? none. We can make an event "庄家购得/取得朱国桢明史原稿并刊行" but there are two versions: line 110 hearsay "花几千两银子买来，以己名刊行"; line 118 says 抵押/寄存. Need reflect uncertainty, perhaps not separate; use line 118 concrete. But line 110 is a claim by 吕留良, could be 传闻. We can include "吕留良听说庄家买朱氏原稿刊行" as 传闻? But not necessary. However this is a causal node: origin of 明史稿. The more detailed line 118 is enough.
+
+26. 吴之荣发现新版书已删改, 推断庄允城收回旧书重镌: line 166-168. This is a past event (庄允城重刊) already #13. The discovery is current? He is in bookstore, current narrative. Not past event. But it's an investigative action in past? It occurs in narrative present relative to conversation? The whole 明史案 is backstory narrated. Hmm the chapter's "current" is 吕家 conversation, and the 明史案 is narrated as past. Within that past, 吴之荣 bookstore discovery is an event. We can include "吴之荣在杭州书铺发现新版明史已删改，推断庄家重刊" as past event. This is important. But #13 effect. Could include. Maybe too many. Need balance.
+
+27. 吴之荣在杭州等大半年, 门房斥责: line 162. Event. Could include with告发. Maybe "吴之荣向松魁告发后久候无果" as event. Good.
+
+28. 庄允城送给吴之荣一两银子: line 132. Include.
+
+29. 吴之荣向庄允城索书, 庄赠"湖州三宝": line 142-146. Include.
+
+30. 李令晰作序: line 126. Part of publication.
+
+31. 庄廷鑨聘请士人 read etc. Good.
+
+32. 庄廷鑨死后，庄允城刊书: line 126. Good.
+
+33. 清廷处决... line 202. Good.
+
+34. 吴之荣告到北京三衙门: line 184. Could combine with #15.
+
+35. 吴之荣偷书: line 182. Good.
+
+36. 吴之荣在客店看到店主人读原版, 偷书: line 182. Good.
+
+37. 吴之荣在书铺发现新版: line 166. Good.
+
+38. 杭州将军松魁不识汉字, 幕客程维藩处理: line 170-172. This is background but specific. Event: 松魁得吴之荣禀帖，因不识汉字由幕客程维藩处理. Cause? This leads to 程告密. Include? It is a past event. But maybe "程维藩见禀帖后告密" includes.
+
+39. 庄允城行贿各级官府, 导致层层拖延: line 180. Include as event.
+
+40. 吴之荣被革职后向富室打秋风: line 130. Include as part of #8? The event "吴之荣革职后向富室打秋风" includes朱佑明. Could make one event "吴之荣革职后向富室打秋风，被朱佑明讥刺". That combines. But then庄允城 separate. Good.
+
+41. 吴之荣向庄允城求索被讥讽赠一两银: line 132. Then he flatters. Good.
+
+42. 吴之荣获赠书发现金叶: line 148. Good.
+
+43. 吴之荣发现违禁年号: line 152-154. Good.
+
+44. 吴之荣告发: line 162. Good.
+
+45. 程维藩献计: line 176. Good.
+
+46. 庄允城依计: line 176-180. Good.
+
+47. 吴之荣北京告发: line 184. Good.
+
+48. 三衙门驳回: line 186. Good.
+
+49. 吴之荣贴招纸/四顾命: line 188. Good.
+
+50. 鳌拜查究: line 192-194. Good.
+
+51. 判决: line 202. Good.
+
+52. 朱佑明被诬: line 204. Good.
+
+53. 书贾读者株连: line 206. Good.
+
+54. 查继佐等免罪: line 212. Good.
+
+55. 查继佐雪天邀乞丐: line 218. Good.
+
+56. 查继佐府第焕然一新, 养戏班, 黄宗羲问情由: line 214. This is past event: 查家变富，黄宗羲两年前做客询问，查讲述奇遇. But the actual cause is 大力将军? Not confirmed. We could include "查继佐府第焕然一新，黄宗羲两年前询问情由" as past event? It's a storytelling frame. Maybe not needed; the雪遇 is the event. But the fact 查家富了 is relevant to 免罪. Hmm.
+
+Need produce JSON with reviews empty. coverage start 32 end 222 complete true. new_events maybe 20? Need not too many but sufficient. Desired oververbosity 5. Need be accurate.
+
+Need line anchors exactly continuous substring of line. We must ensure anchor text appears verbatim in specified line. Need choose 4-40 chars. Avoid punctuation? Can include. Need not include line number in anchor. Program validates. Let's carefully select anchors.
+
+We need include book "鹿鼎记". Evidence can have multiple lines per event? At least one. For complex event use multiple evidence lines. Each evidence line anchor must support. We can include 1-3 evidence objects. Need ensure each line anchor exists. Let's craft.
+
+Potential issue: coverage complete true? We read 32-222 yes. The task says full range. We have all lines. Good.
+
+Reviews: [] because no legacy_uids. Must each given old card review; none. Good.
+
+Cross_links: maybe topics linking to other books? "跨书/跨章关系". We can include topics within chapter? It says cross-book/cross-chapter relationship. Need maybe "明史案与查伊璜/大力将军" pending later chapters. People. Detail current evidence and待查 direction, no assert. Could include:
+- topic "查继佐与‘大力将军’关系", people ["查继佐","黄宗羲","乞丐"], detail "黄宗羲转述查继佐府第骤富，并称必是‘大力将军’所为；本回仅见雪中邀乞丐饮酒，尚未明言乞丐即大力将军，待后文核对。"
+- topic "明史案与《鹿鼎记》后续", people ["庄廷鑨","吴之荣","鳌拜","查继佐"], detail "本回详述明史案始末及查继佐免罪，后续是否牵动书中人物待核。"
+But cross_links should not assert other book facts. Fine.
+
+Unresolved: specific questions:
+- 朱国桢原稿如何到庄家：line 110称庄家花银买稿，line 118称朱姓少年抵押/寄存，二者关系待核.
+- 吴之荣所得金叶是否庄允城故意所夹，原文仅吴之荣推测.
+- 查继佐免罪是否确由“大力将军”营救，原文仅黄宗羲推断.
+- 乞丐是否即“大力将军”，本回未明.
+- 庄廷鑨去世具体时间/死因未详.
+- 明史案处决人数等未详.
+Need concise.
+
+Now event objects. Need field "relationships":"实际关系变化或无". For each maybe "无" or "吴之荣与庄允城由求索转为结怨" etc. Need not overdo.
+
+Let's decide final new_events list. Need avoid duplicate and too granular. I'd include ~18. Let's map:
+
+1. 清廷连逮浙江读书人三十余人 (line 42). Is this too vague and maybe part of案? It is a past event. Include. People unnamed "浙江读书人"; maybe people ["浙江读书人"]; relationships "无". when "吕留良对子说话前一日及当日" (relative). place "浙江" maybe. description. nature 人物自述. uncertain "未列姓名，是否均属明史案待核". Evidence line 42 anchor "昨日和今朝，已逮去了三十几人" (count chars? 昨日和今朝，已逮去了三十几人 = 15). Good.
+
+2. 吕留良拒荐、削发为僧 (line 72). Evidence anchor "吕留良眼见若再相拒" or "于是削发为僧，做了假和尚". Need line 72. Use anchor "于是削发为僧，做了假和尚" 12. Good. when "明亡后至清初，具体年未知". place "浙江崇德". people ["吕留良","当地大吏","大官"]. relationships "吕留良与清廷地方官府由被荐转为以出家相拒". cause "心怀故国，不肯在清朝做官；再拒恐遭杀身". effect "地方官员不再劝他出山". nature 客观叙述.
+
+3. 黄宗羲顾炎武夜访查家扑空、嘱家人躲避并题诗 (line 90). Evidence anchor "我二人前日晚上匆匆赶到海宁袁花镇" (line 90). Also "忙嘱伊璜先生家人连夜躲避" line 90. One evidence enough. when "前日晚上". place "海宁袁花镇查家". people ["黄宗羲","顾炎武","查伊璜","查伊璜家人"]. relationships "黄顾与查伊璜交好，为其通风报信". cause "明史案牵连查伊璜，事势紧急". effect "家人连夜躲避；顾在书房壁题诗示警". nature 人物自述 (黄宗羲叙述). Good.
+
+4. 庄廷鑨因读书过勤眼盲 (line 116). Evidence anchor "庄廷鑨因读书过勤，忽然眼盲" 15. when "顺治年间". place "湖州府南浔镇庄家". people ["庄廷鑨"]. relationships "无". cause "读书过勤". effect "寻遍名医无法治愈，郁郁不欢". nature 客观叙述.
+
+5. 朱姓少年携朱国桢明史遗稿求借并寄存庄家 (line 118). Evidence anchor "说是祖父朱相国的遗稿" or "向庄家抵押，求借数百两银子". Use line 118 anchor "向庄家抵押，求借数百两银子" 14. Good. when "庄廷鑨眼盲后忽有一日". place "庄家". people ["朱姓少年","庄允城","朱国桢"]. relationships "朱国桢后人与庄允城发生借贷/寄存关系". cause "朱姓少年求借数百两银子并要远游，恐遗稿遗失". effect "庄允城允诺借款并答应寄存遗稿；后叫清客读给庄廷鑨解闷". nature 客观叙述. uncertain "line 110另有花银买稿之说，待核".
+
+6. 庄廷鑨聘士人增删修订明史稿，书成后去世 (lines 120-124). Evidence line 122 "聘请了好几位士人，将那部明史稿从头至尾的读给他听" (line 122) and line 124 "书成不久，庄廷鑨便即去世". Need anchors. Use two evidence. when "顺治年间，眼盲后". place "南浔庄家". people ["庄廷鑨","宾客","通士鸿儒"]. relationships "庄廷鑨延请士人修史". cause "眼盲闲居，想效左丘明著史传世". effect "书成不久庄廷鑨去世". nature 客观叙述. uncertain "所聘士人姓名部分列后，具体分工未详".
+
+7. 庄允城刊印《明书辑略》并列名参校者 (line 126). Evidence anchor "书名叫作《明书辑略》，撰书人列名为庄廷鑨" maybe 20. line 126. when "庄廷鑨死后，数年间". place "南浔". people ["庄允城","庄廷鑨","李令晰","茅元锡","查继佐","范骧","陆圻"] etc. relationships "庄允城为亡子刊书；李令晰作序；十八人列名参校". cause "心伤爱子之逝，欲扬其名". effect "书刊成，庄廷鑨之名噪于江北江南；列名者后来受案牵连". nature 客观叙述. uncertain "列名十八人是否都实际参校，原文后文有未通阅全书之说". Good.
+
+8. 吴之荣贪赃被革职 (line 130). Evidence anchor "在任内贪赃枉法，百姓恨之切齿" 16. when "清初，明史案前". place "湖州归安县". people ["吴之荣"]. relationships "无". cause "贪赃枉法为人告发". effect "革职，行贿免抄家，赃款尽失，向富室打秋风". nature 客观叙述. uncertain "具体告发者未详".
+
+9. 吴之荣向朱佑明打秋风被讥刺 (line 130). Evidence anchor "主人朱佑明却是个嫉恶如仇的正直君子" maybe supports. Or "非但不送仪程，反而狠狠讥刺" 14. line 130. when "吴之荣革职后". place "富室朱家". people ["吴之荣","朱佑明"]. relationships "吴之荣求索被拒，结怨". cause "吴之荣丢官无盘缠，向富室求索". effect "朱佑明不送银并讥刺；吴之荣恼怒怀恨". nature 客观叙述.
+
+10. 庄允城赠吴之荣一两银子并讥讽 (line 132). Evidence anchor "封了一两银子给他" 8. when "吴之荣拜访庄家时". place "庄家". people ["吴之荣","庄允城"]. relationships "庄允城轻蔑吴之荣，结怨". cause "吴之荣来求索". effect "吴之荣心下怒极，见《明书辑略》后改以奉承求书". nature 客观叙述.
+
+11. 吴之荣获赠《明书辑略》及湖州三宝，发现书中金叶 (lines 144-148). Evidence line 146 "摸到的竟是一部书，一束蚕丝，几十管毛笔" and line 148 "从书中抖了十张金叶出来". when "同日吴之荣告辞后". place "客店". people ["吴之荣","庄允城"]. relationships "赠受关系". cause "吴之荣求书并恭维庄廷鑨". effect "吴之荣得书、丝、笔及十张金叶，夜读". nature 客观叙述. uncertain "金叶是否庄允城故意夹入，原文仅吴之荣推测". Good.
+
+12. 吴之荣夜读发现《明书辑略》沿用明朝年号等违禁 (lines 152-154). Evidence line 154 "书中仍作“崇祯九年”，不书“大清崇德元年”" maybe 23. Need anchor exact including quotes? Could use "作书之人明明白白是仍奉明朝正朔" 18. line 154. Also line 152 "就不该再用明朝万历年号". Good. when "获书当晚". place "客店". people ["吴之荣"]. relationships "无". cause "翻阅《明书辑略》". effect "认为抓到把柄，决意告发". nature 客观叙述 (书中内容) plus 吴 inference. uncertain "是否全书均如此，吴之荣找出七八十处". Good.
+
+13. 吴之荣向杭州将军松魁告发 (line 162). Evidence anchor "送入将军松魁府中" 9. when "次日中午后". place "杭州将军府". people ["吴之荣","松魁"]. relationships "告发者与受理官员". cause "发现书中违禁，图升官发财". effect "久候大半年无结果，门房斥责". nature 客观叙述.
+
+14. 程维藩见禀帖后赴南浔告庄允城，献毁书重刊行贿计 (lines 172-176). Evidence line 172 "当即向将军告了几天假，星夜坐船，来到湖州南浔镇上，将此事告知庄允城" and line 176 "唯有施一个釜底抽薪之计" maybe. when "吴之荣告发后不久". place "杭州至南浔". people ["程维藩","庄允城","松魁"]. relationships "程维藩为松魁幕客，向庄允城通风报信并献策". cause "怕明史案酿成大狱，苏南浙西多人丧身破家". effect "庄允城得信，依计收购旧书、重刊新版、行贿官府". nature 客观叙述. uncertain "程维藩动机兼有救人及受贿？原文未言受贿". Good.
+
+15. 庄允城依计收回旧书、重刊新版并贿赂官府，浙江查究不了了之 (lines 176-180). Evidence line 176 "将这部书尽数收购回来销毁" and line 180 "层层申复，就此不了了之". Need anchor line 180 "层层申复，就此不了了之" 12. when "隔半个多月后至数月". place "杭州、湖州等官府". people ["庄允城","程维藩","朱昌祚","胡尚衡","学官"]. relationships "庄允城贿赂各级官府". cause "程维藩之计". effect "官府查无违禁，案子暂息；吴之荣告发失败". nature 客观叙述. uncertain "行贿具体数额未详".
+
+16. 吴之荣在书铺发现新版已删改，后在客店偷得原版 (lines 166-182). Maybe split:
+- 吴之荣在杭州书铺发现新版明史已删改 (line 166). Evidence anchor "书中各处犯忌的文字竟已全然无影无踪" 18. when "告发久候无果时". place "杭州文通堂书局". people ["吴之荣"]. relationships "无". cause "查看新版《明书辑略》". effect "推断庄允城收回旧书重镌，决意再告". nature 客观叙述/推断? The observation objective, inference. 
+- 吴之荣旅途偷得原版《明书辑略》 (line 182). Evidence anchor "深夜之中悄悄起床，偷了书便即溜出店门" 20. when "浙东搜购原版不得后". place "旅途客店". people ["吴之荣","店主人"]. relationships "吴之荣偷取店主人之书". cause "遍寻原版不得，见店主人所读为原版". effect "决意赴北京告发". nature 客观叙述.
+
+17. 吴之荣赴北京向礼部等都察院通政司告发 (line 184). Evidence anchor "告到礼部、都察院、通政司三处衙门" 18. when "偷得原版后". place "北京". people ["吴之荣"]. relationships "无". cause "浙江官府受贿不理，一不做二不休". effect "三衙门驳复，称挟嫌诬告". nature 客观叙述. Could combine with next.
+
+18. 三衙门驳回吴之荣，因庄允城已送新版及厚礼 (line 186). Evidence anchor "三处衙门先后驳复下来" 11. when "到京不到一月". place "北京三衙门". people ["吴之荣","庄允城"]. relationships "庄允城行贿，官府驳吴". cause "庄允城受程维藩之教，送新版明史及厚礼". effect "吴之荣告发再败，无盘缠". nature 客观叙述. uncertain "行贿细节未详".
+
+19. 吴之荣分呈四顾命大臣并张贴招纸 (line 188). Evidence anchor "又写了四张禀帖，分呈四位顾命大臣" 18. when "三衙门驳回后". place "北京". people ["吴之荣","索尼","苏克萨哈","遏必隆","鳌拜"]. relationships "吴之荣向辅政大臣告发". cause "无退路，拼坐牢也要干到底". effect "鳌拜得报查究". nature 客观叙述.
+
+20. 鳌拜查究并派钦差，庄家及浙江官员被逮 (lines 190-194). Evidence line 192 "鳌拜得悉之下，立即查究" and line 194 "当即派出钦差，赴浙江查究". when "招纸出现后". place "北京、浙江". people ["鳌拜","吴之荣","庄允城","松魁","朱昌祚"]. relationships "鳌拜借案镇慑汉人及敌党；吴之荣告发得受理". cause "吴之荣招纸及禀帖；鳌拜欲办大案". effect "庄家全逮京，松魁朱昌祚以下官员革职查办，列名士人入狱". nature 客观叙述.
+
+21. 明史案定谳，庄家及涉案官员士人遭严惩 (line 202). Evidence line 202 anchors: "庄廷鑨已死，开棺戮尸" and "十五岁以上的尽数处斩" maybe. Use one or two. when "案发后处决时". place "清廷/杭州". people ["庄廷鑨","庄允城","李令晰","松魁","朱昌祚","程维藩","谭希闵"]. relationships "清廷对涉案者惩处". cause "明史案". effect "庄家破亡，多人处死，妻女发配". nature 客观叙述. uncertain "人数、具体日期未详". This is large. Good.
+
+22. 吴之荣诬指朱佑明为朱氏原稿，致朱家父子斩首、家产赏吴 (line 204). Evidence anchor "这朱氏便是朱佑明了" 9 or "朱佑明和他五个儿子同处斩首" 15. Good. when "办案时". place "北京/清廷法司". people ["吴之荣","朱佑明","朱佑明五子"]. relationships "吴之荣挟怨诬指". cause "朱佑明曾讥刺吴之荣；吴怀恨". effect "朱佑明及五子斩首，家产赏吴". nature 客观叙述.
+
+23. 明史案株连刻工、书贾、读者，李尚白等因购书被杀 (line 206). Evidence anchor "所有雕版的刻工、印书的列工、装钉的钉工" 20 and "以购逆书之罪，在北京立即斩决" 16. when "案子发作后". place "苏州、北京等地". people ["李尚白","工役","书店主人","朱老者"]. relationships "买书卖书者被株连". cause "明史案查究贩书买书之人". effect "多人处斩，朱老者免死充军". nature 客观叙述. uncertain "据史书记载，细节待核". Good.
+
+24. 查继佐、范骧、陆圻因上谕免罪 (line 212). Evidence anchor "查继佐、范骧、陆圻三人" 11 and "免罪不究" 4. line 212. when "明史案获罪名单公布时". place "邸报/嘉兴". people ["查继佐","范骧","陆圻"]. relationships "三人列名参校但免罪". cause "上谕称虽列名参校，事先未见其书". effect "免罪不究；黄宗羲推测大力将军所为". nature 客观叙述 (上谕). uncertain "免罪真实原因是否大力将军营救，原文仅推测".
+
+25. 查继佐雪天邀乞丐入屋饮酒 (lines 218-220). Evidence anchor "见有个乞丐站在屋檐下避雪" 14 or "查伊璜便邀他进屋" 8. when "某年岁暮下雪天（黄宗羲转述）". place "查继佐家门屋檐/屋内". people ["查继佐","乞丐"]. relationships "查继佐由邀饮与乞丐结交". cause "见乞丐骨格雄奇、单衫不惧寒、面有郁怒". effect "邀入饮酒，发现酒量极大；故事未完". nature 人物自述 (黄宗羲转述查伊璜). uncertain "乞丐身份是否大力将军未明；故事在本回未完". Good.
+
+26. 查继佐府第焕然一新，黄宗羲两年前询问情由 (line 214). Evidence anchor "但见他府第焕然一新" 9. when "两年前". place "查伊璜家". people ["黄宗羲","查继佐"]. relationships "好友". cause "黄宗羲做客见府第变富". effect "查继佐讲述风尘奇遇". nature 人物自述 (黄宗羲). This is a past event but maybe redundant with 25. It frames. Could include? It supports 查家富裕 and the story. Maybe include as separate because it's a distinct event: 查家暴富. But cause unknown. The event "查继佐府第焕然一新，黄宗羲询问" is a past event. However not central? It is relevant to 免罪. Include maybe.
+
+27. 顺治遗诏四臣辅政, 鳌拜专权 (line 190). Event. Evidence anchor "顺治皇帝逝世之时，遗诏命这四大臣辅政" 19. when "顺治逝世时". place "北京". people ["顺治皇帝","索尼","苏克萨哈","遏必隆","鳌拜"]. relationships "四臣辅政，鳌拜专权". cause "顺治遗诏". effect "鳌拜几乎尽操清廷大权". nature 客观叙述. Is this a past event? Yes. But could be泛背景. However specific political event and causally relevant. Include? The task says extract政治往事. Yes include. Good.
+
+28. 吴之荣在杭州等大半年无果 (line 162). Already effect in #13. No separate.
+
+29. 庄允城得信吓瘫叩谢 (line 174). Part of #14.
+
+30. 吴之荣向庄允城求书并恭维 (lines 134-142). Part of #11 maybe. The event of flattery is not necessary. But cause of gift. Could include "吴之荣为求书极力恭维庄廷鑨，庄允城允赠". Hmm #11 description can include.
+
+Need not include every. Maybe 20 is okay. But too many? The instruction: "不要为追求数量把同一动作拆成多张。不要重复已有旧卡。复杂历史的独立因果节点应分开。" We have many independent nodes. Need avoid duplicate:
+- #10 and #11 both吴之荣/庄允城; distinct:赠银 vs赠书. Fine.
+- #13 and #16? #13告松魁, #16发现新版, #17偷书, #18北京告, #19贴招纸, #20鳌拜查. All distinct causal sequence.
+- #21 judgment, #22朱佑明, #23书贾读者. These are separate punishments but same judgment. Could be seen as splitting same action. Maybe combine #21-23 into one "明史案定谳及株连" with description including朱佑明 and书贾. But "复杂历史的独立因果节点应分开": 朱佑明被诬 is distinct cause (吴之荣怀恨), not just judgment. 书贾读者株连 is broad effect. Could keep #21 main judgment, #22 distinct, #23 distinct. Maybe acceptable.
+
+Need ensure no "current" events. The 清廷逮人 line 42 is current-ish? It says yesterday and today, but within conversation. It's past relative to now. Fine.
+
+Need maybe include 吕留良题画? It is current, not past. No.
+
+Need include 顾炎武/黄宗羲来吕家? Current conversation, no.
+
+Need include 吕留良决定避祸扬州? Current planning, no.
+
+Need include 查继佐免罪 but not "大力将军" as fact. Good.
+
+Need craft JSON exactly. Need ensure all event objects fields complete. Need no markdown. Need valid JSON, Chinese quotes okay. Avoid newline? JSON can have strings. Need escape quotes inside strings? Use Chinese quotes “ ” not ASCII, safe. Use no line breaks except structure. Good.
+
+Need evidence anchor exact. Let's verify each anchor substring from lines. We'll pick short exact.
+
+Line 42: "昨日和今朝，已逮去了三十几人" — line 42 has “昨日和今朝，已逮去了三十几人，都是我们浙江有名的读书人” yes substring. Good.
+Line 72: "于是削发为僧，做了假和尚" — exact? line 72: "于是削发为僧，做了假和尚。" yes.
+Line 90: "我二人前日晚上匆匆赶到海宁袁花镇" — line 90 exact? "我二人前日晚上匆匆赶到海宁袁花镇，伊璜先生并不在家" yes.
+Line 116: "庄廷鑨因读书过勤，忽然眼盲" — line 116: "庄廷鑨因读书过勤，忽然眼盲，寻遍名医" yes.
+Line 118: "向庄家抵押，求借数百两银子" — line 118: "说是祖父朱相国的遗稿，向庄家抵押，求借数百两银子。" yes.
+Line 122: "聘请了好几位士人，将那部明史稿从头至尾的读给他听" — line 122 exact? "当即聘请了好几位士人，将那部明史稿从头至尾的读给他听。" yes. 28 chars maybe okay.
+Line 124: "书成不久，庄廷鑨便即去世" — line 124 exact at end. yes.
+Line 126: "书名叫作《明书辑略》，撰书人列名为庄廷鑨" — line 126 exact? "书名叫作《明书辑略》，撰书人列名为庄廷鑨，请名士李令晰作序。" yes.
+Line 130: "在任内贪赃枉法，百姓恨之切齿" — exact? "在任内贪赃枉法，百姓恨之切齿，终于为人告发" yes.
+Line 130: "非但不送仪程，反而狠狠讥刺" — exact? "非但不送仪程，反而狠狠讥刺，说道..." yes.
+Line 132: "封了一两银子给他" — exact? "冷笑一声，封了一两银子给他" yes.
+Line 146: "摸到的竟是一部书，一束蚕丝，几十管毛笔" — exact? line 146 "摸到的竟是一部书，一束蚕丝，几十管毛笔。" yes.
+Line 148: "从书中抖了十张金叶出来" — exact? "从书中抖了十张金叶出来" yes.
+Line 154: "作书之人明明白白是仍奉明朝正朔" — exact? line 154 "作书之人明明白白是仍奉明朝正朔，不将清朝放在眼里。" yes.
+Line 162: "送入将军松魁府中" — exact? "连同这部明史，送入将军松魁府中。" yes.
+Line 172: "星夜坐船，来到湖州南浔镇上，将此事告知庄允城" — exact? line 172 "当即向将军告了几天假，星夜坐船，来到湖州南浔镇上，将此事告知庄允城。" yes.
+Line 176: "唯有施一个釜底抽薪之计" — exact? "唯有施一个釜底抽薪之计，一面派人前赴各地书铺" yes.
+Line 180: "层层申复，就此不了了之" — exact? line 180 ends "层层申复，就此不了了之。" yes.
+Line 166: "书中各处犯忌的文字竟已全然无影无踪" — exact? line 166 "只见书中各处犯忌的文字竟已全然无影无踪" yes.
+Line 182: "深夜之中悄悄起床，偷了书便即溜出店门" — exact? line 182 "深夜之中悄悄起床，偷了书便即溜出店门" yes.
+Line 184: "告到礼部、都察院、通政司三处衙门" — exact? "便写了禀帖，告到礼部、都察院、通政司三处衙门" yes.
+Line 186: "三处衙门先后驳复下来" — exact? "三处衙门先后驳复下来" yes.
+Line 188: "又写了四张禀帖，分呈四位顾命大臣" — exact? "当下又写了四张禀帖，分呈四位顾命大臣" yes.
+Line 190: "顺治皇帝逝世之时，遗诏命这四大臣辅政" — exact? line 190 "顺治皇帝逝世之时，遗诏命这四大臣辅政。" yes.
+Line 192: "鳌拜得悉之下，立即查究" — exact? "鳌拜得悉之下，立即查究，登时雷厉风行的办了起来。" yes.
+Line 194: "当即派出钦差，赴浙江查究" — exact? "当即派出钦差，赴浙江查究。" yes.
+Line 202: "庄廷鑨已死，开棺戮尸" — exact? "庄廷鑨已死，开棺戮尸；" yes.
+Line 202: "十五岁以上的尽数处斩" — line 202 "十五岁以上的尽数处斩" yes.
+Line 204: "这朱氏便是朱佑明了" — exact? "这朱氏便是朱佑明了；" yes.
+Line 204: "朱佑明和他五个儿子同处斩首" — exact? "朱佑明和他五个儿子同处斩首" yes.
+Line 206: "所有雕版的刻工、印书的列工、装钉的钉工" — exact? "所有雕版的刻工、印书的列工、装钉的钉工" yes. Note "列工" maybe weird but exact.
+Line 206: "以购逆书之罪，在北京立即斩决" — exact? "以购逆书之罪，在北京立即斩决" yes.
+Line 212: "查继佐、范骧、陆圻三人" — exact? "查继佐、范骧、陆圻三人，虽列名参校" yes.
+Line 212: "免罪不究" — exact? yes.
+Line 218: "见有个乞丐站在屋檐下避雪" — exact? "见有个乞丐站在屋檐下避雪" yes.
+Line 220: "查伊璜便邀他进屋" — exact? line 218? Wait line 218 has "查伊璜便邀他进屋" yes line 218, not 220. Let's check: line 218 ends with "查伊璜便邀他进屋，命书僮取出杯筷..." Yes anchor line 218. So for event 25 use line 218. Good.
+Line 214: "但见他府第焕然一新" — exact? line 214 "但见他府第焕然一新，庭园宽大" yes.
+
+Need no external names? "大力将军" appears line 214. In cross links okay.
+
+Need event nature for #14 程维藩: 客观叙述. Description says "程维藩怕大狱，告假赴南浔告知庄允城，教其..." Good.
+
+Need event #15 when: "吴之荣告发后数月". Place "杭州、湖州及各级官府". People maybe "庄允城","程维藩","朱昌祚","胡尚衡". Relationships "庄允城向官府行贿，官员层层拖延". Cause "程维藩献策". Effect "新版书缴官，查无违禁，案子暂时不了了之". Good.
+
+Need event #19 吴之荣分呈四顾命大臣: People include 索尼 etc. But line 190 names them. Evidence line 188 only says four; line 190 names. We can evidence both 188 and 190. Good. But event is "向四顾命大臣呈禀并贴招纸"; line 190 names. Use evidence line 188 anchor and line 190 anchor? Line 190 anchor "索尼、苏克萨哈、遏必隆、鳌拜" exact? line 190 "名叫索尼、苏克萨哈、遏必隆、鳌拜" yes. But if event only line 188, people names supported by 190. Use both. Good.
+
+Need event #20 鳌拜查究: Cause includes "招纸及禀帖"; effect. Evidence line 192 and 194. Good.
+
+Need event #21 judgment: Description with many details. Evidence line 202 anchors. But "李令晰凌迟" etc within line 202. Fine. People list. Nature 客观叙述. uncertain "处决人数及日期未详".
+
+Need event #22 朱佑明: Cause "吴之荣怀恨朱佑明先前讥刺". Evidence line 204 and maybe line 130 for prior. Good. Use line 204 anchor. Description. Effect. Good.
+
+Need event #23: "李尚白" evidence. People list "李尚白","工役","书店主人","朱老者". Cause "明史案查究贩书买书之人". Effect "李尚白等斩决，朱老者免死充军". Nature 客观叙述. uncertain "原文称据史书记载". Good.
+
+Need event #24 查继佐免罪: Evidence line 212. Cause "上谕称虽列名参校，事先未见其书". Effect "免罪". uncertain "黄宗羲推测大力将军所为，未证实". Good.
+
+Need event #25 查继佐雪遇: Evidence line 218. People ["查继佐","乞丐"]. Relationships "查继佐邀乞丐饮酒，初步结交". Cause "查见乞丐单衫御寒、神色郁怒，心生奇怪". Effect "乞丐入屋饮酒，酒量惊人；故事未完". Nature 人物自述. uncertain "乞丐身份、后续未在本回范围". Good.
+
+Need event #26 查府变富? Maybe include. Evidence line 214. People ["黄宗羲","查继佐"]. Relationships "好友". Cause "黄宗羲两年前做客见府第焕然一新". Effect "询问情由，查继佐讲述风尘奇遇". Nature 人物自述. But this is a story frame, not a historical event? It is a past event: 查府焕然一新 and 黄询问. It supports later

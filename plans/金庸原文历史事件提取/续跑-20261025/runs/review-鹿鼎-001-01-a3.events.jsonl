@@ -1,1 +1,3 @@
 {"sessionId":"session-5cabc340-a982-42bd-a626-7309905800c7","type":"step/start","seq":6,"time":1792863813194}
+{"sessionId":"session-5cabc340-a982-42bd-a626-7309905800c7","type":"assistant/message","seq":13,"time":1792863885341,"data":{"usage":{"inputTokens":11911,"outputTokens":11996,"reasoningTokens":11996}}}
+{"sessionId":"session-5cabc340-a982-42bd-a626-7309905800c7","type":"turn/end","seq":15,"time":1792863885348,"data":{"reason":{"kind":"max-tokens"}}}
