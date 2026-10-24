@@ -54,7 +54,10 @@ def assemble():
     by_book={book:dict(Counter(t['status'] for t in tasks if t['book']==book)) for book in corpus.texts}
     summary=dict(statuses=dict(statuses),by_book=by_book,usage=usage_total(),events=len(events),
         reviewed_legacy=len(reviews),legacy_verdicts=dict(Counter(r['verdict'] for r in reviews.values())),
-        rejected_or_pending_legacy=len(cards)-sum(r['verdict']=='supported' for r in reviews.values()),
+        rejected_or_pending_legacy=len(cards)-sum(
+            (r['verdict']=='supported' and cards[uid]['mechanical_status']=='exact')
+            or (r['verdict']=='corrected' and 'FIX:'+uid in events)
+            for uid,r in reviews.items()),
         source_stage_complete=all(t['status']=='reviewed' for t in tasks),
         diff_reviewed_events=len(differences),
         diff_stage_complete=bool(events) and all(i in differences for i in events),cross_book_dedup_complete=False)

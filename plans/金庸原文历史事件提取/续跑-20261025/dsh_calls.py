@@ -42,6 +42,20 @@ def call(prompt: str, timeout=240, call_id=None):
     result = run_task(prompt=prompt, provider='buddy', model='deepseek-v4.1-flash',
                       preset=str(overlay), cwd=HARNESS, harness_dir=HARNESS, timeout=timeout,
                       env={'DSH_OPENAI_GATEWAY_ENABLED': '0', 'PYTHONUTF8': '1'})
+    if result.success:
+        event_path=HERE/'runs'/(call_id+'.events.jsonl')
+        events=[json.loads(line) for line in event_path.read_text(encoding='utf-8').splitlines()] if event_path.exists() else []
+        headers=[e['data'] for e in events if e['type']=='request/header']
+        messages=[e['data'] for e in events if e['type']=='assistant/message']
+        valid=(len(headers)==1 and headers[0]['toolCount']==0
+               and headers[0]['config']['provider']=='buddy'
+               and headers[0]['config']['model']=='deepseek-v4.1-flash'
+               and len([e for e in events if e['type']=='step/start'])==1
+               and len(messages)==1 and isinstance(messages[0].get('usage'),dict))
+        if not valid:
+            result.success=False
+            result.exit_code=1
+            result.stderr+='\nRun receipt did not prove one tool-free call to the required model with usage.'
     return result
 
 
