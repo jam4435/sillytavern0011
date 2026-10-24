@@ -148,7 +148,7 @@ def materialize_event(event, allowed, corpus, event_id):
         excerpt = line[start:min(len(line), max(pos+len(anchor), start+120))]
         evidence.append(dict(book=book, line=n, column_start=start+1,
             column_end=start+len(excerpt), anchor=anchor, quote=excerpt,
-            source_sha256=corpus.hashes[book], chapter=corpus.chapter(book,n)['seq']))
+            source_sha256=corpus.hashes[book], chapter=(corpus.chapter(book,n) or {}).get('seq')))
     return {**event, 'id':event_id, 'evidence':evidence, 'mechanical_status':'exact',
             'semantic_status':'model_reviewed', 'diff_status':'pending'}
 
@@ -254,12 +254,47 @@ def report():
     print(json.dumps(dict(statuses=dict(Counter(t['status'] for t in tasks)),usage=usage_total()),ensure_ascii=False))
 
 
+def supplement_frontmatter():
+    """Cover non-chapter text explicitly; existing completed windows remain immutable."""
+    if (HERE/'.controller.lock').exists():
+        raise ValueError('wait for the active controller before changing the source queue')
+    corpus=Corpus()
+    path=HERE/'queue.json'
+    tasks=json.loads(path.read_text(encoding='utf-8'))
+    existing={t['id'] for t in tasks}
+    added=0
+    for short,book in BOOKS.items():
+        chapters=corpus.chapters[book]
+        lines=corpus.texts[book].splitlines()
+        spans=[(0,1,chapters[0]['start']-1,'卷首文本'),
+               (999,chapters[-1]['end']+1,len(lines),'卷后文本')]
+        for chapter,start,end,title in spans:
+            part=1
+            while start<=end:
+                hi,size=start-1,0
+                while hi<end:
+                    if hi>=start and size+len(lines[hi])+12>MAX_SOURCE_CHARS:
+                        break
+                    size+=len(lines[hi])+12
+                    hi+=1
+                task_id=f'{short}-{chapter:03d}-{part:02d}'
+                if task_id not in existing:
+                    tasks.append(dict(id=task_id,book=book,chapter=chapter,title=title,start=start,end=hi,
+                        legacy_uids=[],source_sha256=corpus.hashes[book],phase='source_review',status='pending',
+                        prompt_version=VERSION))
+                    added+=1
+                start,part=hi+1,part+1
+    dump(path,tasks)
+    print(json.dumps(dict(added_frontmatter_windows=added,total_windows=len(tasks)),ensure_ascii=False))
+
+
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command',choices=['prepare','run','status'])
+    parser.add_argument('command',choices=['prepare','run','status','supplement'])
     parser.add_argument('--limit',type=int,default=1)
     parser.add_argument('--books',nargs='*')
     args=parser.parse_args()
     if args.command=='prepare': prepare()
     elif args.command=='run': run(args.limit,args.books)
+    elif args.command=='supplement':supplement_frontmatter()
     else: report()
