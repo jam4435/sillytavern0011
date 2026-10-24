@@ -1,11 +1,11 @@
 {
   "reason": "job_failed",
-  "task_id": "鹿鼎-001-01",
+  "task_id": "鹿鼎-024-02",
   "error": "dsh failed: {\"kind\": \"max-tokens\"}",
   "usage": {
-    "inputTokens": 23815,
-    "cacheReadTokens": 0,
-    "outputTokens": 23995,
-    "total": 47810
+    "inputTokens": 604301,
+    "cacheReadTokens": 30080,
+    "outputTokens": 943421,
+    "total": 1577802
   }
 }

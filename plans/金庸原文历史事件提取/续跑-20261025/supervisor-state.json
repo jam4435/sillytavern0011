@@ -1,13 +1,15 @@
 {
   "pid": 48316,
-  "status": "running",
+  "status": "needs_attention",
   "phase": "source",
-  "updated_at": "2026-10-25T03:24:08+0800",
+  "updated_at": "2026-10-25T03:26:59+0800",
   "usage": {
-    "inputTokens": 596542,
-    "cacheReadTokens": 29568,
-    "outputTokens": 910660,
-    "total": 1536770
+    "inputTokens": 604301,
+    "cacheReadTokens": 30080,
+    "outputTokens": 943421,
+    "total": 1577802
   },
-  "book": "鹿鼎记"
+  "failed": [
+    "鹿鼎-024-02"
+  ]
 }
