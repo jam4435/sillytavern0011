@@ -1,0 +1,7 @@
+dsh: reasoning:
+The user asks me to only output a specific JSON. The context says I'm a historical event material verifier. But the instruction "只输出这个 JSON，不加代码围栏" — just output that JSON.
+
+The requested output is exactly:
+{"ok":true,"route":"buddy/deepseek-v4.1-flash"}
+
+I should just output it.

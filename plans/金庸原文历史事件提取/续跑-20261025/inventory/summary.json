@@ -1,0 +1,14 @@
+{
+  "source_cards": 1741,
+  "selected_cards": 1501,
+  "selected_files": 16,
+  "exact": 1477,
+  "needs_review": 24,
+  "hit_line_repairs": 85,
+  "duplicate_ids": [],
+  "issues": {
+    "ambiguous_excerpt": 19,
+    "unbalanced_quotes": 5,
+    "excerpt_not_found": 1
+  }
+}

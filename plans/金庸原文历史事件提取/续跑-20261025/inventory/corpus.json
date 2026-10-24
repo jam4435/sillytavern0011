@@ -1,0 +1,2364 @@
+{
+  "hashes": {
+    "天龙八部": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+    "射雕英雄传": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+    "神雕侠侣": "c21792a7cabd61a3751de7d7970947a603b46463b61055f3ac02599fdafb8611",
+    "倚天屠龙记": "455a755d0001b21ff0d2d8708f58621c60a234fbdeac1e13ee1617cf4696ea38",
+    "笑傲江湖": "8e5503344bb28d0964bd25363384acf721f183952d48290fcec665044a71e252",
+    "鹿鼎记": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23"
+  },
+  "chapters": {
+    "天龙八部": [
+      {
+        "book": "天龙八部",
+        "seq": 1,
+        "chapter": "一",
+        "title": "青衫磊落险峰行",
+        "start": 59,
+        "end": 487,
+        "chars": 23440
+      },
+      {
+        "book": "天龙八部",
+        "seq": 2,
+        "chapter": "二",
+        "title": "玉壁月华明",
+        "start": 488,
+        "end": 906,
+        "chars": 26098
+      },
+      {
+        "book": "天龙八部",
+        "seq": 3,
+        "chapter": "三",
+        "title": "马疾香幽",
+        "start": 907,
+        "end": 1319,
+        "chars": 22002
+      },
+      {
+        "book": "天龙八部",
+        "seq": 4,
+        "chapter": "四",
+        "title": "崖高人远",
+        "start": 1320,
+        "end": 1822,
+        "chars": 28104
+      },
+      {
+        "book": "天龙八部",
+        "seq": 5,
+        "chapter": "五",
+        "title": "微步縠纹生",
+        "start": 1823,
+        "end": 2229,
+        "chars": 25907
+      },
+      {
+        "book": "天龙八部",
+        "seq": 6,
+        "chapter": "六",
+        "title": "谁家子弟谁家院",
+        "start": 2230,
+        "end": 2614,
+        "chars": 22324
+      },
+      {
+        "book": "天龙八部",
+        "seq": 7,
+        "chapter": "七",
+        "title": "无计悔多情",
+        "start": 2615,
+        "end": 3009,
+        "chars": 22018
+      },
+      {
+        "book": "天龙八部",
+        "seq": 8,
+        "chapter": "八",
+        "title": "虎啸龙吟",
+        "start": 3010,
+        "end": 3400,
+        "chars": 23426
+      },
+      {
+        "book": "天龙八部",
+        "seq": 9,
+        "chapter": "九",
+        "title": "换巢鸾凤",
+        "start": 3401,
+        "end": 3923,
+        "chars": 31368
+      },
+      {
+        "book": "天龙八部",
+        "seq": 10,
+        "chapter": "十",
+        "title": "剑气碧烟横",
+        "start": 3924,
+        "end": 4314,
+        "chars": 24794
+      },
+      {
+        "book": "天龙八部",
+        "seq": 11,
+        "chapter": "十一",
+        "title": "向来痴",
+        "start": 4315,
+        "end": 4725,
+        "chars": 24815
+      },
+      {
+        "book": "天龙八部",
+        "seq": 12,
+        "chapter": "十二",
+        "title": "从此醉",
+        "start": 4726,
+        "end": 5198,
+        "chars": 26507
+      },
+      {
+        "book": "天龙八部",
+        "seq": 13,
+        "chapter": "十三",
+        "title": "水榭听香 指点群豪戏",
+        "start": 5199,
+        "end": 5659,
+        "chars": 27214
+      },
+      {
+        "book": "天龙八部",
+        "seq": 14,
+        "chapter": "十四",
+        "title": "剧饮千杯男儿事",
+        "start": 5660,
+        "end": 6042,
+        "chars": 21889
+      },
+      {
+        "book": "天龙八部",
+        "seq": 15,
+        "chapter": "十五",
+        "title": "杏子林中 商略平生义",
+        "start": 6043,
+        "end": 6525,
+        "chars": 24067
+      },
+      {
+        "book": "天龙八部",
+        "seq": 16,
+        "chapter": "十六",
+        "title": "昔时因",
+        "start": 6526,
+        "end": 6996,
+        "chars": 25532
+      },
+      {
+        "book": "天龙八部",
+        "seq": 17,
+        "chapter": "十七",
+        "title": "今日意",
+        "start": 6997,
+        "end": 7421,
+        "chars": 23508
+      },
+      {
+        "book": "天龙八部",
+        "seq": 18,
+        "chapter": "十八",
+        "title": "胡汉恩仇 须倾英雄泪",
+        "start": 7422,
+        "end": 8064,
+        "chars": 36406
+      },
+      {
+        "book": "天龙八部",
+        "seq": 19,
+        "chapter": "十九",
+        "title": "虽万千人吾往矣",
+        "start": 8065,
+        "end": 8547,
+        "chars": 25287
+      },
+      {
+        "book": "天龙八部",
+        "seq": 20,
+        "chapter": "二十",
+        "title": "悄立雁门 绝壁无余字",
+        "start": 8548,
+        "end": 8840,
+        "chars": 14147
+      },
+      {
+        "book": "天龙八部",
+        "seq": 21,
+        "chapter": "二十一",
+        "title": "千里茫茫若梦",
+        "start": 8841,
+        "end": 9387,
+        "chars": 26147
+      },
+      {
+        "book": "天龙八部",
+        "seq": 22,
+        "chapter": "二十二",
+        "title": "双眸粲粲如星",
+        "start": 9388,
+        "end": 9854,
+        "chars": 23828
+      },
+      {
+        "book": "天龙八部",
+        "seq": 23,
+        "chapter": "二十三",
+        "title": "塞上牛羊空许约",
+        "start": 9855,
+        "end": 10291,
+        "chars": 20213
+      },
+      {
+        "book": "天龙八部",
+        "seq": 24,
+        "chapter": "二十四",
+        "title": "烛畔鬓云有旧盟",
+        "start": 10292,
+        "end": 10824,
+        "chars": 25092
+      },
+      {
+        "book": "天龙八部",
+        "seq": 25,
+        "chapter": "二十五",
+        "title": "莽苍踏雪行",
+        "start": 10825,
+        "end": 11363,
+        "chars": 29528
+      },
+      {
+        "book": "天龙八部",
+        "seq": 26,
+        "chapter": "二十六",
+        "title": "赤手屠熊搏虎",
+        "start": 11364,
+        "end": 11670,
+        "chars": 16983
+      },
+      {
+        "book": "天龙八部",
+        "seq": 27,
+        "chapter": "二十七",
+        "title": "金戈荡寇鏖兵",
+        "start": 11671,
+        "end": 12133,
+        "chars": 24053
+      },
+      {
+        "book": "天龙八部",
+        "seq": 28,
+        "chapter": "二十八",
+        "title": "草木残生颅铸铁",
+        "start": 12134,
+        "end": 12540,
+        "chars": 23044
+      },
+      {
+        "book": "天龙八部",
+        "seq": 29,
+        "chapter": "二十九",
+        "title": "虫豸凝寒掌作冰",
+        "start": 12541,
+        "end": 13099,
+        "chars": 32762
+      },
+      {
+        "book": "天龙八部",
+        "seq": 30,
+        "chapter": "三十",
+        "title": "挥洒缚豪英",
+        "start": 13100,
+        "end": 13648,
+        "chars": 27245
+      },
+      {
+        "book": "天龙八部",
+        "seq": 31,
+        "chapter": "三十一",
+        "title": "输赢成败 又争由人算",
+        "start": 13649,
+        "end": 14075,
+        "chars": 22404
+      },
+      {
+        "book": "天龙八部",
+        "seq": 32,
+        "chapter": "三十二",
+        "title": "且自逍遥没谁管",
+        "start": 14076,
+        "end": 14532,
+        "chars": 23102
+      },
+      {
+        "book": "天龙八部",
+        "seq": 33,
+        "chapter": "三十三",
+        "title": "奈天昏地暗 斗转星移",
+        "start": 14533,
+        "end": 15029,
+        "chars": 25667
+      },
+      {
+        "book": "天龙八部",
+        "seq": 34,
+        "chapter": "三十四",
+        "title": "风骤紧 缥缈峰头云乱",
+        "start": 15030,
+        "end": 15454,
+        "chars": 23432
+      },
+      {
+        "book": "天龙八部",
+        "seq": 35,
+        "chapter": "三十五",
+        "title": "红颜弹指老 刹那芳华",
+        "start": 15455,
+        "end": 15909,
+        "chars": 26788
+      },
+      {
+        "book": "天龙八部",
+        "seq": 36,
+        "chapter": "三十六",
+        "title": "梦里真真语真幻",
+        "start": 15910,
+        "end": 16280,
+        "chars": 22866
+      },
+      {
+        "book": "天龙八部",
+        "seq": 37,
+        "chapter": "三十七",
+        "title": "同一笑 到头万事俱空",
+        "start": 16281,
+        "end": 16607,
+        "chars": 20346
+      },
+      {
+        "book": "天龙八部",
+        "seq": 38,
+        "chapter": "三十八",
+        "title": "胡涂醉 情长计短",
+        "start": 16608,
+        "end": 17000,
+        "chars": 22534
+      },
+      {
+        "book": "天龙八部",
+        "seq": 39,
+        "chapter": "三十九",
+        "title": "解不了 名缰系嗔贪",
+        "start": 17001,
+        "end": 17435,
+        "chars": 26507
+      },
+      {
+        "book": "天龙八部",
+        "seq": 40,
+        "chapter": "四十",
+        "title": "却试问 几时把痴心断",
+        "start": 17436,
+        "end": 17856,
+        "chars": 23758
+      },
+      {
+        "book": "天龙八部",
+        "seq": 41,
+        "chapter": "四十一",
+        "title": "燕云十八飞骑 奔腾如虎风烟举",
+        "start": 17857,
+        "end": 18263,
+        "chars": 25178
+      },
+      {
+        "book": "天龙八部",
+        "seq": 42,
+        "chapter": "四十二",
+        "title": "老魔小丑 岂堪一击 胜之不武",
+        "start": 18264,
+        "end": 18674,
+        "chars": 22191
+      },
+      {
+        "book": "天龙八部",
+        "seq": 43,
+        "chapter": "四十三",
+        "title": "王霸雄图 血海深仇 尽归尘土",
+        "start": 18675,
+        "end": 19093,
+        "chars": 24516
+      },
+      {
+        "book": "天龙八部",
+        "seq": 44,
+        "chapter": "四十四",
+        "title": "念枉求美眷 良缘安在",
+        "start": 19094,
+        "end": 19546,
+        "chars": 26031
+      },
+      {
+        "book": "天龙八部",
+        "seq": 45,
+        "chapter": "四十五",
+        "title": "枯井底 污泥处",
+        "start": 19547,
+        "end": 19997,
+        "chars": 26439
+      },
+      {
+        "book": "天龙八部",
+        "seq": 46,
+        "chapter": "四十六",
+        "title": "酒罢问君三语",
+        "start": 19998,
+        "end": 20518,
+        "chars": 26550
+      },
+      {
+        "book": "天龙八部",
+        "seq": 47,
+        "chapter": "四十七",
+        "title": "为谁开 茶花满路",
+        "start": 20519,
+        "end": 20855,
+        "chars": 19753
+      },
+      {
+        "book": "天龙八部",
+        "seq": 48,
+        "chapter": "四十八",
+        "title": "王孙落魄 怎生消得 杨枝玉露",
+        "start": 20856,
+        "end": 21376,
+        "chars": 27056
+      },
+      {
+        "book": "天龙八部",
+        "seq": 49,
+        "chapter": "四十九",
+        "title": "敝屣荣华 浮云生死 此身何惧",
+        "start": 21377,
+        "end": 21793,
+        "chars": 23817
+      },
+      {
+        "book": "天龙八部",
+        "seq": 50,
+        "chapter": "五十",
+        "title": "教单于折箭 六军辟易 奋英雄怒",
+        "start": 21794,
+        "end": 22332,
+        "chars": 25350
+      }
+    ],
+    "射雕英雄传": [
+      {
+        "book": "射雕英雄传",
+        "seq": 1,
+        "chapter": "第一回",
+        "title": "风雪惊变",
+        "start": 32,
+        "end": 484,
+        "chars": 27321
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 2,
+        "chapter": "第二回",
+        "title": "江南七怪",
+        "start": 485,
+        "end": 905,
+        "chars": 26363
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 3,
+        "chapter": "第三回",
+        "title": "大漠风沙",
+        "start": 906,
+        "end": 1332,
+        "chars": 22789
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 4,
+        "chapter": "第四回",
+        "title": "黑风双煞",
+        "start": 1333,
+        "end": 1775,
+        "chars": 24073
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 5,
+        "chapter": "第五回",
+        "title": "弯弓射雕",
+        "start": 1776,
+        "end": 2158,
+        "chars": 21923
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 6,
+        "chapter": "第六回",
+        "title": "崖顶疑阵",
+        "start": 2159,
+        "end": 2645,
+        "chars": 27015
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 7,
+        "chapter": "第七回",
+        "title": "比武招亲",
+        "start": 2646,
+        "end": 3070,
+        "chars": 26625
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 8,
+        "chapter": "第八回",
+        "title": "各显神通",
+        "start": 3071,
+        "end": 3333,
+        "chars": 16124
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 9,
+        "chapter": "第九回",
+        "title": "铁枪破犁",
+        "start": 3334,
+        "end": 3764,
+        "chars": 24582
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 10,
+        "chapter": "第十回",
+        "title": "冤家聚头",
+        "start": 3765,
+        "end": 4041,
+        "chars": 17068
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 11,
+        "chapter": "第十一回",
+        "title": "长春服输",
+        "start": 4042,
+        "end": 4494,
+        "chars": 28705
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 12,
+        "chapter": "第十二回",
+        "title": "亢龙有悔",
+        "start": 4495,
+        "end": 4949,
+        "chars": 30964
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 13,
+        "chapter": "第十三回",
+        "title": "五湖废人",
+        "start": 4950,
+        "end": 5404,
+        "chars": 31176
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 14,
+        "chapter": "第十四回",
+        "title": "桃花岛主",
+        "start": 5405,
+        "end": 5775,
+        "chars": 23017
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 15,
+        "chapter": "第十五回",
+        "title": "神龙摆尾",
+        "start": 5776,
+        "end": 6054,
+        "chars": 18611
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 16,
+        "chapter": "第十六回",
+        "title": "《九阴真经》",
+        "start": 6055,
+        "end": 6377,
+        "chars": 24067
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 17,
+        "chapter": "第十七回",
+        "title": "双手互搏",
+        "start": 6378,
+        "end": 6614,
+        "chars": 18758
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 18,
+        "chapter": "第十八回",
+        "title": "三道试题",
+        "start": 6615,
+        "end": 7001,
+        "chars": 24796
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 19,
+        "chapter": "第十九回",
+        "title": "洪涛群鲨",
+        "start": 7002,
+        "end": 7340,
+        "chars": 21683
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 20,
+        "chapter": "第二十回",
+        "title": "窜改经文",
+        "start": 7341,
+        "end": 7515,
+        "chars": 13626
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 21,
+        "chapter": "第二十一回",
+        "title": "千钧巨岩",
+        "start": 7516,
+        "end": 7936,
+        "chars": 29798
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 22,
+        "chapter": "第二十二回",
+        "title": "骑鲨遨游",
+        "start": 7937,
+        "end": 8355,
+        "chars": 27034
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 23,
+        "chapter": "第二十三回",
+        "title": "大闹禁宫",
+        "start": 8356,
+        "end": 8700,
+        "chars": 22427
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 24,
+        "chapter": "第二十四回",
+        "title": "密室疗伤",
+        "start": 8701,
+        "end": 9057,
+        "chars": 21644
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 25,
+        "chapter": "第二十五回",
+        "title": "荒村野店",
+        "start": 9058,
+        "end": 9518,
+        "chars": 29470
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 26,
+        "chapter": "第二十六回",
+        "title": "新盟旧约",
+        "start": 9519,
+        "end": 9811,
+        "chars": 19263
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 27,
+        "chapter": "第二十七回",
+        "title": "轩辕台前",
+        "start": 9812,
+        "end": 10072,
+        "chars": 19029
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 28,
+        "chapter": "第二十八回",
+        "title": "铁掌峰顶",
+        "start": 10073,
+        "end": 10373,
+        "chars": 20993
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 29,
+        "chapter": "第二十九回",
+        "title": "黑沼隐女",
+        "start": 10374,
+        "end": 10702,
+        "chars": 21779
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 30,
+        "chapter": "第三十回",
+        "title": "一灯大师",
+        "start": 10703,
+        "end": 11005,
+        "chars": 21090
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 31,
+        "chapter": "第三十一回",
+        "title": "鸯鸳锦帕",
+        "start": 11006,
+        "end": 11396,
+        "chars": 25805
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 32,
+        "chapter": "第三十二回",
+        "title": "湍江险滩",
+        "start": 11397,
+        "end": 11687,
+        "chars": 19348
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 33,
+        "chapter": "第三十三回",
+        "title": "来日大难",
+        "start": 11688,
+        "end": 11858,
+        "chars": 10939
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 34,
+        "chapter": "第三十四回",
+        "title": "岛上巨变",
+        "start": 11859,
+        "end": 12245,
+        "chars": 24283
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 35,
+        "chapter": "第三十五回",
+        "title": "铁枪庙中",
+        "start": 12246,
+        "end": 12578,
+        "chars": 21336
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 36,
+        "chapter": "第三十六回",
+        "title": "大军西征",
+        "start": 12579,
+        "end": 12959,
+        "chars": 21645
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 37,
+        "chapter": "第三十七回",
+        "title": "从天而降",
+        "start": 12960,
+        "end": 13342,
+        "chars": 22776
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 38,
+        "chapter": "第三十八回",
+        "title": "锦囊密令",
+        "start": 13343,
+        "end": 13623,
+        "chars": 18154
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 39,
+        "chapter": "第三十九回",
+        "title": "是非善恶",
+        "start": 13624,
+        "end": 13906,
+        "chars": 18133
+      },
+      {
+        "book": "射雕英雄传",
+        "seq": 40,
+        "chapter": "第四十回",
+        "title": "华山论剑",
+        "start": 13907,
+        "end": 14816,
+        "chars": 49435
+      }
+    ],
+    "神雕侠侣": [
+      {
+        "book": "神雕侠侣",
+        "seq": 1,
+        "chapter": "第一回",
+        "title": "风月无情",
+        "start": 32,
+        "end": 306,
+        "chars": 18863
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 2,
+        "chapter": "第二回",
+        "title": "故人之子",
+        "start": 307,
+        "end": 639,
+        "chars": 24492
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 3,
+        "chapter": "第三回",
+        "title": "求师终南",
+        "start": 640,
+        "end": 986,
+        "chars": 24123
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 4,
+        "chapter": "第四回",
+        "title": "全真门下",
+        "start": 987,
+        "end": 1317,
+        "chars": 25782
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 5,
+        "chapter": "第五回",
+        "title": "活死人墓",
+        "start": 1318,
+        "end": 1626,
+        "chars": 24152
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 6,
+        "chapter": "第六回",
+        "title": "玉女心经",
+        "start": 1627,
+        "end": 1955,
+        "chars": 24896
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 7,
+        "chapter": "第七回",
+        "title": "重阳遗篇",
+        "start": 1956,
+        "end": 2268,
+        "chars": 23835
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 8,
+        "chapter": "第八回",
+        "title": "白衣少女",
+        "start": 2269,
+        "end": 2525,
+        "chars": 21038
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 9,
+        "chapter": "第九回",
+        "title": "百计避敌",
+        "start": 2526,
+        "end": 2830,
+        "chars": 23326
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 10,
+        "chapter": "第十回",
+        "title": "少年英侠",
+        "start": 2831,
+        "end": 3193,
+        "chars": 27164
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 11,
+        "chapter": "第十一回",
+        "title": "风尘困顿",
+        "start": 3194,
+        "end": 3536,
+        "chars": 21724
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 12,
+        "chapter": "第十二回",
+        "title": "英雄大宴",
+        "start": 3537,
+        "end": 3905,
+        "chars": 24405
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 13,
+        "chapter": "第十三回",
+        "title": "武林盟主",
+        "start": 3906,
+        "end": 4290,
+        "chars": 27539
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 14,
+        "chapter": "第十四回",
+        "title": "礼教大防",
+        "start": 4291,
+        "end": 4619,
+        "chars": 23400
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 15,
+        "chapter": "第十五回",
+        "title": "东邪门人",
+        "start": 4620,
+        "end": 5028,
+        "chars": 25330
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 16,
+        "chapter": "第十六回",
+        "title": "杀父深仇",
+        "start": 5029,
+        "end": 5375,
+        "chars": 23291
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 17,
+        "chapter": "第十七回",
+        "title": "绝情幽谷",
+        "start": 5376,
+        "end": 5730,
+        "chars": 23650
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 18,
+        "chapter": "第十八回",
+        "title": "公孙谷主",
+        "start": 5731,
+        "end": 6091,
+        "chars": 22801
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 19,
+        "chapter": "第十九回",
+        "title": "地底老妇",
+        "start": 6092,
+        "end": 6510,
+        "chars": 26982
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 20,
+        "chapter": "第二十回",
+        "title": "侠之大者",
+        "start": 6511,
+        "end": 6875,
+        "chars": 23037
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 21,
+        "chapter": "第二十一回",
+        "title": "襄阳鏖兵",
+        "start": 6876,
+        "end": 7234,
+        "chars": 23538
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 22,
+        "chapter": "第二十二回",
+        "title": "危城女婴",
+        "start": 7235,
+        "end": 7683,
+        "chars": 29814
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 23,
+        "chapter": "第二十三回",
+        "title": "手足情仇",
+        "start": 7684,
+        "end": 7956,
+        "chars": 18912
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 24,
+        "chapter": "第二十四回",
+        "title": "意乱情迷",
+        "start": 7957,
+        "end": 8281,
+        "chars": 23499
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 25,
+        "chapter": "第二十五回",
+        "title": "内忧外患",
+        "start": 8282,
+        "end": 8656,
+        "chars": 24812
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 26,
+        "chapter": "第二十六回",
+        "title": "神雕重剑",
+        "start": 8657,
+        "end": 9071,
+        "chars": 25411
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 27,
+        "chapter": "第二十七回",
+        "title": "斗智斗力",
+        "start": 9072,
+        "end": 9452,
+        "chars": 24574
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 28,
+        "chapter": "第二十八回",
+        "title": "洞房花烛",
+        "start": 9453,
+        "end": 9771,
+        "chars": 22766
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 29,
+        "chapter": "第二十九回",
+        "title": "劫难重重",
+        "start": 9772,
+        "end": 10150,
+        "chars": 24009
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 30,
+        "chapter": "第三十回",
+        "title": "离合无常",
+        "start": 10151,
+        "end": 10523,
+        "chars": 24601
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 31,
+        "chapter": "第三十一回",
+        "title": "半枚灵丹",
+        "start": 10524,
+        "end": 10824,
+        "chars": 21490
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 32,
+        "chapter": "第三十二回",
+        "title": "情是何物",
+        "start": 10825,
+        "end": 11287,
+        "chars": 30108
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 33,
+        "chapter": "第三十三回",
+        "title": "风陵夜话",
+        "start": 11288,
+        "end": 11642,
+        "chars": 25035
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 34,
+        "chapter": "第三十四回",
+        "title": "排难解纷",
+        "start": 11643,
+        "end": 12195,
+        "chars": 32335
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 35,
+        "chapter": "第三十五回",
+        "title": "三枚金针",
+        "start": 12196,
+        "end": 12536,
+        "chars": 21896
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 36,
+        "chapter": "第三十六回",
+        "title": "献礼祝寿",
+        "start": 12537,
+        "end": 12859,
+        "chars": 21491
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 37,
+        "chapter": "第三十七回",
+        "title": "三世恩怨",
+        "start": 12860,
+        "end": 13250,
+        "chars": 24392
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 38,
+        "chapter": "第三十八回",
+        "title": "生死茫茫",
+        "start": 13251,
+        "end": 13559,
+        "chars": 20324
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 39,
+        "chapter": "第三十九回",
+        "title": "大战襄阳",
+        "start": 13560,
+        "end": 14038,
+        "chars": 28648
+      },
+      {
+        "book": "神雕侠侣",
+        "seq": 40,
+        "chapter": "第四十回",
+        "title": "华山之巅",
+        "start": 14039,
+        "end": 14340,
+        "chars": 18670
+      }
+    ],
+    "倚天屠龙记": [
+      {
+        "book": "倚天屠龙记",
+        "seq": 1,
+        "chapter": "一",
+        "title": "天涯思君不可忘",
+        "start": 32,
+        "end": 520,
+        "chars": 27571
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 2,
+        "chapter": "二",
+        "title": "武当山顶松柏长",
+        "start": 521,
+        "end": 765,
+        "chars": 13225
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 3,
+        "chapter": "三",
+        "title": "宝刀百炼生玄光",
+        "start": 766,
+        "end": 1290,
+        "chars": 30095
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 4,
+        "chapter": "四",
+        "title": "字作丧乱意彷徨",
+        "start": 1291,
+        "end": 1531,
+        "chars": 14621
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 5,
+        "chapter": "五",
+        "title": "皓臂似玉梅花妆",
+        "start": 1532,
+        "end": 2060,
+        "chars": 30045
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 6,
+        "chapter": "六",
+        "title": "浮槎北溟海茫茫",
+        "start": 2061,
+        "end": 2365,
+        "chars": 16081
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 7,
+        "chapter": "七",
+        "title": "谁送冰舸来仙乡",
+        "start": 2366,
+        "end": 2718,
+        "chars": 19537
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 8,
+        "chapter": "八",
+        "title": "穷发十载泛归航",
+        "start": 2719,
+        "end": 3079,
+        "chars": 19939
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 9,
+        "chapter": "九",
+        "title": "七侠聚会乐未央",
+        "start": 3080,
+        "end": 3726,
+        "chars": 36792
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 10,
+        "chapter": "十",
+        "title": "百岁寿宴摧肝肠",
+        "start": 3727,
+        "end": 4239,
+        "chars": 28962
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 11,
+        "chapter": "十一",
+        "title": "有女长舌利如枪",
+        "start": 4240,
+        "end": 4610,
+        "chars": 19763
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 12,
+        "chapter": "十二",
+        "title": "针其膏兮药其肓",
+        "start": 4611,
+        "end": 4991,
+        "chars": 25109
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 13,
+        "chapter": "十三",
+        "title": "不悔仲子逾我墙",
+        "start": 4992,
+        "end": 5364,
+        "chars": 18197
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 14,
+        "chapter": "十四",
+        "title": "当道时见中山狼",
+        "start": 5365,
+        "end": 5897,
+        "chars": 28685
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 15,
+        "chapter": "十五",
+        "title": "奇谋秘计梦一场",
+        "start": 5898,
+        "end": 6430,
+        "chars": 31256
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 16,
+        "chapter": "十六",
+        "title": "剥极而复参九阳",
+        "start": 6431,
+        "end": 6855,
+        "chars": 24706
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 17,
+        "chapter": "十七",
+        "title": "青翼出没一笑飏",
+        "start": 6856,
+        "end": 7186,
+        "chars": 17447
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 18,
+        "chapter": "十八",
+        "title": "倚天长剑飞寒铓",
+        "start": 7187,
+        "end": 7687,
+        "chars": 26336
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 19,
+        "chapter": "十九",
+        "title": "祸起萧墙破金汤",
+        "start": 7688,
+        "end": 8130,
+        "chars": 24977
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 20,
+        "chapter": "二十",
+        "title": "与子共穴相扶将",
+        "start": 8131,
+        "end": 8607,
+        "chars": 24863
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 21,
+        "chapter": "二十一",
+        "title": "排难解纷当六强",
+        "start": 8608,
+        "end": 9030,
+        "chars": 25446
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 22,
+        "chapter": "二十二",
+        "title": "群雄归心约三章",
+        "start": 9031,
+        "end": 9545,
+        "chars": 28693
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 23,
+        "chapter": "二十三",
+        "title": "灵芙醉客绿柳庄",
+        "start": 9546,
+        "end": 9968,
+        "chars": 23607
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 24,
+        "chapter": "二十四",
+        "title": "太极初传柔克刚",
+        "start": 9969,
+        "end": 10451,
+        "chars": 27440
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 25,
+        "chapter": "二十五",
+        "title": "举火燎天何煌煌",
+        "start": 10452,
+        "end": 10794,
+        "chars": 18368
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 26,
+        "chapter": "二十六",
+        "title": "俊貌玉面甘毁伤",
+        "start": 10795,
+        "end": 11221,
+        "chars": 28101
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 27,
+        "chapter": "二十七",
+        "title": "百尺高塔任回翔",
+        "start": 11222,
+        "end": 11666,
+        "chars": 22701
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 28,
+        "chapter": "二十八",
+        "title": "恩断义绝紫衫王",
+        "start": 11667,
+        "end": 12253,
+        "chars": 34096
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 29,
+        "chapter": "二十九",
+        "title": "四女同舟何所望",
+        "start": 12254,
+        "end": 12482,
+        "chars": 15052
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 30,
+        "chapter": "三十",
+        "title": "东西永隔如参商",
+        "start": 12483,
+        "end": 12959,
+        "chars": 26406
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 31,
+        "chapter": "三十一",
+        "title": "刀剑齐失人云亡",
+        "start": 12960,
+        "end": 13486,
+        "chars": 29824
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 32,
+        "chapter": "三十二",
+        "title": "冤蒙不白愁欲狂",
+        "start": 13487,
+        "end": 13881,
+        "chars": 21033
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 33,
+        "chapter": "三十三",
+        "title": "箫长琴短衣流黄",
+        "start": 13882,
+        "end": 14202,
+        "chars": 18669
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 34,
+        "chapter": "三十四",
+        "title": "新妇素手裂红裳",
+        "start": 14203,
+        "end": 14735,
+        "chars": 29660
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 35,
+        "chapter": "三十五",
+        "title": "屠狮有会孰为殃",
+        "start": 14736,
+        "end": 15110,
+        "chars": 23910
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 36,
+        "chapter": "三十六",
+        "title": "夭矫三松郁青苍",
+        "start": 15111,
+        "end": 15491,
+        "chars": 24184
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 37,
+        "chapter": "三十七",
+        "title": "天下英雄莫能当",
+        "start": 15492,
+        "end": 15964,
+        "chars": 25537
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 38,
+        "chapter": "三十八",
+        "title": "君子可欺之以方",
+        "start": 15965,
+        "end": 16367,
+        "chars": 23574
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 39,
+        "chapter": "三十九",
+        "title": "秘笈兵书此中藏",
+        "start": 16368,
+        "end": 16842,
+        "chars": 24500
+      },
+      {
+        "book": "倚天屠龙记",
+        "seq": 40,
+        "chapter": "四十",
+        "title": "不识张郎是张郎",
+        "start": 16843,
+        "end": 17308,
+        "chars": 25269
+      }
+    ],
+    "笑傲江湖": [
+      {
+        "book": "笑傲江湖",
+        "seq": 1,
+        "chapter": "一",
+        "title": "灭门",
+        "start": 32,
+        "end": 458,
+        "chars": 28034
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 2,
+        "chapter": "二",
+        "title": "聆秘",
+        "start": 459,
+        "end": 819,
+        "chars": 24205
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 3,
+        "chapter": "三",
+        "title": "救难",
+        "start": 820,
+        "end": 1294,
+        "chars": 24460
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 4,
+        "chapter": "四",
+        "title": "坐斗",
+        "start": 1295,
+        "end": 1709,
+        "chars": 24109
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 5,
+        "chapter": "五",
+        "title": "治伤",
+        "start": 1710,
+        "end": 2282,
+        "chars": 33881
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 6,
+        "chapter": "六",
+        "title": "洗手",
+        "start": 2283,
+        "end": 2593,
+        "chars": 17660
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 7,
+        "chapter": "七",
+        "title": "授谱",
+        "start": 2594,
+        "end": 3044,
+        "chars": 26467
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 8,
+        "chapter": "八",
+        "title": "面壁",
+        "start": 3045,
+        "end": 3457,
+        "chars": 27803
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 9,
+        "chapter": "九",
+        "title": "邀客",
+        "start": 3458,
+        "end": 3824,
+        "chars": 24042
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 10,
+        "chapter": "十",
+        "title": "传剑",
+        "start": 3825,
+        "end": 4193,
+        "chars": 24136
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 11,
+        "chapter": "十一",
+        "title": "聚气",
+        "start": 4194,
+        "end": 4616,
+        "chars": 25338
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 12,
+        "chapter": "十二",
+        "title": "围攻",
+        "start": 4617,
+        "end": 5207,
+        "chars": 32009
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 13,
+        "chapter": "十三",
+        "title": "学琴",
+        "start": 5208,
+        "end": 5768,
+        "chars": 28557
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 14,
+        "chapter": "十四",
+        "title": "论杯",
+        "start": 5769,
+        "end": 6195,
+        "chars": 20900
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 15,
+        "chapter": "十五",
+        "title": "灌药",
+        "start": 6196,
+        "end": 6550,
+        "chars": 18914
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 16,
+        "chapter": "十六",
+        "title": "注血",
+        "start": 6551,
+        "end": 6919,
+        "chars": 18617
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 17,
+        "chapter": "十七",
+        "title": "倾心",
+        "start": 6920,
+        "end": 7594,
+        "chars": 36895
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 18,
+        "chapter": "十八",
+        "title": "联手",
+        "start": 7595,
+        "end": 8023,
+        "chars": 23724
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 19,
+        "chapter": "十九",
+        "title": "打赌",
+        "start": 8024,
+        "end": 8468,
+        "chars": 23752
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 20,
+        "chapter": "二十",
+        "title": "入狱",
+        "start": 8469,
+        "end": 8869,
+        "chars": 22196
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 21,
+        "chapter": "二十一",
+        "title": "囚居",
+        "start": 8870,
+        "end": 9174,
+        "chars": 17674
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 22,
+        "chapter": "二十二",
+        "title": "脱困",
+        "start": 9175,
+        "end": 9495,
+        "chars": 18885
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 23,
+        "chapter": "二十三",
+        "title": "伏击",
+        "start": 9496,
+        "end": 10040,
+        "chars": 31449
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 24,
+        "chapter": "二十四",
+        "title": "蒙冤",
+        "start": 10041,
+        "end": 10619,
+        "chars": 28662
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 25,
+        "chapter": "二十五",
+        "title": "闻讯",
+        "start": 10620,
+        "end": 10976,
+        "chars": 20262
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 26,
+        "chapter": "二十六",
+        "title": "围寺",
+        "start": 10977,
+        "end": 11599,
+        "chars": 31090
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 27,
+        "chapter": "二十七",
+        "title": "三战",
+        "start": 11600,
+        "end": 12150,
+        "chars": 27347
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 28,
+        "chapter": "二十八",
+        "title": "积雪",
+        "start": 12151,
+        "end": 12451,
+        "chars": 16170
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 29,
+        "chapter": "二十九",
+        "title": "掌门",
+        "start": 12452,
+        "end": 12892,
+        "chars": 22590
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 30,
+        "chapter": "三十",
+        "title": "密议",
+        "start": 12893,
+        "end": 13417,
+        "chars": 27429
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 31,
+        "chapter": "三十一",
+        "title": "绣花",
+        "start": 13418,
+        "end": 13818,
+        "chars": 18330
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 32,
+        "chapter": "三十二",
+        "title": "并派",
+        "start": 13819,
+        "end": 14297,
+        "chars": 27246
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 33,
+        "chapter": "三十三",
+        "title": "比剑",
+        "start": 14298,
+        "end": 14646,
+        "chars": 23800
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 34,
+        "chapter": "三十四",
+        "title": "夺帅",
+        "start": 14647,
+        "end": 14903,
+        "chars": 14781
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 35,
+        "chapter": "三十五",
+        "title": "复仇",
+        "start": 14904,
+        "end": 15546,
+        "chars": 38742
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 36,
+        "chapter": "三十六",
+        "title": "伤逝",
+        "start": 15547,
+        "end": 16015,
+        "chars": 25718
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 37,
+        "chapter": "三十七",
+        "title": "迫娶",
+        "start": 16016,
+        "end": 16390,
+        "chars": 26627
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 38,
+        "chapter": "三十八",
+        "title": "聚歼",
+        "start": 16391,
+        "end": 16855,
+        "chars": 29133
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 39,
+        "chapter": "三十九",
+        "title": "拒盟",
+        "start": 16856,
+        "end": 17258,
+        "chars": 22296
+      },
+      {
+        "book": "笑傲江湖",
+        "seq": 40,
+        "chapter": "四十",
+        "title": "曲谐",
+        "start": 17259,
+        "end": 17686,
+        "chars": 24381
+      }
+    ],
+    "鹿鼎记": [
+      {
+        "book": "鹿鼎记",
+        "seq": 1,
+        "chapter": "第一回",
+        "title": "纵横钩党清流祸 峭茜风期月旦评",
+        "start": 32,
+        "end": 376,
+        "chars": 24129
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 2,
+        "chapter": "第二回",
+        "title": "绝世奇事传闻里 最好交情见面初",
+        "start": 377,
+        "end": 899,
+        "chars": 31429
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 3,
+        "chapter": "第三回",
+        "title": "符来袖里围方解 椎脱囊中事竟成",
+        "start": 900,
+        "end": 1190,
+        "chars": 16906
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 4,
+        "chapter": "第四回",
+        "title": "无迹可寻羚挂角 忘机相对鹤梳翎",
+        "start": 1191,
+        "end": 1527,
+        "chars": 21325
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 5,
+        "chapter": "第五回",
+        "title": "金戈运启驱除会 玉匣书留想象间",
+        "start": 1528,
+        "end": 2062,
+        "chars": 29785
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 6,
+        "chapter": "第六回",
+        "title": "可知今日怜才意 即是当时种树心",
+        "start": 2063,
+        "end": 2495,
+        "chars": 23090
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 7,
+        "chapter": "第七回",
+        "title": "古来成败原关数 天下英雄大可知",
+        "start": 2496,
+        "end": 2908,
+        "chars": 23387
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 8,
+        "chapter": "第八回",
+        "title": "佳客偶逢如有约 盛名长恐见无因",
+        "start": 2909,
+        "end": 3225,
+        "chars": 16893
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 9,
+        "chapter": "第九回",
+        "title": "琢磨颇望成全璧 激烈何须到碎琴",
+        "start": 3226,
+        "end": 3762,
+        "chars": 29025
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 10,
+        "chapter": "第十回",
+        "title": "尽有狂言容数子 每从高会厕诸公",
+        "start": 3763,
+        "end": 4313,
+        "chars": 31729
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 11,
+        "chapter": "第十一回",
+        "title": "春辞小院离离影 夜受轻衫漠漠香",
+        "start": 4314,
+        "end": 4634,
+        "chars": 18439
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 12,
+        "chapter": "第十二回",
+        "title": "语带滑稽吾是戏 弊清摘发尔如神",
+        "start": 4635,
+        "end": 5047,
+        "chars": 21714
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 13,
+        "chapter": "第十三回",
+        "title": "翻覆两家天假手 兴衰一劫局更新",
+        "start": 5048,
+        "end": 5652,
+        "chars": 26833
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 14,
+        "chapter": "第十四回",
+        "title": "放逐肯消亡国恨 岁时犹动楚人哀",
+        "start": 5653,
+        "end": 6177,
+        "chars": 26278
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 15,
+        "chapter": "第十五回",
+        "title": "关心风雨经联榻 轻命江山博壮游",
+        "start": 6178,
+        "end": 6712,
+        "chars": 27292
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 16,
+        "chapter": "第十六回",
+        "title": "粉麝余香衔语燕 珮环新鬼泣啼乌",
+        "start": 6713,
+        "end": 7229,
+        "chars": 24240
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 17,
+        "chapter": "第十七回",
+        "title": "法门猛叩无方便 疑网重开有譬如",
+        "start": 7230,
+        "end": 7692,
+        "chars": 21740
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 18,
+        "chapter": "第十八回",
+        "title": "金刚宝杵卫帝释 雕篆石碣敲头陀",
+        "start": 7693,
+        "end": 8243,
+        "chars": 28788
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 19,
+        "chapter": "第十九回",
+        "title": "九州聚铁铸一字 百金立木招群魔",
+        "start": 8244,
+        "end": 8580,
+        "chars": 17999
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 20,
+        "chapter": "第二十回",
+        "title": "残碑日月看仍在 前辈风流许再攀",
+        "start": 8581,
+        "end": 9149,
+        "chars": 25409
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 21,
+        "chapter": "第二十一回",
+        "title": "金剪无声云委地 宝钗有梦燕依人",
+        "start": 9150,
+        "end": 9584,
+        "chars": 23005
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 22,
+        "chapter": "第二十二回",
+        "title": "老衲山中移漏处 佳人世外改妆时",
+        "start": 9585,
+        "end": 10197,
+        "chars": 32966
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 23,
+        "chapter": "第二十三回",
+        "title": "天生才士定多癖 君与此图皆可传",
+        "start": 10198,
+        "end": 10630,
+        "chars": 23973
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 24,
+        "chapter": "第二十四回",
+        "title": "爱河纵涸须千劫 苦海难量为一慈",
+        "start": 10631,
+        "end": 11009,
+        "chars": 21249
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 25,
+        "chapter": "第二十五回",
+        "title": "乌飞白头窜帝子 马挟红粉啼宫娥",
+        "start": 11010,
+        "end": 11452,
+        "chars": 22762
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 26,
+        "chapter": "第二十六回",
+        "title": "草木连天人骨白 关山满眼夕阳红",
+        "start": 11453,
+        "end": 11939,
+        "chars": 27641
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 27,
+        "chapter": "第二十七回",
+        "title": "滇海有人闻鬼哭 棘门此外尽儿嬉",
+        "start": 11940,
+        "end": 12312,
+        "chars": 21401
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 28,
+        "chapter": "第二十八回",
+        "title": "未免情多丝宛转 为谁辛苦窍玲珑",
+        "start": 12313,
+        "end": 12887,
+        "chars": 30031
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 29,
+        "chapter": "第二十九回",
+        "title": "卷幔微风香忽到 瞰床新月雨初收",
+        "start": 12888,
+        "end": 13352,
+        "chars": 26521
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 30,
+        "chapter": "第三十回",
+        "title": "镇将南朝偏跋扈 部兵西楚最轻剽",
+        "start": 13353,
+        "end": 13759,
+        "chars": 21912
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 31,
+        "chapter": "第三十一回",
+        "title": "罗甸一军深壁垒 滇池千顷沸波涛",
+        "start": 13760,
+        "end": 14198,
+        "chars": 22277
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 32,
+        "chapter": "第三十二回",
+        "title": "歌喉欲断从弦续 舞袖能长听客夸",
+        "start": 14199,
+        "end": 14711,
+        "chars": 23073
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 33,
+        "chapter": "第三十三回",
+        "title": "谁无痼疾难相笑 各有风流两不如",
+        "start": 14712,
+        "end": 15262,
+        "chars": 28438
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 34,
+        "chapter": "第三十四回",
+        "title": "一纸兴亡看复鹿 千年灰劫付冥鸿",
+        "start": 15263,
+        "end": 15941,
+        "chars": 37822
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 35,
+        "chapter": "第三十五回",
+        "title": "曾随东西南北路 独结冰霜雨雪缘",
+        "start": 15942,
+        "end": 16346,
+        "chars": 21727
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 36,
+        "chapter": "第三十六回",
+        "title": "犵鸟蛮花天万里 朔云边雪路千盘",
+        "start": 16347,
+        "end": 16799,
+        "chars": 22089
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 37,
+        "chapter": "第三十七回",
+        "title": "辕门谁上平蛮策 朝议先颁谕蜀文",
+        "start": 16800,
+        "end": 17160,
+        "chars": 19782
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 38,
+        "chapter": "第三十八回",
+        "title": "纵横野马群飞路 跋扈风筝一线天",
+        "start": 17161,
+        "end": 17537,
+        "chars": 21434
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 39,
+        "chapter": "第三十九回",
+        "title": "先生乐事行如栉 小子浮踪寄若萍",
+        "start": 17538,
+        "end": 18210,
+        "chars": 40994
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 40,
+        "chapter": "第四十回",
+        "title": "待兔只疑株可守 求鱼方悔木难缘",
+        "start": 18211,
+        "end": 18503,
+        "chars": 18089
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 41,
+        "chapter": "第四十一回",
+        "title": "渔阳鼓动天方醉 督亢图穷悔已迟",
+        "start": 18504,
+        "end": 18988,
+        "chars": 26626
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 42,
+        "chapter": "第四十二回",
+        "title": "九重城阙微茫外 一气风云吐纳间",
+        "start": 18989,
+        "end": 19427,
+        "chars": 22385
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 43,
+        "chapter": "第四十三回",
+        "title": "身作红云长傍日 心随碧草又迎风",
+        "start": 19428,
+        "end": 19846,
+        "chars": 25560
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 44,
+        "chapter": "第四十四回",
+        "title": "人来绝域原拚命 事到伤心每怕真",
+        "start": 19847,
+        "end": 20359,
+        "chars": 28578
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 45,
+        "chapter": "第四十五回",
+        "title": "尚余截竹为竿手 可有临渊结网心",
+        "start": 20360,
+        "end": 20794,
+        "chars": 24493
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 46,
+        "chapter": "第四十六回",
+        "title": "千里帆樯来域外 九霄风雨过城头",
+        "start": 20795,
+        "end": 21215,
+        "chars": 25316
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 47,
+        "chapter": "第四十七回",
+        "title": "云点旌旗秋出塞 风传鼓角夜临关",
+        "start": 21216,
+        "end": 21684,
+        "chars": 27876
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 48,
+        "chapter": "第四十八回",
+        "title": "都护玉门关不设 将军铜柱界重标",
+        "start": 21685,
+        "end": 22243,
+        "chars": 34497
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 49,
+        "chapter": "第四十九回",
+        "title": "好官气色车裘壮 独客心情故旧疑",
+        "start": 22244,
+        "end": 22586,
+        "chars": 18490
+      },
+      {
+        "book": "鹿鼎记",
+        "seq": 50,
+        "chapter": "第五十回",
+        "title": "鹗立云端原矫矫 鸿飞天外又冥冥",
+        "start": 22587,
+        "end": 23133,
+        "chars": 25907
+      }
+    ]
+  }
+}

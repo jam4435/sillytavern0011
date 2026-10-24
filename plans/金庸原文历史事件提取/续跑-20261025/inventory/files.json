@@ -1,0 +1,198 @@
+[
+  {
+    "file": "批次A/A1-逍遥派三师兄妹.md",
+    "sha256": "56716790cc3673d3776a4bfbec6782c6b3b9e5906b43357a3a560f2147d58e42",
+    "bytes": 107282,
+    "cards": 58,
+    "selected": true
+  },
+  {
+    "file": "批次A/A2-无崖子师徒决裂与传承.md",
+    "sha256": "887af5dbd4bc418dfb2bff19ddd2bf8b4211e0790aee0acb40b97e202080e21d",
+    "bytes": 151352,
+    "cards": 99,
+    "selected": true
+  },
+  {
+    "file": "批次A/A3-梅超风完整前史.md",
+    "sha256": "aa8073e05b23ae35e971b4df13eec62b8f763133f2a0d88768eb25dedf7ba5de",
+    "bytes": 132084,
+    "cards": 52,
+    "selected": true
+  },
+  {
+    "file": "批次B/_add6.md",
+    "sha256": "9ef2cb7d4b4aa3df542115f860eefff54b14681d06ee2a35087241b57bb1e0d1",
+    "bytes": 9066,
+    "cards": 6,
+    "selected": false
+  },
+  {
+    "file": "批次B/_c730.md",
+    "sha256": "f7f6c5aa43a36ae3202e9494ce345a607c199f70d41f4dac458f8bbee9556334",
+    "bytes": 1580,
+    "cards": 1,
+    "selected": false
+  },
+  {
+    "file": "批次B/_foot.md",
+    "sha256": "ccbf9d5b28c52e97c85098ac80fc6658c6ce494c6fa6b07da203642d9356f27b",
+    "bytes": 8305,
+    "cards": 0,
+    "selected": false
+  },
+  {
+    "file": "批次B/_p1.md",
+    "sha256": "65ebb3671dcbd9e5e5515b319a5869aa9b357f8efae6f8d87a7214d78e542a8c",
+    "bytes": 51180,
+    "cards": 30,
+    "selected": false
+  },
+  {
+    "file": "批次B/_p2a.md",
+    "sha256": "1069528182752a977ba79444a2848e0c5c9e2e3d672315f76f0db1235a91a7e2",
+    "bytes": 34033,
+    "cards": 20,
+    "selected": false
+  },
+  {
+    "file": "批次B/_p2b.md",
+    "sha256": "c6e2d0d46ae89e6f646021d38aca8fc9b4e4ac45467e9234ffff8e20f4c5cb39",
+    "bytes": 31428,
+    "cards": 20,
+    "selected": false
+  },
+  {
+    "file": "批次B/_p2c.md",
+    "sha256": "7b3d74858ad23b5d3deb9cef2e1c21198899005d24a9748f6a0d7b000dacc959",
+    "bytes": 40421,
+    "cards": 24,
+    "selected": false
+  },
+  {
+    "file": "批次B/_p3.md",
+    "sha256": "bed695e78259b6f57f7958250b47bae0bcf38541b8fbead38be66e3052e37f4a",
+    "bytes": 10571,
+    "cards": 6,
+    "selected": false
+  },
+  {
+    "file": "批次B/_p4.md",
+    "sha256": "b0546139cbef311af5f2edf6d56871571405f38cc9145dc137f21bef173aa996",
+    "bytes": 1719,
+    "cards": 1,
+    "selected": false
+  },
+  {
+    "file": "批次B/B1-天龙第1-17回.md",
+    "sha256": "1f7ce2fd2caed3dd95d5095c091618991e1da7529e6d39aaeb10c32dee5b0a19",
+    "bytes": 211886,
+    "cards": 120,
+    "selected": true
+  },
+  {
+    "file": "批次B/B2-天龙第18-30回.md",
+    "sha256": "0bacde3713dfa4ae282e2dec06e34056024768b5567263316635f610d3a1a5d3",
+    "bytes": 180737,
+    "cards": 101,
+    "selected": true
+  },
+  {
+    "file": "批次B/B3-天龙第31-40回.md",
+    "sha256": "45eb4fdb48e6adde29f92d8fb022a71163126ade6ab6ca231c3169fb71a1312a",
+    "bytes": 159226,
+    "cards": 85,
+    "selected": true
+  },
+  {
+    "file": "批次B/B4-天龙第41-50回.md",
+    "sha256": "1822399a3b6a827ae48aaf003f0ea29c9711f9db95ca4f59cfc02f66c4c06e4a",
+    "bytes": 186465,
+    "cards": 116,
+    "selected": true
+  },
+  {
+    "file": "批次C/C1-射雕第1-20回.md",
+    "sha256": "2646c11f6df957531e824303960a2e3a84783d8a833ff727dc808c5838aa8242",
+    "bytes": 276214,
+    "cards": 140,
+    "selected": true
+  },
+  {
+    "file": "批次C/C2-射雕第21-40回.md",
+    "sha256": "b78d49ac3423a00dc849e9d22fc7941fb94723828e1925611c1e8c4bd89c3200",
+    "bytes": 275496,
+    "cards": 162,
+    "selected": true
+  },
+  {
+    "file": "批次D/_test_body.md",
+    "sha256": "1ffd97e1ddef345d7f54bdd6f4f974b93db012379500908f495b6a04a23a9926",
+    "bytes": 240199,
+    "cards": 132,
+    "selected": false
+  },
+  {
+    "file": "批次D/D1-神雕第1-20回.md",
+    "sha256": "0edfe594e4a893d4558f703637f8ca90418906cd6c8d43965b84f6658301338a",
+    "bytes": 167636,
+    "cards": 111,
+    "selected": true
+  },
+  {
+    "file": "批次D/D2-神雕第21-40回.md",
+    "sha256": "1fec0cda46cdd81c7d6e3c658549563320b6eaaa5157cb6bf0d79086ec58b3b0",
+    "bytes": 255288,
+    "cards": 132,
+    "selected": true
+  },
+  {
+    "file": "批次E/_body.md",
+    "sha256": "be1f5771e3d83c282b0d17accaa6bc1a198bf2ee56b9840f1f9ccb2840c95a22",
+    "bytes": 199103,
+    "cards": 118,
+    "selected": true
+  },
+  {
+    "file": "批次E/_foot.md",
+    "sha256": "1d7d829c9398478857ebef722ae9110bfd697213a42e34590edb0939ba9cc52c",
+    "bytes": 5889,
+    "cards": 0,
+    "selected": false
+  },
+  {
+    "file": "批次E/_head.md",
+    "sha256": "fc3b8ddde794c530fb4ce1015d2dc6fa229c1696ba311cb8e3543266995cc8c6",
+    "bytes": 2410,
+    "cards": 0,
+    "selected": false
+  },
+  {
+    "file": "批次F/_f2_p1.md",
+    "sha256": "12da1696636f0a892f710d1bb3590a7972c3070da4c0343b81eadc2580017094",
+    "bytes": 63201,
+    "cards": 44,
+    "selected": true
+  },
+  {
+    "file": "批次F/_f2_p2.md",
+    "sha256": "5e3b9c563cc2d92f7ebf224da28380c508b76cd519f2117534fe960a72522d6c",
+    "bytes": 24316,
+    "cards": 18,
+    "selected": true
+  },
+  {
+    "file": "批次F/_f2_p3.md",
+    "sha256": "650fce77923bdacf954e78798a98ef32483793b34667d385b6092a3e50c984dd",
+    "bytes": 27475,
+    "cards": 20,
+    "selected": true
+  },
+  {
+    "file": "批次F/F1-笑傲第1-20回.md",
+    "sha256": "96f90eb51fd8cc3cdabd3155582b04406e90063ee20a1f8628f41723dd3451a5",
+    "bytes": 167178,
+    "cards": 125,
+    "selected": true
+  }
+]
