@@ -1,0 +1,2 @@
+{"sessionId":"session-5278134f-2064-4520-b55c-168f74ee713d","type":"step/start","seq":6,"time":1792863404051}
+{"sessionId":"session-5278134f-2064-4520-b55c-168f74ee713d","type":"turn/end","seq":8,"time":1792863404057,"data":{"reason":{"kind":"error","error":{"message":"provider \"buddy\" model \"deepseek-v4.1-flash\" does not support reasoning effort \"medium\"","code":"UNSUPPORTED_REASONING_EFFORT"}}}}

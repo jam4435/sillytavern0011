@@ -48,8 +48,7 @@ def quotes(text):
         return [], "unbalanced_quotes"
     if not groups:
         return [], "no_quoted_excerpt"
-    segments = [s.strip() for g in groups for s in re.split(r"……|\.{6}", g) if s.strip()]
-    return segments, None
+    return groups, None
 
 
 class Corpus:
@@ -98,12 +97,19 @@ def parse_cards(path):
 
 def bind_card(card, corpus):
     fields = card["fields"]
-    segments, error = quotes(fields.get("原文摘录", ""))
+    groups, error = quotes(fields.get("原文摘录", ""))
     issues = [error] if error else []
     evidence = []
     position = fields.get("原文位置", "")
     stated_books = [b for b in BOOKS.values() if "《" + b + "》" in position]
     allowed = list(dict.fromkeys([card["book"]] + stated_books))
+    segments = []
+    for group in groups:
+        # Natural pauses in dialogue are literal punctuation, not omitted text.
+        if any(corpus.matches(b, group) for b in allowed if b):
+            segments.append(group)
+        else:
+            segments.extend(s.strip() for s in re.split(r"……|\.{6}", group) if s.strip())
     hit_match = re.search(r"命中行\s*(\d+)", position)
     hit = int(hit_match[1]) if hit_match else None
     numbers = [int(x) for x in re.findall(r"(?:行|[-–—~至、])\s*(\d{1,6})", position)]
