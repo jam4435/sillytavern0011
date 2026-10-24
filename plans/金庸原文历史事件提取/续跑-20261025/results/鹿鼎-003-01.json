@@ -1,0 +1,364 @@
+{
+  "task_id": "鹿鼎-003-01",
+  "coverage": {
+    "start": 900,
+    "end": 1129,
+    "complete": true
+  },
+  "reviews": [],
+  "events": [
+    {
+      "title": "茅十八夸口赴京与鳌拜比武",
+      "when": "抵京前（原文作‘当日’）",
+      "place": "未知",
+      "people": [
+        "茅十八",
+        "韦小宝",
+        "鳌拜"
+      ],
+      "relationships": "茅十八向韦小宝夸口，欲挑战鳌拜",
+      "description": "茅十八当日心情激荡，向韦小宝夸口要去找鳌拜比武；他自知鳌拜官高势大，未必肯比，但因已夸下海口，仍带韦小宝上北京，心想若鳌拜肯比便拚命一战。",
+      "cause": "心情激荡之际的一句壮语；既在韦小宝面前夸下海口",
+      "effect": "茅十八带韦小宝到北京，准备万一鳌拜肯比便拚命",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 904,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "当日说要找鳌拜比武，只是心情激荡之际的一句壮语",
+          "quote": "　　茅十八苦笑不答。当日说要找鳌拜比武，只是心情激荡之际的一句壮语，他虽然卤莽粗豪，毕竟已在江湖上混了二十来年，岂不知鳌拜是一人之下、万人之上的大官，怎肯来跟他这么个江湖汉子比武？自己武功不过是二三流脚色，鳌拜倘若真是满洲第一勇士，多半打他",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 3
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 976,
+          "column_start": 116,
+          "column_end": 156,
+          "anchor": "特地上北京来，要跟他比划比划",
+          "quote": "什么拳毙疯牛，脚踢虎豹，说得天花乱坠。姓茅的不服，特地上北京来，要跟他比划比划。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 3
+        }
+      ],
+      "uncertain": [
+        "鳌拜是否肯比武，本回范围内未发生"
+      ],
+      "id": "NEW:鹿鼎-003-01:001",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "韦小宝七岁时随母烧香坐轿",
+      "when": "七岁时",
+      "place": "未知",
+      "people": [
+        "韦小宝",
+        "母亲"
+      ],
+      "relationships": "母子同行",
+      "description": "韦小宝回忆自己七岁时曾跟母亲去烧香，当时坐过轿子。",
+      "cause": "未知",
+      "effect": "未知",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 948,
+          "column_start": 99,
+          "column_end": 217,
+          "anchor": "只在七岁时曾跟母亲去烧香时坐过轿子",
+          "quote": "人口中塞了布块，用黑布蒙了眼，放入轿中抬走。韦小宝只在七岁时曾跟母亲去烧香时坐过轿子，此刻只好自己心下安慰：“他妈的，老子好久没坐轿了，今日孝顺儿子服侍老子坐轿，真是乖儿子、乖孙子！”但想到不知会不会陪着茅十八一起杀头，却也不禁害怕发抖。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 3
+        }
+      ],
+      "uncertain": [
+        "烧香地点及具体情形未详"
+      ],
+      "id": "NEW:鹿鼎-003-01:002",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "茅十八出身江北泰州五虎断门刀门下",
+      "when": "未知",
+      "place": "江北泰州（师门所称）",
+      "people": [
+        "茅十八"
+      ],
+      "relationships": "师承五虎断门刀",
+      "description": "茅十八向海老公自报姓茅名十八，是江北泰州五虎断门刀门下。",
+      "cause": "未知",
+      "effect": "未知",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 966,
+          "column_start": 41,
+          "column_end": 160,
+          "anchor": "是江北泰州五虎断门刀门下",
+          "quote": "是我们北方的武功。”茅十八道：“我姓茅，叫茅十八，是江北泰州五虎断门刀门下。”海老公点点头，说道：“茅十八茅老兄，我也曾听到过你的名头。听说老兄在扬州一带，打家劫舍，杀官越狱，着实做了不少大事。”茅十八道：“不错。”他对这痨病鬼老太监的惊人",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 3
+        }
+      ],
+      "uncertain": [
+        "原文未交代入门时间、师父姓名与学艺经过"
+      ],
+      "id": "NEW:鹿鼎-003-01:003",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "茅十八在扬州打家劫舍、杀官越狱",
+      "when": "来京前（原文未详）",
+      "place": "扬州一带",
+      "people": [
+        "茅十八"
+      ],
+      "relationships": "无",
+      "description": "海老公称听说茅十八在扬州一带打家劫舍、杀官越狱，做了不少大事；茅十八答称‘不错’，未加否认。",
+      "cause": "未知",
+      "effect": "茅十八在江湖上颇有声名，海老公亦知其名头",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 966,
+          "column_start": 88,
+          "column_end": 204,
+          "anchor": "在扬州一带，打家劫舍，杀官越狱",
+          "quote": "道：“茅十八茅老兄，我也曾听到过你的名头。听说老兄在扬州一带，打家劫舍，杀官越狱，着实做了不少大事。”茅十八道：“不错。”他对这痨病鬼老太监的惊人武功不由得不服。也就不敢出言顶撞。海老公道：“阁下来到京师，想干什么事，能跟我说说吗？”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 3
+        }
+      ],
+      "uncertain": [
+        "海老公的消息来源为‘听说’",
+        "具体案件、次数及时间未详"
+      ],
+      "id": "NEW:鹿鼎-003-01:004",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "吴三桂引清兵入关致明亡",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "吴三桂"
+      ],
+      "relationships": "无",
+      "description": "原文叙及吴三桂带清兵入关，以致明室沦亡；韦小宝在扬州市井间听人提起吴三桂时，常听到‘汉奸’、‘臭贼’等骂语。",
+      "cause": "未知",
+      "effect": "明室沦亡",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 972,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "吴三桂带清兵入关，以致明室沦亡",
+          "quote": "　　吴三桂带清兵入关，以致明室沦亡，韦小宝在市井之间，听人提起吴三桂来，总是加上几个“汉奸”、“臭贼”、“直娘贼”的字眼，心想：“听这老乌龟的口气，只要茅大哥冒认是吴三桂的心腹，便可放了我们。偏偏茅大哥骨头硬，不肯冒充。但骨头硬，皮肉就得受",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 3
+        }
+      ],
+      "uncertain": [
+        "原文未交代入关经过、时间、地点等细节",
+        "市井评语带明显立场"
+      ],
+      "id": "NEW:鹿鼎-003-01:005",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "江湖传闻鳌拜拳毙疯牛、脚踢虎豹",
+      "when": "未知（茅十八来京前在南方听闻）",
+      "place": "未知",
+      "people": [
+        "鳌拜",
+        "茅十八"
+      ],
+      "relationships": "茅十八因传闻不服鳌拜",
+      "description": "茅十八在南方听江湖上传说鳌拜是满洲第一勇士，有拳毙疯牛、脚踢虎豹之能；茅十八因此不服，特地上北京要跟鳌拜比划。",
+      "cause": "江湖传闻鳌拜武功惊人",
+      "effect": "茅十八不服，赴京欲与鳌拜比武",
+      "nature": "传闻",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 976,
+          "column_start": 91,
+          "column_end": 156,
+          "anchor": "什么拳毙疯牛，脚踢虎豹",
+          "quote": "说，我在南方听得江湖上说道，那鳌拜是满洲第一勇士，什么拳毙疯牛，脚踢虎豹，说得天花乱坠。姓茅的不服，特地上北京来，要跟他比划比划。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 3
+        }
+      ],
+      "uncertain": [
+        "传闻内容未获原文证实",
+        "传闻来源与发生时间未详"
+      ],
+      "id": "NEW:鹿鼎-003-01:006",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "茅十八在得胜山恶战史松等人",
+      "when": "来京前（原文未详）",
+      "place": "扬州得胜山",
+      "people": [
+        "茅十八",
+        "史松"
+      ],
+      "relationships": "敌对交手",
+      "description": "茅十八回忆自己曾在扬州得胜山下与史松等人恶战，当时情势危急，他并未气馁。",
+      "cause": "未知",
+      "effect": "未知",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 980,
+          "column_start": 70,
+          "column_end": 151,
+          "anchor": "在扬州得胜山下恶战史松等人之时",
+          "quote": "满洲老病夫都打不过，还说什么跟满洲第一勇士比武？他在扬州得胜山下恶战史松等人之时，虽情势危急，却毫不气馁，此刻对着这个痨病鬼太监，竟不由得豪气尽消，终于叹了口长气。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 3
+        }
+      ],
+      "uncertain": [
+        "原文未说明恶战起因、胜负及史松身份"
+      ],
+      "id": "NEW:鹿鼎-003-01:007",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "海老公自称久服药物毒积致眼盲",
+      "when": "此前长期服药，至本回当夜失明",
+      "place": "大内尚膳监住所",
+      "people": [
+        "海老公",
+        "小桂子"
+      ],
+      "relationships": "小桂子服侍海老公服药",
+      "description": "海老公自述因咳嗽长期服用某种药，每次只吃一点，但日积月累毒性太重，终于眼睛出了毛病、看不见烛光；他把失明归因于旧药积毒。",
+      "cause": "长期服药，毒性日积月累（海老公自述）",
+      "effect": "海老公双目失明",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 1060,
+          "column_start": 76,
+          "column_end": 169,
+          "anchor": "日积月累下来，毒性太重",
+          "quote": "实在……实在……太苦，唉，虽然每次只吃一点点，可是日积月累下来，毒性太重，终于……终于眼睛出了毛病。”韦小宝心中一宽：“老家伙不知我在他酒中加了药粉，还道是服药多日，积了下来，这才发作。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 3
+        }
+      ],
+      "uncertain": [
+        "失明是否全由旧药造成，原文未明；韦小宝此前曾在酒中暗加药粉，实际因果待核"
+      ],
+      "id": "NEW:鹿鼎-003-01:008",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "海老公教小桂子掷骰赌钱数月",
+      "when": "此前数月",
+      "place": "大内尚膳监住所",
+      "people": [
+        "海老公",
+        "小桂子"
+      ],
+      "relationships": "海老公训练、指使小桂子",
+      "description": "海老公自述已教小桂子几个月掷骰子，几百两银子已输掉，为来为去便是为了‘这件大事’，并要小桂子继续去赌钱。",
+      "cause": "为了‘这件大事’（原文未明）",
+      "effect": "输掉几百两银子；小桂子被派去继续赌钱",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 1100,
+          "column_start": 57,
+          "column_end": 122,
+          "anchor": "我教了你几个月，几百两银子已输掉了，为来为去，便是为了这件大事",
+          "quote": "不好，我怎能自己去玩？”海老公怒道：“谁说是玩了？我教了你几个月，几百两银子已输掉了，为来为去，便是为了这件大事，你不听我吩咐么？”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 3
+        }
+      ],
+      "uncertain": [
+        "‘这件大事’具体内容原文未揭示",
+        "赌钱对手、地点与目的未详"
+      ],
+      "id": "NEW:鹿鼎-003-01:009",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    }
+  ],
+  "cross_links": [
+    {
+      "topic": "吴三桂引清兵入关与明亡",
+      "people": [
+        "吴三桂"
+      ],
+      "detail": "本回仅由叙述及市井评语提及此事；待查其他章节或其他金庸小说是否有同一历史线索，当前不对未提供文本作事实断言。"
+    },
+    {
+      "topic": "天地会与陈近南",
+      "people": [
+        "陈近南",
+        "茅十八",
+        "海老公"
+      ],
+      "detail": "海老公想见陈近南、领教‘凝血神抓’，茅十八自称未入天地会但盼加入；待查后文陈近南出场及茅十八入会线索。"
+    },
+    {
+      "topic": "海老公训练小桂子赌钱",
+      "people": [
+        "海老公",
+        "小桂子",
+        "韦小宝"
+      ],
+      "detail": "本回只揭海老公教小桂子掷骰数月、输银数百两，目的称为‘这件大事’；待查后续赌局与图谋。"
+    },
+    {
+      "topic": "鳌拜武功传闻",
+      "people": [
+        "鳌拜",
+        "茅十八"
+      ],
+      "detail": "茅十八因江湖传闻鳌拜拳毙疯牛、脚踢虎豹而欲比武；待查鳌拜实际武功及二人是否相见。"
+    }
+  ],
+  "unresolved": [
+    "海老公失明的真正原因是旧药积毒，还是韦小宝暗中加药，原文未明。",
+    "海老公教小桂子掷骰赌钱所称的‘这件大事’具体指什么，原文未揭示。",
+    "茅十八在得胜山与史松等人恶战的起因、胜负及史松身份未详。",
+    "茅十八何时、如何投入江北泰州五虎断门刀门下，原文未交代。",
+    "鳌拜拳毙疯牛、脚踢虎豹之说仅为传闻，原文未证实。"
+  ],
+  "validation_issues": [],
+  "semantic_acceptance": "model_reviewed_not_independent_audit"
+}
