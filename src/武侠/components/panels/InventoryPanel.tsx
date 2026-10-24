@@ -315,8 +315,8 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
                               {eligibility.requirementStatuses.length > 0 ? (
                                 eligibility.requirementStatuses.map(status => (
                                   <span key={status.attribute} className="workbench-chip">
-                                    {status.attribute} {status.current} / {status.required}
-                                    {status.met ? '（已满足）' : `（尚缺 ${status.deficit}）`}
+                                    {status.attribute} {status.current} / {status.requirementText}{status.deficitText ? `（${status.deficitText}）` : ''}
+                                    {status.met ? '（已满足）' : ''}
                                   </span>
                                 ))
                               ) : (

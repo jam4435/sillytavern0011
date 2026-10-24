@@ -9,21 +9,36 @@
  */
 
 import { dataLogger } from './logger';
+import type { MartialArtRequirementValue } from '../types';
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
 import { checkMartialArtTraitRestriction, getTraitDiscounts } from './traitsDatabase';
+import {
+  MASTERY_LEVELS,
+  MASTERY_COEFFICIENT,
+  RANK_BASE_COST,
+  RANK_COMBAT_COEFFICIENT_SUM,
+  RANK_COMPREHENSION_BASELINE,
+  RANK_LEVELS,
+  RANK_BASE_VALUE,
+  UPGRADE_MULTIPLIER,
+} from './martialArtNumerics';
+import type { MartialArtsRank, MasteryLevel, MartialArtsType } from './martialArtNumerics';
+
+export {
+  MASTERY_LEVELS,
+  MASTERY_COEFFICIENT,
+  RANK_BASE_COST,
+  RANK_COMBAT_COEFFICIENT_SUM,
+  RANK_COMPREHENSION_BASELINE,
+  RANK_LEVELS,
+  RANK_BASE_VALUE,
+  UPGRADE_MULTIPLIER,
+};
+export type { MartialArtsRank, MasteryLevel, MartialArtsType };
 
 // ============================================
 // 类型定义
 // ============================================
-
-/** 功法品阶 */
-export type MartialArtsRank = '粗浅' | '传家' | '上乘' | '镇派' | '绝世' | '传说';
-
-/** 掌握程度 */
-export type MasteryLevel = '初窥门径' | '略有小成' | '融会贯通' | '炉火纯青' | '出神入化';
-
-/** 功法类型 */
-export type MartialArtsType = '内功' | '外功' | '轻功' | '剑法' | '刀法' | '拳掌' | '指法' | '暗器' | '枪戟' | '棍锤';
 
 /** 战斗系数属性配置 */
 export interface CombatAttribute {
@@ -37,15 +52,18 @@ export interface CombatCoefficient {
   属性列表: CombatAttribute[];
 }
 
+/** 单项修炼限制：数字表示最低要求；对象可声明最低/最高范围。 */
+export type TrainingRequirementValue = MartialArtRequirementValue;
+
 /** 修炼限制 */
 export interface TrainingRequirement {
-  臂力?: number;
-  根骨?: number;
-  机敏?: number;
-  悟性?: number;
-  洞察?: number;
-  风姿?: number;
-  福缘?: number;
+  臂力?: TrainingRequirementValue;
+  根骨?: TrainingRequirementValue;
+  机敏?: TrainingRequirementValue;
+  悟性?: TrainingRequirementValue;
+  洞察?: TrainingRequirementValue;
+  风姿?: TrainingRequirementValue;
+  福缘?: TrainingRequirementValue;
 }
 
 /** 功法数据库中的完整功法结构 */
@@ -150,73 +168,7 @@ function assertMartialArtUpgradePersisted(
   }
 }
 
-// ============================================
-// 常量定义
-// ============================================
-
-/** 掌握程度列表（按顺序） */
-export const MASTERY_LEVELS: MasteryLevel[] = ['初窥门径', '略有小成', '融会贯通', '炉火纯青', '出神入化'];
-
-/** 功法品阶列表（按顺序） */
-export const RANK_LEVELS: MartialArtsRank[] = ['粗浅', '传家', '上乘', '镇派', '绝世', '传说'];
-
-/** 品阶基础消耗（用于升级掌握程度） */
-export const RANK_BASE_COST: Record<MartialArtsRank, number> = {
-  粗浅: 100,
-  传家: 300,
-  上乘: 800,
-  镇派: 1500,
-  绝世: 4000,
-  传说: 10000,
-};
-
-/** 升级系数（当前掌握程度 → 下一掌握程度） */
-export const UPGRADE_MULTIPLIER: Record<MasteryLevel, number> = {
-  初窥门径: 1, // 初窥门径 → 略有小成: ×1
-  略有小成: 2, // 略有小成 → 融会贯通: ×2
-  融会贯通: 4, // 融会贯通 → 炉火纯青: ×4
-  炉火纯青: 8, // 炉火纯青 → 出神入化: ×8
-  出神入化: 0, // 已满级，无法升级
-};
-
-/** 品阶对应的悟性基准点（用于悟性折扣计算） */
-export const RANK_COMPREHENSION_BASELINE: Record<MartialArtsRank, number> = {
-  粗浅: 0,
-  传家: 4,
-  上乘: 8,
-  镇派: 12,
-  绝世: 16,
-  传说: 20,
-};
-
-/** 掌握程度系数（用于功法加成计算） */
-export const MASTERY_COEFFICIENT: Record<MasteryLevel, number> = {
-  初窥门径: 0.6,
-  略有小成: 0.8,
-  融会贯通: 1.0,
-  炉火纯青: 1.2,
-  出神入化: 1.5,
-};
-
-/** 品阶基础值（用于功法加成计算） */
-export const RANK_BASE_VALUE: Record<MartialArtsRank, number> = {
-  粗浅: 1,
-  传家: 2,
-  上乘: 4,
-  镇派: 8,
-  绝世: 15,
-  传说: 25,
-};
-
-/** 品阶战斗系数总和 */
-export const RANK_COMBAT_COEFFICIENT_SUM: Record<MartialArtsRank, number> = {
-  粗浅: 0.6,
-  传家: 0.8,
-  上乘: 1.0,
-  镇派: 1.2,
-  绝世: 1.5,
-  传说: 2.0,
-};
+// 品阶、掌握程度、成本、折扣基准和战斗系数预算统一定义于 martialArtNumerics.ts。
 
 // ============================================
 // 功法数据库管理

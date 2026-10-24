@@ -52,8 +52,8 @@ describe('quoteMartialArtStudyEligibility', () => {
 
     expect(quote.canStudy).toBe(false);
     expect(quote.requirementStatuses).toEqual([
-      { attribute: '悟性', current: 10, required: 12, met: false, deficit: 2 },
-      { attribute: '根骨', current: 10, required: 11, met: false, deficit: 1 },
+      { attribute: '悟性', current: 10, requirement: 12, requirementText: '12', deficitText: '尚缺 2', met: false, deficit: 2 },
+      { attribute: '根骨', current: 10, requirement: 11, requirementText: '11', deficitText: '尚缺 1', met: false, deficit: 1 },
     ]);
     expect(quote.reasons).toEqual([
       '悟性不足：当前 10，需要 12，尚缺 2。',
@@ -96,6 +96,37 @@ describe('quoteMartialArtStudyEligibility', () => {
     expect(quote.canStudy).toBe(false);
     expect(quote.alreadyLearned).toBe(true);
     expect(quote.reasons).toContain('已习得《九阳神功》，无需重复参悟。');
+  });
+
+  it('支持属性上限与区间门槛', () => {
+    const rangedItem: InventoryItem = {
+      ...secretItem,
+      name: '降魔掌',
+      martialArtInfo: {
+        description: '出掌轻柔，若有若无。',
+        rank: '上乘',
+        requirements: {
+          臂力: { max: 8 },
+          机敏: { min: 8, max: 12 },
+        },
+      },
+    };
+
+    const invalid = quoteMartialArtStudyEligibility({
+      item: rangedItem,
+      initialAttributes: { ...baseAttributes, 臂力: 10, 机敏: 13 },
+    });
+    expect(invalid.canStudy).toBe(false);
+    expect(invalid.requirementStatuses.map(status => status.requirementText)).toEqual(['≤ 8', '8–12']);
+    expect(invalid.reasons).toContain('臂力过高：当前 10，要求不高于 8，超出 2。');
+    expect(invalid.reasons).toContain('机敏过高：当前 13，要求 8–12，超出 1。');
+
+    const valid = quoteMartialArtStudyEligibility({
+      item: rangedItem,
+      initialAttributes: { ...baseAttributes, 臂力: 8, 机敏: 10 },
+    });
+    expect(valid.canStudy).toBe(true);
+    expect(valid.reasons).toEqual([]);
   });
 
   it('所有限制满足时返回可参悟', () => {
