@@ -9,7 +9,7 @@ export function apply(ctx, config) {
   if (!Number.isSafeInteger(config.maxTokens) || config.maxTokens <= 0) {
     throw new Error('bounded-call requires a positive maxTokens');
   }
-  ctx.on('agent/created', agent => {
+  ctx.on('agent/created', ({ agent }) => {
     agent.ctx.tools.restrict({ allow: [] });
   });
   ctx.on('agent/pre-step', async (payload, next) => {

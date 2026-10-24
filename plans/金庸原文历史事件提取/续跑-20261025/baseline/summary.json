@@ -1,0 +1,103 @@
+{
+  "records": 2187,
+  "read_errors": [],
+  "skipped": [
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\世界背景.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-万兽山庄.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-丐帮.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-全真教.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-古墓派.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-吐蕃密宗·大轮寺一脉.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-大理天龙寺.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-大理段氏.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-姑苏慕容氏.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-少林派.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-星宿派.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-桃花岛.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-江南七怪.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-灵鹫宫.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-白驼山庄.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-神农帮.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-绝情谷公孙家传.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-蒙古军旅武学.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-蓬莱派.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-藏传密宗·金轮一脉.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-西夏一品堂.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-逍遥派.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-铁掌帮.yaml",
+      "reason": "non-event document"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\世界书\\金庸群侠传1\\世界书\\势力-青城派.yaml",
+      "reason": "non-event document"
+    }
+  ],
+  "duplicate_keys": {}
+}
