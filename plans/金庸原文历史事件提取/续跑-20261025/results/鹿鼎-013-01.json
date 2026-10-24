@@ -1,0 +1,649 @@
+{
+  "task_id": "鹿鼎-013-01",
+  "coverage": {
+    "start": 5048,
+    "end": 5320,
+    "complete": true
+  },
+  "reviews": [],
+  "events": [
+    {
+      "title": "吴三桂手下闯回春堂掳走徐天川",
+      "when": "原文称‘那日’，具体日期未知",
+      "place": "回春堂",
+      "people": [
+        "徐天川",
+        "吴三桂手下",
+        "卢一峰"
+      ],
+      "relationships": "无",
+      "description": "吴三桂手下的一批汉奸闯进回春堂，将徐天川捉走；卢一峰辱骂徐天川，把一张膏药贴在他嘴上，声称要饿死他。",
+      "cause": "未知",
+      "effect": "徐天川被掳受辱，险些丧命，后被沐家救出。",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 5124,
+          "column_start": 33,
+          "column_end": 109,
+          "anchor": "闯进回春堂来，捉了我去",
+          "quote": "手下那批汉奸做的手脚。”徐天川道：“正是。这批汉奸闯进回春堂来，捉了我去，那卢……卢一峰这狗贼臭骂了我一顿，将一张膏药贴在我嘴上，说要饿死我这只老猴儿。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 5124,
+          "column_start": 62,
+          "column_end": 109,
+          "anchor": "将一张膏药贴在我嘴上",
+          "quote": "堂来，捉了我去，那卢……卢一峰这狗贼臭骂了我一顿，将一张膏药贴在我嘴上，说要饿死我这只老猴儿。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        }
+      ],
+      "uncertain": [
+        "具体日期未知",
+        "卢一峰身份仅称‘狗贼’，未详"
+      ],
+      "id": "NEW:鹿鼎-013-01:001",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "沐剑声与柳大洪救出徐天川",
+      "when": "徐天川被掳后、本回宴席前",
+      "place": "未知",
+      "people": [
+        "沐剑声",
+        "柳大洪",
+        "徐天川",
+        "沐王府"
+      ],
+      "relationships": "沐家救出徐天川，天地会因此感激",
+      "description": "徐天川被吴三桂手下掳走后，沐剑声和柳大洪将他救出，使他脱险。",
+      "cause": "原文称沐家钉住吴三桂手下的云南狗官（行5126）",
+      "effect": "徐天川性命无碍；天地会群豪向沐家称谢。",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 5122,
+          "column_start": 75,
+          "column_end": 115,
+          "anchor": "沐家小公爷和柳老英雄相救脱险",
+          "quote": "。属下给吴三桂手下的走狗掳了去，险些送了老命，幸蒙沐家小公爷和柳老英雄相救脱险。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 5126,
+          "column_start": 133,
+          "column_end": 235,
+          "anchor": "贵府居然救出了徐三哥",
+          "quote": "到处查察，寻不到线索，心中这份焦急，那也不用说了。贵府居然救出了徐三哥，令人好生佩服。”苏冈道：“吴三桂手下的云南狗官，都是沐家死对头，我们自然钉得他们很紧。这狗官冒犯徐三哥，给我们发觉了，也没什么希奇。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        }
+      ],
+      "uncertain": [
+        "获救具体地点和经过未知"
+      ],
+      "id": "NEW:鹿鼎-013-01:002",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "徐天川失手重伤白寒松致死",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "徐天川",
+        "白寒松"
+      ],
+      "relationships": "徐天川与白寒松生死冲突，成为天地会与沐王府待了结的公案",
+      "description": "白寒松死在徐天川手下；徐天川自称是失手所伤，愿一命抵一命。",
+      "cause": "徐天川自称失手（行5144）",
+      "effect": "白寒松死，沐王府要陈近南拿话出来；徐天川表示愿抵命。",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 5142,
+          "column_start": 79,
+          "column_end": 138,
+          "anchor": "白寒松白兄弟死在徐三爷手下",
+          "quote": "给你送去便是。”柳大洪嘿嘿一笑，道：“这件事吗，是白寒松白兄弟死在徐三爷手下，不知如何了结，要请陈总舵主拿一句话出来。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 5144,
+          "column_start": 30,
+          "column_end": 144,
+          "anchor": "白大侠是在下失手所伤",
+          "quote": "我从汉奸手下救了出来，免遭恶徒折辱，在下感激不尽。白大侠是在下失手所伤，在下一命抵一命，这条老命赔了他便是，又何必让陈总舵主和韦香主为难？樊兄弟，借你佩刀一用。”说着伸出右手，向着樊纲，意思非常明白，他是要当场自刎，了结这场公案。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        }
+      ],
+      "uncertain": [
+        "具体冲突经过、日期和地点未知"
+      ],
+      "id": "NEW:鹿鼎-013-01:003",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "白寒枫重伤徐天川",
+      "when": "原文称‘当日’",
+      "place": "未知",
+      "people": [
+        "白寒枫",
+        "徐天川"
+      ],
+      "relationships": "无",
+      "description": "白寒枫当日将徐天川打成重伤；徐天川承认白寒枫手下容情，将养数日后已好转。",
+      "cause": "未知",
+      "effect": "徐天川重伤，养伤数日。",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 5128,
+          "column_start": 49,
+          "column_end": 111,
+          "anchor": "你给白二侠打得重伤",
+          "quote": "装作不知，却听他有何话说。”向徐天川道：“徐三哥，你给白二侠打得重伤，他手上的劲道可厉害得很哪，你活得了吗？不会就此归天罢？”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 5130,
+          "column_start": 1,
+          "column_end": 34,
+          "anchor": "白二侠当日手下容情",
+          "quote": "　　徐天川道：“白二侠当日手下容情，属下将养了这几日，已好得多啦。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        }
+      ],
+      "uncertain": [
+        "是否与白寒松之死同一冲突，原文未明"
+      ],
+      "id": "NEW:鹿鼎-013-01:004",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "清军平定云南后柳大洪救护沐氏遗孤",
+      "when": "清军打平云南时",
+      "place": "云南",
+      "people": [
+        "柳大洪",
+        "沐氏遗孤",
+        "沐剑声"
+      ],
+      "relationships": "柳大洪救护沐氏遗孤；沐剑声成为柳大洪亲传弟子",
+      "description": "清军打平云南后，柳大洪出全力救护沐氏遗孤，沐剑声便是他的亲传弟子。",
+      "cause": "清军打平云南",
+      "effect": "沐氏遗孤得柳大洪救护；沐剑声师从柳大洪。",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 5110,
+          "column_start": 110,
+          "column_end": 229,
+          "anchor": "柳大洪出全力救护沐氏遗孤",
+          "quote": "已久，听说当年沐天波对他也好生敬重。清军打平云南，柳大洪出全力救护沐氏遗孤，沐剑声便是他的亲传弟子，乃是沐王府中除了沐剑声之外的第一号人物。”躬身说道：“柳老英雄当年怒江诛三霸，腾冲杀清兵，侠名播于天下。江湖上后生小子说起老英雄来，无不敬仰",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 5110,
+          "column_start": 123,
+          "column_end": 231,
+          "anchor": "沐剑声便是他的亲传弟子",
+          "quote": "好生敬重。清军打平云南，柳大洪出全力救护沐氏遗孤，沐剑声便是他的亲传弟子，乃是沐王府中除了沐剑声之外的第一号人物。”躬身说道：“柳老英雄当年怒江诛三霸，腾冲杀清兵，侠名播于天下。江湖上后生小子说起老英雄来，无不敬仰。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        }
+      ],
+      "uncertain": [
+        "‘沐氏遗孤’具体包括哪些人未列",
+        "救护具体经过未知"
+      ],
+      "id": "NEW:鹿鼎-013-01:005",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "沐剑声为沐天波之子",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "沐剑声",
+        "沐天波"
+      ],
+      "relationships": "父子",
+      "description": "虬髯汉子称沐剑声是沐天波的儿子，流落江湖，不知死活。",
+      "cause": "未知",
+      "effect": "未知",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 5284,
+          "column_start": 15,
+          "column_end": 77,
+          "anchor": "沐剑声是沐天波的儿子",
+          "quote": "背苍龙’柳大洪在云贵四川一带，谁人不知，哪个不晓？沐剑声是沐天波的儿子，流落江湖，此刻也不知是死是活。”一面说，一面连连摇头。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        }
+      ],
+      "uncertain": [
+        "仅人物口述，未由沐剑声本人确认"
+      ],
+      "id": "NEW:鹿鼎-013-01:006",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "柳大洪当年在怒江诛三霸",
+      "when": "许多年前/成名已久",
+      "place": "怒江",
+      "people": [
+        "柳大洪",
+        "三霸"
+      ],
+      "relationships": "无",
+      "description": "玄贞称柳大洪当年在怒江诛杀三霸，因而侠名播于天下。",
+      "cause": "未知",
+      "effect": "柳大洪侠名播于天下。",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 5110,
+          "column_start": 168,
+          "column_end": 231,
+          "anchor": "怒江诛三霸",
+          "quote": "沐剑声之外的第一号人物。”躬身说道：“柳老英雄当年怒江诛三霸，腾冲杀清兵，侠名播于天下。江湖上后生小子说起老英雄来，无不敬仰。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        }
+      ],
+      "uncertain": [
+        "三霸身份和具体经过未知"
+      ],
+      "id": "NEW:鹿鼎-013-01:007",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "柳大洪当年在腾冲杀清兵",
+      "when": "许多年前/成名已久",
+      "place": "腾冲",
+      "people": [
+        "柳大洪",
+        "清兵"
+      ],
+      "relationships": "无",
+      "description": "玄贞称柳大洪当年在腾冲杀清兵，因而侠名播于天下。",
+      "cause": "未知",
+      "effect": "柳大洪侠名播于天下。",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 5110,
+          "column_start": 174,
+          "column_end": 231,
+          "anchor": "腾冲杀清兵",
+          "quote": "第一号人物。”躬身说道：“柳老英雄当年怒江诛三霸，腾冲杀清兵，侠名播于天下。江湖上后生小子说起老英雄来，无不敬仰。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        }
+      ],
+      "uncertain": [
+        "具体战役和杀清兵经过未知"
+      ],
+      "id": "NEW:鹿鼎-013-01:008",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "方怡与刘一舟有婚姻之约",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "方怡",
+        "刘一舟",
+        "韦小宝"
+      ],
+      "relationships": "方怡与刘一舟为师兄妹，据韦小宝称已有婚姻之约",
+      "description": "韦小宝对被捕刺客说，方怡本来不肯嫁他，并说跟师哥刘一舟已有婚姻之约；他以此试探刘一舟。",
+      "cause": "未知",
+      "effect": "刘一舟闻言暴怒，几乎承认身份。",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 5300,
+          "column_start": 22,
+          "column_end": 141,
+          "anchor": "说跟她师哥刘一舟已有婚姻之约",
+          "quote": "家里的事，怎么不知道？那方怡方姑娘本来不肯嫁我的，说跟她师哥刘一舟已有婚姻之约。但听说这姓刘的不长进，投到了大汉奸吴三桂的部下，进皇宫来行刺。你想……吴三桂这大汉奸……”说到这里，压低了嗓子道：“勾结鞑子，将我大明天子的花花江山双手奉送给了",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 5326,
+          "column_start": 1,
+          "column_end": 20,
+          "anchor": "我们刘师哥平安没事",
+          "quote": "　　沐剑屏喜道：“我们刘师哥平安没事？”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        }
+      ],
+      "uncertain": [
+        "婚约仅由韦小宝口述，方怡未在本段确认",
+        "韦小宝可能为套话而编派"
+      ],
+      "id": "NEW:鹿鼎-013-01:009",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "刘一舟等三名刺客夜入皇宫行刺被擒",
+      "when": "昨晚",
+      "place": "紫禁城皇宫",
+      "people": [
+        "刘一舟",
+        "三名刺客",
+        "宫中侍卫",
+        "康熙"
+      ],
+      "relationships": "无",
+      "description": "刘一舟等三名刺客夜入皇宫行刺皇帝，事败被宫中侍卫擒获；被拷问时始终咬定是吴三桂所遣。",
+      "cause": "真实主使未知；被捕后口供称吴三桂所遣",
+      "effect": "三人被绑在侍卫房拷打；康熙计划放他们出宫以追踪主谋。",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 5244,
+          "column_start": 8,
+          "column_end": 111,
+          "anchor": "擒到的三个刺客口风很紧",
+          "quote": "：“皇上的主意必是好的。”康熙道：“适才多隆禀告，擒到的三个刺客口风很紧，不论怎么拷打诱骗，始终咬实是吴三桂所遣，看来便再拷问，也问不出一句真话。我想不如放了他们。”韦小宝道：“放了？这……这太便宜他们了。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 5328,
+          "column_start": 1,
+          "column_end": 99,
+          "anchor": "他给宫里侍卫擒住了",
+          "quote": "　　韦小宝道：“死是还没死，要活恐怕也不大容易。他给宫里侍卫擒住了，咬定说是大汉奸吴三桂派到宫里来行刺的。死罪固然难逃，传了出去，江湖上英雄好汉都说他给吴三桂做走狗，杀了头之后，这名声也就臭得很。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 5278,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "木柱上绑着三个汉子",
+          "quote": "　　走进西厅，见木柱上绑着三个汉子，光着上身，已给打得血肉模糊。一个是虬髯大汉，另外两个是二十来岁的年轻人，一个皮色甚白，另一个身上刺满了花，胸口刺着个狰狞的虎头。韦小宝寻思：“不知这二人之中，有没那刘一舟在内？”转头向赵齐贤道：“赵大哥，",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        }
+      ],
+      "uncertain": [
+        "真实主使未确认",
+        "‘咬定吴三桂所遣’是口供，不可当事实",
+        "三人是否全属沐王府未明"
+      ],
+      "id": "NEW:鹿鼎-013-01:010",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "方怡曾闯入皇宫行刺",
+      "when": "本回之前/未知",
+      "place": "皇宫",
+      "people": [
+        "方怡"
+      ],
+      "relationships": "无",
+      "description": "韦小宝心想方怡是闯进宫去的刺客，因此可设法让她混出宫。",
+      "cause": "未知",
+      "effect": "方怡被韦小宝视为可放还沐王府的人。",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 5226,
+          "column_start": 73,
+          "column_end": 192,
+          "anchor": "那方怡却是闯进宫去的刺客",
+          "quote": "郡主不是刺客，是天地会捉进宫去的，放了也算不得数，那方怡却是闯进宫去的刺客，想法子让她混出宫来，却不是难事。他听玄贞这么问，微笑道：“多了不行，救个把人出来，多半还办得到。徐三哥只杀了白寒松一个，咱们弄一个人出来还他们，一命抵一命，他们也不",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        }
+      ],
+      "uncertain": [
+        "具体行刺时间与经过未知",
+        "是否与刘一舟同批未明"
+      ],
+      "id": "NEW:鹿鼎-013-01:011",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "天地会捉走沐剑屏并带入皇宫",
+      "when": "日前",
+      "place": "皇宫",
+      "people": [
+        "天地会",
+        "沐剑屏",
+        "沐剑声",
+        "韦小宝"
+      ],
+      "relationships": "天地会控制沐剑屏；沐剑声托天地会打听妹妹下落",
+      "description": "沐剑屏日前忽然失踪，实为天地会将她捉进宫去，扣在韦小宝屋中。",
+      "cause": "未知",
+      "effect": "沐剑声着急寻妹，托天地会打听；韦小宝以此作为与沐家交涉的筹码。",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 5226,
+          "column_start": 47,
+          "column_end": 166,
+          "anchor": "小郡主不是刺客，是天地会捉进宫去的",
+          "quote": "自己屋里床上，却好端端的躺着一个小郡主、一个方怡。小郡主不是刺客，是天地会捉进宫去的，放了也算不得数，那方怡却是闯进宫去的刺客，想法子让她混出宫来，却不是难事。他听玄贞这么问，微笑道：“多了不行，救个把人出来，多半还办得到。徐三哥只杀了白寒",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 5210,
+          "column_start": 58,
+          "column_end": 138,
+          "anchor": "舍妹日前忽然失踪",
+          "quote": "儿一般的同感大德。”顿了一顿，又道：“还有一件事，舍妹日前忽然失踪，在下着急得很。天地会众位朋友在京城交游广阔，眼线众多，如能代为打听，设法相救，在下感激不尽。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        }
+      ],
+      "uncertain": [
+        "天地会具体执行人未知",
+        "捉走的具体地点未知"
+      ],
+      "id": "NEW:鹿鼎-013-01:012",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "陈近南吩咐韦小宝在宫中打探消息",
+      "when": "未知（韦小宝入宫后）",
+      "place": "皇宫",
+      "people": [
+        "陈近南",
+        "韦小宝"
+      ],
+      "relationships": "师徒；陈近南指派韦小宝任务",
+      "description": "韦小宝心想师父陈近南吩咐过，要他在皇宫里打探消息；他因此不敢自行出宫。",
+      "cause": "陈近南吩咐",
+      "effect": "韦小宝继续留在宫中当差并打探消息。",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 5078,
+          "column_start": 90,
+          "column_end": 171,
+          "anchor": "师父吩咐过，要我在宫里打探消息",
+          "quote": "老婊子来杀我，哪有这般做青木堂香主的逍遥快乐？只是师父吩咐过，要我在宫里打探消息，倘若自行出来，只怕香主固然做不成，这条小命能不能保，咱们也得骑驴看唱本，走着瞧！”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 5086,
+          "column_start": 30,
+          "column_end": 114,
+          "anchor": "倚仗师父陈近南的靠山",
+          "quote": "说这小孩武艺低微，油嘴滑舌，是个小泼皮，料想他不过倚仗师父陈近南的靠山，才做到香主，此刻见他神色镇定，一副漫不在乎的模样，心想：“这孩子只怕也有点儿门道。”当下让进门去。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        }
+      ],
+      "uncertain": [
+        "任务布置的具体时间和内容范围未知"
+      ],
+      "id": "NEW:鹿鼎-013-01:013",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "方怡为沐王府方家家将后人",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "方怡",
+        "方家",
+        "沐王府"
+      ],
+      "relationships": "方家为沐王府刘白方苏四大家将之一；方怡为方家后人",
+      "description": "韦小宝对被捕刺客称，方怡是沐王府刘白方苏四大家将中姓方的后人。",
+      "cause": "未知",
+      "effect": "未知",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 5294,
+          "column_start": 68,
+          "column_end": 184,
+          "anchor": "刘白方苏四大家将姓方的后人",
+          "quote": "免有些可怖，当下笑道：“什么胡说？我老婆是沐王府中刘白方苏四大家将姓方的后人。跟我做媒人的姓苏，名叫苏冈，有个外号叫作‘圣手居士’。还有个媒人姓白，他兄长白寒松最近给人打死了，那白寒枫穷极无聊，就给人做媒人骗钱，收殓他死了的兄长……”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 13
+        }
+      ],
+      "uncertain": [
+        "此语出自韦小宝，可能为套话；方怡身世未由本人确认"
+      ],
+      "id": "NEW:鹿鼎-013-01:014",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    }
+  ],
+  "cross_links": [
+    {
+      "topic": "沐王府与吴三桂势力仇怨",
+      "people": [
+        "沐剑声",
+        "柳大洪",
+        "吴三桂",
+        "卢一峰",
+        "徐天川"
+      ],
+      "detail": "本回称吴三桂手下掳徐天川、沐家钉住云南狗官；仇怨起源与具体经过待其他章节核。"
+    },
+    {
+      "topic": "韦小宝与陈近南的师徒任务",
+      "people": [
+        "韦小宝",
+        "陈近南"
+      ],
+      "detail": "本回只提陈近南吩咐在宫中打探；拜师和任务布置待前章核。"
+    },
+    {
+      "topic": "方怡与刘一舟婚约",
+      "people": [
+        "方怡",
+        "刘一舟",
+        "韦小宝"
+      ],
+      "detail": "婚约由韦小宝口述，需方怡或刘一舟确认；与沐王府家将关系待核。"
+    },
+    {
+      "topic": "柳大洪救护沐氏遗孤",
+      "people": [
+        "柳大洪",
+        "沐剑声",
+        "沐天波"
+      ],
+      "detail": "清军平云南时救护遗孤，具体年份和遗孤名单待核。"
+    },
+    {
+      "topic": "刘一舟等行刺主使",
+      "people": [
+        "刘一舟",
+        "吴三桂",
+        "沐剑声",
+        "康熙"
+      ],
+      "detail": "口供称吴三桂所遣，韦小宝又暗示沐王府；真实主使待核。"
+    }
+  ],
+  "unresolved": [
+    "韦小宝自称‘冒牌太监’，其入宫来历本段未说明。",
+    "刘一舟等行刺的真实主使未确认，口供称吴三桂所遣。",
+    "方怡与刘一舟的婚姻之约仅见韦小宝口述，未见方怡确认。",
+    "白寒松之死与白寒枫重伤徐天川是否同一冲突，原文未明。",
+    "柳大洪救护的‘沐氏遗孤’具体包括哪些人未列。",
+    "沐剑屏被天地会捉走的具体执行人与地点未知。",
+    "康熙所学武功的师父和学武时间本段未说明。"
+  ],
+  "validation_issues": [],
+  "semantic_acceptance": "model_reviewed_not_independent_audit"
+}
