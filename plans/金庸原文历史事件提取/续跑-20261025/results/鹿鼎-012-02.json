@@ -1,0 +1,408 @@
+{
+  "task_id": "鹿鼎-012-02",
+  "coverage": {
+    "start": 4877,
+    "end": 5047,
+    "complete": true
+  },
+  "reviews": [],
+  "events": [
+    {
+      "title": "沐王府同伴昨夜入宫，刘一舟被侍卫打倒",
+      "when": "昨晚",
+      "place": "皇宫",
+      "people": [
+        "方怡",
+        "沐剑屏",
+        "刘一舟"
+      ],
+      "relationships": "方怡与刘一舟为师姊弟，刘一舟是方怡心上人；方怡、沐剑屏为同门",
+      "description": "方怡、沐剑屏等同伴昨晚进宫，方怡受伤；她见到刘一舟被三名侍卫打倒，一名侍卫按住他，是否被擒尚不确定。",
+      "cause": "原文未明",
+      "effect": "方怡向韦小宝打听刘一舟下落",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 4887,
+          "column_start": 1,
+          "column_end": 100,
+          "anchor": "我们昨晚进宫来的同伴",
+          "quote": "　　方怡轻轻叹了口气，问道：“我们昨晚进宫来的同伴，不知有几人死了，几人给拿了？遭难的人叫什么名字，你可知道么？”韦小宝摇头道：“不知道。你既然关心，我可以给你去打听打听。”方怡低声道：“多谢你啦。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 12
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 4895,
+          "column_start": 1,
+          "column_end": 72,
+          "anchor": "昨晚她受伤之时，见到刘师哥给三名侍卫打倒了",
+          "quote": "　　果然沐剑屏道：“对了，对了，就是他。方师姊说，昨晚她受伤之时，见到刘师哥给三名侍卫打倒了，一名侍卫按住了他，多半是给擒住了。不知现今怎样？”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 12
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 4891,
+          "column_start": 48,
+          "column_end": 118,
+          "anchor": "他是我师姊的心上人",
+          "quote": "？”沐剑屏道：“那是我们刘师哥。叫做刘一舟。他……他是我师姊的心上人，那可……那可……”突然嗤的一声笑，原来方怡在她肢窝中呵痒，不许她说下去。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 12
+        }
+      ],
+      "uncertain": [
+        "入宫的具体目的与人数原文未在本段说明",
+        "刘一舟是否被擒、生死未明"
+      ],
+      "id": "NEW:鹿鼎-012-02:001",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "吴应熊一行在康亲王府练武，众大臣见证",
+      "when": "昨晚",
+      "place": "康亲王府",
+      "people": [
+        "吴应熊",
+        "杨溢之",
+        "韦小宝"
+      ],
+      "relationships": "无",
+      "description": "杨溢之昨晚随吴应熊在康亲王府练武，大出风头，不少文武大臣亲眼所见；韦小宝以此认为不能说他入宫行刺。",
+      "cause": "原文未明",
+      "effect": "杨溢之担心奸人反以此诬他们借练武作见证、另行派人行刺",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 4951,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "昨晚你在康亲王府里练武，大出风头",
+          "quote": "　　韦小宝道：“杨大哥，你不用担心，昨晚你在康亲王府里练武，大出风头，不少文武大臣都是亲眼所见，决不能说你入宫行刺。我也可以给你作证。”杨溢之道：“是，是！多谢公公。就只怕奸人陷害，反说世子带我们去康王爷府中，好叫众位大臣作个见证，暗中却另",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 12
+        }
+      ],
+      "uncertain": [
+        "练武的详细经过及在场大臣名单未明"
+      ],
+      "id": "NEW:鹿鼎-012-02:002",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "韦小宝力擒鳌拜而扬名",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "韦小宝",
+        "鳌拜"
+      ],
+      "relationships": "无",
+      "description": "杨溢之称韦小宝力擒鳌拜，四海扬名，并据此推想韦小宝拳脚功夫极高。",
+      "cause": "原文未明",
+      "effect": "杨溢之据此称赞韦小宝武功",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 4955,
+          "column_start": 1,
+          "column_end": 73,
+          "anchor": "公公力擒鳌拜，四海扬名",
+          "quote": "　　杨溢之道：“不敢，公公力擒鳌拜，四海扬名，拳脚功夫定是极高的。小人使得不到之处，请公公点拨。”说着站到厅中，拉开架式，慢慢的一招一式使将出来。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 12
+        }
+      ],
+      "uncertain": [
+        "擒鳌拜的具体经过不在本段"
+      ],
+      "id": "NEW:鹿鼎-012-02:003",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "沐家拳自沐英传下三百余年",
+      "when": "三百余年前至故事时",
+      "place": "云南",
+      "people": [
+        "沐英",
+        "杨溢之"
+      ],
+      "relationships": "沐家拳为沐英所传；杨溢之会演其招式",
+      "description": "沐家拳自沐英手上传下，至此时已逾三百年，历代有高手传人，在云南知者甚众；杨溢之虽不擅长，仍能依式演练。",
+      "cause": "原文未明",
+      "effect": "沐家拳自成一家，容易辨认",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 4957,
+          "column_start": 1,
+          "column_end": 97,
+          "anchor": "这路沐家拳自沐英手上传下来，到这时已逾三百年",
+          "quote": "　　这路沐家拳自沐英手上传下来，到这时已逾三百年，历代均有高手传人，说得上是千锤百炼之作，在云南知者甚众，杨溢之虽于这套拳法并不擅长，但他武功甚高，见闻广博，一招招演将出来，气度凝重，招式精妙。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 12
+        }
+      ],
+      "uncertain": [
+        "传承谱系与三百余年的具体计算未明"
+      ],
+      "id": "NEW:鹿鼎-012-02:004",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "黔宁王平定云南",
+      "when": "未知",
+      "place": "云南",
+      "people": [
+        "黔宁王爷爷",
+        "沐剑屏"
+      ],
+      "relationships": "沐剑屏称黔宁王为祖先",
+      "description": "沐剑屏称其祖先黔宁王爷爷平定云南，此事载于《英烈传》故事。",
+      "cause": "原文未明",
+      "effect": "沐家以平定云南之功为家族旧事",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 5037,
+          "column_start": 26,
+          "column_end": 88,
+          "anchor": "我们黔宁王爷爷平定云南",
+          "quote": "桂公公双手抱佳人’，你也听过没有？”沐剑屏啐道：“我们黔宁王爷爷平定云南，英烈传中自然有的。可哪有什么桂公公双手……双手的？”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 12
+        }
+      ],
+      "uncertain": [
+        "黔宁王与沐英的对应关系需与同回沐家拳来源合看",
+        "具体战役与时间未明"
+      ],
+      "id": "NEW:鹿鼎-012-02:005",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "卢一峰行贿得任曲靖知县，吴应熊抽成",
+      "when": "故事前，卢一峰来京陛见之前",
+      "place": "未知",
+      "people": [
+        "卢一峰",
+        "吴三桂",
+        "吴应熊"
+      ],
+      "relationships": "吴三桂委卢一峰为知县；吴应熊从贿赂中抽三千余两",
+      "description": "卢一峰用四万多两银子行贿，得吴三桂委为云南曲靖县知县；吴应熊从中抽了三千多两。",
+      "cause": "卢一峰行贿求官",
+      "effect": "卢一峰得官，后因丑事被韦小宝借皇帝名义查问",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 4969,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "是使了四万多两银子贿赂得来的，吴应熊曾从中抽了三千多两",
+          "quote": "　　那卢一峰所以能得吴三桂委为曲靖县知县，是使了四万多两银子贿赂得来的，吴应熊曾从中抽了三千多两，此刻听韦小宝这么说，大吃一惊，忙道：“卑职定当好好教训他。”转头向杨溢之道：“即刻去叫那卢一峰来，先打他五十大板再说。”向韦小宝请了个安，道：",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 12
+        }
+      ],
+      "uncertain": [
+        "行贿的具体时间、经手人未明"
+      ],
+      "id": "NEW:鹿鼎-012-02:006",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "钱老板以死猪藏活人送入皇宫",
+      "when": "前次（第一次送猪时）",
+      "place": "皇宫御膳房",
+      "people": [
+        "钱老板",
+        "韦小宝"
+      ],
+      "relationships": "钱老板向韦小宝送猪；韦小宝知其事",
+      "description": "韦小宝回想钱老板第一次在一口死猪中藏了个活人送进宫；此次钱老板改送活猪，以避人怀疑。",
+      "cause": "原文未明；其行径在掩人耳目",
+      "effect": "韦小宝认为此次送活猪可消除怀疑",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 5019,
+          "column_start": 47,
+          "column_end": 166,
+          "anchor": "第一次在一口死猪中藏了个活人进宫",
+          "quote": "那口猪，自行回屋，寻思：“钱老板这人当真聪明得紧，第一次在一口死猪中藏了个活人进宫，第二次倘若再送死猪进宫，不免引人怀疑，索性送一口活猪进来，让它在御膳房中喂着，什么花样也没有。就算本来有人怀疑，那也疑心尽去了。对，要使乖骗人，不但事先要想",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 12
+        }
+      ],
+      "uncertain": [
+        "被藏活人的身份与目的未明"
+      ],
+      "id": "NEW:鹿鼎-012-02:007",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "沐王府众人约定刘一舟冒充姓夏",
+      "when": "入宫前",
+      "place": "未知",
+      "people": [
+        "刘一舟",
+        "方怡",
+        "沐剑屏",
+        "吴三桂"
+      ],
+      "relationships": "吴三桂女婿姓夏；刘一舟拟冒充其叔父",
+      "description": "方怡说，大伙儿事先约定刘一舟若被擒也不说姓刘，而冒充姓夏，并招供姓夏的是他叔父；因吴三桂的女婿姓夏。",
+      "cause": "为隐瞒刘一舟真实身份",
+      "effect": "方怡认为即使被捉也不会暴露姓刘",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 5027,
+          "column_start": 58,
+          "column_end": 177,
+          "anchor": "大伙儿说好的，他冒充姓夏",
+          "quote": "子杀了。再说，刘师哥即使给捉到了，也不会说是姓刘。大伙儿说好的，他冒充姓夏。吴三桂的女婿姓夏。刘师哥会招供说，那个姓夏的是他叔父。”韦小宝笑道：“那你岂不是成了吴三桂的亲戚？”小郡主忙道：“那是假的。”韦小宝叹道：“不过方姑娘想做吴三桂的侄",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 12
+        }
+      ],
+      "uncertain": [
+        "此约定是否实际执行、刘一舟是否照供未明"
+      ],
+      "id": "NEW:鹿鼎-012-02:008",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "吴三桂派吴应熊来京以金银结交官员",
+      "when": "故事前，吴应熊来京期间",
+      "place": "北京",
+      "people": [
+        "吴三桂",
+        "吴应熊",
+        "韦小宝",
+        "康熙"
+      ],
+      "relationships": "吴三桂遣子吴应熊入京；韦小宝向康熙转述其行径",
+      "description": "韦小宝向康熙称，吴三桂派儿子吴应熊来京，带来大量金银，见人就送钱，未必安着好心。",
+      "cause": "原文未明",
+      "effect": "康熙同意将吴应熊所出银子说成自己所赏",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 4991,
+          "column_start": 1,
+          "column_end": 107,
+          "anchor": "吴三桂派他儿子来京，带来的金子银子可真不少",
+          "quote": "　　韦小宝见康熙沉吟不语，又道：“皇上，吴三桂派他儿子来京，带来的金子银子可真不少，见人就送钱，未必安着什么好心。天下的地方百姓、金银珠宝，本来一古脑儿都是你皇上的，可是吴三桂这老小子横得很，倒像云南是他吴家的。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 12
+        }
+      ],
+      "uncertain": [
+        "系韦小宝对康熙的陈述，具体贿赂对象与金额未明"
+      ],
+      "id": "NEW:鹿鼎-012-02:009",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "吴三桂为清廷剿灭叛逆而结仇",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "吴三桂",
+        "吴应熊"
+      ],
+      "relationships": "吴应熊称这些余党都痛恨其父吴三桂",
+      "description": "吴应熊称其父吴三桂为大清打天下，剿灭的叛逆不少；李闯余部、前明唐王与桂王余党、云南沐家余党都因此怀恨，可能作乱犯上。",
+      "cause": "吴三桂为清廷剿灭叛逆",
+      "effect": "吴应熊以此解释吴家仇家甚多，可把行刺推给仇家",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 4945,
+          "column_start": 77,
+          "column_end": 190,
+          "anchor": "家严为大清打天下，剿灭的叛逆着实不少",
+          "quote": "仇家出来认头，皇上才能信啊。”吴应熊道：“是，是！家严为大清打天下，剿灭的叛逆着实不少，这些叛逆的余党，都是十分痛恨家严的。好比李闯的余逆啦，前明唐王、桂王的余党啦，云南沐家的余党啦，他们心中怀恨，什么作乱犯上的事都做得出来。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 12
+        }
+      ],
+      "uncertain": [
+        "各股势力的具体剿灭经过与时间未明",
+        "吴应熊此言有为自己开脱的动机"
+      ],
+      "id": "NEW:鹿鼎-012-02:010",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    }
+  ],
+  "cross_links": [
+    {
+      "topic": "沐王府与吴三桂的仇怨",
+      "people": [
+        "吴三桂",
+        "吴应熊",
+        "沐王府"
+      ],
+      "detail": "本回吴应熊称吴三桂剿灭的叛逆包括云南沐家余党，杨溢之又称沐家拳在云南流传；沐家被剿的具体经过与仇怨起点需另一章原文核对。"
+    },
+    {
+      "topic": "钱老板身份与天地会联络",
+      "people": [
+        "钱老板",
+        "韦小宝",
+        "天地会"
+      ],
+      "detail": "本回钱老板以猪藏人、递纸条约高升茶馆；补充文本见天地会众人中有钱老板，其身份、藏人目的待核。"
+    },
+    {
+      "topic": "韦小宝擒鳌拜",
+      "people": [
+        "韦小宝",
+        "鳌拜"
+      ],
+      "detail": "本回杨溢之称韦小宝力擒鳌拜；具体经过需前文核对。"
+    }
+  ],
+  "unresolved": [
+    "刘一舟是否被擒、生死如何",
+    "钱老板所藏活人的身份与目的",
+    "吴应熊所称吴三桂剿灭云南沐家余党的具体事件",
+    "卢一峰行贿的具体时间与经手人",
+    "韦小宝擒鳌拜的具体经过不在本段"
+  ],
+  "validation_issues": [],
+  "semantic_acceptance": "model_reviewed_not_independent_audit"
+}
