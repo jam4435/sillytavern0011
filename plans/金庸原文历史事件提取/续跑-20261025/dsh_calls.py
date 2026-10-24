@@ -26,7 +26,7 @@ def prepare_overlay(call_id):
                '- id: agent-default-model\n  config:\n    provider: buddy\n    model: deepseek-v4.1-flash\n    reasoningEffort: low',
                '- id: system-prompt\n  config:\n    personaPrefix: >-\n      你是原文历史事件资料核验员。只处理用户提供的材料；工具和外部知识不可用。只输出要求的 JSON。',
                '- insert:\n    - id: wuxia-provider\n      name: file:///C:/Users/DELL/.dsh/profiles/web/node_modules/dsh-providers-hub/lib/index.js\n'
-               '    - id: wuxia-bounded-call\n      name: ' + (HERE / 'bounded-call.mjs').as_uri() + '\n      config:\n        maxTokens: 12000\n        eventLog: ' + json.dumps(str(HERE / 'runs' / (call_id + '.events.jsonl')), ensure_ascii=False)]
+               '    - id: wuxia-bounded-call\n      name: ' + (HERE / 'bounded-call.mjs').as_uri() + '\n      config:\n        maxTokens: 32768\n        eventLog: ' + json.dumps(str(HERE / 'runs' / (call_id + '.events.jsonl')), ensure_ascii=False)]
     (HERE / 'runs').mkdir(exist_ok=True)
     p = HERE / 'runs' / (call_id + '.patch.yml')
     p.write_text('\n\n'.join(blocks) + '\n', encoding='utf-8')

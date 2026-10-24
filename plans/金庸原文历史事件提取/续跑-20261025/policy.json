@@ -4,10 +4,10 @@
   "reasoningEffort": "low",
   "max_source_chars": 16000,
   "max_prompt_chars": 52000,
-  "max_output_tokens": 12000,
+  "max_output_tokens": 32768,
   "max_steps": 1,
-  "max_attempts_per_job": 2,
   "aggregate_token_limit": 15000000,
   "original_files_read_only": true,
-  "missing_entry_claim": "retrieval-only; never globally proven by keyword absence"
+  "missing_entry_claim": "retrieval-only; never globally proven by keyword absence",
+  "automatic_retries": 0
 }

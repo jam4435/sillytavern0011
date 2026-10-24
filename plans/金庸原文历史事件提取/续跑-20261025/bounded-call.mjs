@@ -22,8 +22,8 @@ export function apply(ctx, config) {
   ctx.on('session/event', (session, event) => {
     let data;
     if (event.type === 'request/header') data = { config: event.data.header.config,
-      toolCount: event.data.header.tools.length,
-      toolNames: event.data.header.tools.map(tool => tool.name) };
+      toolCount: (event.data.header.tools ?? []).length,
+      toolNames: (event.data.header.tools ?? []).map(tool => tool.name) };
     else if (event.type === 'assistant/message') data = { usage: event.data.usage };
     else if (event.type === 'turn/end') data = { reason: event.data.reason };
     else if (event.type !== 'step/start') return;

@@ -63,7 +63,7 @@ def prepare():
     dump(HERE / 'inventory/unassigned-cards.json', [c['uid'] for c in cards if c['uid'] not in assigned])
     dump(HERE / 'policy.json', dict(provider='buddy', model='deepseek-v4.1-flash', reasoningEffort='low',
         max_source_chars=MAX_SOURCE_CHARS, max_prompt_chars=MAX_PROMPT_CHARS,
-        max_output_tokens=12000, max_steps=1, max_attempts_per_job=2,
+        max_output_tokens=32768, max_steps=1, automatic_retries=0,
         aggregate_token_limit=TOTAL_TOKEN_LIMIT, original_files_read_only=True,
         missing_entry_claim='retrieval-only; never globally proven by keyword absence'))
     print(json.dumps(dict(tasks=len(tasks), legacy_cards=len(cards), assigned_cards=len(assigned),
@@ -197,7 +197,7 @@ def run(limit, books=None):
         tasks = json.loads((HERE / 'queue.json').read_text(encoding='utf-8'))
         chosen = [t for t in tasks if t['status']=='pending' and (not books or t['book'] in books)][:limit]
         for task in chosen:
-            if usage_total()['total'] + 70000 > TOTAL_TOKEN_LIMIT:
+            if usage_total()['total'] + 90000 > TOTAL_TOKEN_LIMIT:
                 dump(HERE / 'STOP.json', dict(reason='aggregate_token_limit', usage=usage_total()))
                 break
             if corpus.hashes[task['book']] != task['source_sha256']:
