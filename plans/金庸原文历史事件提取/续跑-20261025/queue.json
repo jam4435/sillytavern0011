@@ -9608,5 +9608,83 @@
     "phase": "source_review",
     "status": "pending",
     "prompt_version": "source-review-v1"
+  },
+  {
+    "id": "天龙-000-01",
+    "book": "天龙八部",
+    "chapter": 0,
+    "title": "卷首文本",
+    "start": 1,
+    "end": 58,
+    "legacy_uids": [],
+    "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+    "phase": "source_review",
+    "status": "pending",
+    "prompt_version": "source-review-v1"
+  },
+  {
+    "id": "射雕-000-01",
+    "book": "射雕英雄传",
+    "chapter": 0,
+    "title": "卷首文本",
+    "start": 1,
+    "end": 31,
+    "legacy_uids": [],
+    "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+    "phase": "source_review",
+    "status": "pending",
+    "prompt_version": "source-review-v1"
+  },
+  {
+    "id": "神雕-000-01",
+    "book": "神雕侠侣",
+    "chapter": 0,
+    "title": "卷首文本",
+    "start": 1,
+    "end": 31,
+    "legacy_uids": [],
+    "source_sha256": "c21792a7cabd61a3751de7d7970947a603b46463b61055f3ac02599fdafb8611",
+    "phase": "source_review",
+    "status": "pending",
+    "prompt_version": "source-review-v1"
+  },
+  {
+    "id": "倚天-000-01",
+    "book": "倚天屠龙记",
+    "chapter": 0,
+    "title": "卷首文本",
+    "start": 1,
+    "end": 31,
+    "legacy_uids": [],
+    "source_sha256": "455a755d0001b21ff0d2d8708f58621c60a234fbdeac1e13ee1617cf4696ea38",
+    "phase": "source_review",
+    "status": "pending",
+    "prompt_version": "source-review-v1"
+  },
+  {
+    "id": "笑傲-000-01",
+    "book": "笑傲江湖",
+    "chapter": 0,
+    "title": "卷首文本",
+    "start": 1,
+    "end": 31,
+    "legacy_uids": [],
+    "source_sha256": "8e5503344bb28d0964bd25363384acf721f183952d48290fcec665044a71e252",
+    "phase": "source_review",
+    "status": "pending",
+    "prompt_version": "source-review-v1"
+  },
+  {
+    "id": "鹿鼎-000-01",
+    "book": "鹿鼎记",
+    "chapter": 0,
+    "title": "卷首文本",
+    "start": 1,
+    "end": 31,
+    "legacy_uids": [],
+    "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+    "phase": "source_review",
+    "status": "pending",
+    "prompt_version": "source-review-v1"
   }
 ]
