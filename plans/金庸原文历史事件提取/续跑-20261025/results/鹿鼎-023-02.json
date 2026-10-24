@@ -1,0 +1,872 @@
+{
+  "task_id": "鹿鼎-023-02",
+  "coverage": {
+    "start": 10422,
+    "end": 10630,
+    "complete": true
+  },
+  "reviews": [],
+  "events": [
+    {
+      "title": "韦小宝向海大富学武功",
+      "when": "当日",
+      "place": "未知",
+      "people": [
+        "韦小宝",
+        "海大富"
+      ],
+      "relationships": "无",
+      "description": "韦小宝当日向海大富学武功，因有人监督，兼之即学即用，总算学到了一点儿。",
+      "cause": "有人监督、即学即用",
+      "effect": "学到一点儿",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 10410,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "韦小宝当日向海大富学武功",
+          "quote": "　　韦小宝当日向海大富学武功，由于有人监督，兼之即学即用，总算学到了一点儿，此后陈近南传他武功图谱，只学得几次，便畏难不学了。至于洪教主夫妇所授的救命六招，也只马马虎虎的学个大概，离神龙岛后便不再练习。可是这一次练武，为的是要捉那绿衫女郎来",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        }
+      ],
+      "uncertain": [
+        "学武具体时间、地点原文未详"
+      ],
+      "id": "NEW:鹿鼎-023-02:001",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "陈近南传韦小宝武功图谱",
+      "when": "此后",
+      "place": "未知",
+      "people": [
+        "陈近南",
+        "韦小宝"
+      ],
+      "relationships": "传功",
+      "description": "陈近南传韦小宝武功图谱，韦小宝只学得几次，便因畏难不再学。",
+      "cause": "畏难",
+      "effect": "未继续学",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 10410,
+          "column_start": 16,
+          "column_end": 135,
+          "anchor": "陈近南传他武功图谱",
+          "quote": "由于有人监督，兼之即学即用，总算学到了一点儿，此后陈近南传他武功图谱，只学得几次，便畏难不学了。至于洪教主夫妇所授的救命六招，也只马马虎虎的学个大概，离神龙岛后便不再练习。可是这一次练武，为的是要捉那绿衫女郎来做老婆，自己做不成她老公便得上",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 10410,
+          "column_start": 32,
+          "column_end": 151,
+          "anchor": "便畏难不学了",
+          "quote": "学到了一点儿，此后陈近南传他武功图谱，只学得几次，便畏难不学了。至于洪教主夫妇所授的救命六招，也只马马虎虎的学个大概，离神龙岛后便不再练习。可是这一次练武，为的是要捉那绿衫女郎来做老婆，自己做不成她老公便得上刀山，下油锅，死后身入十八层地狱",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        }
+      ],
+      "uncertain": [
+        "图谱内容、传授时间地点未详"
+      ],
+      "id": "NEW:鹿鼎-023-02:002",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "洪教主夫妇授韦小宝救命六招",
+      "when": "离神龙岛前",
+      "place": "未知",
+      "people": [
+        "洪教主夫妇",
+        "韦小宝"
+      ],
+      "relationships": "传授武功",
+      "description": "洪教主夫妇曾授韦小宝救命六招，韦小宝只马马虎虎学个大概，离开神龙岛后便不再练习。",
+      "cause": "未知",
+      "effect": "只学大概，离岛后不练",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 10410,
+          "column_start": 41,
+          "column_end": 160,
+          "anchor": "洪教主夫妇所授的救命六招",
+          "quote": "陈近南传他武功图谱，只学得几次，便畏难不学了。至于洪教主夫妇所授的救命六招，也只马马虎虎的学个大概，离神龙岛后便不再练习。可是这一次练武，为的是要捉那绿衫女郎来做老婆，自己做不成她老公便得上刀山，下油锅，死后身入十八层地狱，此事非同小可，学",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 10410,
+          "column_start": 66,
+          "column_end": 182,
+          "anchor": "离神龙岛后便不再练习",
+          "quote": "洪教主夫妇所授的救命六招，也只马马虎虎的学个大概，离神龙岛后便不再练习。可是这一次练武，为的是要捉那绿衫女郎来做老婆，自己做不成她老公便得上刀山，下油锅，死后身入十八层地狱，此事非同小可，学招时居然十分用心，一招一式，和澄观拆解试演。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        }
+      ],
+      "uncertain": [
+        "授招具体时间、地点未详"
+      ],
+      "id": "NEW:鹿鼎-023-02:003",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "蓝衫女郎到少林寺伤人，另一女郎留寺疗伤后离去",
+      "when": "那日",
+      "place": "少林寺",
+      "people": [
+        "蓝衫女郎",
+        "另一女郎",
+        "晦聪"
+      ],
+      "relationships": "少林寺与二女发生冲突；另一女郎曾在寺中疗伤",
+      "description": "晦聪认出女扮男装者便是那日到少林寺伤人的姑娘；另一姑娘确曾在少林寺疗伤，并随她一起离去。",
+      "cause": "未知",
+      "effect": "少林寺与二女结下冲突；另一女郎伤后离开",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 10512,
+          "column_start": 1,
+          "column_end": 60,
+          "anchor": "那日来到敝寺伤人的姑娘",
+          "quote": "　　晦聪也认了出来，说道：“原来这位便是那日来到敝寺伤人的姑娘，另有一位姑娘，确曾在敝寺疗伤，不是随着姑娘一起去了吗？”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 10512,
+          "column_start": 15,
+          "column_end": 60,
+          "anchor": "确曾在敝寺疗伤",
+          "quote": "原来这位便是那日来到敝寺伤人的姑娘，另有一位姑娘，确曾在敝寺疗伤，不是随着姑娘一起去了吗？”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 10512,
+          "column_start": 23,
+          "column_end": 60,
+          "anchor": "不是随着姑娘一起去了吗",
+          "quote": "来到敝寺伤人的姑娘，另有一位姑娘，确曾在敝寺疗伤，不是随着姑娘一起去了吗？”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        }
+      ],
+      "uncertain": [
+        "伤者身份、冲突原因未详；另一女郎姓名未详"
+      ],
+      "id": "NEW:鹿鼎-023-02:004",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "女郎指控澄观打倒其师妹、韦小宝将其掳入少林寺",
+      "when": "后来",
+      "place": "少林寺",
+      "people": [
+        "女郎",
+        "师妹",
+        "澄观",
+        "韦小宝"
+      ],
+      "relationships": "二女与韦小宝、澄观冲突加深",
+      "description": "女扮男装的女郎指称，后来她师妹又被韦小宝捉进少林寺，澄观曾将她师妹打倒。",
+      "cause": "未知",
+      "effect": "女郎据此要求少林交人",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 10514,
+          "column_start": 1,
+          "column_end": 56,
+          "anchor": "后来我师妹又给这小和尚捉进你庙里来了",
+          "quote": "　　那女郎怒道：“后来我师妹又给这小和尚捉进你庙里来了，这个老和尚便是帮手，是他将我师妹打倒的。”说着指着澄观。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 10514,
+          "column_start": 14,
+          "column_end": 56,
+          "anchor": "是他将我师妹打倒的",
+          "quote": "妹又给这小和尚捉进你庙里来了，这个老和尚便是帮手，是他将我师妹打倒的。”说着指着澄观。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        }
+      ],
+      "uncertain": [
+        "属女郎单方指控；韦小宝担心澄观不会撒谎，未直接承认"
+      ],
+      "id": "NEW:鹿鼎-023-02:005",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "杨溢之卫护吴应熊前往北京",
+      "when": "当日",
+      "place": "北京",
+      "people": [
+        "杨溢之",
+        "吴应熊"
+      ],
+      "relationships": "杨溢之护卫世子吴应熊",
+      "description": "杨溢之当日卫护吴应熊前往北京；此次又随马总兵来到河南，在少林寺与韦小宝重逢。",
+      "cause": "未知",
+      "effect": "与韦小宝在少林重逢",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 10536,
+          "column_start": 8,
+          "column_end": 91,
+          "anchor": "他当日卫护吴应熊前往北京",
+          "quote": "之下，登时大喜，原来此人便是在北京会过面的杨溢之。他当日卫护吴应熊前往北京，想来吴应熊已回云南，这一趟随着马总兵来到河南，他一直低下了头，站在旁人身后，是以没认他出来。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        }
+      ],
+      "uncertain": [
+        "吴应熊已回云南只是韦小宝推想"
+      ],
+      "id": "NEW:鹿鼎-023-02:006",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "韦小宝与杨溢之在北京相识",
+      "when": "此前",
+      "place": "北京",
+      "people": [
+        "韦小宝",
+        "杨溢之"
+      ],
+      "relationships": "由北京相识到少林重逢",
+      "description": "韦小宝此前在北京与杨溢之会过面，此次在少林寺认出他。",
+      "cause": "杨溢之卫护吴应熊赴北京",
+      "effect": "此次杨溢之出面为韦小宝解围",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 10536,
+          "column_start": 1,
+          "column_end": 91,
+          "anchor": "在北京会过面的杨溢之",
+          "quote": "　　韦小宝一见之下，登时大喜，原来此人便是在北京会过面的杨溢之。他当日卫护吴应熊前往北京，想来吴应熊已回云南，这一趟随着马总兵来到河南，他一直低下了头，站在旁人身后，是以没认他出来。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        }
+      ],
+      "uncertain": [
+        "会面具体时间、场合未详"
+      ],
+      "id": "NEW:鹿鼎-023-02:007",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "韦小宝出家前为皇宫太监",
+      "when": "出家前",
+      "place": "皇宫",
+      "people": [
+        "韦小宝",
+        "杨溢之"
+      ],
+      "relationships": "杨溢之以此为其辩白",
+      "description": "杨溢之称韦小宝出家之前本是皇宫中的一位公公；众人也知他是康熙宠幸的小太监，因此不信其嫖妓、强抢女子之说。",
+      "cause": "未知",
+      "effect": "在场众人对女郎指控转为不信",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 10540,
+          "column_start": 24,
+          "column_end": 96,
+          "anchor": "他出家之前，本是皇宫中的一位公公",
+          "quote": "，我们世子也认得他。这位小禅师于我王府有极大恩惠，他出家之前，本是皇宫中的一位公公。因此去妓院什么的，又是什么强逼令师妹，决非事实，请姑娘明鉴。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 10550,
+          "column_start": 1,
+          "column_end": 52,
+          "anchor": "知他是康熙所宠幸的一个小太监",
+          "quote": "　　众人都曾听过杀鳌拜的小桂子之名，知他是康熙所宠幸的一个小太监，不由得“哦”了一声，脸上显露惊佩之色。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        }
+      ],
+      "uncertain": [
+        "杨溢之自述；原文未叙其入宫经过"
+      ],
+      "id": "NEW:鹿鼎-023-02:008",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "韦小宝手诛鳌拜",
+      "when": "出家前",
+      "place": "未知",
+      "people": [
+        "韦小宝",
+        "鳌拜",
+        "康熙"
+      ],
+      "relationships": "韦小宝因此成名，被称为桂公公",
+      "description": "杨溢之称韦小宝出家前大大有名，是手诛大奸臣鳌拜的桂公公；众人也听过杀鳌拜的小桂子之名，葛尔丹并称鳌拜号为满洲第一勇士。",
+      "cause": "未知",
+      "effect": "韦小宝因此名声在外",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 10548,
+          "column_start": 5,
+          "column_end": 88,
+          "anchor": "乃是手诛大奸臣鳌拜的桂公公",
+          "quote": "之道：“姑娘，你不知这位小禅师出家之前，大大有名，乃是手诛大奸臣鳌拜的桂公公。我们王爷受奸人诬陷，险遭不白之冤，全仗这位小禅师在皇上面前一力分辩，大恩大德，至今未报。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 10550,
+          "column_start": 1,
+          "column_end": 52,
+          "anchor": "知他是康熙所宠幸的一个小太监",
+          "quote": "　　众人都曾听过杀鳌拜的小桂子之名，知他是康熙所宠幸的一个小太监，不由得“哦”了一声，脸上显露惊佩之色。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 10558,
+          "column_start": 24,
+          "column_end": 79,
+          "anchor": "鳌拜号称满洲第一勇士",
+          "quote": "是杀死鳌拜的小太监。我在蒙古，也曾听到过你的名头。鳌拜号称满洲第一勇士，那么你的武功，并不是在少林寺中学的了。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        }
+      ],
+      "uncertain": [
+        "诛鳌拜具体经过不在本段；仅称手诛"
+      ],
+      "id": "NEW:鹿鼎-023-02:009",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "杨溢之称吴三桂受诬陷险遭不白之冤",
+      "when": "此前",
+      "place": "未知",
+      "people": [
+        "吴三桂",
+        "杨溢之",
+        "韦小宝",
+        "康熙"
+      ],
+      "relationships": "平西王府与韦小宝结恩",
+      "description": "杨溢之称平西王吴三桂受奸人诬陷，险遭不白之冤，全仗韦小宝在康熙面前一力分辩。",
+      "cause": "奸人诬陷",
+      "effect": "吴三桂险遭冤屈，后得辨明；平西王府感激韦小宝",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 10548,
+          "column_start": 19,
+          "column_end": 88,
+          "anchor": "我们王爷受奸人诬陷，险遭不白之冤",
+          "quote": "师出家之前，大大有名，乃是手诛大奸臣鳌拜的桂公公。我们王爷受奸人诬陷，险遭不白之冤，全仗这位小禅师在皇上面前一力分辩，大恩大德，至今未报。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 10548,
+          "column_start": 36,
+          "column_end": 88,
+          "anchor": "全仗这位小禅师在皇上面前一力分辩",
+          "quote": "臣鳌拜的桂公公。我们王爷受奸人诬陷，险遭不白之冤，全仗这位小禅师在皇上面前一力分辩，大恩大德，至今未报。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        }
+      ],
+      "uncertain": [
+        "诬陷者、具体冤情未详；杨溢之自述"
+      ],
+      "id": "NEW:鹿鼎-023-02:010",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "杨溢之教韦小宝两招沐家拳",
+      "when": "此前",
+      "place": "未知",
+      "people": [
+        "杨溢之",
+        "韦小宝"
+      ],
+      "relationships": "杨溢之传韦小宝武功",
+      "description": "韦小宝称杨溢之曾教他一招“横扫千军”、一招“高山流水”，当场比划确是沐家拳。",
+      "cause": "未知",
+      "effect": "韦小宝后来将这两招演给康熙看",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 10560,
+          "column_start": 19,
+          "column_end": 112,
+          "anchor": "就曾教过我一招‘横扫千军’",
+          "quote": "说来不值一笑。教过我武功的人倒是不少，这位杨大哥，就曾教过我一招‘横扫千军’，一招‘高山流水’。”说着站起身来，将这两招随手比划。他没使半分内劲，旁人瞧不出高下，但招式确是“沐家拳”无疑。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 10560,
+          "column_start": 76,
+          "column_end": 112,
+          "anchor": "招式确是“沐家拳”无疑",
+          "quote": "这两招随手比划。他没使半分内劲，旁人瞧不出高下，但招式确是“沐家拳”无疑。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        }
+      ],
+      "uncertain": [
+        "教授时间、地点未详"
+      ],
+      "id": "NEW:鹿鼎-023-02:011",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "韦小宝将杨溢之所授两招演给康熙，助辨吴三桂冤屈",
+      "when": "此前",
+      "place": "皇上面前",
+      "people": [
+        "韦小宝",
+        "杨溢之",
+        "康熙",
+        "吴三桂"
+      ],
+      "relationships": "韦小宝助吴三桂辨冤",
+      "description": "杨溢之称韦小宝将杨所授两招演给康熙看，才辨明吴三桂为仇家诬陷的冤屈。",
+      "cause": "吴三桂被仇家诬陷",
+      "effect": "冤屈得以辨明",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 10562,
+          "column_start": 1,
+          "column_end": 40,
+          "anchor": "全仗禅师将这两招演给皇上看了",
+          "quote": "　　杨溢之道：“全仗禅师将这两招演给皇上看了，才辨明我们王爷为仇家诬陷的冤屈。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 10562,
+          "column_start": 1,
+          "column_end": 40,
+          "anchor": "才辨明我们王爷为仇家诬陷的冤屈",
+          "quote": "　　杨溢之道：“全仗禅师将这两招演给皇上看了，才辨明我们王爷为仇家诬陷的冤屈。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        }
+      ],
+      "uncertain": [
+        "韦小宝暗想康熙自行查知真相，自己只是顺水人情，与杨溢之说法有出入"
+      ],
+      "id": "NEW:鹿鼎-023-02:012",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "韦小宝自认康熙自行查知吴三桂冤情",
+      "when": "此前",
+      "place": "未知",
+      "people": [
+        "康熙",
+        "韦小宝",
+        "吴三桂"
+      ],
+      "relationships": "韦小宝自认未真正为吴三桂出力，平西王府仍感激他",
+      "description": "韦小宝心想，康熙圣明，自己查知了真相；自己这个顺水人情想不做也不可得，总算当日结下善缘，今日得杨溢之解围。",
+      "cause": "康熙自行查知真相",
+      "effect": "韦小宝自认只是顺水人情",
+      "nature": "推断",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 10556,
+          "column_start": 24,
+          "column_end": 103,
+          "anchor": "只是皇上圣明，自己查知了真相",
+          "quote": "了。”心下却想：“我恨不得扳倒了你们这个汉奸王爷，只是皇上圣明，自己查知了真相，我这个顺水人情就想不做也不可得。总算当日结下了善缘，今天居然是这人来给我解围。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 10556,
+          "column_start": 39,
+          "column_end": 103,
+          "anchor": "我这个顺水人情就想不做也不可得",
+          "quote": "了你们这个汉奸王爷，只是皇上圣明，自己查知了真相，我这个顺水人情就想不做也不可得。总算当日结下了善缘，今天居然是这人来给我解围。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        }
+      ],
+      "uncertain": [
+        "韦小宝内心看法，与杨溢之公开称谢的因果不完全一致"
+      ],
+      "id": "NEW:鹿鼎-023-02:013",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "顺治皇帝出家，法名行痴",
+      "when": "此前",
+      "place": "清凉寺",
+      "people": [
+        "顺治皇帝",
+        "行痴",
+        "韦小宝",
+        "康熙"
+      ],
+      "relationships": "康熙命韦小宝到清凉寺侍奉出家老皇帝",
+      "description": "密旨第四幅画中，韦小宝跪侍一个中年僧人；叙述指明这僧人正是出家后法名行痴的顺治皇帝。康熙画图要韦小宝到清凉寺做住持，侍奉老皇帝。",
+      "cause": "未知",
+      "effect": "康熙命韦小宝赴清凉寺侍奉顺治",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 10600,
+          "column_start": 9,
+          "column_end": 48,
+          "anchor": "正是出家后法名行痴的顺治皇帝",
+          "quote": "小和尚跪在地下，侍奉一个中年僧人。这僧人相貌清癯，正是出家后法名行痴的顺治皇帝。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 10602,
+          "column_start": 35,
+          "column_end": 77,
+          "anchor": "是要他到清凉寺去做住持，侍奉老皇帝",
+          "quote": "识字有限，便画图下旨。这四幅图画说得再也明白不过，是要他到清凉寺去做住持，侍奉老皇帝。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        }
+      ],
+      "uncertain": [
+        "顺治出家具体时间、经过不在本段；清凉寺地点由密旨图意推得"
+      ],
+      "id": "NEW:鹿鼎-023-02:014",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "韦小宝推断康熙先派其入少林再转清凉寺以护顺治",
+      "when": "此前；在少林寺住了半年有余",
+      "place": "少林寺、清凉寺",
+      "people": [
+        "康熙",
+        "韦小宝",
+        "顺治皇帝",
+        "少林僧"
+      ],
+      "relationships": "康熙通过韦小宝调动少林僧保护出家老皇帝",
+      "description": "韦小宝恍然大悟：康熙当时派自己到少林寺出家，早安排今日赴清凉寺之事；让他在少林寺住半年有余，与群僧相熟，以便挑选合意僧侣同赴清凉寺。老皇帝既已出家，不愿由侍卫官兵保卫，可能不别而行；少林僧武功卓绝，由韦小宝率领保护比侍卫稳妥。此事乃天大机密，若派侍卫保卫五台山和尚会沸沸扬扬，且侍卫中可能有人识得老皇帝；由少林僧入主清凉寺则寻常。",
+      "cause": "顺治出家后不愿侍卫保卫；康熙要隐秘保护老皇帝",
+      "effect": "韦小宝明白康熙布置并钦服",
+      "nature": "推断",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 10608,
+          "column_start": 3,
+          "column_end": 122,
+          "anchor": "当时派自己来少林寺出家",
+          "quote": "韦小宝呆了半晌，这才恍然大悟，原来小皇帝思虑周详，当时派自己来少林寺出家，早就安排下了今日之事。让自己在少林寺住了半年有余，得与群僧相熟，以便挑选合意僧侣，同赴清凉寺。老皇帝既已出家，决不愿由侍卫官兵保卫，说不定竟然来个不别而行，从此再也找",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 10608,
+          "column_start": 26,
+          "column_end": 145,
+          "anchor": "让自己在少林寺住了半年有余",
+          "quote": "详，当时派自己来少林寺出家，早就安排下了今日之事。让自己在少林寺住了半年有余，得与群僧相熟，以便挑选合意僧侣，同赴清凉寺。老皇帝既已出家，决不愿由侍卫官兵保卫，说不定竟然来个不别而行，从此再也找不到他。少林僧武功卓绝，由自己率领了保护皇帝，",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 10610,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "此事乃天大机密",
+          "quote": "　　何况此事乃天大机密，皇帝倘若派遣侍卫官兵，去保卫五台山的一个和尚，必定沸沸扬扬，传得举世皆知。众侍卫中也必有识得老皇帝的。由一个少林僧入主清凉寺，却十分寻常，以前清凉寺的住持澄光，本就是少林寺的十八罗汉之一。又想：“倘若小皇帝起初就命我",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 10610,
+          "column_start": 112,
+          "column_end": 175,
+          "anchor": "到少林寺来转得一转，就不会有人疑心了",
+          "quote": "若小皇帝起初就命我去清凉寺出家，仍然太过引人注目，到少林寺来转得一转，就不会有人疑心了。”想到此处，对康熙的布置不由得大是钦服。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        }
+      ],
+      "uncertain": [
+        "属韦小宝推断；康熙未在密旨文字中明言"
+      ],
+      "id": "NEW:鹿鼎-023-02:015",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "韦小宝提及澄光曾任清凉寺住持且出身少林十八罗汉",
+      "when": "此前",
+      "place": "清凉寺、少林寺",
+      "people": [
+        "澄光",
+        "少林寺十八罗汉"
+      ],
+      "relationships": "澄光由少林十八罗汉之一出任清凉寺住持",
+      "description": "韦小宝心想，以前清凉寺的住持澄光，本就是少林寺的十八罗汉之一；因此由少林僧入主清凉寺十分寻常。",
+      "cause": "未知",
+      "effect": "为康熙安排少林僧住持清凉寺提供先例",
+      "nature": "推断",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 10610,
+          "column_start": 57,
+          "column_end": 175,
+          "anchor": "以前清凉寺的住持澄光，本就是少林寺的十八罗汉之一",
+          "quote": "识得老皇帝的。由一个少林僧入主清凉寺，却十分寻常，以前清凉寺的住持澄光，本就是少林寺的十八罗汉之一。又想：“倘若小皇帝起初就命我去清凉寺出家，仍然太过引人注目，到少林寺来转得一转，就不会有人疑心了。”想到此处，对康熙的布置不由得大是钦服。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        }
+      ],
+      "uncertain": [
+        "澄光任职具体时间未详；出自韦小宝思量"
+      ],
+      "id": "NEW:鹿鼎-023-02:016",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "韦小宝曾在清凉寺住过多日",
+      "when": "此前",
+      "place": "清凉寺",
+      "people": [
+        "韦小宝"
+      ],
+      "relationships": "无",
+      "description": "韦小宝见密旨第一幅画着五台山清凉寺，认出该寺，因他曾在清凉寺多日。",
+      "cause": "未知",
+      "effect": "他识得“清凉寺”三字并觉得面熟",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 10594,
+          "column_start": 22,
+          "column_end": 92,
+          "anchor": "他曾在清凉寺多日",
+          "quote": "山。在南台顶之北画着一座庙宇，写着“清凉寺”三字。他曾在清凉寺多日，这三个字倒有点面熟，写在别处，他是决计不识的，写在庙上，便算是遇上熟人了。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        }
+      ],
+      "uncertain": [
+        "居住时间、缘由未详"
+      ],
+      "id": "NEW:鹿鼎-023-02:017",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "女郎称韦小宝曾说要娶其师妹为妻",
+      "when": "此前",
+      "place": "未知",
+      "people": [
+        "韦小宝",
+        "女郎",
+        "师妹"
+      ],
+      "relationships": "韦小宝对师妹有求婚之意，女郎因此质疑其太监身份",
+      "description": "女郎当众质问：韦小宝如是太监，怎会说要娶她师妹做老婆；她以此反驳杨溢之的太监说法。",
+      "cause": "韦小宝曾表示要娶其师妹",
+      "effect": "女郎据此质疑韦小宝身份",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 10544,
+          "column_start": 26,
+          "column_end": 103,
+          "anchor": "怎会说要娶……娶我师妹做……做老婆",
+          "quote": "是恼怒，尖声道：“你怎么知道他是太监？他如是太监，怎会说要娶……娶我师妹做……做老婆？不但小和尚风言风语，这老和尚也是油嘴滑舌，爱讨人便宜。”说着手指澄观。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        }
+      ],
+      "uncertain": [
+        "女郎单方转述；韦小宝未当众承认具体经过"
+      ],
+      "id": "NEW:鹿鼎-023-02:018",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "马总兵为平西王吴三桂麾下",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "马总兵",
+        "吴三桂"
+      ],
+      "relationships": "马总兵隶属吴三桂",
+      "description": "晦聪介绍马总兵为云南平西王麾下总兵马宝马大人；韦小宝也明知那马总兵是吴三桂部下。",
+      "cause": "未知",
+      "effect": "韦小宝后来利用其来历设局",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 10432,
+          "column_start": 39,
+          "column_end": 101,
+          "anchor": "云南平西王麾下总兵马宝马大人",
+          "quote": "葛尔丹王子殿下，这位是西藏大喇嘛昌齐大法师，这位是云南平西王麾下总兵马宝马大人。”转身向三人道：“这位是老衲的师弟晦明禅师。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 10624,
+          "column_start": 180,
+          "column_end": 260,
+          "anchor": "韦小宝明知那马总兵是吴三桂部下",
+          "quote": "下山不久，一定追得上。那总兵有名有姓，一查便知。”韦小宝明知那马总兵是吴三桂部下，却故意诬陷，假作不知他来历，让一众御前侍卫查知，禀告皇上邀功，远胜于自己去诬告。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 23
+        }
+      ],
+      "uncertain": [
+        "马总兵本名、职衔细节原文仅称马宝马大人"
+      ],
+      "id": "NEW:鹿鼎-023-02:019",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    }
+  ],
+  "cross_links": [
+    {
+      "topic": "韦小宝的多段师承",
+      "people": [
+        "韦小宝",
+        "海大富",
+        "陈近南",
+        "洪教主夫妇"
+      ],
+      "detail": "本回追述海大富、陈近南、洪教主夫妇三段传功；各段具体章节、时间地点待查。"
+    },
+    {
+      "topic": "顺治出家与清凉寺",
+      "people": [
+        "顺治皇帝",
+        "行痴",
+        "康熙",
+        "韦小宝",
+        "澄光"
+      ],
+      "detail": "本回密旨图与韦小宝推断指向清凉寺保护老皇帝；顺治出家经过及澄光任职时间待查。"
+    },
+    {
+      "topic": "吴三桂冤屈与韦小宝演拳",
+      "people": [
+        "吴三桂",
+        "韦小宝",
+        "杨溢之",
+        "康熙"
+      ],
+      "detail": "杨溢之称韦小宝演沐家拳两招助辨冤，韦小宝自认康熙自查真相；两种说法的因果差异待核。"
+    },
+    {
+      "topic": "蓝衫女郎师姐妹与少林冲突",
+      "people": [
+        "蓝衫女郎",
+        "师妹",
+        "澄观",
+        "韦小宝"
+      ],
+      "detail": "本回有到寺伤人、留寺疗伤、被掳入寺、澄观打倒等说法；先后与真相待查。"
+    }
+  ],
+  "unresolved": [
+    "蓝衫女郎与师妹的姓名、门派，以及“到寺伤人”“被掳入寺”“澄观打倒”三事的先后和真相。",
+    "韦小宝手诛鳌拜的具体经过，以及吴三桂受诬陷、韦小宝分辩、康熙自查真相之间的因果差异。",
+    "顺治出家的具体时间、经过，澄光任清凉寺住持的时间，以及康熙布置的完整范围。",
+    "海大富、陈近南、洪教主夫妇各自传功的具体时间、地点和后续影响。"
+  ],
+  "validation_issues": [],
+  "semantic_acceptance": "model_reviewed_not_independent_audit"
+}
