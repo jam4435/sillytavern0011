@@ -2,12 +2,16 @@
 import { appendFileSync } from 'node:fs';
 
 export const name = 'wuxia-bounded-call';
+export const inject = ['tools'];
 
 /** Install reversible request guards for this one-shot dsh process. */
 export function apply(ctx, config) {
   if (!Number.isSafeInteger(config.maxTokens) || config.maxTokens <= 0) {
     throw new Error('bounded-call requires a positive maxTokens');
   }
+  ctx.on('agent/created', agent => {
+    agent.ctx.tools.restrict({ allow: [] });
+  });
   ctx.on('agent/pre-step', async (payload, next) => {
     if (payload.step > 1) throw new Error('one-shot extraction forbids a second model step');
     return next();
@@ -18,7 +22,8 @@ export function apply(ctx, config) {
   ctx.on('session/event', (session, event) => {
     let data;
     if (event.type === 'request/header') data = { config: event.data.header.config,
-      toolCount: event.data.header.tools.length };
+      toolCount: event.data.header.tools.length,
+      toolNames: event.data.header.tools.map(tool => tool.name) };
     else if (event.type === 'assistant/message') data = { usage: event.data.usage };
     else if (event.type === 'turn/end') data = { reason: event.data.reason };
     else if (event.type !== 'step/start') return;

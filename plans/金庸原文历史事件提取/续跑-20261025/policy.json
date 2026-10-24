@@ -1,7 +1,7 @@
 {
   "provider": "buddy",
   "model": "deepseek-v4.1-flash",
-  "reasoningEffort": "high",
+  "reasoningEffort": "low",
   "max_source_chars": 16000,
   "max_prompt_chars": 52000,
   "max_output_tokens": 12000,

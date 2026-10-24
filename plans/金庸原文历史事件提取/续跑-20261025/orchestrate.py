@@ -61,7 +61,7 @@ def prepare():
     assigned = {uid for t in tasks for uid in t['legacy_uids']}
     dump(HERE / 'queue.json', tasks)
     dump(HERE / 'inventory/unassigned-cards.json', [c['uid'] for c in cards if c['uid'] not in assigned])
-    dump(HERE / 'policy.json', dict(provider='buddy', model='deepseek-v4.1-flash', reasoningEffort='high',
+    dump(HERE / 'policy.json', dict(provider='buddy', model='deepseek-v4.1-flash', reasoningEffort='low',
         max_source_chars=MAX_SOURCE_CHARS, max_prompt_chars=MAX_PROMPT_CHARS,
         max_output_tokens=12000, max_steps=1, max_attempts_per_job=2,
         aggregate_token_limit=TOTAL_TOKEN_LIMIT, original_files_read_only=True,
@@ -205,7 +205,8 @@ def run(limit, books=None):
             prompt, allowed = prompt_for(task, corpus, cards)
             task['status'] = 'running'
             dump(HERE / 'queue.json', tasks)
-            job_id = 'review-' + task['id']
+            task['attempts'] = task.get('attempts',0) + 1
+            job_id = 'review-' + task['id'] + '-a' + str(task['attempts'])
             (HERE / 'runs' / (job_id+'.prompt.txt')).write_text(prompt+'\n',encoding='utf-8')
             print(json.dumps(dict(start=task['id'],prompt_chars=len(prompt)),ensure_ascii=False), flush=True)
             try:
@@ -213,7 +214,10 @@ def run(limit, books=None):
                 (HERE / 'runs' / (job_id+'.stdout.txt')).write_text(result.text+'\n',encoding='utf-8')
                 (HERE / 'runs' / (job_id+'.stderr.txt')).write_text(result.stderr+'\n',encoding='utf-8')
                 if not result.success:
-                    raise RuntimeError('dsh failed: '+result.stderr[-600:])
+                    receipt_path=HERE/'runs'/(job_id+'.events.jsonl')
+                    receipts=jsonl(receipt_path) if receipt_path.exists() else []
+                    ending=next((e.get('data',{}).get('reason') for e in reversed(receipts) if e['type']=='turn/end'), None)
+                    raise RuntimeError('dsh failed: '+json.dumps(ending or {'exit_code':result.exit_code},ensure_ascii=False))
                 payload = decode(result.text)
                 checked = validate(task, payload, allowed, corpus)
                 dump(HERE / 'results' / (task['id']+'.json'),checked)
