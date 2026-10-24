@@ -1,0 +1,977 @@
+{
+  "task_id": "鹿鼎-009-01",
+  "coverage": {
+    "start": 3226,
+    "end": 3471,
+    "complete": true
+  },
+  "reviews": [],
+  "events": [
+    {
+      "title": "海大富传授韦小宝假武功",
+      "when": "未知（本回之前）",
+      "place": "未知",
+      "people": [
+        "海大富",
+        "韦小宝",
+        "陈近南"
+      ],
+      "relationships": "海大富曾传授韦小宝武功；陈近南判断这些功夫是假的",
+      "description": "陈近南细问海大富所授武功详情，听韦小宝说完后指出，这些功夫韦小宝早已知道是假的，当真遇敌半点不管用。",
+      "cause": "未知",
+      "effect": "陈近南因此奇怪皇太后传给小皇帝的武功也是假的",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3240,
+          "column_start": 17,
+          "column_end": 136,
+          "anchor": "这些功夫，你也早知道是假的",
+          "quote": "详情，待韦小宝连说带比的一一说完，陈近南沉吟道：“这些功夫，你也早知道是假的，当真遇上敌人，半点也不管用。我只是奇怪，怎地鞑子皇太后传授给鞑子小皇帝的武功，却也是假的。”韦小宝道：“老婊子不是小皇帝的亲娘，而且……而且老婊子不是好人，是个大",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "海大富传授的具体时间、地点原文未明"
+      ],
+      "id": "NEW:鹿鼎-009-01:001",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "皇太后传授小皇帝假武功",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "皇太后",
+        "小皇帝",
+        "陈近南"
+      ],
+      "relationships": "皇太后曾传授小皇帝武功；陈近南判断为假",
+      "description": "陈近南听韦小宝转述海大富所授武功后，说皇太后传授给小皇帝的武功也是假的。",
+      "cause": "未知",
+      "effect": "陈近南起疑",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3240,
+          "column_start": 55,
+          "column_end": 174,
+          "anchor": "皇太后传授给鞑子小皇帝的武功，却也是假的",
+          "quote": "，当真遇上敌人，半点也不管用。我只是奇怪，怎地鞑子皇太后传授给鞑子小皇帝的武功，却也是假的。”韦小宝道：“老婊子不是小皇帝的亲娘，而且……而且老婊子不是好人，是个大大的坏人。”心想老婊子害死小皇帝的母亲等等情由，牵连太过重大，对师父也不能说",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "仅由陈近南口中说出，未见传授过程"
+      ],
+      "id": "NEW:鹿鼎-009-01:002",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "皇太后并非小皇帝生母",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "皇太后",
+        "小皇帝",
+        "韦小宝"
+      ],
+      "relationships": "韦小宝认为皇太后不是小皇帝的亲娘",
+      "description": "韦小宝心想皇太后不是小皇帝的亲娘，并因此认为她是大大的坏人。",
+      "cause": "未知",
+      "effect": "韦小宝不敢把其中情由告诉陈近南",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3240,
+          "column_start": 83,
+          "column_end": 187,
+          "anchor": "老婊子不是小皇帝的亲娘",
+          "quote": "传授给鞑子小皇帝的武功，却也是假的。”韦小宝道：“老婊子不是小皇帝的亲娘，而且……而且老婊子不是好人，是个大大的坏人。”心想老婊子害死小皇帝的母亲等等情由，牵连太过重大，对师父也不能说，何况此事跟师父毫不相干。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "仅为韦小宝内心判断，原文未给出旁证"
+      ],
+      "id": "NEW:鹿鼎-009-01:003",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "皇太后害死小皇帝母亲",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "皇太后",
+        "小皇帝",
+        "小皇帝的母亲",
+        "韦小宝"
+      ],
+      "relationships": "韦小宝认为皇太后害死小皇帝的母亲",
+      "description": "韦小宝心想皇太后害死小皇帝的母亲等情由，因牵连重大，对师父陈近南也不能说。",
+      "cause": "未知",
+      "effect": "韦小宝隐瞒此事",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3240,
+          "column_start": 120,
+          "column_end": 187,
+          "anchor": "老婊子害死小皇帝的母亲",
+          "quote": "而且……而且老婊子不是好人，是个大大的坏人。”心想老婊子害死小皇帝的母亲等等情由，牵连太过重大，对师父也不能说，何况此事跟师父毫不相干。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "仅为韦小宝内心所想，真实性待核"
+      ],
+      "id": "NEW:鹿鼎-009-01:004",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "海大富在汤中暗下毒药",
+      "when": "未知（本回之前）",
+      "place": "未知",
+      "people": [
+        "海大富",
+        "韦小宝"
+      ],
+      "relationships": "海大富对韦小宝下毒",
+      "description": "韦小宝向陈近南哭诉，海大富在汤中暗下毒药，使他中毒；他以为毒不可解。",
+      "cause": "未知",
+      "effect": "陈近南后来用内力逼毒并给解毒丹",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3242,
+          "column_start": 68,
+          "column_end": 187,
+          "anchor": "将海大富在汤中暗下毒药的事说了",
+          "quote": "陈近南温言问道：“小宝，怎么啦？”韦小宝抽抽噎噎的将海大富在汤中暗下毒药的事说了，最后泣道：“师父，我这毒是解不了的啦。我死之后，青木堂的兄弟们可不能再用老法子。”陈近南问道：“什么老法子？”韦小宝道：“鳌拜害死尹香主，我杀了鳌拜，大伙儿就",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "下毒具体时间、地点原文未明"
+      ],
+      "id": "NEW:鹿鼎-009-01:005",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "皇太后杀海大富",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "皇太后",
+        "海大富",
+        "韦小宝"
+      ],
+      "relationships": "皇太后杀海大富",
+      "description": "韦小宝说老婊子杀了海老乌龟；据上下文，老婊子指皇太后，海老乌龟指海大富。",
+      "cause": "未知",
+      "effect": "海大富死",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3242,
+          "column_start": 182,
+          "column_end": 235,
+          "anchor": "老婊子杀了海老乌龟",
+          "quote": "拜，大伙儿就叫我做青木堂香主。海老乌龟害死韦香主，老婊子杀了海老乌龟。大伙儿可不能请老婊子来做青木堂香主。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "指称关系据上下文，原文未在本句明说"
+      ],
+      "id": "NEW:鹿鼎-009-01:006",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "鳌拜害死尹香主",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "鳌拜",
+        "尹香主"
+      ],
+      "relationships": "鳌拜杀天地会青木堂尹香主",
+      "description": "韦小宝说鳌拜害死尹香主，青木堂因此缺了香主。",
+      "cause": "未知",
+      "effect": "尹香主死；后韦小宝杀鳌拜",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3242,
+          "column_start": 145,
+          "column_end": 235,
+          "anchor": "鳌拜害死尹香主",
+          "quote": "老法子。”陈近南问道：“什么老法子？”韦小宝道：“鳌拜害死尹香主，我杀了鳌拜，大伙儿就叫我做青木堂香主。海老乌龟害死韦香主，老婊子杀了海老乌龟。大伙儿可不能请老婊子来做青木堂香主。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "具体经过原文未明"
+      ],
+      "id": "NEW:鹿鼎-009-01:007",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "韦小宝杀鳌拜",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "韦小宝",
+        "鳌拜"
+      ],
+      "relationships": "韦小宝杀鳌拜",
+      "description": "韦小宝自述杀了鳌拜。",
+      "cause": "原文并列鳌拜害死尹香主，未明说是否为报仇",
+      "effect": "天地会众人叫他做青木堂香主",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3242,
+          "column_start": 153,
+          "column_end": 235,
+          "anchor": "我杀了鳌拜",
+          "quote": "问道：“什么老法子？”韦小宝道：“鳌拜害死尹香主，我杀了鳌拜，大伙儿就叫我做青木堂香主。海老乌龟害死韦香主，老婊子杀了海老乌龟。大伙儿可不能请老婊子来做青木堂香主。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "具体时间、地点原文未明"
+      ],
+      "id": "NEW:鹿鼎-009-01:008",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "天地会众人推韦小宝为青木堂香主",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "韦小宝",
+        "天地会众人"
+      ],
+      "relationships": "韦小宝因杀鳌拜被众人推为青木堂香主",
+      "description": "韦小宝说，鳌拜害死尹香主，他杀了鳌拜，大伙儿就叫他做青木堂香主。",
+      "cause": "韦小宝杀鳌拜",
+      "effect": "韦小宝任青木堂香主",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3242,
+          "column_start": 159,
+          "column_end": 235,
+          "anchor": "大伙儿就叫我做青木堂香主",
+          "quote": "老法子？”韦小宝道：“鳌拜害死尹香主，我杀了鳌拜，大伙儿就叫我做青木堂香主。海老乌龟害死韦香主，老婊子杀了海老乌龟。大伙儿可不能请老婊子来做青木堂香主。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "推举的具体过程原文未明"
+      ],
+      "id": "NEW:鹿鼎-009-01:009",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "索额图变卖鳌拜家产并加送银票",
+      "when": "未知（韦小宝杀鳌拜后、本回之前）",
+      "place": "未知",
+      "people": [
+        "索额图",
+        "韦小宝",
+        "鳌拜"
+      ],
+      "relationships": "索额图以变卖鳌拜家产所得向韦小宝送银",
+      "description": "索额图原答应送韦小宝四十五万两银子，后变卖鳌拜家产，得价高于预计，加至四十六万六千五百两。",
+      "cause": "讨好韦小宝",
+      "effect": "韦小宝得银票",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3270,
+          "column_start": 47,
+          "column_end": 166,
+          "anchor": "后来变卖鳌拜家产，得价较预计为多",
+          "quote": "乐。原来索额图为了讨好他，本来答应四十五万两银子，后来变卖鳌拜家产，得价较预计为多，又加了一万多两。他看了多时，收起银票，取出陈近南的那本武功册子，照着所传秘诀，盘膝而坐，练了起来。他点收银票，看到票子上银号、票号的朱印时神采奕奕，一翻到武",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 3270,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "一共四十六万六千五百两的银票",
+          "quote": "　　韦小宝进宫回到自己屋里，将索额图交来几十张、一共四十六万六千五百两的银票反复细看，心下大乐。原来索额图为了讨好他，本来答应四十五万两银子，后来变卖鳌拜家产，得价较预计为多，又加了一万多两。他看了多时，收起银票，取出陈近南的那本武功册子，",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "变卖具体经手过程原文未明"
+      ],
+      "id": "NEW:鹿鼎-009-01:010",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "索额图替韦小宝分送银两打点宫中",
+      "when": "未知（此前数月中）",
+      "place": "皇宫",
+      "people": [
+        "索额图",
+        "韦小宝",
+        "宫中嫔妃",
+        "太监",
+        "侍卫"
+      ],
+      "relationships": "索额图为韦小宝打点宫中关系",
+      "description": "索额图替韦小宝将几万两银子分送宫中嫔妃和有权势的太监、侍卫，使韦小宝在宫中众口交誉。",
+      "cause": "替韦小宝打点",
+      "effect": "韦小宝在宫中受欢迎",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3276,
+          "column_start": 26,
+          "column_end": 126,
+          "anchor": "索额图早已替他将几万两银子分送宫中嫔妃",
+          "quote": "十六，管事太监便送四百两银子到韦小宝屋子里来。这时索额图早已替他将几万两银子分送宫中嫔妃和有权势的太监、侍卫，韦小宝嘴头上既来得，康熙又正对他十分宠幸，这几个月中，在宫中众口交誉，人人见了他都笑颜相迎。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "具体分送名单和次数原文未明"
+      ],
+      "id": "NEW:鹿鼎-009-01:011",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "徐天川与白氏兄弟争执动手受重伤",
+      "when": "未知（本回前，徐天川回到回春堂之前）",
+      "place": "未知",
+      "people": [
+        "徐天川",
+        "白寒松",
+        "白寒枫"
+      ],
+      "relationships": "徐天川与沐王府白氏兄弟冲突，被两人打伤",
+      "description": "高彦超转述徐天川的话：徐天川与沐王府白寒松、白寒枫兄弟为了争执拥唐拥桂，越说越僵，终于动手；徐天川双拳难敌四手，身受重伤。",
+      "cause": "争执拥唐拥桂",
+      "effect": "徐天川重伤回到回春堂；青木堂众人欲向白氏兄弟问罪",
+      "nature": "传闻",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3320,
+          "column_start": 147,
+          "column_end": 266,
+          "anchor": "他们为了争执拥唐拥桂，越说越僵，终于动起手来",
+          "quote": "烂木头，有什么了不起啦。”高彦超道：“听徐大哥说，他们为了争执拥唐拥桂，越说越僵，终于动起手来。徐大哥双拳难敌四手，身受重伤。”韦小宝道：“两个打一个，不是英雄好汉。什么糖啊桂的，莫非……莫非……”心想什么“拥桂”，莫非为了拥护我小桂子，但",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 3320,
+          "column_start": 170,
+          "column_end": 278,
+          "anchor": "徐大哥双拳难敌四手，身受重伤",
+          "quote": "说，他们为了争执拥唐拥桂，越说越僵，终于动起手来。徐大哥双拳难敌四手，身受重伤。”韦小宝道：“两个打一个，不是英雄好汉。什么糖啊桂的，莫非……莫非……”心想什么“拥桂”，莫非为了拥护我小桂子，但觉得不大像，缩住了不说。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "具体动手地点、时间及白寒松死亡是否同一冲突，原文未明"
+      ],
+      "id": "NEW:鹿鼎-009-01:012",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "白寒松亡故，白寒枫指为天地会徐天川所害",
+      "when": "未知（本回之前）",
+      "place": "未知（灵堂设于杨柳胡同白宅）",
+      "people": [
+        "白寒松",
+        "白寒枫",
+        "徐天川",
+        "天地会"
+      ],
+      "relationships": "白寒松死；白寒枫归咎天地会徐天川",
+      "description": "白寒枫称兄长白寒松不幸亡故，并指为天地会下毒手害死；后又说是天桥卖药的徐天川所为。原文未直接证实。",
+      "cause": "白寒枫称天地会或徐天川下毒手",
+      "effect": "白寒枫设灵堂、欲杀天地会人报仇；天地会众人震惊",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3430,
+          "column_start": 17,
+          "column_end": 107,
+          "anchor": "是家兄寒松不幸亡故",
+          "quote": "侠身上有服，不知府上是哪一位过世了？”白寒枫道：“是家兄寒松不幸亡故。”马博仁跌足道：“可惜，可惜！白氏双木乃沐王府的英雄虎将，武林中大大有名，白大侠正当英年，不知是得了什么疾病？”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 3448,
+          "column_start": 1,
+          "column_end": 36,
+          "anchor": "家兄不幸为天地会下毒手害死",
+          "quote": "　　白寒枫道：“对不住了！家兄不幸为天地会下毒手害死，在下心中悲痛……”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 3476,
+          "column_start": 1,
+          "column_end": 94,
+          "anchor": "害死我哥哥的，是那平日在天桥卖药的姓徐老贼",
+          "quote": "　　白寒枫双手扠腰，在灵堂一站，大声道：“害死我哥哥的，是那平日在天桥卖药的姓徐老贼。这老贼名叫徐天川，有个匪号叫作‘八臂猿猴’，乃是天地会青木堂中有职司的人，是也不是？你们还能不能赖？”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "白寒枫单方指控；徐天川只称被白氏兄弟打伤，白寒松死因原文未直接证实"
+      ],
+      "id": "NEW:鹿鼎-009-01:013",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "徐天川从前服侍唐王天子",
+      "when": "从前（原文未系年）",
+      "place": "未知",
+      "people": [
+        "徐天川",
+        "唐王天子"
+      ],
+      "relationships": "徐天川旧为唐王天子属下",
+      "description": "玄贞道人说徐天川从前服侍过唐王天子，忠心耿耿，提到先帝时便流眼泪。",
+      "cause": "未知",
+      "effect": "未知",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3332,
+          "column_start": 62,
+          "column_end": 158,
+          "anchor": "他从前服侍过唐王天子",
+          "quote": "也都狂妄自大起来。我们这位徐大哥人是再好也没有的，他从前服侍过唐王天子，当真是忠心耿耿，提到先帝时便流眼泪。定是沐王府的人说话不三不四，言语中轻侮了先帝，否则的话，徐老哥怎能跟沐王府的人动手？”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "具体职司和经历原文未明"
+      ],
+      "id": "NEW:鹿鼎-009-01:014",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "李闯攻入北京逼死崇祯天子",
+      "when": "当年（原文未系年）",
+      "place": "北京",
+      "people": [
+        "李闯",
+        "崇祯天子"
+      ],
+      "relationships": "李闯攻入北京，逼死崇祯",
+      "description": "玄贞道人追述：当年李闯攻入北京，逼死了崇祯天子。",
+      "cause": "未知",
+      "effect": "各地忠臣义士推戴太祖皇帝的子孙为王",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3324,
+          "column_start": 10,
+          "column_end": 129,
+          "anchor": "当年李闯攻入北京，逼死了崇祯天子",
+          "quote": "小宝的底细，知他肚中的料子有限，插口道：“韦香主，当年李闯攻入北京，逼死了崇祯天子。吴三桂带领清兵入关，占我花花江山。各地的忠臣义士，纷纷推戴太祖皇帝的子孙为王。先是福王在南京做天子。后来福王给鞑子害了，咱们唐王在福建做天子，那是国姓爷郑家",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "具体年份原文未明"
+      ],
+      "id": "NEW:鹿鼎-009-01:015",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "吴三桂带领清兵入关",
+      "when": "未知（明朝末年）",
+      "place": "关",
+      "people": [
+        "吴三桂",
+        "清兵"
+      ],
+      "relationships": "吴三桂带清兵入关",
+      "description": "玄贞道人说吴三桂带领清兵入关，占我花花江山。",
+      "cause": "未知",
+      "effect": "清兵入关，占据江山",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3324,
+          "column_start": 27,
+          "column_end": 146,
+          "anchor": "吴三桂带领清兵入关，占我花花江山",
+          "quote": "口道：“韦香主，当年李闯攻入北京，逼死了崇祯天子。吴三桂带领清兵入关，占我花花江山。各地的忠臣义士，纷纷推戴太祖皇帝的子孙为王。先是福王在南京做天子。后来福王给鞑子害了，咱们唐王在福建做天子，那是国姓爷郑家一伙人拥戴的，自然是真命天子。哪知",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "具体经过原文未详"
+      ],
+      "id": "NEW:鹿鼎-009-01:016",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "福王在南京称帝后被害",
+      "when": "未知",
+      "place": "南京（称帝）；被害地未知",
+      "people": [
+        "福王",
+        "鞑子"
+      ],
+      "relationships": "福王在南京做天子，后为鞑子所害",
+      "description": "玄贞道人说先是福王在南京做天子，后来福王给鞑子害了。",
+      "cause": "未知",
+      "effect": "唐王继在福建称帝",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3324,
+          "column_start": 66,
+          "column_end": 185,
+          "anchor": "先是福王在南京做天子",
+          "quote": "江山。各地的忠臣义士，纷纷推戴太祖皇帝的子孙为王。先是福王在南京做天子。后来福王给鞑子害了，咱们唐王在福建做天子，那是国姓爷郑家一伙人拥戴的，自然是真命天子。哪知道另一批人在广西、云南推戴桂王做天子，又有一批人在浙江推戴鲁王做天子，那都是假",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 3324,
+          "column_start": 77,
+          "column_end": 192,
+          "anchor": "后来福王给鞑子害了",
+          "quote": "纷纷推戴太祖皇帝的子孙为王。先是福王在南京做天子。后来福王给鞑子害了，咱们唐王在福建做天子，那是国姓爷郑家一伙人拥戴的，自然是真命天子。哪知道另一批人在广西、云南推戴桂王做天子，又有一批人在浙江推戴鲁王做天子，那都是假的真命天子。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "被害具体经过原文未明"
+      ],
+      "id": "NEW:鹿鼎-009-01:017",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "唐王在福建称帝，郑家拥戴",
+      "when": "未知",
+      "place": "福建",
+      "people": [
+        "唐王",
+        "国姓爷郑家"
+      ],
+      "relationships": "国姓爷郑家一伙人拥戴唐王在福建做天子",
+      "description": "玄贞道人说福王被害后，唐王在福建做天子，由国姓爷郑家一伙人拥戴，所以是真命天子。",
+      "cause": "福王被害",
+      "effect": "唐王称帝；天地会自称唐派",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3324,
+          "column_start": 87,
+          "column_end": 192,
+          "anchor": "咱们唐王在福建做天子",
+          "quote": "孙为王。先是福王在南京做天子。后来福王给鞑子害了，咱们唐王在福建做天子，那是国姓爷郑家一伙人拥戴的，自然是真命天子。哪知道另一批人在广西、云南推戴桂王做天子，又有一批人在浙江推戴鲁王做天子，那都是假的真命天子。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 3324,
+          "column_start": 98,
+          "column_end": 192,
+          "anchor": "那是国姓爷郑家一伙人拥戴的",
+          "quote": "做天子。后来福王给鞑子害了，咱们唐王在福建做天子，那是国姓爷郑家一伙人拥戴的，自然是真命天子。哪知道另一批人在广西、云南推戴桂王做天子，又有一批人在浙江推戴鲁王做天子，那都是假的真命天子。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "具体称帝年份原文未明"
+      ],
+      "id": "NEW:鹿鼎-009-01:018",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "桂王、鲁王分别被拥立为帝",
+      "when": "未知",
+      "place": "广西、云南（桂王）；浙江（鲁王）",
+      "people": [
+        "桂王",
+        "鲁王"
+      ],
+      "relationships": "桂王、鲁王各成一方拥立对象",
+      "description": "玄贞道人说另一批人在广西、云南推戴桂王做天子，又有一批人在浙江推戴鲁王做天子。",
+      "cause": "未知",
+      "effect": "形成桂派、鲁派",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3324,
+          "column_start": 123,
+          "column_end": 192,
+          "anchor": "另一批人在广西、云南推戴桂王做天子",
+          "quote": "那是国姓爷郑家一伙人拥戴的，自然是真命天子。哪知道另一批人在广西、云南推戴桂王做天子，又有一批人在浙江推戴鲁王做天子，那都是假的真命天子。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 3324,
+          "column_start": 141,
+          "column_end": 192,
+          "anchor": "又有一批人在浙江推戴鲁王做天子",
+          "quote": "命天子。哪知道另一批人在广西、云南推戴桂王做天子，又有一批人在浙江推戴鲁王做天子，那都是假的真命天子。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "拥立者身份原文未详"
+      ],
+      "id": "NEW:鹿鼎-009-01:019",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "唐王、鲁王、桂王先后遭难",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "唐王",
+        "鲁王",
+        "桂王"
+      ],
+      "relationships": "三王先后失败或死难",
+      "description": "玄贞道人说后来唐王、鲁王、桂王先后都遭了难。",
+      "cause": "未知",
+      "effect": "江湖豪杰分别找三王后人奉以为主",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3328,
+          "column_start": 40,
+          "column_end": 159,
+          "anchor": "后来唐王、鲁王、桂王，先后都遭了难",
+          "quote": "命天子，大家自伙里争得很厉害。”叹了口气，续道：“后来唐王、鲁王、桂王，先后都遭了难。这些年来，江湖上的豪杰不忘明室，分别找了三王的后人，奉以为主，干反清复明的大业。桂王的手下拥戴桂王的子孙，鲁王的手下拥戴鲁王的子孙，那是桂派和鲁派，他们又",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "三王遭难的具体情形原文未明"
+      ],
+      "id": "NEW:鹿鼎-009-01:020",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "江湖豪杰奉三王后人为主，唐桂鲁三派长期相争",
+      "when": "十几年来（原文）",
+      "place": "未知",
+      "people": [
+        "唐王后人",
+        "桂王后人",
+        "鲁王后人",
+        "天地会",
+        "沐王府"
+      ],
+      "relationships": "三派分别拥戴三王后人；天地会为唐派，沐王府为桂派",
+      "description": "玄贞道人说，江湖豪杰不忘明室，分别找唐、桂、鲁三王的后人奉以为主；桂王手下拥戴桂王子孙，鲁王手下拥戴鲁王子孙，又称天地会为唐派。三派都反清复明，但天地会自称正统，十几年来相争不休。",
+      "cause": "三王先后遭难；各派争正统",
+      "effect": "唐桂鲁三派长期不和",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3328,
+          "column_start": 74,
+          "column_end": 193,
+          "anchor": "分别找了三王的后人，奉以为主",
+          "quote": "王，先后都遭了难。这些年来，江湖上的豪杰不忘明室，分别找了三王的后人，奉以为主，干反清复明的大业。桂王的手下拥戴桂王的子孙，鲁王的手下拥戴鲁王的子孙，那是桂派和鲁派，他们又称咱们天地会为唐派。唐、桂、鲁三派，都是反清复明的。不过只有咱们天地",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 3328,
+          "column_start": 145,
+          "column_end": 262,
+          "anchor": "唐、桂、鲁三派，都是反清复明的",
+          "quote": "的子孙，那是桂派和鲁派，他们又称咱们天地会为唐派。唐、桂、鲁三派，都是反清复明的。不过只有咱们天地会才是正统，桂派、鲁派却是篡位。”韦小宝点头道：“我明白了。沐王府那些人是桂派，是不是？”玄贞道人道：“正是。这三派人十几年来相争不休。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 3328,
+          "column_start": 224,
+          "column_end": 262,
+          "anchor": "这三派人十几年来相争不休",
+          "quote": "沐王府那些人是桂派，是不是？”玄贞道人道：“正是。这三派人十几年来相争不休。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "各派具体形成时间原文未明"
+      ],
+      "id": "NEW:鹿鼎-009-01:021",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "沐天波尽忠死节",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "沐天波",
+        "沐王府",
+        "江湖好汉"
+      ],
+      "relationships": "江湖好汉因沐天波尽忠死节而容让沐王府",
+      "description": "玄贞道人说江湖好汉因沐天波沐公爷尽忠死节，遇沐王府人物都容让三分，致使沐王府中有些人狂妄自大。",
+      "cause": "沐天波尽忠死节",
+      "effect": "江湖容让沐王府",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3332,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "沐天波沐公爷尽忠死节",
+          "quote": "　　玄贞道人道：“江湖上好汉瞧在沐天波沐公爷尽忠死节的份上，遇上了沐王府的人物，都是容让三分。这样一来，沐王府中连阿猫阿狗也都狂妄自大起来。我们这位徐大哥人是再好也没有的，他从前服侍过唐王天子，当真是忠心耿耿，提到先帝时便流眼泪。定是沐王府",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "死节具体经过原文未明"
+      ],
+      "id": "NEW:鹿鼎-009-01:022",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "韦小宝在苏北道小饭店见白寒松以筷子击打吴三桂部属",
+      "when": "那日（具体日期未知）",
+      "place": "苏北道小饭店",
+      "people": [
+        "韦小宝",
+        "白寒松",
+        "吴三桂部属"
+      ],
+      "relationships": "韦小宝此前见过白寒松武功；白寒松与吴三桂部属冲突",
+      "description": "韦小宝回忆，那日在苏北道上小饭店中见过白寒松，见他以筷子击打吴三桂部属，武功高强；本回见到死者面容才认出。",
+      "cause": "未知",
+      "effect": "韦小宝对白氏兄弟武功忌惮，后认出死者",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3430,
+          "column_start": 17,
+          "column_end": 107,
+          "anchor": "是家兄寒松不幸亡故",
+          "quote": "侠身上有服，不知府上是哪一位过世了？”白寒枫道：“是家兄寒松不幸亡故。”马博仁跌足道：“可惜，可惜！白氏双木乃沐王府的英雄虎将，武林中大大有名，白大侠正当英年，不知是得了什么疾病？”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 3466,
+          "column_start": 10,
+          "column_end": 87,
+          "anchor": "那人以筷子击打吴三桂部属，武功高强",
+          "quote": "人面容，大吃一惊，那正是在苏北道上小饭店中见过的，那人以筷子击打吴三桂部属，武功高强，想不到竟会死在这里，随即想到对方少了一个厉害角色，惊奇之余，暗自宽心。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "当时白寒松与吴三桂部属冲突的前因原文未明"
+      ],
+      "id": "NEW:鹿鼎-009-01:023",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "徐天川奉陈近南之命暗中等候韦小宝数月",
+      "when": "已等好几个月（原文）",
+      "place": "北京街市、茶馆",
+      "people": [
+        "徐天川",
+        "韦小宝",
+        "陈近南"
+      ],
+      "relationships": "徐天川受总舵主陈近南吩咐，不主动与韦小宝相认",
+      "description": "高彦超转述徐天川的话：徐天川一直在等候韦小宝，已等数月，有时见他在街市采购或茶馆听书；因总舵主陈近南吩咐过韦小宝有事自会去找他，徐天川不敢上前相认。",
+      "cause": "陈近南吩咐",
+      "effect": "韦小宝不知被跟踪；徐天川受伤后才由高彦超联络",
+      "nature": "传闻",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 3336,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "他一直在等候韦香主驾到，已等了好几个月",
+          "quote": "　　高彦超又道：“徐大哥说，他一直在等候韦香主驾到，已等了好几个月，有时见到韦香主在街市采购物品，有时在茶馆里听书。”韦小宝脸上微微一红，说道：“原来他早见到我了。”高彦超道：“徐大哥说，总舵主吩咐过的，韦香主倘若有事，自会去找他，因此徐大",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 3336,
+          "column_start": 70,
+          "column_end": 138,
+          "anchor": "总舵主吩咐过的，韦香主倘若有事，自会去找他",
+          "quote": "说道：“原来他早见到我了。”高彦超道：“徐大哥说，总舵主吩咐过的，韦香主倘若有事，自会去找他，因此徐大哥虽然见到韦香主，却不敢上前相认。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 9
+        }
+      ],
+      "uncertain": [
+        "等候的具体起止时间原文未明"
+      ],
+      "id": "NEW:鹿鼎-009-01:024",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    }
+  ],
+  "cross_links": [
+    {
+      "topic": "天地会与沐王府的唐桂正统冲突",
+      "people": [
+        "玄贞道人",
+        "高彦超",
+        "徐天川",
+        "白寒松",
+        "白寒枫",
+        "沐天波"
+      ],
+      "detail": "本回证据显示徐天川与白氏兄弟因拥唐拥桂争执动手，白寒松死亡而白寒枫归咎天地会；双方门派归属与冲突全貌待其他章节核。"
+    },
+    {
+      "topic": "康熙、皇太后与海大富的宫闱旧事",
+      "people": [
+        "皇太后",
+        "小皇帝",
+        "海大富",
+        "韦小宝"
+      ],
+      "detail": "韦小宝自述或心想皇太后非小皇帝生母、害死其母，海大富下毒、皇太后杀海大富；这些说法的来源与真伪待核。"
+    },
+    {
+      "topic": "韦小宝的师承与天地会身份",
+      "people": [
+        "陈近南",
+        "韦小宝",
+        "海大富",
+        "徐天川"
+      ],
+      "detail": "陈近南为韦小宝师父并授内功，徐天川奉陈近南之命暗中等候；陈近南收徒经过及海大富武功来源待核。"
+    }
+  ],
+  "unresolved": [
+    "‘海老乌龟害死韦香主’与韦小宝仍活着并自称韦香主矛盾，所指待核。",
+    "白寒松是否确为徐天川或天地会所杀，原文只有白寒枫指控与徐天川伤重，缺直接证据。",
+    "皇太后害死小皇帝母亲、皇太后非小皇帝生母等仅见韦小宝内心，真实性待核。",
+    "徐天川与白氏兄弟争执的具体地点、时间及白寒松死亡是否同一场冲突，原文未明。",
+    "陈近南接到福建何事、为何只停留一天，原文未明。",
+    "陈近南何时收韦小宝为徒，本回未交代。"
+  ],
+  "validation_issues": [],
+  "semantic_acceptance": "model_reviewed_not_independent_audit"
+}
