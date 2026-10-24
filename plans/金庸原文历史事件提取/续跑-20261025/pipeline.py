@@ -9,6 +9,7 @@ import argparse
 import bisect
 import hashlib
 import json
+import os
 import re
 from collections import Counter
 from pathlib import Path
@@ -25,7 +26,9 @@ CARD = re.compile(r"^###\s+(EV-[^\s·]+)\s*[·・]?\s*(.*?)\s*$", re.M)
 def dump(p: Path, value):
     """Write a deterministic UTF-8 JSON artifact."""
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary = p.with_suffix(p.suffix + '.tmp')
+    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    os.replace(temporary, p)
 
 
 def sha(p: Path):
