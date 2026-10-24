@@ -1,0 +1,10 @@
+import re
+t = open('批次B/B4-天龙第41-50回.md', encoding='utf-8').read()
+heads = set(re.findall(r'### (EV-天龙-\d{4})', t))
+refs = set(re.findall(r'EV-天龙-\d{4}', t))
+dangling = sorted(refs - heads)
+print('cards', len(heads), 'refs', len(refs))
+print('dangling ->', [(d, 'B3' if d in {'EV-天龙-1262','EV-天龙-1281','EV-天龙-1283','EV-天龙-1284','EV-天龙-1285','EV-天龙-1278'} else '?') for d in dangling])
+b3 = set(re.findall(r'### (EV-天龙-\d{4})', open('批次B/B3-天龙第31-40回.md', encoding='utf-8').read()))
+print('dangling not in B3 ->', [d for d in dangling if d not in b3 and d != 'EV-天龙-0001'])
+print('A1 note refs:', [d for d in dangling if d == 'EV-天龙-0001'])
