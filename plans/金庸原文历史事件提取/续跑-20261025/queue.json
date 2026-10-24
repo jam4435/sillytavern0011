@@ -8233,9 +8233,12 @@
     "legacy_uids": [],
     "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
     "phase": "source_review",
-    "status": "running",
+    "status": "needs_repair",
     "prompt_version": "source-review-v1",
-    "attempts": 1
+    "attempts": 1,
+    "duration_ms": 177213.20399999968,
+    "event_count": 22,
+    "issue_count": 1
   },
   {
     "id": "鹿鼎-006-02",
@@ -8247,8 +8250,9 @@
     "legacy_uids": [],
     "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "running",
+    "prompt_version": "source-review-v1",
+    "attempts": 1
   },
   {
     "id": "鹿鼎-007-01",
