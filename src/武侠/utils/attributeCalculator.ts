@@ -3,6 +3,7 @@
  * 负责根据初始属性、境界、功法计算战斗属性和资源属性
  */
 import type { InitialAttributes } from '../types';
+import { MASTERY_COEFFICIENT, RANK_BASE_VALUE } from './martialArtNumerics';
 
 // ============ 常量定义 ============
 
@@ -23,25 +24,6 @@ export const MINOR_REALM_COEF: Record<string, number> = {
   中期: 1.2,
   后期: 1.4,
   圆满: 1.6,
-};
-
-// 品阶基础值
-export const RANK_BASE: Record<string, number> = {
-  粗浅: 1,
-  传家: 2,
-  上乘: 4,
-  镇派: 8,
-  绝世: 15,
-  传说: 25,
-};
-
-// 掌握程度系数
-export const MASTERY_COEF: Record<string, number> = {
-  初窥门径: 0.6,
-  略有小成: 0.8,
-  融会贯通: 1.0,
-  炉火纯青: 1.2,
-  出神入化: 1.5,
 };
 
 // 境界隐含保底
@@ -215,7 +197,7 @@ export function getRealmCoefficient(realm: string): number {
  * 计算功法加成
  */
 export function calculateMartialArtBonus(rank: string, mastery: string): number {
-  return (RANK_BASE[rank] || 1) * (MASTERY_COEF[mastery] || 0.6);
+  return (RANK_BASE_VALUE[rank as keyof typeof RANK_BASE_VALUE] || 1) * (MASTERY_COEFFICIENT[mastery as keyof typeof MASTERY_COEFFICIENT] || 0.6);
 }
 
 /**

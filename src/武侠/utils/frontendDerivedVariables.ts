@@ -47,6 +47,7 @@ const POWER_ZONE_TYPES: MartialArtsType[] = [
   '暗器',
   '枪戟',
   '棍锤',
+  '鞭法',
 ];
 
 const DEFAULT_INITIAL_ATTRIBUTES: InitialAttributes = {

@@ -1,4 +1,4 @@
-import type { InitialAttributes, InventoryItem } from '../types';
+import type { InitialAttributes, InventoryItem, MartialArtRequirementValue } from '../types';
 import { checkMartialArtPrerequisites } from './martialArtsDatabase';
 
 const INITIAL_ATTRIBUTE_KEYS = ['臂力', '根骨', '机敏', '悟性', '洞察', '风姿', '福缘'] as const;
@@ -8,7 +8,9 @@ export type MartialArtStudyAttribute = (typeof INITIAL_ATTRIBUTE_KEYS)[number];
 export interface MartialArtRequirementStatus {
   attribute: MartialArtStudyAttribute;
   current: number;
-  required: number;
+  requirement: MartialArtRequirementValue;
+  requirementText: string;
+  deficitText: string;
   met: boolean;
   deficit: number;
 }
@@ -63,7 +65,25 @@ export function quoteMartialArtStudyEligibility({
   }
 
   for (const [attribute, rawRequired] of Object.entries(item.martialArtInfo?.requirements || {})) {
-    if (!isInitialAttributeKey(attribute) || typeof rawRequired !== 'number' || !Number.isFinite(rawRequired)) {
+    if (!isInitialAttributeKey(attribute)) continue;
+
+    let min: number | undefined;
+    let max: number | undefined;
+    if (typeof rawRequired === 'number' && Number.isFinite(rawRequired)) {
+      min = rawRequired;
+    } else if (rawRequired && typeof rawRequired === 'object' && !Array.isArray(rawRequired)) {
+      min = rawRequired.min;
+      max = rawRequired.max;
+      if (
+        (min === undefined && max === undefined) ||
+        (min !== undefined && (!Number.isInteger(min) || min < 0 || min > 20)) ||
+        (max !== undefined && (!Number.isInteger(max) || max < 0 || max > 20)) ||
+        (min !== undefined && max !== undefined && min > max)
+      ) {
+        reasons.push(`${attribute}的修炼限制数据无效。`);
+        continue;
+      }
+    } else {
       continue;
     }
 
@@ -73,19 +93,39 @@ export function quoteMartialArtStudyEligibility({
       continue;
     }
 
-    const required = rawRequired;
-    const deficit = Math.max(0, required - current);
+    const requirementText = min !== undefined && max !== undefined
+      ? `${min}–${max}`
+      : min !== undefined
+        ? String(min)
+        : `≤ ${max}`;
+    const deficit = min !== undefined && current < min
+      ? min - current
+      : max !== undefined && current > max
+        ? current - max
+        : 0;
     const met = deficit === 0;
     requirementStatuses.push({
       attribute,
       current,
-      required,
+      requirement: rawRequired,
+      requirementText,
+      deficitText: deficit === 0 ? '' : `${min !== undefined && current < min ? '尚缺' : '超出'} ${deficit}`,
       met,
       deficit,
     });
 
-    if (!met) {
-      reasons.push(`${attribute}不足：当前 ${current}，需要 ${required}，尚缺 ${deficit}。`);
+    if (!met && min !== undefined && current < min) {
+      reasons.push(
+        max !== undefined
+          ? `${attribute}不足：当前 ${current}，要求 ${min}–${max}，尚缺 ${deficit}。`
+          : `${attribute}不足：当前 ${current}，需要 ${min}，尚缺 ${deficit}。`,
+      );
+    } else if (!met && max !== undefined && current > max) {
+      reasons.push(
+        min !== undefined
+          ? `${attribute}过高：当前 ${current}，要求 ${min}–${max}，超出 ${deficit}。`
+          : `${attribute}过高：当前 ${current}，要求不高于 ${max}，超出 ${deficit}。`,
+      );
     }
   }
 
