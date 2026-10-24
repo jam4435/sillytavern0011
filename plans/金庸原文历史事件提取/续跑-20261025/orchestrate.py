@@ -105,6 +105,7 @@ def prompt_for(task, corpus, card_map):
 【返回规则】只输出一个 JSON 对象，无 Markdown。顶层字段：
 {"task_id":"给定ID","coverage":{"start":整数,"end":整数,"complete":true},"reviews":[{"uid":"旧卡uid","verdict":"supported|corrected|not_historical|insufficient","reason":"简短具体依据","event":null或事件对象}],"new_events":[事件对象],"cross_links":[{"topic":"跨书/跨章关系","people":["原文人物"],"detail":"当前证据与待查方向，不断言未核对的另一书事实"}],"unresolved":["具体疑问"]}
 每张给定旧卡必须有且仅有一个 review。supported 表示给定原文支持事件经过和核心因果，并未证明差分；corrected 必须返回完整修正事件；not_historical 表示不属于过去事件；insufficient 表示给定材料不足，不能猜。
+如果旧卡 mechanical 是 needs_review，即使事实无误也必须用 corrected 并返回完整事件及精确证据锚，让程序重新生成引文；不能只回 supported。
 事件对象字段必须完整：{"title":"具体动作","when":"原文相对时间或未知，不编精确年份","place":"原文地点或未知","people":["原文称谓"],"relationships":"实际关系变化或无","description":"具体事件经过，保留必要因果","cause":"原文依据或未知","effect":"原文依据或未知","nature":"客观叙述|人物自述|传闻|揭密|推断","evidence":[{"book":"书名","line":整数,"anchor":"该行内连续逐字原文4至40字"}],"uncertain":["限制或疑点"]}
 禁止自行生成原文摘录字段：你只选行号和短定位锚，程序会从原文生成引文并验证。至少一处证据，不得伪造锚。只能引用下方主文本或补充文本内的书名与行号。每条证据须确实支持该事件。单行含多个往事时依内容判断。
 不要生成世界书 YAML、人物档案或精确公历年份。不要判定现有世界书是否缺失（后续另有完整正文差分步骤）。不要声称通读本窗口之外的章节。'''
