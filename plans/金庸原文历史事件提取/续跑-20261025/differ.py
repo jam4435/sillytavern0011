@@ -30,16 +30,18 @@ def build_baseline():
                     errors.append(dict(path=str(p),error=str(error)))
                     continue
             if not isinstance(value,dict):
-                skipped.append(dict(path=str(p),reason='non-event document'))
-                continue
-            if '事件详情' not in value and '事件概要' not in value:
-                continue
+                # Background prose can also contain a previously recorded history.
+                value={'原始文档文本':text}
+                doc_type='background'
+            else:
+                doc_type='event' if '事件类型' in value or '事件详情' in value else 'other_record'
             records.append(dict(id=p.relative_to(PROJECT).as_posix(),key=p.stem,
-                path=str(p),sha256=sha(p),record=value,
+                path=str(p),sha256=sha(p),document_type=doc_type,record=value,
                 search_text=json.dumps(value,ensure_ascii=False,separators=(',',':'))))
     (HERE/'baseline').mkdir(exist_ok=True)
     (HERE/'baseline/entries.jsonl').write_text(''.join(json.dumps(r,ensure_ascii=False)+'\n' for r in records),encoding='utf-8')
     dump(HERE/'baseline/summary.json',dict(records=len(records),read_errors=errors, skipped=skipped,
+        document_types=dict(Counter(r['document_type'] for r in records)),
         duplicate_keys={k:n for k,n in Counter(r['key'] for r in records).items() if n>1}))
     if errors:
         raise ValueError('baseline contains unreadable records; inspect baseline/summary.json')

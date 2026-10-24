@@ -36,6 +36,8 @@ def anchor_for(card):
 
 def prepare():
     """Partition every source chapter; old read claims do not count as coverage."""
+    if (HERE/'queue.json').exists():
+        raise ValueError('queue already exists; do not overwrite persisted progress')
     corpus = Corpus()
     cards = jsonl(HERE / 'inventory/cards.jsonl')
     tasks = []
@@ -74,6 +76,15 @@ def prompt_for(task, corpus, card_map):
     lines = corpus.texts[task['book']].splitlines()
     text = '\n'.join(f'{n}\t{lines[n-1]}' for n in range(task['start'], task['end'] + 1))
     legacy, supplement = [], {}
+    # Adjacent context is supplied explicitly, rather than inherited from a Session.
+    for numbers in [range(max(1,task['start']-12),task['start']),
+                    range(task['end']+1,min(len(lines),task['end']+12)+1)]:
+        used=0
+        for n in numbers:
+            if used+len(lines[n-1])>1800:
+                break
+            supplement[f'{task["book"]}:{n}']=lines[n-1]
+            used+=len(lines[n-1])
     for uid in task['legacy_uids']:
         c = card_map[uid]
         legacy.append(dict(uid=uid, title=c['title'], fields={k:v for k,v in c['fields'].items()
@@ -204,9 +215,9 @@ def run(limit, books=None):
                 raise ValueError('source novel changed; re-plan before resuming')
             prompt, allowed = prompt_for(task, corpus, cards)
             task['status'] = 'running'
-            dump(HERE / 'queue.json', tasks)
             task['attempts'] = task.get('attempts',0) + 1
             job_id = 'review-' + task['id'] + '-a' + str(task['attempts'])
+            dump(HERE / 'queue.json', tasks)
             (HERE / 'runs' / (job_id+'.prompt.txt')).write_text(prompt+'\n',encoding='utf-8')
             print(json.dumps(dict(start=task['id'],prompt_chars=len(prompt)),ensure_ascii=False), flush=True)
             try:
