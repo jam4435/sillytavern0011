@@ -1,0 +1,4 @@
+{"sessionId":"session-f10a8529-ed84-41be-803e-1edfd9766c6a","type":"step/start","seq":6,"time":1792864288279}
+{"sessionId":"session-f10a8529-ed84-41be-803e-1edfd9766c6a","type":"request/header","seq":10,"time":1792864288289,"data":{"config":{"provider":"buddy","model":"deepseek-v4.1-flash","reasoningEffort":"low","maxTokens":32768},"toolCount":0,"toolNames":[]}}
+{"sessionId":"session-f10a8529-ed84-41be-803e-1edfd9766c6a","type":"assistant/message","seq":13,"time":1792864302495,"data":{"usage":{"inputTokens":24896,"outputTokens":1800,"reasoningTokens":1157}}}
+{"sessionId":"session-f10a8529-ed84-41be-803e-1edfd9766c6a","type":"turn/end","seq":15,"time":1792864302498,"data":{"reason":{"kind":"completed"}}}

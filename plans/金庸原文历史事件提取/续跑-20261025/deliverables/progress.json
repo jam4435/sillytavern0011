@@ -1,11 +1,12 @@
 {
   "statuses": {
-    "pending": 598,
-    "reviewed": 1
+    "reviewed": 2,
+    "pending": 597
   },
   "by_book": {
     "天龙八部": {
-      "pending": 113
+      "reviewed": 1,
+      "pending": 112
     },
     "射雕英雄传": {
       "pending": 88
@@ -25,15 +26,18 @@
     }
   },
   "usage": {
-    "inputTokens": 35086,
-    "cacheReadTokens": 640,
-    "outputTokens": 39978,
-    "total": 75704
+    "inputTokens": 48087,
+    "cacheReadTokens": 1152,
+    "outputTokens": 57601,
+    "total": 106840
   },
-  "events": 18,
-  "reviewed_legacy": 0,
-  "legacy_verdicts": {},
-  "rejected_or_pending_legacy": 1501,
+  "events": 27,
+  "reviewed_legacy": 4,
+  "legacy_verdicts": {
+    "supported": 3,
+    "corrected": 1
+  },
+  "rejected_or_pending_legacy": 1498,
   "source_stage_complete": false,
   "diff_stage_complete": false,
   "cross_book_dedup_complete": false
