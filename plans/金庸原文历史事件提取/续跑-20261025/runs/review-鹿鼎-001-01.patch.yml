@@ -1,0 +1,99 @@
+- id: tool-plugin-manager
+  disabled: true
+
+- id: session-log-deepseek
+  disabled: true
+
+- id: session-title-llm
+  disabled: true
+
+- id: plugin-package-inventory-deepseek
+  disabled: true
+
+- id: llm-retry
+  disabled: true
+
+- id: tool-working-directory
+  disabled: true
+
+- id: session-telemetry-otel
+  disabled: true
+
+- id: tool-bash
+  disabled: true
+
+- id: tool-pwsh
+  disabled: true
+
+- id: tool-jobs
+  disabled: true
+
+- id: tool-fs
+  disabled: true
+
+- id: tool-fs-search
+  disabled: true
+
+- id: agent-instructions
+  disabled: true
+
+- id: skill-filesystem
+  disabled: true
+
+- id: tool-skill
+  disabled: true
+
+- id: plan-mode
+  disabled: true
+
+- id: tool-subagent-control
+  disabled: true
+
+- id: tool-subagent-list-agents
+  disabled: true
+
+- id: tool-subagent
+  disabled: true
+
+- id: tool-subagent-fork
+  disabled: true
+
+- id: tool-workflow
+  disabled: true
+
+- id: tool-result-pruner
+  disabled: true
+
+- id: tool-todo
+  disabled: true
+
+- id: tool-goal
+  disabled: true
+
+- id: tool-web
+  disabled: true
+
+- id: credentials
+  disabled: false
+  config:
+    watch: false
+
+- id: agent-default-model
+  config:
+    provider: buddy
+    model: deepseek-v4.1-flash
+    reasoningEffort: high
+
+- id: system-prompt
+  config:
+    personaPrefix: >-
+      你是原文历史事件资料核验员。只处理用户提供的材料；工具和外部知识不可用。只输出要求的 JSON。
+
+- insert:
+    - id: wuxia-provider
+      name: file:///C:/Users/DELL/.dsh/profiles/web/node_modules/dsh-providers-hub/lib/index.js
+    - id: wuxia-bounded-call
+      name: file:///F:/Develop/AI/sillytavern/plans/%E9%87%91%E5%BA%B8%E5%8E%9F%E6%96%87%E5%8E%86%E5%8F%B2%E4%BA%8B%E4%BB%B6%E6%8F%90%E5%8F%96/%E7%BB%AD%E8%B7%91-20261025/bounded-call.mjs
+      config:
+        maxTokens: 12000
+        eventLog: "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-001-01.events.jsonl"

@@ -1,0 +1,2 @@
+{"sessionId":"session-abbdf8a3-b7a4-41b3-a617-87074e5f8781","type":"step/start","seq":6,"time":1792863595047}
+{"sessionId":"session-abbdf8a3-b7a4-41b3-a617-87074e5f8781","type":"request/header","seq":10,"time":1792863595067,"data":{"config":{"provider":"buddy","model":"deepseek-v4.1-flash","reasoningEffort":"high","maxTokens":12000},"toolCount":1}}
