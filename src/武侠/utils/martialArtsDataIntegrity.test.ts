@@ -6,12 +6,38 @@ import {
   RANK_LEVELS,
   type MartialArtsRank,
   type MartialArtsType,
+  type MasteryLevel,
 } from './martialArtNumerics';
 
 const supportedTypes: MartialArtsType[] = [
   '内功', '外功', '轻功', '剑法', '刀法', '拳掌', '指法', '暗器', '枪戟', '棍锤', '鞭法',
 ];
 const allowedAttributes = ['臂力', '根骨', '机敏', '悟性', '洞察', '风姿', '福缘'] as const;
+const expectedTraitStages: Record<MartialArtsRank, MasteryLevel[]> = {
+  粗浅: [],
+  传家: ['出神入化'],
+  上乘: ['出神入化', '炉火纯青'],
+  镇派: ['出神入化', '炉火纯青', '融会贯通'],
+  绝世: ['出神入化', '炉火纯青', '融会贯通', '略有小成'],
+  传说: ['出神入化', '炉火纯青', '融会贯通', '略有小成', '初窥门径'],
+};
+
+// 这些空列表尚未被判定为设计正确，只是已登记为待人工复核的现存记录。
+const emptyCombatCoefficientReviewList = [
+  '北冥神功',
+  '小无相功',
+  '八荒六合唯我独尊功',
+  '化功大法',
+  '心意气混元功',
+  '神足经',
+  '铁拐阵',
+  '罗汉大阵',
+  '打狗阵',
+  '打狗大阵',
+  '混沌剑阵',
+  '罗汉剑阵',
+].sort();
+
 const arts = martialArtsDatabase.功法;
 
 describe('功法数据库数值完整性', () => {
@@ -60,6 +86,20 @@ describe('功法数据库数值完整性', () => {
     for (const art of arts) {
       for (const mastery of Object.keys(art.特性 || {})) expect(MASTERY_LEVELS, `${art.功法名称} 的特性阶段`).toContain(mastery);
     }
+  });
+
+  it('每门功法的特性数量、阶段和存储顺序都符合品阶规则', () => {
+    for (const art of arts) {
+      expect(Object.keys(art.特性 || {}), art.功法名称).toEqual(expectedTraitStages[art.功法品阶 as MartialArtsRank]);
+    }
+  });
+
+  it('所有空战斗系数列表都登记在待人工复核清单中', () => {
+    const emptyNames = arts
+      .filter(art => !(art.战斗系数?.属性列表 || []).length)
+      .map(art => art.功法名称)
+      .sort();
+    expect(emptyNames).toEqual(emptyCombatCoefficientReviewList);
   });
 
   it('所有功法品阶都在统一枚举中', () => {
