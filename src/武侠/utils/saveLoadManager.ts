@@ -999,6 +999,13 @@ function persistHistoryVerificationRepairAudit(entry: Record<string, unknown>): 
   localStorage.setItem(WUXIA_HISTORY_REPAIR_AUDIT_KEY, JSON.stringify([...old, entry].slice(-100)));
 }
 
+function persistHistoryIdentityAliasAudit(entry: Record<string, unknown>): void {
+  const raw = localStorage.getItem(WUXIA_HISTORY_IDENTITY_ALIAS_AUDIT_KEY);
+  const old: unknown = raw ? JSON.parse(raw) : [];
+  if (!Array.isArray(old)) throw new Error('历史节点身份别名审计格式不正确');
+  localStorage.setItem(WUXIA_HISTORY_IDENTITY_ALIAS_AUDIT_KEY, JSON.stringify([...old, entry].slice(-100)));
+}
+
 export async function finalizeCurrentTurn(options: FinalizeHistoryTurnOptions = {}): Promise<HistoryTreeViewState> {
   const scanned = await scanCurrentChat(options);
   if (!scanned.currentNodeId) return scanned;
@@ -1997,7 +2004,7 @@ function tryApplyAutomaticLegacyMkRepair(
       state.currentChat.id !== journal.targetLocator.chatId) return null;
 
   const current = readCurrentVerification();
-  if (current.selectedMksHash === original.selectedMksHash ||
+  if (acceptsSelectedMksHash(original, current.selectedMksHash) ||
       current.eventStateHash !== original.eventStateHash) return null;
 
   const witness = readCheckoutSourceMkWitness(journal.transactionId);
@@ -2061,18 +2068,193 @@ function rollbackAutomaticLegacyMkRepair(applied: AppliedAutomaticMkRepair): voi
   });
 }
 
+/**
+ * A failed fork scan can leave an MK-keyed duplicate in the tree. Reconcile it only when
+ * the checkout journal + pre-fork source witness identify the exact source locator, the
+ * branch still ends at that same assistant/swipe, normalized source and branch text match,
+ * all current SelectedMks align to messages, and the event-state seal is unchanged.
+ * A changed branch MK is then recorded as an accepted hash variant; the original seal is
+ * never overwritten.
+ */
+async function reconcileForkBranchMkIdentity(
+  journal: HistoryCheckoutJournal,
+  state: HistoryTreeViewState,
+  targetNodeId: string,
+): Promise<HistoryTreeViewState | null> {
+  if (journal.actionKind !== 'fork_branch' || journal.stage !== 'verify' ||
+      state.currentChat.id !== journal.targetLocator.chatId) return null;
+  const sourceLocator = journal.branchSourceLocator;
+  if (!sourceLocator || sourceLocator.chatId !== journal.sourceChatId ||
+      sourceLocator.assistantMessageId !== journal.targetLocator.assistantMessageId ||
+      sourceLocator.swipeId !== journal.targetLocator.swipeId ||
+      !currentChatMatchesForkSnapshot(journal.targetLocator)) return null;
+
+  const target = state.tree.nodes[targetNodeId];
+  const actual = state.currentNodeId ? state.tree.nodes[state.currentNodeId] : null;
+  if (!target?.verification || !actual || actual.parentId !== target.parentId) return null;
+  const sourceLocatorOnTarget = target.locators.find(locator =>
+    locator.chatId === sourceLocator.chatId &&
+    locator.assistantMessageId === sourceLocator.assistantMessageId &&
+    locator.swipeId === sourceLocator.swipeId,
+  );
+  const branchLocator = actual.locators.find(locator =>
+    locator.chatId === state.currentChat.id &&
+    locator.assistantMessageId === journal.targetLocator.assistantMessageId &&
+    locator.swipeId === journal.targetLocator.swipeId,
+  );
+  if (!sourceLocatorOnTarget || !branchLocator) return null;
+
+  const witness = readCheckoutSourceMkWitness(journal.transactionId);
+  if (!witness ||
+      witness.transactionId !== journal.transactionId ||
+      witness.targetNodeId !== target.id ||
+      witness.sourceChatId !== journal.sourceChatId ||
+      witness.targetMessageId !== journal.targetLocator.assistantMessageId ||
+      witness.targetSwipeId !== journal.targetLocator.swipeId ||
+      witness.targetMk === undefined ||
+      !nodeAcceptsMessageKey(target, witness.targetMk) ||
+      witness.originalSelectedMksHash !== target.verification.selectedMksHash ||
+      witness.eventStateHash !== target.verification.eventStateHash) return null;
+
+  const currentMessages = readAllHistoryMessages();
+  const branchMessage = currentMessages.find(message =>
+    message.message_id === journal.targetLocator.assistantMessageId,
+  );
+  const branchSwipe = branchMessage ? getSwipeTexts(branchMessage) : null;
+  const branchText = branchSwipe?.texts[journal.targetLocator.swipeId] ?? '';
+  if (!branchMessage || !branchSwipe ||
+      branchSwipe.activeSwipeId !== journal.targetLocator.swipeId || !branchText.trim()) return null;
+
+  let sourceText: string;
+  try {
+    sourceText = await readHistoryAssistantSwipeText(
+      { id: sourceLocator.chatId, name: sourceLocator.chatName },
+      sourceLocator.assistantMessageId,
+      sourceLocator.swipeId,
+    );
+  } catch (error) {
+    recordEraDiagnostic('wuxia-history-checkout', 'history-branch-mk-identity-source-read-failed', {
+      transactionId: journal.transactionId,
+      targetNodeId,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+  const sourceMk = extractMessageKey(sourceText);
+  const branchMk = extractMessageKey(branchText);
+  const sourceContent = cleanStoryTextForIdentityComparison(sourceText);
+  const branchContent = cleanStoryTextForIdentityComparison(branchText);
+  if (!sourceText.trim() || !sourceContent || sourceContent !== branchContent ||
+      sourceMk !== witness.targetMk || !branchMk || branchMk === sourceMk ||
+      !nodeAcceptsMessageKey(actual, branchMk)) return null;
+
+  let alignedMks: (string | null)[];
+  try {
+    alignedMks = assertCurrentHistoryMksAligned();
+  } catch (error) {
+    recordEraDiagnostic('wuxia-history-checkout', 'history-branch-mk-identity-alignment-rejected', {
+      transactionId: journal.transactionId,
+      targetNodeId,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+  const currentVerification = readCurrentVerification();
+  if (alignedMks.length !== journal.targetLocator.assistantMessageId + 1 ||
+      stableHistoryHash(alignedMks) !== currentVerification.selectedMksHash ||
+      currentVerification.eventStateHash !== target.verification.eventStateHash) return null;
+
+  const latest = cloneTree(loadHistoryTree());
+  const latestTarget = latest.nodes[targetNodeId];
+  const latestActual = latest.nodes[actual.id];
+  const branch = latest.branches[state.currentBranchId];
+  if (!latestTarget?.verification || !latestActual || !branch ||
+      branch.chatId !== state.currentChat.id ||
+      latestTarget.verification.selectedMksHash !== target.verification.selectedMksHash ||
+      latestTarget.verification.eventStateHash !== target.verification.eventStateHash ||
+      latestActual.parentId !== latestTarget.parentId ||
+      !latestTarget.locators.some(locator =>
+        locator.chatId === sourceLocator.chatId &&
+        locator.assistantMessageId === sourceLocator.assistantMessageId &&
+        locator.swipeId === sourceLocator.swipeId,
+      )) return null;
+
+  const acceptedHashes = new Set(latestTarget.verification.acceptedSelectedMksHashes ?? []);
+  if (currentVerification.selectedMksHash !== latestTarget.verification.selectedMksHash) {
+    acceptedHashes.add(currentVerification.selectedMksHash);
+  }
+  const aliases = new Set(latestTarget.messageKeyAliases ?? []);
+  aliases.add(branchMk);
+  const nextTarget = appendLocator({
+    ...latestTarget,
+    messageKeyAliases: [...aliases],
+    verification: {
+      ...latestTarget.verification,
+      ...(acceptedHashes.size ? { acceptedSelectedMksHashes: [...acceptedHashes] } : {}),
+    },
+  }, branchLocator);
+  latest.nodes[targetNodeId] = nextTarget;
+
+  if (actual.id !== targetNodeId) {
+    latest.nodes[actual.id] = {
+      ...latestActual,
+      locators: latestActual.locators.filter(locator => !locatorEquals(locator, branchLocator)),
+    };
+  }
+  latest.branches[state.currentBranchId] = {
+    ...branch,
+    originNodeId: branch.originNodeId === actual.id ? targetNodeId : branch.originNodeId,
+    headNodeId: targetNodeId,
+    status: 'active',
+  };
+
+  if (actual.id !== targetNodeId) {
+    const orphan = latest.nodes[actual.id];
+    if (orphan && orphan.locators.length === 0 && !orphan.pinned && !orphan.label && !orphan.verification) {
+      const hasChildren = Object.values(latest.nodes).some(node => node.parentId === orphan.id);
+      const isReferenced = Object.values(latest.branches).some(candidate =>
+        candidate.headNodeId === orphan.id || candidate.originNodeId === orphan.id,
+      );
+      if (!hasChildren && !isReferenced) delete latest.nodes[orphan.id];
+    }
+  }
+
+  persistHistoryIdentityAliasAudit({
+    timestamp: Date.now(),
+    transactionId: journal.transactionId,
+    targetNodeId,
+    duplicateNodeId: actual.id === targetNodeId ? null : actual.id,
+    sourceChatId: journal.sourceChatId,
+    targetChatId: journal.targetLocator.chatId,
+    sourceMk,
+    branchMk,
+    sourceContentHash: stableHistoryHash(sourceContent),
+    branchContentHash: stableHistoryHash(branchContent),
+    originalSelectedMksHash: target.verification.selectedMksHash,
+    acceptedSelectedMksHash: currentVerification.selectedMksHash,
+    eventStateHash: currentVerification.eventStateHash,
+    status: 'accepted',
+  });
+  const persisted = persistHistoryTree(latest);
+  recordEraDiagnostic('wuxia-history-checkout', 'history-branch-mk-identity-reconciled', {
+    transactionId: journal.transactionId,
+    targetNodeId,
+    duplicateNodeId: actual.id === targetNodeId ? null : actual.id,
+    sourceMk,
+    branchMk,
+    acceptedSelectedMksHash: currentVerification.selectedMksHash,
+  });
+  return buildViewState(persisted, state.currentChat);
+}
+
 function commitVerification(
   state: HistoryTreeViewState,
   targetNodeId: string,
   baseline: HistoryVerification | null,
 ): HistoryTreeViewState {
   const verification = readCurrentVerification();
-  if (
-    baseline &&
-    (baseline.selectedMksHash !== verification.selectedMksHash ||
-      baseline.eventStateHash !== verification.eventStateHash)
-  ) {
-    const mksSame = baseline.selectedMksHash === verification.selectedMksHash;
+  const mksSame = acceptsSelectedMksHash(baseline, verification.selectedMksHash);
+  if (baseline && (!mksSame || baseline.eventStateHash !== verification.eventStateHash)) {
     const eventSame = baseline.eventStateHash === verification.eventStateHash;
     const eventDetails = baseline.eventPartHashes
       ? HISTORY_EVENT_STATE_KEYS.map(key => {
