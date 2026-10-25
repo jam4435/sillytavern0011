@@ -40,6 +40,7 @@ interface ApiWriteJob {
   blockContent: object;
   diagnosticIds?: string[];
   transactionIds?: string[];
+  targetMessageId?: number;
 }
 
 const API_WRITE_FLUSH_DELAY = 75;
@@ -130,7 +131,10 @@ function mergeDeleteUnion(target: Record<string, any>, source: Record<string, an
 }
 
 function mergeJobInto(targetJob: ApiWriteJob, sourceJob: ApiWriteJob) {
-  if (targetJob.blockTag !== sourceJob.blockTag) {
+  if (
+    targetJob.blockTag !== sourceJob.blockTag ||
+    targetJob.targetMessageId !== sourceJob.targetMessageId
+  ) {
     return false;
   }
   if (targetJob.blockTag === 'VariableInsert') {
@@ -157,6 +161,7 @@ function mergeAdjacentJobs(jobs: ApiWriteJob[]) {
       blockContent: cloneJson(job.blockContent || {}),
       diagnosticIds: [...(job.diagnosticIds ?? [])],
       transactionIds: [...(job.transactionIds ?? [])],
+      targetMessageId: job.targetMessageId,
     };
     const lastJob = merged[merged.length - 1];
     if (lastJob && mergeJobInto(lastJob, normalizedJob)) {
@@ -274,7 +279,12 @@ async function flushApiWriteQueue() {
   }
 
   apiWriteFlushPromise = (async () => {
-    const jobs = apiWriteQueue.splice(0);
+    // 一次 flush 只处理同一个目标楼层的连续任务，避免不同楼层的事务被合并。
+    const targetMessageId = apiWriteQueue[0]?.targetMessageId;
+    const jobs: ApiWriteJob[] = [];
+    while (apiWriteQueue.length > 0 && apiWriteQueue[0].targetMessageId === targetMessageId) {
+      jobs.push(apiWriteQueue.shift()!);
+    }
     if (jobs.length === 0) {
       return;
     }
@@ -296,18 +306,23 @@ async function flushApiWriteQueue() {
       flushId,
       sourceDiagnosticIds,
       jobCount: jobs.length,
-      phase: 'find-last-ai-message',
+      phase: 'find-target-message',
     });
 
     try {
-      const lastAiMessage = await findLastAiMessage();
-      if (!lastAiMessage) {
-        finishWatchdog('cancelled', { reason: 'last-ai-message-not-found' });
-        logger.warn('flushApiWriteQueue', '找不到任何 AI 消息，无法执行 API 写入。');
-        return;
+      const targetMessage = targetMessageId === undefined
+        ? await findLastAiMessage()
+        : getChatMessages(targetMessageId, { role: 'assistant', include_swipes: true })
+          .find(message => message.message_id === targetMessageId) ?? null;
+      if (!targetMessage) {
+        const message = targetMessageId === undefined
+          ? '找不到任何 AI 消息，无法执行 API 写入。'
+          : `指定的 assistant 楼层 ${targetMessageId} 不存在，已取消写入；不会回退到最新楼层。`;
+        logger.warn('flushApiWriteQueue', message);
+        throw new Error(message);
       }
 
-      const originalContent = getMessageContent(lastAiMessage) ?? '';
+      const originalContent = getMessageContent(targetMessage) ?? '';
       const compactedOriginal = compressVariableBlocksInText(originalContent);
       const mergedJobs = mergeAdjacentJobs(jobs);
       const appendedBlocks = mergedJobs.map(buildVariableBlock).join('');
@@ -320,7 +335,7 @@ async function flushApiWriteQueue() {
           ' 个 API 任务，合并后 ' +
           mergedJobs.length +
           ' 个变量块到消息 ID ' +
-          lastAiMessage.message_id +
+          targetMessage.message_id +
           '...',
       );
       updateEraDiagnosticState('apiWriteFlush', {
@@ -328,7 +343,7 @@ async function flushApiWriteQueue() {
         sourceDiagnosticIds,
         jobCount: jobs.length,
         mergedJobCount: mergedJobs.length,
-        messageId: lastAiMessage.message_id,
+        messageId: targetMessage.message_id,
         phase: 'set-chat-message',
       });
       recordEraDiagnostic(
@@ -336,7 +351,7 @@ async function flushApiWriteQueue() {
         'flush-message-selected',
         {
           sourceDiagnosticIds,
-          messageId: lastAiMessage.message_id,
+          messageId: targetMessage.message_id,
           jobCount: jobs.length,
           mergedJobCount: mergedJobs.length,
           originalContentLength: originalContent.length,
@@ -346,23 +361,23 @@ async function flushApiWriteQueue() {
         },
         flushId,
       );
-      await updateMessageContent(lastAiMessage, newContent, flushId);
+      await updateMessageContent(targetMessage, newContent, flushId);
 
       updateEraDiagnosticState('apiWriteFlush', {
         flushId,
         sourceDiagnosticIds,
         jobCount: jobs.length,
         mergedJobCount: mergedJobs.length,
-        messageId: lastAiMessage.message_id,
+        messageId: targetMessage.message_id,
         phase: 'emit-api-write',
       });
       const emittedAt = Date.now();
       // 在 emit 之前订阅确认，且保持 flush 锁至 ERA 实际完成，避免同楼事务写入交错。
-      const acknowledgement = waitForTransactionWriteDone(lastAiMessage.message_id, transactionIds);
+      const acknowledgement = waitForTransactionWriteDone(targetMessage.message_id, transactionIds);
       const emission = eventEmit(ERA_EVENT_EMITTER.API_WRITE, {
         flushId,
         sourceDiagnosticIds,
-        messageId: lastAiMessage.message_id,
+        messageId: targetMessage.message_id,
         ...(transactionIds.length > 0 ? { transactionIds } : {}),
         ...(transactionIds.length === 1 ? { transactionId: transactionIds[0] } : {}),
       });
@@ -372,7 +387,7 @@ async function flushApiWriteQueue() {
             'api-command',
             'api-write-listeners-settled',
             {
-              messageId: lastAiMessage.message_id,
+              messageId: targetMessage.message_id,
               durationMs: Date.now() - emittedAt,
             },
             flushId,
@@ -383,7 +398,7 @@ async function flushApiWriteQueue() {
             'api-write-listeners-failed',
             error,
             {
-              messageId: lastAiMessage.message_id,
+              messageId: targetMessage.message_id,
               durationMs: Date.now() - emittedAt,
             },
             flushId,
@@ -394,13 +409,13 @@ async function flushApiWriteQueue() {
       const confirmed = await acknowledgement.promise;
       if (!confirmed && transactionIds.length > 0) {
         recordEraDiagnostic('api-command', 'api-transaction-ack-timeout', {
-          flushId, messageId: lastAiMessage.message_id, transactionIds,
+          flushId, messageId: targetMessage.message_id, transactionIds,
           reason: '未收到对应 era:writeDone，无法确认 EditLog 已完成写入',
         }, flushId);
         logger.warn('flushApiWriteQueue', '事件事务未能在 15 秒内确认 ERA 记账完成', transactionIds);
       }
       finishWatchdog(confirmed ? 'success' : 'error', {
-        messageId: lastAiMessage.message_id,
+        messageId: targetMessage.message_id,
         mergedJobCount: mergedJobs.length,
         transactionIds,
       });
@@ -629,6 +644,7 @@ function performApiWrites(jobs: ApiWriteJob[]) {
       blockContent: cloneJson(job.blockContent || {}),
       diagnosticIds: [diagnosticId],
       transactionIds: [...(job.transactionIds ?? [])],
+      targetMessageId: job.targetMessageId,
     } satisfies ApiWriteJob;
   });
 
@@ -740,6 +756,12 @@ function assertValidTransactionDetail(detail: unknown): asserts detail is EraTra
   }
 
   const transaction = detail as Partial<EraTransactionDetail>;
+  if (
+    transaction.targetMessageId !== undefined &&
+    (!Number.isInteger(transaction.targetMessageId) || transaction.targetMessageId < 0)
+  ) {
+    throw new TypeError('era:transactionByObject 的 targetMessageId 必须是非负整数。');
+  }
   if (typeof transaction.transactionId !== 'string' || transaction.transactionId.trim() === '') {
     throw new TypeError('era:transactionByObject 的 transactionId 必须是非空字符串。');
   }
@@ -775,6 +797,7 @@ export function transactionByObject(detail: EraTransactionDetail) {
         blockTag: getTransactionBlockTag(operation),
         blockContent: operation.payload,
         transactionIds: [transactionId],
+        targetMessageId: detail.targetMessageId,
       }) satisfies ApiWriteJob,
   );
   performApiWrites(jobs);
