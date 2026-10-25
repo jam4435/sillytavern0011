@@ -465,6 +465,31 @@ describe('history tree v2 scanning', () => {
     expect(Object.values(second.tree.nodes).every(node => node.locators.length === 1)).toBe(true);
   });
 
+  it('旧内容身份在分叉后首次出现 MK 时保持稳定，并拒绝合并不同 MK', async () => {
+    currentChat().messages = [{ message_id: 0, role: 'assistant', message: '第一回' }];
+    const initial = await scanCurrentChat();
+    const originalId = initial.currentNodeId!;
+
+    currentChat().messages[0].message =
+      '<era_data>{"era-message-key"="mk-first","era-message-type"="assistant"}</era_data>第一回';
+    const firstMk = await scanCurrentChat();
+    expect(firstMk.currentNodeId).toBe(originalId);
+    expect(Object.keys(firstMk.tree.nodes)).toHaveLength(1);
+    expect(firstMk.tree.nodes[originalId].messageKey).toBeNull();
+    expect(firstMk.tree.nodes[originalId].messageKeyAliases).toEqual(['mk-first']);
+
+    const repeated = await scanCurrentChat();
+    expect(repeated.currentNodeId).toBe(originalId);
+    expect(Object.keys(repeated.tree.nodes)).toHaveLength(1);
+
+    currentChat().messages[0].message =
+      '<era_data>{"era-message-key"="mk-other","era-message-type"="assistant"}</era_data>第一回';
+    const differentMk = await scanCurrentChat();
+    expect(differentMk.currentNodeId).not.toBe(originalId);
+    expect(Object.keys(differentMk.tree.nodes)).toHaveLength(2);
+    expect(differentMk.tree.nodes[originalId].messageKeyAliases).toEqual(['mk-first']);
+  });
+
   it('finalizeCurrentTurn 幂等封存 verification，且事件 hash 排除前端派生结算字段', async () => {
     currentChat().messages = [{ message_id: 0, role: 'assistant', message: '开场' }];
     currentChat().variables = {
@@ -688,6 +713,30 @@ describe('history tree v2 scanning', () => {
 });
 
 describe('history checkout', () => {
+  it('分叉后同一正文首次出现 MK 时复用原节点并继续严格校验', async () => {
+    currentChat().messages = [{ message_id: 0, role: 'assistant', message: '第一回' }];
+    currentChat().variables.ERAMetaData = { SelectedMks: [null] };
+    const scanned = await scanCurrentChat();
+    const targetId = scanned.currentNodeId!;
+
+    eventOn('manual_full_sync', () => {
+      if (!currentChatId.startsWith('fork-')) return;
+      currentChat().messages[0].message =
+        '<era_data>{"era-message-key"="mk-opening","era-message-type"="assistant"}</era_data>第一回';
+      currentChat().variables.ERAMetaData = { SelectedMks: ['mk-opening'] };
+    });
+
+    const result = await checkoutNode(targetId, { forceBranch: true });
+
+    expect(result.status).toBe('commit');
+    expect(result.currentNodeId).toBe(targetId);
+    const tree = loadHistoryTree();
+    expect(Object.keys(tree.nodes)).toHaveLength(1);
+    expect(tree.nodes[targetId].messageKey).toBeNull();
+    expect(tree.nodes[targetId].messageKeyAliases).toContain('mk-opening');
+    expect(tree.nodes[targetId].verification?.selectedMksHash).toBe(stableHistoryHash(['mk-opening']));
+  });
+
   it('journal 创建前失败仍保存原始异常与失败步骤，不创建恢复锁；下一次成功后清理诊断', async () => {
     currentChat().messages = [{ message_id: 0, role: 'assistant', message: '原始节点' }];
     const scanned = await scanCurrentChat();
