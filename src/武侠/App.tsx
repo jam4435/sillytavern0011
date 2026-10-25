@@ -827,10 +827,8 @@ const App: React.FC = () => {
   );
 
   const handleOpenLatestReplyEditor = useCallback(() => {
-    if (isLoading || historyMutationPending) {
-      showError('当前回合、历史分叉或聊天改名仍在处理中，暂时不能编辑聊天楼层。');
-      return;
-    }
+    // 按钮已通过 disabled 拦截；此处静默兜底，避免状态更新竞态时弹出错误提示。
+    if (isLoading || historyMutationPending) return;
     if (getIsExtraVariableUpdating()) {
       showError('额外变量仍在写入或校验中，请稍后再编辑聊天楼层。');
       return;
@@ -2016,7 +2014,8 @@ const App: React.FC = () => {
                   type="button"
                   className={`header-action-btn mobile-turn-edit-btn ${canEditLatestReply ? '' : 'is-unavailable'}`}
                   onClick={handleOpenLatestReplyEditor}
-                  title={canEditLatestReply ? '编辑当前显示回合的 User 输入与 AI 输出' : '当前回复暂不可编辑，点击查看原因'}
+                  disabled={!canEditLatestReply}
+                  title={isLoading ? '正在生成回复，暂不可编辑' : canEditLatestReply ? '编辑当前显示回合的 User 输入与 AI 输出' : '当前回复暂不可编辑'}
                   aria-label="编辑当前聊天回合"
                   data-wuxia-automation="open-latest-reply-editor-mobile"
                   data-wuxia-editable={canEditLatestReply ? 'true' : 'false'}
