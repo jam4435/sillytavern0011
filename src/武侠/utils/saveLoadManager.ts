@@ -1357,6 +1357,61 @@ async function readHistoryUserMessage(chat: HistoryChatIdentity, messageId: numb
   return cleanDraftUserMessage(String(rawMessage.mes ?? rawMessage.message ?? ''));
 }
 
+/** Read a precise assistant swipe from the source chat without navigating away from the branch. */
+async function readHistoryAssistantSwipeText(
+  chat: HistoryChatIdentity,
+  messageId: number,
+  swipeId: number,
+): Promise<string> {
+  const current = await readCurrentChatIdentity();
+  if (current.id === chat.id) {
+    const message = getChatMessages(messageId, {
+      role: 'all',
+      hide_state: 'all',
+      include_swipes: true,
+    })[0] as TavernHistoryMessage | undefined;
+    if (!message || getMessageRole(message) !== 'assistant') return '';
+    return getSwipeTexts(message).texts[swipeId] ?? '';
+  }
+
+  const groupId = getCurrentGroupId();
+  const endpoint = groupId ? '/api/chats/group/get' : '/api/chats/get';
+  const requestBody = groupId
+    ? { id: chat.id }
+    : (() => {
+        const character = getCurrentCharacterIdentity();
+        return { ch_name: character.name, file_name: chat.id, avatar_url: character.avatarUrl };
+      })();
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: SillyTavern.getRequestHeaders(),
+      body: JSON.stringify(requestBody),
+      cache: 'no-cache',
+    });
+  } catch (error) {
+    throw new Error(`无法读取历史分支中的 assistant 消息：${chat.name}（${chat.id}）`, { cause: error });
+  }
+  if (!response.ok) {
+    if (response.status === 404) throw new HistoryChatUnavailableError(chat.id, chat.name);
+    throw new Error(`无法读取历史分支中的 assistant 消息（HTTP ${response.status}）。`);
+  }
+  const payload: unknown = await response.json();
+  if (!Array.isArray(payload)) throw new HistoryChatUnavailableError(chat.id, chat.name);
+  const messages = payload.filter(
+    (item): item is Record<string, unknown> => isRecord(item) && ('mes' in item || 'message' in item),
+  );
+  const rawMessage = messages[messageId];
+  if (!rawMessage || rawMessage.is_user === true || rawMessage.is_system === true) return '';
+  if (Array.isArray(rawMessage.swipes)) {
+    const swipe = rawMessage.swipes[swipeId];
+    return typeof swipe === 'string' ? swipe : '';
+  }
+  if (swipeId !== 0 && Number(rawMessage.swipe_id ?? 0) !== swipeId) return '';
+  return String(rawMessage.mes ?? rawMessage.message ?? '');
+}
+
 async function openHistoryChatById(chatId: string): Promise<void> {
   const groupId = getCurrentGroupId();
   if (groupId) {
