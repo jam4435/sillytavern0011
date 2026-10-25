@@ -4,6 +4,7 @@
  */
 
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
+import type { EraTransactionDetail, EraTransactionOperation } from '../../ERA变量框架/utils/constants';
 import { dataLogger } from './logger';
 import type {
   SummarySettings,
@@ -74,20 +75,18 @@ let isSummarizing = false;
 export const BIOGRAPHY_RECENT_ENTRIES_TO_KEEP = 5;
 export const BIOGRAPHY_COMPRESSION_BATCH_SIZE = 10;
 const LEGACY_SUMMARY_META_KEY = '【总结】';
-const COMPRESSED_BIOGRAPHY_KEY_RE = /^阶段经历(\d+)$/;
-const GAME_DATE_PREFIX_RE =
-  /^\((\d{3,4})\.(\d{1,2})\.(\d{1,2})(?:\s*[~～-]\s*(\d{3,4})\.(\d{1,2})\.(\d{1,2}))?\)\s*/;
+// 兼容旧的“阶段经历1”和带标题的新键名“阶段经历1-初入江湖”。
+const COMPRESSED_BIOGRAPHY_KEY_RE = /^阶段经历(\d+)/;
+const SUMMARY_STAGE_KEY_RE = /^阶段经历([1-9]\d*)(.+)$/;
+const SUMMARY_DATE_PREFIX_RE =
+  /^[（(](?:(?:\d{3,4}\.\d{1,2}\.\d{1,2})(?:\s*[~～—-]\s*\d{3,4}\.\d{1,2}\.\d{1,2})?|旧记录时间不详|时间不详)[）)]\s*\S/;
+const SUMMARY_DATE_RANGE_RE =
+  /^[（(](\d{3,4})\.(\d{1,2})\.(\d{1,2})(?:\s*[~～—-]\s*(\d{3,4})\.(\d{1,2})\.(\d{1,2}))?[）)]/;
 
 export interface BiographyCompressionPlan {
   originalBiography: Record<string, string>;
   sourceEntries: Record<string, string>;
   sourceKeys: string[];
-  summaryKey: string;
-}
-
-interface ParsedBiographyDate {
-  text: string;
-  sortValue: number;
 }
 
 // =========================================
@@ -102,40 +101,71 @@ function isCountedBiographyKey(key: string): boolean {
   return !key.startsWith('$') && key !== LEGACY_SUMMARY_META_KEY && !isCompressedBiographyKey(key);
 }
 
-function parseBiographyDatePrefix(value: string): ParsedBiographyDate[] {
-  const match = String(value || '').match(GAME_DATE_PREFIX_RE);
-  if (!match) return [];
-
-  const toDate = (year: string, month: string, day: string): ParsedBiographyDate => {
-    const y = Number(year);
-    const m = Number(month);
-    const d = Number(day);
-    return { text: `${y}.${m}.${d}`, sortValue: y * 10000 + m * 100 + d };
-  };
-
-  const dates = [toDate(match[1], match[2], match[3])];
-  if (match[4] && match[5] && match[6]) {
-    dates.push(toDate(match[4], match[5], match[6]));
-  }
-  return dates;
-}
-
-function getBiographyDateRangePrefix(entries: Record<string, string>): string {
-  const dates = Object.values(entries).flatMap(parseBiographyDatePrefix);
-  if (dates.length === 0) return '(旧记录时间不详)';
-
-  dates.sort((left, right) => left.sortValue - right.sortValue);
-  const first = dates[0];
-  const last = dates[dates.length - 1];
-  return first.sortValue === last.sortValue ? `(${first.text})` : `(${first.text}~${last.text})`;
-}
-
-function getNextSummaryKey(biography: Record<string, string>): string {
+function getNextStageMemoryNumber(biography: Record<string, string>): number {
   const highest = Object.keys(biography).reduce((max, key) => {
     const match = key.match(COMPRESSED_BIOGRAPHY_KEY_RE);
     return match ? Math.max(max, Number(match[1]) || 0) : max;
   }, 0);
-  return `阶段经历${highest + 1}`;
+  return highest + 1;
+}
+
+/**
+ * 将模型返回的阶段经历编号调整到现有记忆之后，避免覆盖旧阶段记忆。
+ * 模型输出中的编号只用于标识本次响应的顺序，持久化编号由程序统一分配。
+ */
+export function rebaseStageMemoryKeys(
+  stageMemories: Record<string, string>,
+  existingBiography: Record<string, string>,
+): Record<string, string> {
+  let nextNumber = getNextStageMemoryNumber(existingBiography);
+  const result: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(stageMemories)) {
+    const match = key.match(SUMMARY_STAGE_KEY_RE);
+    if (!match) {
+      throw new Error(`阶段记忆键名格式错误：${key}。键名必须以“阶段经历数字+标题”开头。`);
+    }
+
+    const cleanValue = value.trim();
+    if (!cleanValue) throw new Error(`阶段记忆“${key}”的内容为空。`);
+
+    const rebasedKey = `阶段经历${nextNumber}${match[2]}`;
+    if (Object.prototype.hasOwnProperty.call(existingBiography, rebasedKey) ||
+        Object.prototype.hasOwnProperty.call(result, rebasedKey)) {
+      throw new Error(`阶段记忆键名冲突：${rebasedKey}。`);
+    }
+    result[rebasedKey] = cleanValue;
+    nextNumber += 1;
+  }
+
+  if (Object.keys(result).length === 0) throw new Error('总结模型没有返回任何阶段记忆。');
+  return result;
+}
+
+function parseGameDateRange(value: string): { start: number; end: number } | null {
+  const match = value.trim().match(SUMMARY_DATE_RANGE_RE);
+  if (!match) return null;
+
+  const toDateNumber = (year: string, month: string, day: string) =>
+    Number(year) * 10000 + Number(month) * 100 + Number(day);
+  const start = toDateNumber(match[1], match[2], match[3]);
+  const end = match[4] && match[5] && match[6]
+    ? toDateNumber(match[4], match[5], match[6])
+    : start;
+  if (end < start) return null;
+  return { start, end };
+}
+
+function getSourceDateBounds(sourceEntries: Record<string, string>): { start: number; end: number } | null {
+  const ranges = Object.values(sourceEntries)
+    .map(parseGameDateRange)
+    .filter((range): range is { start: number; end: number } => range !== null);
+  if (ranges.length === 0) return null;
+
+  return {
+    start: Math.min(...ranges.map(range => range.start)),
+    end: Math.max(...ranges.map(range => range.end)),
+  };
 }
 
 export function buildBiographyCompressionPlan(
@@ -154,30 +184,14 @@ export function buildBiographyCompressionPlan(
     originalBiography,
     sourceEntries,
     sourceKeys: Object.keys(sourceEntries),
-    summaryKey: getNextSummaryKey(originalBiography),
   };
-}
-
-export function buildBiographyStageSummaryValue(
-  summaryContent: string,
-  sourceEntries: Record<string, string>,
-): string {
-  const cleanSummary = summaryContent
-    .split('\n')
-    .map(line => line.replace(/^[-•*]\s*/, '').replace(/^\d+\.\s*/, '').trim())
-    .filter(Boolean)
-    .join('；')
-    .replace(/；+/g, '；')
-    .trim();
-
-  if (!cleanSummary) throw new Error('人物经历总结为空');
-  return `${getBiographyDateRangePrefix(sourceEntries)} ${cleanSummary}`;
 }
 
 export function mergeBiographyCompression(
   plan: BiographyCompressionPlan,
-  summaryValue: string,
+  stageMemories: Record<string, string>,
 ): Record<string, string> {
+  const rebasedStageMemories = rebaseStageMemoryKeys(stageMemories, plan.originalBiography);
   const sourceKeys = new Set(plan.sourceKeys);
   const result: Record<string, string> = {};
   let inserted = false;
@@ -187,7 +201,7 @@ export function mergeBiographyCompression(
 
     if (sourceKeys.has(key)) {
       if (!inserted) {
-        result[plan.summaryKey] = summaryValue;
+        Object.assign(result, rebasedStageMemories);
         inserted = true;
       }
       continue;
@@ -196,8 +210,61 @@ export function mergeBiographyCompression(
     result[key] = value;
   }
 
-  if (!inserted) result[plan.summaryKey] = summaryValue;
+  if (!inserted) Object.assign(result, rebasedStageMemories);
   return result;
+}
+
+/**
+ * 构造总结回写的 ERA 操作。
+ *
+ * 正常对象结构只删除本批最旧经历和废弃的旧总结元数据，再一次性插入所有新阶段记忆；
+ * 旧版字符串结构无法删除子键，因此先删除整个人物经历字段，再插入保留近期条目与新阶段记忆。
+ */
+export function buildBiographyCompressionOperations(
+  characterId: string,
+  plan: BiographyCompressionPlan,
+  stageMemories: Record<string, string>,
+  options: { replaceLegacyString?: boolean } = {},
+): EraTransactionOperation[] {
+  const characterName = characterId.startsWith('character:')
+    ? characterId.slice('character:'.length)
+    : characterId;
+
+  const makePayload = (biographyEntries: Record<string, unknown>): Record<string, unknown> => {
+    if (characterId === 'user') {
+      return { user数据: { 人物经历: biographyEntries } };
+    }
+    return {
+      角色数据: {
+        [characterName]: { 人物经历: biographyEntries },
+      },
+    };
+  };
+
+  if (options.replaceLegacyString) {
+    return [
+      { type: 'delete', payload: makePayload({}) },
+      {
+        type: 'insert',
+        payload: makePayload(mergeBiographyCompression(plan, stageMemories)),
+      },
+    ];
+  }
+
+  const keysToDelete = [...plan.sourceKeys];
+  if (Object.prototype.hasOwnProperty.call(plan.originalBiography, LEGACY_SUMMARY_META_KEY)) {
+    keysToDelete.push(LEGACY_SUMMARY_META_KEY);
+  }
+  const deleteEntries = Object.fromEntries(keysToDelete.map(key => [key, {}]));
+  const rebasedStageMemories = rebaseStageMemoryKeys(stageMemories, plan.originalBiography);
+
+  return [
+    { type: 'delete', payload: makePayload(deleteEntries) },
+    {
+      type: 'insert',
+      payload: makePayload(rebasedStageMemories),
+    },
+  ];
 }
 
 /**
@@ -402,33 +469,114 @@ export function formatPromptForCharacter(
 // =========================================
 
 /**
- * 解析总结结果，提取 <summary> 标签内容
- *
- * @param response AI 返回的原始文本
- * @returns 提取的总结内容，如果没有找到标签则返回整个响应
+ * 严格解析人物经历压缩模型返回的 JSON 键值对。
+ * 格式错误时直接拒绝写回，避免把解释文字或错误结构写进人物经历。
  */
-function parseSummaryResponse(response: string): string {
-  const match = response.match(/<summary>([\s\S]*?)<\/summary>/i);
-  if (match) {
-    return match[1].trim();
+export function parseSummaryResponse(response: string, maxStageMemories?: number, sourceEntries?: Record<string, string>): Record<string, string> {
+  const raw = response.trim();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('总结模型输出不是合法 JSON；已取消写回以保护原始人物经历。');
   }
-  // 如果没有找到 summary 标签，返回整个响应（去除首尾空白）
-  return response.trim();
+
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error('总结模型必须返回 JSON 对象，键为阶段记忆名称，值为记忆内容。');
+  }
+
+  const entries = Object.entries(parsed as Record<string, unknown>);
+  if (entries.length === 0) throw new Error('总结模型返回了空 JSON 对象。');
+  if (maxStageMemories !== undefined && entries.length > maxStageMemories) {
+    throw new Error(`总结模型返回了 ${entries.length} 条阶段记忆，多于本批 ${maxStageMemories} 条输入经历；已取消写回。`);
+  }
+
+  // JSON.parse 会静默覆盖重复键，因此额外检查原始文本中的键数量。
+  const rawKeys = [...raw.matchAll(/"((?:\\.|[^"\\])*)"\s*:/g)];
+  if (rawKeys.length !== entries.length) {
+    throw new Error('总结 JSON 存在重复键或非预期的嵌套结构；已取消写回。');
+  }
+
+  const sourceDateBounds = sourceEntries ? getSourceDateBounds(sourceEntries) : null;
+  const result: Record<string, string> = {};
+  entries.forEach(([key, value], index) => {
+    const match = key.match(SUMMARY_STAGE_KEY_RE);
+    if (!match) {
+      throw new Error(`总结 JSON 的键名“${key}”无效；必须以“阶段经历N+标题”命名。`);
+    }
+    if (Number(match[1]) !== index + 1) {
+      throw new Error('总结 JSON 的阶段经历编号必须从 1 开始，按输出顺序连续递增。');
+    }
+    if (typeof value !== 'string' || !value.trim()) {
+      throw new Error(`阶段记忆“${key}”必须对应非空字符串。`);
+    }
+
+    const cleanValue = value.trim();
+    if (!SUMMARY_DATE_PREFIX_RE.test(cleanValue)) {
+      throw new Error(
+        `阶段记忆“${key}”缺少有效的游戏内时间前缀；请使用“（1200.11.1~1200.11.5）”或“（旧记录时间不详）”。`,
+      );
+    }
+
+    const outputDateRange = parseGameDateRange(cleanValue);
+    if (outputDateRange && sourceEntries) {
+      if (!sourceDateBounds) {
+        throw new Error(`阶段记忆“${key}”使用了日期，但输入经历中没有可识别的游戏内日期。`);
+      }
+      if (outputDateRange.start < sourceDateBounds.start || outputDateRange.end > sourceDateBounds.end) {
+        throw new Error(`阶段记忆“${key}”的日期范围超出本批原始经历，已取消写回。`);
+      }
+    } else if (!outputDateRange && !/^[（(](?:旧记录时间不详|时间不详)[）)]/.test(cleanValue)) {
+      throw new Error(`阶段记忆“${key}”的日期范围无效或结束时间早于开始时间。`);
+    }
+    result[key] = cleanValue;
+  });
+
+  return result;
 }
 
-function readCurrentCharacterBiography(characterId: string): Record<string, string> {
+function readCurrentCharacterBiographyValue(
+  characterId: string,
+): Record<string, string> | string | undefined {
   const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
   const statData = variables?.stat_data as Record<string, unknown> | undefined;
-  if (!statData) return {};
+  if (!statData) return undefined;
 
   if (characterId === 'user') {
     const userData = statData.user数据 as CharacterDataForSummary | undefined;
-    return normalizeBiography(userData?.人物经历);
+    return userData?.人物经历;
   }
 
   const characterName = characterId.replace('character:', '');
   const characters = statData.角色数据 as Record<string, CharacterDataForSummary> | undefined;
-  return normalizeBiography(characters?.[characterName]?.人物经历);
+  return characters?.[characterName]?.人物经历;
+}
+
+function readCurrentCharacterBiography(characterId: string): Record<string, string> {
+  return normalizeBiography(readCurrentCharacterBiographyValue(characterId));
+}
+
+function getLatestAssistantMessageId(): number | null {
+  try {
+    const messages = getChatMessages('0-{{lastMessageId}}', {
+      role: 'assistant',
+      include_swipes: true,
+    });
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const messageId = messages[index]?.message_id;
+      if (typeof messageId === 'number' && Number.isInteger(messageId) && messageId >= 0) return messageId;
+    }
+  } catch (error) {
+    dataLogger.warn('[summaryManager] 无法读取当前 assistant 楼层 ID', error);
+  }
+  return null;
+}
+
+function createSummaryTransactionId(targetMessageId: number, characterId: string): string {
+  const randomSuffix = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `summary:${targetMessageId}:${characterId}:${randomSuffix}`;
 }
 
 /**
@@ -441,6 +589,7 @@ function readCurrentCharacterBiography(characterId: string): Record<string, stri
 export async function executeSummary(
   settings: SummarySettings,
   character: PendingCharacterSummary,
+  targetMessageId: number,
 ): Promise<CharacterSummaryResult> {
   dataLogger.log(`[summaryManager] 开始总结角色: ${character.displayName}`);
 
@@ -452,9 +601,9 @@ export async function executeSummary(
   };
 
   try {
-    const latestBiography = readCurrentCharacterBiography(character.characterId);
-    result.originalCount = getBiographyEntryCount(latestBiography);
-    const compressionPlan = buildBiographyCompressionPlan(latestBiography);
+    const initialBiography = readCurrentCharacterBiography(character.characterId);
+    result.originalCount = getBiographyEntryCount(initialBiography);
+    const compressionPlan = buildBiographyCompressionPlan(initialBiography);
     if (!compressionPlan) {
       result.success = true;
       dataLogger.log(`[summaryManager] 角色 ${character.displayName} 没有足够旧经历可分块压缩，跳过`);
@@ -481,38 +630,61 @@ export async function executeSummary(
     const response = await requestSummaryText({ prompt, settings });
     dataLogger.log(`[summaryManager] 收到响应，长度: ${response.length}`);
 
-    // 3. 解析响应
-    const summaryContent = parseSummaryResponse(response);
-    result.summaryContent = summaryContent;
+    // 3. 严格解析模型返回的多条阶段记忆 JSON
+    const summaryEntries = parseSummaryResponse(response, Object.keys(compressionPlan.sourceEntries).length, compressionPlan.sourceEntries);
 
-    // 4. 只把本批旧经历替换为一个带游戏时间范围的阶段经历。
-    const summaryValue = buildBiographyStageSummaryValue(summaryContent, compressionPlan.sourceEntries);
-    const newBiography = mergeBiographyCompression(compressionPlan, summaryValue);
-
-    // 构建更新数据
-    const updateData: Record<string, unknown> = {};
-    if (character.characterId === 'user') {
-      updateData.user数据 = { 人物经历: newBiography };
-    } else {
-      const characterName = character.characterId.replace('character:', '');
-      updateData.角色数据 = {
-        [characterName]: { 人物经历: newBiography },
-      };
+    // 4. 回写前重新读取人物经历，防止模型请求期间新增或编辑的经历被覆盖/误删。
+    const latestRawBiography = readCurrentCharacterBiographyValue(character.characterId);
+    const latestBiography = normalizeBiography(latestRawBiography);
+    const changedSourceKeys = compressionPlan.sourceKeys.filter(
+      key => !Object.prototype.hasOwnProperty.call(latestBiography, key) ||
+        latestBiography[key] !== compressionPlan.sourceEntries[key],
+    );
+    if (changedSourceKeys.length > 0) {
+      throw new Error(
+        `人物经历在总结期间已变化（${changedSourceKeys.join('、')}），已取消写回以保护最新数据。`,
+      );
     }
 
-    dataLogger.log('[summaryManager] 写入更新数据:', JSON.stringify(updateData, null, 2));
+    const writePlan: BiographyCompressionPlan = {
+      ...compressionPlan,
+      originalBiography: latestBiography,
+    };
+    const rebasedStageEntries = rebaseStageMemoryKeys(summaryEntries, latestBiography);
+    result.summaryContent = JSON.stringify(rebasedStageEntries, null, 2);
+    const operations = buildBiographyCompressionOperations(
+      character.characterId,
+      writePlan,
+      summaryEntries,
+      { replaceLegacyString: typeof latestRawBiography === 'string' },
+    );
+    const transactionId = createSummaryTransactionId(targetMessageId, character.characterId);
+    const transaction: EraTransactionDetail = {
+      transactionId,
+      targetMessageId,
+      operations,
+    };
 
-    // 使用 updateByObject 替换人物经历
+    dataLogger.log('[summaryManager] 使用固定楼层的 Delete + Insert 事务写回总结:', {
+      targetMessageId,
+      characterId: character.characterId,
+      deletedKeys: writePlan.sourceKeys,
+      insertedKeys: Object.keys(rebasedStageEntries),
+      legacyStringBiography: typeof latestRawBiography === 'string',
+    });
+
     await emitSourcedEraVariableWriteAndWait({
       source: 'frontend',
-      operation: 'update',
+      operation: 'replace',
       reason: 'summary-write',
-      eventName: 'era:updateByObject',
+      eventName: 'era:transactionByObject',
       attribution: 'background',
-      detail: updateData,
+      detail: transaction,
       expectedAction: 'apiWrite',
-      timeoutMs: 3000,
-      timeoutMessage: '人物经历总结写回请求已发出，但 ERA 没有确认写入完成。',
+      expectedMessageId: targetMessageId,
+      expectedTransactionId: transactionId,
+      timeoutMs: 15000,
+      timeoutMessage: `人物经历总结已写入楼层 ${targetMessageId}，但 ERA 未在时限内确认 Delete + Insert 事务。`,
     });
 
     result.success = true;
@@ -536,6 +708,7 @@ export async function executeSummary(
 export async function executeAllPendingSummaries(
   settings: SummarySettings,
   characters?: PendingCharacterSummary[],
+  targetMessageId?: number,
 ): Promise<BatchSummaryResult> {
   const result: BatchSummaryResult = {
     success: false,
@@ -560,13 +733,18 @@ export async function executeAllPendingSummaries(
     return result;
   }
 
+  const resolvedTargetMessageId = targetMessageId ?? getLatestAssistantMessageId();
+  if (!Number.isInteger(resolvedTargetMessageId) || (resolvedTargetMessageId as number) < 0) {
+    throw new Error('无法确定总结写回的 assistant 楼层，已取消总结以避免写入错误楼层。');
+  }
+
   isSummarizing = true;
   dataLogger.log(`[summaryManager] 开始批量总结，共 ${targetCharacters.length} 个角色`);
 
   try {
     // 顺序执行总结（避免 API 过载）
     for (const character of targetCharacters) {
-      const summaryResult = await executeSummary(settings, character);
+      const summaryResult = await executeSummary(settings, character, resolvedTargetMessageId as number);
       result.results.push(summaryResult);
       result.totalProcessed++;
 

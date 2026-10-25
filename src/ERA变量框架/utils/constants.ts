@@ -120,6 +120,8 @@ export type EraTransactionOperation = {
 
 export interface EraTransactionDetail {
   transactionId: string;
+  /** 将 API 变量写入固定到指定 assistant 楼层；省略时沿用最后一条 AI 消息。 */
+  targetMessageId?: number;
   operations: EraTransactionOperation[];
 }
 

@@ -31,9 +31,9 @@ export interface UseSummaryDetectionOptions {
  * 自动总结检测 Hook
  *
  * 功能：
- * 1. 监听 MESSAGE_RECEIVED 事件
- * 2. 每回合检测角色人物经历条目数
- * 3. 当满足阈值条件时自动触发总结
+ * 1. 监听 wuxia:turn-events-settled 成功事件
+ * 2. 使用该回合的 assistant messageId 检测角色人物经历条目数
+ * 3. 当满足阈值条件时，将总结事务写回触发楼层
  *
  * @param options 配置选项
  */
@@ -58,7 +58,7 @@ export function useSummaryDetection({
   onStatusChangeRef.current = onStatusChange;
 
   // 检测并执行总结的核心函数
-  const checkAndExecuteSummary = useCallback(async () => {
+  const checkAndExecuteSummary = useCallback(async (triggeringMessageId: number) => {
     const settings = settingsRef.current;
 
     // 如果未启用自动总结，跳过
@@ -95,7 +95,11 @@ export function useSummaryDetection({
       dataLogger.log('[useSummaryDetection] 触发自动总结:', triggerResult.triggerReason);
 
       try {
-        const result = await executeAllPendingSummaries(settings, triggerResult.pendingCharacters);
+        const result = await executeAllPendingSummaries(
+          settings,
+          triggerResult.pendingCharacters,
+          triggeringMessageId,
+        );
         dataLogger.log('[useSummaryDetection] 总结完成:', result);
         onCompleteRef.current?.(result);
       } catch (error) {
@@ -107,24 +111,36 @@ export function useSummaryDetection({
     }
   }, []);
 
-  // 监听消息接收事件
+  // 只在武侠前端确认本回合事件结算成功后检测，避免依赖宿主不保证触发的 MESSAGE_RECEIVED。
   useEffect(() => {
-    // 消息接收事件处理器
-    const handleMessageReceived = () => {
-      dataLogger.log('[useSummaryDetection] 收到 MESSAGE_RECEIVED 事件');
-      // 延迟执行，确保变量已更新
-      setTimeout(() => {
-        checkAndExecuteSummary();
-      }, 500);
-    };
+    const listener = eventOn(
+      'wuxia:turn-events-settled',
+      (detail: { status?: string; messageId?: number; roundId?: string }) => {
+        if (detail?.status !== 'success') {
+          dataLogger.log('[useSummaryDetection] 回合结算未成功，跳过自动总结', {
+            messageId: detail?.messageId,
+            status: detail?.status,
+          });
+          return;
+        }
 
-    // 注册事件监听
-    dataLogger.log('[useSummaryDetection] 注册 MESSAGE_RECEIVED 事件监听');
-    const listener = eventOn('MESSAGE_RECEIVED', handleMessageReceived);
+        if (!Number.isInteger(detail.messageId) || (detail.messageId as number) < 0) {
+          dataLogger.warn('[useSummaryDetection] 回合结算成功事件缺少有效 messageId，跳过自动总结');
+          onErrorRef.current?.(new Error('自动总结未启动：回合结算事件没有有效的写回楼层 ID。'));
+          return;
+        }
 
-    // 清理函数
+        dataLogger.log('[useSummaryDetection] 收到回合结算成功事件，固定总结写回楼层', {
+          messageId: detail.messageId,
+          roundId: detail.roundId,
+        });
+        void checkAndExecuteSummary(detail.messageId as number);
+      },
+    );
+
+    dataLogger.log('[useSummaryDetection] 已注册 wuxia:turn-events-settled 自动总结监听');
     return () => {
-      dataLogger.log('[useSummaryDetection] 移除 MESSAGE_RECEIVED 事件监听');
+      dataLogger.log('[useSummaryDetection] 移除 wuxia:turn-events-settled 自动总结监听');
       listener.stop();
     };
   }, [checkAndExecuteSummary]);

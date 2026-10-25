@@ -10,6 +10,7 @@ import {
   BUILTIN_LOCAL_REGEX_RULES,
   CONTENT_FONT_FAMILIES,
   createDefaultDisplaySettings,
+  DEFAULT_SUMMARY_PROMPT_TEMPLATE,
   ERA_BASE_REGEX_RULE,
   EVENT_AUDIT_REGEX_RULE,
   EVENT_STAGE_TAG_REGEX_RULE,
@@ -260,17 +261,48 @@ describe('settingsManager ui theme', () => {
     expect('variableInputTemplate' in settings).toBe(false);
     expect(settings.variableStructureTemplate).toContain('<变量模板>');
     expect(settings.variableStructureTemplateCustomized).toBe(false);
-    expect(settings.variableGuidanceTemplate).toContain('# ERA 变量更新规则');
+    expect(settings.variableGuidanceTemplate).toContain('<变量更新规则>');
     expect(settings.variableGuidanceTemplate).toContain('最终执行：');
     expect(settings.variableGuidanceTemplateCustomized).toBe(false);
   });
 
-  it('keeps biography compression focused on old chunks and game-time dates', () => {
+  it('uses strict multi-entry JSON for biography compression', () => {
     const template = createDefaultDisplaySettings().summarySettings.promptTemplate;
-    expect(template).toContain('只总结下面提供的旧条目');
+    expect(template).toContain('只依据下面提供的旧条目');
     expect(template).toContain('(1200.11.26)');
     expect(template).toContain('不得把现实日期写入结果');
-    expect(template).toContain('1～3 句');
+    expect(template).toContain('严格合法的 JSON 对象');
+    expect(template).toContain('"阶段经历1初入江湖"');
+    expect(template).toContain('整批输出必须涵盖旧条目中的所有重要长期事实');
+    expect(template).not.toContain('<summary>');
+  });
+
+  it('migrates the old built-in XML summary prompt while preserving custom prompts', () => {
+    const legacyPrompt = `你负责压缩《金庸群侠传》角色的旧人物经历片段。只总结下面提供的旧条目，不改写近期经历，也不要补写未提供的事实。
+
+角色名称：{{characterName}}
+待压缩的旧经历：
+{{biographyEntries}}
+
+强制要求：
+1. 保留会长期影响人物身份、关系、立场、伤病、生死、师承、重要物品或重大事件认知的事实。
+2. 普通聊天、短时情绪、连续场景动作等无长期意义的细节可以合并或删除。
+3. 输入值开头形如 (1200.11.26) 的内容是游戏内日期。不得把现实日期写入结果，不得猜测缺失日期，不得改变明确日期先后。
+4. 只输出一段精炼的阶段经历，尽量控制在 1～3 句；不要生成新的“经历1/经历2”键。
+
+输出格式：
+<summary>
+[阶段经历内容]
+</summary>`;
+    window.localStorage.setItem('wuxia_display_settings', JSON.stringify({
+      summarySettings: { promptTemplate: legacyPrompt },
+    }));
+    expect(loadSettings().summarySettings.promptTemplate).toBe(DEFAULT_SUMMARY_PROMPT_TEMPLATE);
+
+    window.localStorage.setItem('wuxia_display_settings', JSON.stringify({
+      summarySettings: { promptTemplate: 'CUSTOM PROMPT' },
+    }));
+    expect(loadSettings().summarySettings.promptTemplate).toBe('CUSTOM PROMPT');
   });
 
   it('ignores stored variable prompt text unless it is explicitly marked customized', () => {
