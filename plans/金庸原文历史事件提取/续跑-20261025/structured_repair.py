@@ -44,6 +44,8 @@ def apply_repairs(original, patch, issues):
             raise ValueError('new event must remain a complete object in its original slot')
         fixed['new_events'][item['index']-1]=item['event']
     for review in reviews:
+        if review.get('verdict') not in ['corrected','not_historical','insufficient']:
+            raise ValueError('repaired review requires an explicit correction or exclusion')
         matches=[i for i,r in enumerate(fixed['reviews']) if r['uid']==review['uid']]
         if len(matches)!=1:raise ValueError('original review UID is not unique')
         fixed['reviews'][matches[0]]=review

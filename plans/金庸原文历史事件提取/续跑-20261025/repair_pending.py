@@ -52,7 +52,15 @@ def main():
         _, allowed = prompt_for(task,corpus,cards)
         changes = []
         repair_calls = []
-        for issue in old['validation_issues']:
+        structured=any(i.get('error')!='anchor not present verbatim on source line' or 'new_event' not in i
+                       for i in old['validation_issues'])
+        if structured:
+            from structured_repair import repair
+            repair_id=f'structure-{call_id}'
+            payload,patch=repair(task,payload,old['validation_issues'],allowed,corpus,cards,repair_id)
+            changes.append(dict(method='model_repaired_rejected_entries',patch=patch))
+            repair_calls.append(repair_id)
+        for issue in ([] if structured else old['validation_issues']):
             if issue.get('error') != 'anchor not present verbatim on source line' or 'new_event' not in issue:
                 raise ValueError('repair supports new-event misplaced exact anchors only')
             event = payload['new_events'][issue['new_event']-1]
@@ -83,7 +91,7 @@ def main():
         current = {e['id']:e for e in checked['events']}
         if any(current.get(k)!=v for k,v in previous.items()):
             raise ValueError('previous accepted events changed')
-        if len(current) != len(previous)+len(old['validation_issues']):
+        if not structured and len(current) != len(previous)+len(old['validation_issues']):
             raise ValueError('unexpected restored event count')
         audit = HERE/'handoff/evidence-repairs'/call_id
         if audit.exists():
@@ -97,7 +105,9 @@ def main():
         dump(audit/'payload.json',payload)
         dump(audit/'repair.json',dict(task_id=task['id'],raw_sha256=sha(raw),changes=changes,
              usage_before=before_usage,usage_after=usage_total(),repair_calls=repair_calls,validation_issues=checked['validation_issues'],
-             semantic_scope='Evidence locators only; original model assertions remain subject to review.'))
+             semantic_scope=('Rejected entries semantically repaired by the required model; all accepted events unchanged.'
+                             if any(c.get('method')=='model_repaired_rejected_entries' for c in changes)
+                             else 'Evidence locators only; original model assertions remain subject to review.')))
     for task,raw,path,payload,checked,changes,audit,repair_calls in staged:
         dump(path,checked)
         task.update(status='reviewed',event_count=len(checked['events']),issue_count=0)
@@ -107,4 +117,10 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    lock=HERE/'.supervisor.lock'
+    fd=os.open(lock,os.O_CREAT|os.O_EXCL|os.O_WRONLY)
+    os.write(fd,str(os.getpid()).encode());os.close(fd)
+    try:
+        main()
+    finally:
+        lock.unlink()

@@ -1,0 +1,66 @@
+{
+  "task_id": "神雕-003-01",
+  "raw_sha256": "5ecd0ef2e5002313099451cd77a4de8abb288c34bf1beefaeecfbb1d26cfebd5",
+  "changes": [
+    {
+      "method": "model_repaired_rejected_entries",
+      "patch": {
+        "task_id": "神雕-003-01",
+        "reviews": [],
+        "new_events": [
+          {
+            "index": 8,
+            "event": {
+              "title": "大金国已为蒙古所灭，黄河以北尽为蒙古人天下",
+              "when": "本回叙事之前，具体年份未知",
+              "place": "黄河以北",
+              "people": [
+                "郭靖",
+                "杨过",
+                "蒙古人"
+              ],
+              "relationships": "蒙古人灭大金国，尽有黄河以北；郭靖携杨过北行，途经其地",
+              "description": "郭靖带杨过北上，渡过黄河来到陕西；原文交代此时大金国已为蒙古所灭，黄河以北尽为蒙古人天下。",
+              "cause": "原文未载",
+              "effect": "郭靖恐遇蒙古旧部招惹麻烦，换瘦丑驴子、改穿破旧衣衫扮作乡农",
+              "nature": "客观叙述",
+              "evidence": [
+                {
+                  "book": "神雕侠侣",
+                  "line": 782,
+                  "anchor": "此时大金国已为蒙古所灭，黄河以北，尽为蒙古人天下"
+                },
+                {
+                  "book": "神雕侠侣",
+                  "line": 782,
+                  "anchor": "将良马换了两匹极瘦极丑的驴子"
+                }
+              ],
+              "uncertain": [
+                "灭金具体战事不在本窗口，须与《射雕英雄传》对勘"
+              ]
+            }
+          }
+        ],
+        "unresolved": []
+      }
+    }
+  ],
+  "usage_before": {
+    "inputTokens": 1069050,
+    "cacheReadTokens": 52608,
+    "outputTokens": 1701365,
+    "total": 2823023
+  },
+  "usage_after": {
+    "inputTokens": 1102578,
+    "cacheReadTokens": 52864,
+    "outputTokens": 1707679,
+    "total": 2863121
+  },
+  "repair_calls": [
+    "structure-review-神雕-003-01-a1"
+  ],
+  "validation_issues": [],
+  "semantic_scope": "Rejected entries semantically repaired by the required model; all accepted events unchanged."
+}
