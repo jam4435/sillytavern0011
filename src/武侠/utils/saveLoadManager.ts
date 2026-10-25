@@ -2372,7 +2372,7 @@ async function executeCheckout(
   let automaticMkRepair: AppliedAutomaticMkRepair | null = null;
   try {
     const tree = loadHistoryTree();
-    const node = tree.nodes[nodeId];
+    let node = tree.nodes[nodeId];
     if (!node) throw new Error(`历史节点不存在：${nodeId}`);
 
     failureStep = '识别当前来源聊天';
@@ -2512,6 +2512,11 @@ async function executeCheckout(
       state = await scanCurrentChat({
         originNodeId: actionKind === 'fork_branch' ? nodeId : undefined,
       });
+      if (actionKind === 'fork_branch') {
+        const reconciled = await reconcileForkBranchMkIdentity(journal, state, nodeId);
+        if (reconciled) state = reconciled;
+      }
+      node = state.tree.nodes[nodeId] ?? node;
       if (state.currentNodeId !== nodeId) {
         throw new HistoryVerificationError(
           '切换后的活动叶节点不是目标节点。',
@@ -2526,7 +2531,7 @@ async function executeCheckout(
       }
       state = commitVerification(
         state, nodeId,
-        automaticMkRepair ? automaticMkRepair.repaired : node.verification,
+        automaticMkRepair ? automaticMkRepair.repaired : (state.tree.nodes[nodeId]?.verification ?? node.verification),
       );
       journal = updateHistoryCheckoutJournal({ stage: 'commit' }) ?? journal;
     }
