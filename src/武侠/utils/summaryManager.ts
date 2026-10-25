@@ -535,9 +535,9 @@ export async function executeSummary(
   };
 
   try {
-    const latestBiography = readCurrentCharacterBiography(character.characterId);
-    result.originalCount = getBiographyEntryCount(latestBiography);
-    const compressionPlan = buildBiographyCompressionPlan(latestBiography);
+    const initialBiography = readCurrentCharacterBiography(character.characterId);
+    result.originalCount = getBiographyEntryCount(initialBiography);
+    const compressionPlan = buildBiographyCompressionPlan(initialBiography);
     if (!compressionPlan) {
       result.success = true;
       dataLogger.log(`[summaryManager] 角色 ${character.displayName} 没有足够旧经历可分块压缩，跳过`);
