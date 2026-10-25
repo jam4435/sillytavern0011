@@ -272,7 +272,7 @@ describe('settingsManager ui theme', () => {
     expect(template).toContain('(1200.11.26)');
     expect(template).toContain('不得把现实日期写入结果');
     expect(template).toContain('严格合法的 JSON 对象');
-    expect(template).toContain('"阶段经历1-初入江湖"');
+    expect(template).toContain('"阶段经历1初入江湖"');
     expect(template).toContain('整批输出必须涵盖旧条目中的所有重要长期事实');
     expect(template).not.toContain('<summary>');
   });
