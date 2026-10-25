@@ -842,15 +842,16 @@ describe('history checkout', () => {
     expect(result.status).toBe('commit');
     expect(result.currentNodeId).toBe(targetId);
     const repaired = loadHistoryTree();
+    const branchChatId = repaired.branches[result.currentBranchId!].chatId;
     expect(repaired.nodes[targetId].messageKeyAliases).toContain(mk);
     expect(repaired.nodes[targetId].locators).toContainEqual(expect.objectContaining({
-      chatId: result.currentBranchId,
+      chatId: branchChatId,
       assistantMessageId: 1,
       swipeId: 0,
     }));
     expect(repaired.branches[result.currentBranchId!].headNodeId).toBe(targetId);
     expect(repaired.nodes[duplicateId].locators.some(locator =>
-      locator.chatId === result.currentBranchId,
+      locator.chatId === branchChatId,
     )).toBe(false);
     expect(repaired.nodes[targetId].verification?.selectedMksHash)
       .toBe(stableHistoryHash([null, mk]));
