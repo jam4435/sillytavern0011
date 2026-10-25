@@ -11,6 +11,10 @@ const command = vi.hoisted(() => ({
   updateByPath: vi.fn(),
 }));
 const key = vi.hoisted(() => ({
+  ensureMessageKey: vi.fn(async (message: { message_id: number }) => ({
+    mk: message.message_id === 3 ? 'mk-floor-3' : 'mk-transaction',
+    isNew: false,
+  })),
   ensureMkForLatestMessage: vi.fn(async () => ({
     mk: 'mk-transaction',
     message_id: 7,
@@ -31,7 +35,10 @@ vi.mock('../api/macro/patch', () => ({ forceRenderRecentMessages: vi.fn() }));
 vi.mock('../core/crud/patcher', () => patcher);
 vi.mock('../core/key/mk', () => key);
 vi.mock('../core/rollback', () => rollback);
-vi.mock('../core/sync', () => ({ resyncStateOnHistoryChange: vi.fn() }));
+const sync = vi.hoisted(() => ({
+  resyncStateOnHistoryChange: vi.fn(async () => undefined),
+}));
+vi.mock('../core/sync', () => sync);
 vi.mock('../utils/era_data', () => ({
   getEraData: () => ({
     meta: {
@@ -69,7 +76,7 @@ describe('ERA dispatcher transaction correlation', () => {
     });
     vi.stubGlobal(
       'getChatMessages',
-      vi.fn(() => [{ message_id: 7 }]),
+      vi.fn(() => [{ message_id: 7, role: 'assistant' }]),
     );
   });
 
@@ -99,6 +106,46 @@ describe('ERA dispatcher transaction correlation', () => {
         transactionId: 'checkout-42',
         transactionIds: ['checkout-42'],
         actions: expect.objectContaining({ apiWrite: true, apply: true }),
+      }),
+    );
+  });
+
+  it('写回到已不在末尾的指定楼层时全量重放历史，writeDone 仍关联原楼层', async () => {
+    const targetFloor = { message_id: 3, role: 'assistant' };
+    const latestFloor = { message_id: 9, role: 'assistant' };
+    vi.stubGlobal(
+      'getChatMessages',
+      vi.fn((range: string | number) => {
+        if (Number(range) === 3) return [targetFloor];
+        if (Number(range) === -1) return [latestFloor];
+        return [];
+      }),
+    );
+    const { dispatchAndExecuteTask } = await import('./dispatcher');
+
+    await dispatchAndExecuteTask(
+      {
+        type: 'era:apiWrite',
+        detail: {
+          messageId: 3,
+          transactionId: 'summary-floor-3',
+          transactionIds: ['summary-floor-3'],
+        },
+        timestamp: Date.now(),
+      },
+      null,
+    );
+
+    expect(key.ensureMessageKey).toHaveBeenCalledWith(targetFloor);
+    expect(sync.resyncStateOnHistoryChange).toHaveBeenCalledWith(true);
+    expect(rollback.rollbackByMk).not.toHaveBeenCalled();
+    expect(patcher.ApplyVarChange).not.toHaveBeenCalled();
+    expect(command.emitWriteDoneEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message_id: 3,
+        transactionId: 'summary-floor-3',
+        transactionIds: ['summary-floor-3'],
+        actions: expect.objectContaining({ apiWrite: true, resync: true }),
       }),
     );
   });
