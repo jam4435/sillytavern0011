@@ -170,6 +170,16 @@ describe('summaryManager biography compression', () => {
     expect(() => parseSummaryResponse('{"阶段经历1-一":"（1200.11.1）一","阶段经历3-三":"（1200.11.3）三"}')).toThrow(/连续递增/);
     expect(() => parseSummaryResponse('{"阶段经历1-一":"（1200.11.1）一","阶段经历1-重复":"（1200.11.2）二"}')).toThrow(/连续递增/);
     expect(() => parseSummaryResponse('{"阶段经历1-一":"（1200.11.1）一","阶段经历2-二":"（1200.11.2）二"}', 1)).toThrow(/多于本批/);
+    expect(() => parseSummaryResponse(
+      '{"阶段经历1-超出范围":"（1200.11.1~1200.11.20）日期不应超出输入"}',
+      1,
+      { 经历1: '(1200.11.1) 一', 经历2: '(1200.11.5) 五' },
+    )).toThrow(/超出本批/);
+    expect(() => parseSummaryResponse(
+      '{"阶段经历1-无来源日期":"（1200.11.1）不应编造日期"}',
+      1,
+      { 经历1: '旧存档没有日期', 经历2: '另一条也没有日期' },
+    )).toThrow(/没有可识别的游戏内日期/);
   });
 
   it('rebases generated stage keys after existing stage memories and excludes titled stage keys from raw counts', () => {
