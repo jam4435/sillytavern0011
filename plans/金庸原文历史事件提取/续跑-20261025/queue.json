@@ -3734,9 +3734,12 @@
     ],
     "source_sha256": "c21792a7cabd61a3751de7d7970947a603b46463b61055f3ac02599fdafb8611",
     "phase": "source_review",
-    "status": "running",
+    "status": "reviewed",
     "prompt_version": "source-review-v1",
-    "attempts": 1
+    "attempts": 1,
+    "duration_ms": 86260.65820000076,
+    "event_count": 8,
+    "issue_count": 0
   },
   {
     "id": "神雕-001-02",
@@ -5164,9 +5167,12 @@
     ],
     "source_sha256": "455a755d0001b21ff0d2d8708f58621c60a234fbdeac1e13ee1617cf4696ea38",
     "phase": "source_review",
-    "status": "running",
+    "status": "reviewed",
     "prompt_version": "source-review-v1",
-    "attempts": 1
+    "attempts": 1,
+    "duration_ms": 109971.12519999791,
+    "event_count": 7,
+    "issue_count": 0
   },
   {
     "id": "倚天-001-02",
@@ -9241,9 +9247,12 @@
     "legacy_uids": [],
     "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
     "phase": "source_review",
-    "status": "running",
+    "status": "reviewed",
     "prompt_version": "source-review-v1",
-    "attempts": 1
+    "attempts": 1,
+    "duration_ms": 91721.9286000036,
+    "event_count": 5,
+    "issue_count": 0
   },
   {
     "id": "鹿鼎-030-01",
