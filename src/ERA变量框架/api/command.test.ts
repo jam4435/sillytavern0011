@@ -175,7 +175,16 @@ describe('ERA API command write scheduling', () => {
       operations: [{ type: 'insert', payload: { user数据: { 人物经历: { 阶段经历1: '总结内容' } } } }],
     });
 
-    await vi.waitFor(() => expect(diagnostics.recordEraDiagnosticError).toHaveBeenCalled());
+    await vi.waitFor(() => {
+      expect(
+        diagnostics.recordEraDiagnostic.mock.calls.some(
+          ([source, event, detail]) =>
+            source === 'api-command' &&
+            event === 'target-message-not-found' &&
+            (detail as any)?.targetMessageId === 12,
+        ),
+      ).toBe(true);
+    });
     expect(messages.updateMessageContent).not.toHaveBeenCalled();
     expect(messages.findLastAiMessage).not.toHaveBeenCalled();
     expect(eventEmit).not.toHaveBeenCalledWith('era:apiWrite', expect.anything());
