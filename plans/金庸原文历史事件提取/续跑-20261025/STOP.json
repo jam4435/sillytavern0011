@@ -1,0 +1,30 @@
+{
+  "reason": "parallel_jobs_failed",
+  "failed": [
+    {
+      "id": "倚天-001-02",
+      "book": "倚天屠龙记",
+      "chapter": 1,
+      "title": "天涯思君不可忘",
+      "start": 255,
+      "end": 501,
+      "legacy_uids": [
+        "批次E/_body.md#EV-倚天-0010",
+        "批次E/_body.md#EV-倚天-0011",
+        "批次E/_body.md#EV-倚天-0012"
+      ],
+      "source_sha256": "455a755d0001b21ff0d2d8708f58621c60a234fbdeac1e13ee1617cf4696ea38",
+      "phase": "source_review",
+      "status": "failed",
+      "prompt_version": "source-review-v1",
+      "attempts": 1,
+      "error": "legacy review missing, duplicate, or unknown uid"
+    }
+  ],
+  "usage": {
+    "inputTokens": 883286,
+    "cacheReadTokens": 43392,
+    "outputTokens": 1403336,
+    "total": 2330014
+  }
+}

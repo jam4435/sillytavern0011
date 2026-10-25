@@ -1,48 +1,52 @@
 {
   "statuses": {
-    "reviewed": 78,
-    "pending": 528
+    "reviewed": 82,
+    "pending": 522,
+    "needs_repair": 1,
+    "failed": 1
   },
   "by_book": {
     "天龙八部": {
-      "reviewed": 2,
-      "pending": 112
+      "reviewed": 3,
+      "pending": 111
     },
     "射雕英雄传": {
-      "reviewed": 1,
-      "pending": 88
+      "reviewed": 2,
+      "pending": 87
     },
     "神雕侠侣": {
       "reviewed": 1,
-      "pending": 86
+      "needs_repair": 1,
+      "pending": 85
     },
     "倚天屠龙记": {
       "reviewed": 1,
-      "pending": 95
+      "failed": 1,
+      "pending": 94
     },
     "笑傲江湖": {
-      "reviewed": 1,
-      "pending": 95
+      "reviewed": 2,
+      "pending": 94
     },
     "鹿鼎记": {
-      "reviewed": 72,
-      "pending": 52
+      "reviewed": 73,
+      "pending": 51
     }
   },
   "usage": {
-    "inputTokens": 806503,
-    "cacheReadTokens": 40320,
-    "outputTokens": 1268052,
-    "total": 2114875
+    "inputTokens": 883286,
+    "cacheReadTokens": 43392,
+    "outputTokens": 1403336,
+    "total": 2330014
   },
-  "events": 871,
-  "reviewed_legacy": 45,
+  "events": 930,
+  "reviewed_legacy": 71,
   "legacy_verdicts": {
-    "supported": 30,
-    "not_historical": 8,
-    "corrected": 7
+    "supported": 38,
+    "not_historical": 13,
+    "corrected": 20
   },
-  "rejected_or_pending_legacy": 1464,
+  "rejected_or_pending_legacy": 1443,
   "source_stage_complete": false,
   "diff_reviewed_events": 3,
   "diff_stage_complete": false,

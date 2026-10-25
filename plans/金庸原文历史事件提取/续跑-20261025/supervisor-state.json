@@ -1,13 +1,15 @@
 {
-  "pid": 40060,
-  "status": "paused",
+  "pid": 37012,
+  "status": "needs_attention",
   "phase": "source",
-  "updated_at": "2026-10-25T11:34:36+0800",
+  "updated_at": "2026-10-25T11:38:46+0800",
   "usage": {
-    "inputTokens": 806503,
-    "cacheReadTokens": 40320,
-    "outputTokens": 1268052,
-    "total": 2114875
+    "inputTokens": 883286,
+    "cacheReadTokens": 43392,
+    "outputTokens": 1403336,
+    "total": 2330014
   },
-  "reason": "bounded source wave completed"
+  "failed": [
+    "倚天-001-02"
+  ]
 }

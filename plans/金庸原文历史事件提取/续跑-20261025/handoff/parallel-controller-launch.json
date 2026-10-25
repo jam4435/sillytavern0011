@@ -1,0 +1,13 @@
+{
+  "pid": 37012,
+  "launched_at": "2026-10-25T11:35:45.7851486+08:00",
+  "parallel_books": 6,
+  "stdout": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\handoff\\parallel-supervisor.stdout.log",
+  "stderr": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\handoff\\parallel-supervisor.stderr.log",
+  "retained": true,
+  "provider": "buddy",
+  "model": "deepseek-v4.1-flash",
+  "budget": 15000000,
+  "baseline_usage": 2114875,
+  "trial_acceptance": "handoff/parallel-trial-acceptance.json"
+}

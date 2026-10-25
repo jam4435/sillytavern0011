@@ -1,0 +1,130 @@
+{
+  "accepted": true,
+  "peak_simultaneous_model_requests": 6,
+  "rows": [
+    {
+      "task_id": "鹿鼎-029-03",
+      "book": "鹿鼎记",
+      "session_id": "session-d025d192-deb3-47c0-b368-2068913ef9c6",
+      "route": {
+        "provider": "buddy",
+        "model": "deepseek-v4.1-flash",
+        "reasoningEffort": "low",
+        "maxTokens": 32768
+      },
+      "usage": {
+        "inputTokens": 1787,
+        "outputTokens": 9379,
+        "cacheReadTokens": 512,
+        "reasoningTokens": 7843
+      },
+      "events": 5,
+      "validation_issues": []
+    },
+    {
+      "task_id": "倚天-001-01",
+      "book": "倚天屠龙记",
+      "session_id": "session-48f92421-42fd-4675-b2df-bcc589cf05bd",
+      "route": {
+        "provider": "buddy",
+        "model": "deepseek-v4.1-flash",
+        "reasoningEffort": "low",
+        "maxTokens": 32768
+      },
+      "usage": {
+        "inputTokens": 15210,
+        "outputTokens": 14634,
+        "cacheReadTokens": 512,
+        "reasoningTokens": 12249
+      },
+      "events": 7,
+      "validation_issues": []
+    },
+    {
+      "task_id": "笑傲-001-01",
+      "book": "笑傲江湖",
+      "session_id": "session-7e95d6d4-3463-45cb-95e1-9eebcfe3ddb0",
+      "route": {
+        "provider": "buddy",
+        "model": "deepseek-v4.1-flash",
+        "reasoningEffort": "low",
+        "maxTokens": 32768
+      },
+      "usage": {
+        "inputTokens": 15110,
+        "outputTokens": 22277,
+        "cacheReadTokens": 512,
+        "reasoningTokens": 19879
+      },
+      "events": 5,
+      "validation_issues": []
+    },
+    {
+      "task_id": "天龙-001-02",
+      "book": "天龙八部",
+      "session_id": "session-8c03a523-c8ad-4fde-925b-5f1b62585a10",
+      "route": {
+        "provider": "buddy",
+        "model": "deepseek-v4.1-flash",
+        "reasoningEffort": "low",
+        "maxTokens": 32768
+      },
+      "usage": {
+        "inputTokens": 9832,
+        "outputTokens": 14523,
+        "cacheReadTokens": 512,
+        "reasoningTokens": 12485
+      },
+      "events": 6,
+      "validation_issues": []
+    },
+    {
+      "task_id": "射雕-001-01",
+      "book": "射雕英雄传",
+      "session_id": "session-1ae5e46c-69e2-43eb-b48e-ac30ca7da422",
+      "route": {
+        "provider": "buddy",
+        "model": "deepseek-v4.1-flash",
+        "reasoningEffort": "low",
+        "maxTokens": 32768
+      },
+      "usage": {
+        "inputTokens": 16357,
+        "outputTokens": 29088,
+        "cacheReadTokens": 512,
+        "reasoningTokens": 26105
+      },
+      "events": 7,
+      "validation_issues": []
+    },
+    {
+      "task_id": "神雕-001-01",
+      "book": "神雕侠侣",
+      "session_id": "session-4d92c8f9-dc6c-42be-bcca-1b05d766a9d0",
+      "route": {
+        "provider": "buddy",
+        "model": "deepseek-v4.1-flash",
+        "reasoningEffort": "low",
+        "maxTokens": 32768
+      },
+      "usage": {
+        "inputTokens": 16500,
+        "outputTokens": 9197,
+        "cacheReadTokens": 512,
+        "reasoningTokens": 5727
+      },
+      "events": 8,
+      "validation_issues": []
+    }
+  ],
+  "added_tokens": 176966,
+  "usage": {
+    "inputTokens": 806503,
+    "cacheReadTokens": 40320,
+    "outputTokens": 1268052,
+    "total": 2114875
+  },
+  "original_data_hashes": "unchanged",
+  "queue_coverage_preserved": true,
+  "unselected_tasks_unchanged": true
+}
