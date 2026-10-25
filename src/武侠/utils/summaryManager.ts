@@ -519,14 +519,14 @@ export function parseSummaryResponse(response: string, maxStageMemories?: number
     }
 
     const outputDateRange = parseGameDateRange(cleanValue);
-    if (outputDateRange) {
+    if (outputDateRange && sourceEntries) {
       if (!sourceDateBounds) {
         throw new Error(`阶段记忆“${key}”使用了日期，但输入经历中没有可识别的游戏内日期。`);
       }
       if (outputDateRange.start < sourceDateBounds.start || outputDateRange.end > sourceDateBounds.end) {
         throw new Error(`阶段记忆“${key}”的日期范围超出本批原始经历，已取消写回。`);
       }
-    } else if (!/^[（(](?:旧记录时间不详|时间不详)[）)]/.test(cleanValue)) {
+    } else if (!outputDateRange && !/^[（(](?:旧记录时间不详|时间不详)[）)]/.test(cleanValue)) {
       throw new Error(`阶段记忆“${key}”的日期范围无效或结束时间早于开始时间。`);
     }
     result[key] = cleanValue;
