@@ -515,7 +515,7 @@ ERA 不直接向其他脚本暴露函数；外部调用方通过 `eventEmit` 发
 | `era:insertByObject`      | 要插入的对象                                                                                |
 | `era:updateByObject`      | 要更新的对象                                                                                |
 | `era:deleteByObject`      | 描述删除路径的对象                                                                          |
-| `era:transactionByObject` | `{ transactionId, operations: Array<{ type: 'insert' \| 'update' \| 'delete', payload }> }` |
+| `era:transactionByObject` | `{ transactionId, targetMessageId?, operations: Array<{ type: 'insert' \| 'update' \| 'delete', payload }> }` |
 | `era:insertByPath`        | `{ path: string, value: unknown }`                                                          |
 | `era:updateByPath`        | `{ path: string, value: unknown }`                                                          |
 | `era:deleteByPath`        | `{ path: string }`                                                                          |
@@ -536,6 +536,8 @@ eventEmit('era:deleteByPath', {
 
 eventEmit('era:transactionByObject', {
   transactionId: 'event-settlement-42',
+  // 可选：固定写入目标 assistant 楼层；省略时沿用最后一条 AI 消息
+  targetMessageId: 42,
   operations: [
     { type: 'update', payload: { player: { hp: 80 } } },
     { type: 'delete', payload: { quests: { active: { old_event: {} } } } },
@@ -554,13 +556,13 @@ era:* API
 → 进入 ERA 事件队列
 → ApiWriteJob 进入独立写入队列
 → 可见页在 75 ms 窗口内收集任务；隐藏页在当前调用栈结束后经 microtask flush
-→ 相邻同类型任务按 Insert/Edit/Delete 各自规则合并
+→ 相邻同类型且目标楼层相同的任务按 Insert/Edit/Delete 各自规则合并
 → 压缩正文中相邻、同类型的合法 Variable* 块
-→ 找到最后一条“非用户”消息并一次性更新正文
+→ 选择 targetMessageId 指定的 assistant 楼层；未指定时才找最后一条 AI 消息
 → setChatMessages(refresh: none)
-→ era:apiWrite
-→ WRITE：回滚旧日志并重算整条消息
-→ era:writeDone
+→ era:apiWrite(messageId)
+→ 若目标是历史楼层，从该历史变更完整重放聊天；若目标仍在末尾则回滚并重算目标消息
+→ era:writeDone(message_id, transactionIds)
 ```
 
 合并规则：
@@ -568,7 +570,8 @@ era:* API
 - `VariableInsert`：同一路径以先到值为准，缺失路径继续补入。
 - `VariableEdit`：同一路径以后到值为准。
 - `VariableDelete`：合并所有删除路径；任一侧以空对象删除父节点时，父节点删除优先。
-- 只有相邻且同类型的任务或正文块会合并，Insert/Edit/Delete 的先后边界会被保留。
+- 只有相邻、同类型且目标楼层相同的任务或正文块会合并，Insert/Edit/Delete 的先后边界会被保留。
+- 指定的 assistant 楼层不存在时事务取消，不会回退写入最后一条 AI 消息。
 - 合法 JSON 块使用紧凑 JSON 重写；无法解析的块保持原文。
 
 路径 API 使用 `_.set({}, path, value)` 构造嵌套对象。普通单操作外部调用没有 request ID、同步返回值或失败结果；批事务使用
