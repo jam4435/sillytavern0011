@@ -106,6 +106,81 @@ describe('ERA API command write scheduling', () => {
     );
   });
 
+  it('批事务写回指定的历史 assistant 楼层，不回退到最新楼层', async () => {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    const targetMessage = {
+      message_id: 3,
+      role: 'assistant',
+      message: '触发总结的旧楼层',
+      swipes: ['触发总结的旧楼层'],
+      swipe_id: 0,
+    };
+    vi.stubGlobal(
+      'getChatMessages',
+      vi.fn((range: string | number) => Number(range) === 3 ? [targetMessage] : []),
+    );
+    const eventEmit = vi.fn(async (type: string, detail?: any) => {
+      if (type === 'era:apiWrite') {
+        const callbacks = [...(listeners.get('era:writeDone') ?? [])];
+        await Promise.all(callbacks.map(fn => fn({
+          message_id: detail?.messageId,
+          actions: { apiWrite: true },
+          transactionId: detail?.transactionId,
+          transactionIds: detail?.transactionIds,
+        })));
+      }
+    });
+    vi.stubGlobal('eventEmit', eventEmit);
+    const { transactionByObject } = await import('./command');
+
+    transactionByObject({
+      transactionId: 'summary-floor-3',
+      targetMessageId: 3,
+      operations: [
+        { type: 'delete', payload: { user数据: { 人物经历: { 经历1: {} } } } },
+        { type: 'insert', payload: { user数据: { 人物经历: { 阶段经历1: '总结内容' } } } },
+      ],
+    });
+
+    await vi.waitFor(() => expect(messages.updateMessageContent).toHaveBeenCalledOnce());
+    expect(messages.updateMessageContent).toHaveBeenCalledWith(
+      targetMessage,
+      expect.stringContaining('<VariableDelete>'),
+      expect.anything(),
+    );
+    const writtenText = messages.updateMessageContent.mock.calls[0][1] as string;
+    expect(writtenText).toContain('<VariableDelete>');
+    expect(writtenText).toContain('<VariableInsert>');
+    expect(eventEmit).toHaveBeenCalledWith(
+      'era:apiWrite',
+      expect.objectContaining({
+        messageId: 3,
+        transactionId: 'summary-floor-3',
+        transactionIds: ['summary-floor-3'],
+      }),
+    );
+    expect(messages.findLastAiMessage).not.toHaveBeenCalled();
+  });
+
+  it('指定楼层不存在时拒绝写入，不会静默回退到最后一条 AI 消息', async () => {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    vi.stubGlobal('getChatMessages', vi.fn(() => []));
+    const eventEmit = vi.fn(async () => undefined);
+    vi.stubGlobal('eventEmit', eventEmit);
+    const { transactionByObject } = await import('./command');
+
+    transactionByObject({
+      transactionId: 'summary-missing-floor',
+      targetMessageId: 12,
+      operations: [{ type: 'insert', payload: { user数据: { 人物经历: { 阶段经历1: '总结内容' } } } }],
+    });
+
+    await vi.waitFor(() => expect(diagnostics.recordEraDiagnosticError).toHaveBeenCalled());
+    expect(messages.updateMessageContent).not.toHaveBeenCalled();
+    expect(messages.findLastAiMessage).not.toHaveBeenCalled();
+    expect(eventEmit).not.toHaveBeenCalledWith('era:apiWrite', expect.anything());
+  });
+
   it('同一楼先插入参与事件再删除后续线索：前一事务未 writeDone 前不能修改消息发起后继事务', async () => {
     vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
     vi.stubGlobal('eventEmit', vi.fn(async () => undefined));
