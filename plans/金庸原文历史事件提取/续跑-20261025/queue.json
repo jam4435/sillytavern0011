@@ -179,9 +179,12 @@
     "legacy_uids": [],
     "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
     "phase": "source_review",
-    "status": "running",
+    "status": "reviewed",
     "prompt_version": "source-review-v1",
-    "attempts": 1
+    "attempts": 1,
+    "duration_ms": 102849.6918999881,
+    "event_count": 5,
+    "issue_count": 0
   },
   {
     "id": "天龙-005-01",
@@ -196,8 +199,12 @@
     ],
     "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 139056.77239998477,
+    "event_count": 4,
+    "issue_count": 0
   },
   {
     "id": "天龙-005-02",
@@ -209,8 +216,12 @@
     "legacy_uids": [],
     "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 130143.15419999184,
+    "event_count": 8,
+    "issue_count": 0
   },
   {
     "id": "天龙-006-01",
@@ -224,8 +235,12 @@
     ],
     "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 155396.7440999986,
+    "event_count": 5,
+    "issue_count": 0
   },
   {
     "id": "天龙-006-02",
@@ -237,29 +252,90 @@
     "legacy_uids": [],
     "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 146542.06589999376,
+    "event_count": 11,
+    "issue_count": 0
   },
   {
-    "id": "天龙-007-01",
+    "id": "天龙-007-01a",
     "book": "天龙八部",
     "chapter": 7,
     "title": "无计悔多情",
     "start": 2615,
-    "end": 2858,
+    "end": 2674,
     "legacy_uids": [
-      "批次B/B1-天龙第1-17回.md#EV-天龙-0225",
-      "批次B/B1-天龙第1-17回.md#EV-天龙-0226",
-      "批次B/B1-天龙第1-17回.md#EV-天龙-0236",
-      "批次B/B1-天龙第1-17回.md#EV-天龙-0237",
-      "批次B/B1-天龙第1-17回.md#EV-天龙-0238",
-      "批次B/B1-天龙第1-17回.md#EV-天龙-0239",
       "批次B/B1-天龙第1-17回.md#EV-天龙-0317"
     ],
     "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 91694.60690001142,
+    "event_count": 5,
+    "issue_count": 0
+  },
+  {
+    "id": "天龙-007-01b",
+    "book": "天龙八部",
+    "chapter": 7,
+    "title": "无计悔多情",
+    "start": 2675,
+    "end": 2736,
+    "legacy_uids": [
+      "批次B/B1-天龙第1-17回.md#EV-天龙-0225"
+    ],
+    "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+    "phase": "source_review",
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 174562.63910001144,
+    "event_count": 9,
+    "issue_count": 0
+  },
+  {
+    "id": "天龙-007-01c",
+    "book": "天龙八部",
+    "chapter": 7,
+    "title": "无计悔多情",
+    "start": 2737,
+    "end": 2802,
+    "legacy_uids": [
+      "批次B/B1-天龙第1-17回.md#EV-天龙-0226",
+      "批次B/B1-天龙第1-17回.md#EV-天龙-0236",
+      "批次B/B1-天龙第1-17回.md#EV-天龙-0237",
+      "批次B/B1-天龙第1-17回.md#EV-天龙-0238",
+      "批次B/B1-天龙第1-17回.md#EV-天龙-0239"
+    ],
+    "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+    "phase": "source_review",
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 198712.1767999779,
+    "event_count": 3,
+    "issue_count": 0
+  },
+  {
+    "id": "天龙-007-01d",
+    "book": "天龙八部",
+    "chapter": 7,
+    "title": "无计悔多情",
+    "start": 2803,
+    "end": 2858,
+    "legacy_uids": [],
+    "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+    "phase": "source_review",
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 118593.10719999485,
+    "event_count": 15,
+    "issue_count": 0
   },
   {
     "id": "天龙-007-02",
@@ -273,8 +349,12 @@
     ],
     "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 102330.99680001033,
+    "event_count": 2,
+    "issue_count": 0
   },
   {
     "id": "天龙-008-01",
@@ -2351,9 +2431,12 @@
     ],
     "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
     "phase": "source_review",
-    "status": "running",
+    "status": "reviewed",
     "prompt_version": "source-review-v1",
-    "attempts": 1
+    "attempts": 1,
+    "duration_ms": 194540.49729998223,
+    "event_count": 12,
+    "issue_count": 0
   },
   {
     "id": "射雕-004-02",
@@ -2378,8 +2461,12 @@
     ],
     "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 143326.05609999155,
+    "event_count": 10,
+    "issue_count": 0
   },
   {
     "id": "射雕-005-01",
@@ -2395,8 +2482,12 @@
     ],
     "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 223042.60529999738,
+    "event_count": 11,
+    "issue_count": 0
   },
   {
     "id": "射雕-005-02",
@@ -2411,8 +2502,12 @@
     ],
     "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 98400.08859999944,
+    "event_count": 5,
+    "issue_count": 0
   },
   {
     "id": "射雕-006-01",
@@ -2432,8 +2527,12 @@
     ],
     "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 139983.20819999208,
+    "event_count": 5,
+    "issue_count": 0
   },
   {
     "id": "射雕-006-02",
@@ -2447,8 +2546,12 @@
     ],
     "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 189604.7508000047,
+    "event_count": 15,
+    "issue_count": 0
   },
   {
     "id": "射雕-006-03",
@@ -2460,8 +2563,12 @@
     "legacy_uids": [],
     "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 109581.57530002063,
+    "event_count": 14,
+    "issue_count": 0
   },
   {
     "id": "射雕-007-01",
@@ -2476,8 +2583,12 @@
     ],
     "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 114184.34599999455,
+    "event_count": 9,
+    "issue_count": 0
   },
   {
     "id": "射雕-007-02",
@@ -2493,8 +2604,12 @@
     ],
     "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 146546.61620000843,
+    "event_count": 11,
+    "issue_count": 0
   },
   {
     "id": "射雕-008-01",
@@ -2512,8 +2627,10 @@
     ],
     "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "failed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "error": "dsh failed: {\"kind\": \"max-tokens\"}"
   },
   {
     "id": "射雕-008-02",
@@ -3958,9 +4075,12 @@
     ],
     "source_sha256": "c21792a7cabd61a3751de7d7970947a603b46463b61055f3ac02599fdafb8611",
     "phase": "source_review",
-    "status": "running",
+    "status": "reviewed",
     "prompt_version": "source-review-v1",
-    "attempts": 1
+    "attempts": 1,
+    "duration_ms": 116597.87959998357,
+    "event_count": 10,
+    "issue_count": 0
   },
   {
     "id": "神雕-005-01",
@@ -3977,8 +4097,12 @@
     ],
     "source_sha256": "c21792a7cabd61a3751de7d7970947a603b46463b61055f3ac02599fdafb8611",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 144240.5345000152,
+    "event_count": 8,
+    "issue_count": 0
   },
   {
     "id": "神雕-005-02",
@@ -3996,8 +4120,12 @@
     ],
     "source_sha256": "c21792a7cabd61a3751de7d7970947a603b46463b61055f3ac02599fdafb8611",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 101126.43170001684,
+    "event_count": 5,
+    "issue_count": 0
   },
   {
     "id": "神雕-006-01",
@@ -4013,8 +4141,12 @@
     ],
     "source_sha256": "c21792a7cabd61a3751de7d7970947a603b46463b61055f3ac02599fdafb8611",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 118367.92499999865,
+    "event_count": 7,
+    "issue_count": 0
   },
   {
     "id": "神雕-006-02",
@@ -4030,8 +4162,12 @@
     ],
     "source_sha256": "c21792a7cabd61a3751de7d7970947a603b46463b61055f3ac02599fdafb8611",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 150882.66250002198,
+    "event_count": 10,
+    "issue_count": 0
   },
   {
     "id": "神雕-007-01",
@@ -4055,8 +4191,12 @@
     ],
     "source_sha256": "c21792a7cabd61a3751de7d7970947a603b46463b61055f3ac02599fdafb8611",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 125132.25359999342,
+    "event_count": 9,
+    "issue_count": 0
   },
   {
     "id": "神雕-007-02",
@@ -4072,8 +4212,12 @@
     ],
     "source_sha256": "c21792a7cabd61a3751de7d7970947a603b46463b61055f3ac02599fdafb8611",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 126422.48509998899,
+    "event_count": 4,
+    "issue_count": 0
   },
   {
     "id": "神雕-008-01",
@@ -4085,8 +4229,12 @@
     "legacy_uids": [],
     "source_sha256": "c21792a7cabd61a3751de7d7970947a603b46463b61055f3ac02599fdafb8611",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 125030.05219998886,
+    "event_count": 10,
+    "issue_count": 0
   },
   {
     "id": "神雕-008-02",
@@ -4098,8 +4246,12 @@
     "legacy_uids": [],
     "source_sha256": "c21792a7cabd61a3751de7d7970947a603b46463b61055f3ac02599fdafb8611",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 104094.72699998878,
+    "event_count": 10,
+    "issue_count": 0
   },
   {
     "id": "神雕-009-01",
@@ -4111,8 +4263,12 @@
     "legacy_uids": [],
     "source_sha256": "c21792a7cabd61a3751de7d7970947a603b46463b61055f3ac02599fdafb8611",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 81547.4358999927,
+    "event_count": 12,
+    "issue_count": 0
   },
   {
     "id": "神雕-009-02",
@@ -5403,9 +5559,12 @@
     "legacy_uids": [],
     "source_sha256": "455a755d0001b21ff0d2d8708f58621c60a234fbdeac1e13ee1617cf4696ea38",
     "phase": "source_review",
-    "status": "running",
+    "status": "reviewed",
     "prompt_version": "source-review-v1",
-    "attempts": 1
+    "attempts": 1,
+    "duration_ms": 132528.07989998837,
+    "event_count": 11,
+    "issue_count": 0
   },
   {
     "id": "倚天-004-01",
@@ -5421,8 +5580,12 @@
     ],
     "source_sha256": "455a755d0001b21ff0d2d8708f58621c60a234fbdeac1e13ee1617cf4696ea38",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 187396.4258999913,
+    "event_count": 6,
+    "issue_count": 0
   },
   {
     "id": "倚天-004-02",
@@ -5434,8 +5597,12 @@
     "legacy_uids": [],
     "source_sha256": "455a755d0001b21ff0d2d8708f58621c60a234fbdeac1e13ee1617cf4696ea38",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 95037.62029999052,
+    "event_count": 4,
+    "issue_count": 0
   },
   {
     "id": "倚天-005-01",
@@ -5450,8 +5617,12 @@
     ],
     "source_sha256": "455a755d0001b21ff0d2d8708f58621c60a234fbdeac1e13ee1617cf4696ea38",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 111010.1914999832,
+    "event_count": 3,
+    "issue_count": 0
   },
   {
     "id": "倚天-005-02",
@@ -5463,8 +5634,12 @@
     "legacy_uids": [],
     "source_sha256": "455a755d0001b21ff0d2d8708f58621c60a234fbdeac1e13ee1617cf4696ea38",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 105444.63739998173,
+    "event_count": 8,
+    "issue_count": 0
   },
   {
     "id": "倚天-005-03",
@@ -5476,8 +5651,12 @@
     "legacy_uids": [],
     "source_sha256": "455a755d0001b21ff0d2d8708f58621c60a234fbdeac1e13ee1617cf4696ea38",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 99771.52270000079,
+    "event_count": 5,
+    "issue_count": 0
   },
   {
     "id": "倚天-006-01",
@@ -5492,8 +5671,12 @@
     ],
     "source_sha256": "455a755d0001b21ff0d2d8708f58621c60a234fbdeac1e13ee1617cf4696ea38",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 81085.46999999089,
+    "event_count": 3,
+    "issue_count": 0
   },
   {
     "id": "倚天-006-02",
@@ -5505,8 +5688,12 @@
     "legacy_uids": [],
     "source_sha256": "455a755d0001b21ff0d2d8708f58621c60a234fbdeac1e13ee1617cf4696ea38",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 55432.5172000099,
+    "event_count": 2,
+    "issue_count": 0
   },
   {
     "id": "倚天-007-01",
@@ -5523,8 +5710,12 @@
     ],
     "source_sha256": "455a755d0001b21ff0d2d8708f58621c60a234fbdeac1e13ee1617cf4696ea38",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 128424.19389999122,
+    "event_count": 7,
+    "issue_count": 0
   },
   {
     "id": "倚天-007-02",
@@ -5542,8 +5733,12 @@
     ],
     "source_sha256": "455a755d0001b21ff0d2d8708f58621c60a234fbdeac1e13ee1617cf4696ea38",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 155289.84299997683,
+    "event_count": 6,
+    "issue_count": 0
   },
   {
     "id": "倚天-008-01",
@@ -6823,9 +7018,12 @@
     ],
     "source_sha256": "8e5503344bb28d0964bd25363384acf721f183952d48290fcec665044a71e252",
     "phase": "source_review",
-    "status": "running",
+    "status": "reviewed",
     "prompt_version": "source-review-v1",
-    "attempts": 1
+    "attempts": 1,
+    "duration_ms": 136165.0739000179,
+    "event_count": 9,
+    "issue_count": 0
   },
   {
     "id": "笑傲-004-02",
@@ -6840,8 +7038,12 @@
     ],
     "source_sha256": "8e5503344bb28d0964bd25363384acf721f183952d48290fcec665044a71e252",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 112495.20330000087,
+    "event_count": 4,
+    "issue_count": 0
   },
   {
     "id": "笑傲-005-01",
@@ -6853,8 +7055,12 @@
     "legacy_uids": [],
     "source_sha256": "8e5503344bb28d0964bd25363384acf721f183952d48290fcec665044a71e252",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 131686.01589999162,
+    "event_count": 9,
+    "issue_count": 0
   },
   {
     "id": "笑傲-005-02",
@@ -6870,8 +7076,12 @@
     ],
     "source_sha256": "8e5503344bb28d0964bd25363384acf721f183952d48290fcec665044a71e252",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 148341.68449998833,
+    "event_count": 9,
+    "issue_count": 0
   },
   {
     "id": "笑傲-005-03",
@@ -6885,8 +7095,12 @@
     ],
     "source_sha256": "8e5503344bb28d0964bd25363384acf721f183952d48290fcec665044a71e252",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 103702.87070001359,
+    "event_count": 5,
+    "issue_count": 0
   },
   {
     "id": "笑傲-006-01",
@@ -6909,8 +7123,12 @@
     ],
     "source_sha256": "8e5503344bb28d0964bd25363384acf721f183952d48290fcec665044a71e252",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 145985.5341000075,
+    "event_count": 9,
+    "issue_count": 0
   },
   {
     "id": "笑傲-006-02",
@@ -6926,8 +7144,12 @@
     ],
     "source_sha256": "8e5503344bb28d0964bd25363384acf721f183952d48290fcec665044a71e252",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 94637.0832999819,
+    "event_count": 3,
+    "issue_count": 0
   },
   {
     "id": "笑傲-007-01",
@@ -6945,8 +7167,12 @@
     ],
     "source_sha256": "8e5503344bb28d0964bd25363384acf721f183952d48290fcec665044a71e252",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 145813.32899999688,
+    "event_count": 9,
+    "issue_count": 0
   },
   {
     "id": "笑傲-007-02",
@@ -6962,8 +7188,12 @@
     ],
     "source_sha256": "8e5503344bb28d0964bd25363384acf721f183952d48290fcec665044a71e252",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 140855.39540002355,
+    "event_count": 10,
+    "issue_count": 0
   },
   {
     "id": "笑傲-007-03",
@@ -6975,8 +7205,12 @@
     "legacy_uids": [],
     "source_sha256": "8e5503344bb28d0964bd25363384acf721f183952d48290fcec665044a71e252",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 125815.19790002494,
+    "event_count": 8,
+    "issue_count": 0
   },
   {
     "id": "笑傲-008-01",
@@ -9499,9 +9733,12 @@
     "legacy_uids": [],
     "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
     "phase": "source_review",
-    "status": "running",
+    "status": "reviewed",
     "prompt_version": "source-review-v1",
-    "attempts": 1
+    "attempts": 1,
+    "duration_ms": 140192.70129999495,
+    "event_count": 8,
+    "issue_count": 0
   },
   {
     "id": "鹿鼎-033-02",
@@ -9513,8 +9750,12 @@
     "legacy_uids": [],
     "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 140217.04150000005,
+    "event_count": 12,
+    "issue_count": 0
   },
   {
     "id": "鹿鼎-033-03",
@@ -9526,21 +9767,63 @@
     "legacy_uids": [],
     "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 119057.5780000072,
+    "event_count": 6,
+    "issue_count": 0
   },
   {
-    "id": "鹿鼎-034-01",
+    "id": "鹿鼎-034-01a",
     "book": "鹿鼎记",
     "chapter": 34,
     "title": "一纸兴亡看复鹿 千年灰劫付冥鸿",
     "start": 15263,
+    "end": 15372,
+    "legacy_uids": [],
+    "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+    "phase": "source_review",
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 149483.04399999324,
+    "event_count": 14,
+    "issue_count": 0
+  },
+  {
+    "id": "鹿鼎-034-01ba",
+    "book": "鹿鼎记",
+    "chapter": 34,
+    "title": "一纸兴亡看复鹿 千年灰劫付冥鸿",
+    "start": 15373,
+    "end": 15434,
+    "legacy_uids": [],
+    "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+    "phase": "source_review",
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 102541.35059998953,
+    "event_count": 14,
+    "issue_count": 0
+  },
+  {
+    "id": "鹿鼎-034-01bb",
+    "book": "鹿鼎记",
+    "chapter": 34,
+    "title": "一纸兴亡看复鹿 千年灰劫付冥鸿",
+    "start": 15435,
     "end": 15496,
     "legacy_uids": [],
     "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 89134.08240000717,
+    "event_count": 14,
+    "issue_count": 0
   },
   {
     "id": "鹿鼎-034-02",
@@ -9552,8 +9835,12 @@
     "legacy_uids": [],
     "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 177560.4011999967,
+    "event_count": 21,
+    "issue_count": 0
   },
   {
     "id": "鹿鼎-034-03",
@@ -9565,8 +9852,12 @@
     "legacy_uids": [],
     "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 181358.79399999976,
+    "event_count": 20,
+    "issue_count": 0
   },
   {
     "id": "鹿鼎-035-01",
@@ -9578,8 +9869,12 @@
     "legacy_uids": [],
     "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 129026.49759998894,
+    "event_count": 10,
+    "issue_count": 0
   },
   {
     "id": "鹿鼎-035-02",
@@ -9591,8 +9886,12 @@
     "legacy_uids": [],
     "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 94043.63300002296,
+    "event_count": 7,
+    "issue_count": 0
   },
   {
     "id": "鹿鼎-036-01",
@@ -9604,8 +9903,12 @@
     "legacy_uids": [],
     "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 140960.03909999854,
+    "event_count": 13,
+    "issue_count": 0
   },
   {
     "id": "鹿鼎-036-02",
@@ -9617,8 +9920,12 @@
     "legacy_uids": [],
     "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
     "phase": "source_review",
-    "status": "pending",
-    "prompt_version": "source-review-v1"
+    "status": "reviewed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "duration_ms": 104897.96969998861,
+    "event_count": 11,
+    "issue_count": 0
   },
   {
     "id": "鹿鼎-037-01",

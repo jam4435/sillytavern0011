@@ -1,0 +1,114 @@
+{
+  "checks_passed": true,
+  "coverage_exact": true,
+  "card_ownership_exact": true,
+  "other_tasks_unchanged": true,
+  "historical_receipts_unchanged": true,
+  "receipt": [
+    {
+      "sessionId": "session-81370003-fff9-43df-bea0-8c159af901da",
+      "type": "step/start",
+      "seq": 6,
+      "time": 1792937094430
+    },
+    {
+      "sessionId": "session-81370003-fff9-43df-bea0-8c159af901da",
+      "type": "request/header",
+      "seq": 10,
+      "time": 1792937094463,
+      "data": {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    },
+    {
+      "sessionId": "session-81370003-fff9-43df-bea0-8c159af901da",
+      "type": "assistant/message",
+      "seq": 13,
+      "time": 1792937177993,
+      "data": {
+        "usage": {
+          "inputTokens": 4513,
+          "outputTokens": 13550,
+          "cacheReadTokens": 512,
+          "reasoningTokens": 11636
+        }
+      }
+    },
+    {
+      "sessionId": "session-81370003-fff9-43df-bea0-8c159af901da",
+      "type": "turn/end",
+      "seq": 15,
+      "time": 1792937178006,
+      "data": {
+        "reason": {
+          "kind": "completed"
+        }
+      }
+    }
+  ],
+  "trial_tokens": 18575,
+  "usage": {
+    "inputTokens": 1729584,
+    "cacheReadTokens": 80512,
+    "outputTokens": 2720258,
+    "total": 4530354
+  },
+  "progress": {
+    "statuses": {
+      "reviewed": 152,
+      "pending": 459
+    },
+    "by_book": {
+      "天龙八部": {
+        "reviewed": 14,
+        "pending": 103
+      },
+      "射雕英雄传": {
+        "reviewed": 13,
+        "pending": 76
+      },
+      "神雕侠侣": {
+        "reviewed": 13,
+        "pending": 74
+      },
+      "倚天屠龙记": {
+        "reviewed": 13,
+        "pending": 83
+      },
+      "笑傲江湖": {
+        "reviewed": 13,
+        "pending": 83
+      },
+      "鹿鼎记": {
+        "reviewed": 86,
+        "pending": 40
+      }
+    },
+    "usage": {
+      "inputTokens": 1729584,
+      "cacheReadTokens": 80512,
+      "outputTokens": 2720258,
+      "total": 4530354
+    },
+    "events": 1648,
+    "reviewed_legacy": 285,
+    "legacy_verdicts": {
+      "supported": 138,
+      "not_historical": 57,
+      "corrected": 89,
+      "insufficient": 1
+    },
+    "rejected_or_pending_legacy": 1274,
+    "source_stage_complete": false,
+    "diff_reviewed_events": 3,
+    "diff_stage_complete": false,
+    "cross_book_dedup_complete": false
+  }
+}

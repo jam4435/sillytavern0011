@@ -1,0 +1,39 @@
+{
+  "task_id": "倚天-005-02",
+  "raw_sha256": "80278324bd2f3e33e142cad883d38fc54cb9eda9efedf91378a8acc875ae6392",
+  "changes": [
+    {
+      "new_event": 3,
+      "method": "model_reselected",
+      "evidence_index": 2,
+      "before": {
+        "book": "倚天屠龙记",
+        "line": 1886,
+        "anchor": "敝教殷教主原拟柬请天下英雄大会天鹰山"
+      },
+      "after": {
+        "book": "倚天屠龙记",
+        "line": 1886,
+        "anchor": "敝教殷教主原拟柬请天下各路英雄大会天鹰山"
+      },
+      "source_line": "　　白龟寿站起身来，朗声说道：“敝教新近得了一柄宝刀，叫作屠龙刀。有道是：‘武林至尊，宝刀屠龙，号令天下，莫敢不从！’”他说到这里，顿了一顿，晶亮闪烁的眼光从左至右，扫视全场。他身形并不魁梧，但语声响亮，目光锐利，威严之气慑人，又道：“敝教殷教主原拟柬请天下各路英雄大会天鹰山，展示宝刀，只是此举筹划费时，须得暇以时日。诚恐天下英雄不知宝刀已为敝教所得，因此上就近奉请江南诸帮会各位朋友驾临，瞧一瞧宝刀的面目。”说着挥了挥手。教下八名弟子大声答应，转身走进西首一个大山洞中。"
+    }
+  ],
+  "usage_before": {
+    "inputTokens": 1650013,
+    "cacheReadTokens": 76928,
+    "outputTokens": 2566286,
+    "total": 4293227
+  },
+  "usage_after": {
+    "inputTokens": 1651208,
+    "cacheReadTokens": 76928,
+    "outputTokens": 2566586,
+    "total": 4294722
+  },
+  "repair_calls": [
+    "evidence-review-倚天-005-02-a1-event3"
+  ],
+  "validation_issues": [],
+  "semantic_scope": "Evidence locators only; original model assertions remain subject to review."
+}

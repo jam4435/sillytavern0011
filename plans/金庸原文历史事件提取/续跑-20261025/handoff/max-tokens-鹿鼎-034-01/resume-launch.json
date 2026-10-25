@@ -1,0 +1,19 @@
+{
+  "pid": 16796,
+  "started_at": "2026-10-25T21:27:24.0456834+08:00",
+  "command": [
+    "python",
+    "-X",
+    "utf8",
+    "-B",
+    "supervise.py",
+    "--parallel-books",
+    "6"
+  ],
+  "cwd": "F:/Develop/AI/sillytavern/plans/金庸原文历史事件提取/续跑-20261025",
+  "stdout": "handoff/max-tokens-鹿鼎-034-01/resume.stdout.log",
+  "stderr": "handoff/max-tokens-鹿鼎-034-01/resume.stderr.log",
+  "prelaunch_acceptance": "handoff/max-tokens-鹿鼎-034-01/child-acceptance.json",
+  "cumulative_tokens_before_launch": 4107378,
+  "retained_background_job": true
+}

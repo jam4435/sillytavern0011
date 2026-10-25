@@ -1,0 +1,35 @@
+{
+  "task_id": "天龙-005-02",
+  "raw_sha256": "3c1232d658d36ddec816b7f06e10f77feb3520b46540f6029efc852a98be6b56",
+  "changes": [
+    {
+      "new_event": 8,
+      "before": {
+        "book": "天龙八部",
+        "line": 2115,
+        "anchor": "那天打他一拳，拳上内力送入了他膻中气海"
+      },
+      "after": {
+        "book": "天龙八部",
+        "line": 2145,
+        "anchor": "那天打他一拳，拳上内力送入了他膻中气海"
+      },
+      "source_line": "　　郁光标那天打他一拳，拳上内力送入了他膻中气海。单是这一拳，内力自也无几，但段誉以此为引，走顺了手太阴肺经和任脉间的通道。此时郁光标身上的内力，便顺着这条通道缓缓流入他的气海，那正是“北冥神功”中百川汇海的道理。两人倘若各不使劲，两个大拇指轻轻相对，段誉不会“北冥神功”，自也不能吸他内力。但此时两人各自拚命使劲，又已和郁光标早几日打他一拳的情景相同，以自身内力硬生生的逼入对方少商穴中，有如酒壶斟酒，酒杯欲不受而不可得。"
+    }
+  ],
+  "usage_before": {
+    "inputTokens": 1484902,
+    "cacheReadTokens": 68480,
+    "outputTokens": 2252417,
+    "total": 3805799
+  },
+  "usage_after": {
+    "inputTokens": 1488552,
+    "cacheReadTokens": 68736,
+    "outputTokens": 2254680,
+    "total": 3811968
+  },
+  "repair_calls": [],
+  "validation_issues": [],
+  "semantic_scope": "Evidence locators only; original model assertions remain subject to review."
+}

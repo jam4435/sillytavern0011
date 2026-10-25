@@ -1,0 +1,634 @@
+{
+  "task_id": "鹿鼎-034-01bb",
+  "coverage": {
+    "start": 15435,
+    "end": 15496,
+    "complete": true
+  },
+  "reviews": [],
+  "events": [
+    {
+      "title": "郑经立长子郑克臧为太子并命其监国",
+      "when": "郑经出征时",
+      "place": "未知",
+      "people": [
+        "郑经",
+        "郑克臧",
+        "陈永华"
+      ],
+      "relationships": "郑经与郑克臧为父子；郑克臧为陈永华之婿",
+      "description": "郑经长子郑克臧是陈永华之婿，郑经将其立为太子，出征时命他监国。",
+      "cause": "未知",
+      "effect": "郑克臧在郑经出征期间执掌监国",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 15435,
+          "column_start": 1,
+          "column_end": 101,
+          "anchor": "克臧是陈永华之婿",
+          "quote": "　　『注：台湾延平郡王郑经长子克臧是陈永华之婿，刚毅果断，郑经立为太子，出征时命其监国。克臧执法一秉至公，诸叔及诸弟多怨之，扬言其母假娠，克臧为屠夫李某之子。郑经及陈永华死后，克臧为董太妃及诸弟杀害。』",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 15435,
+          "column_start": 5,
+          "column_end": 101,
+          "anchor": "郑经立为太子，出征时命其监国",
+          "quote": "：台湾延平郡王郑经长子克臧是陈永华之婿，刚毅果断，郑经立为太子，出征时命其监国。克臧执法一秉至公，诸叔及诸弟多怨之，扬言其母假娠，克臧为屠夫李某之子。郑经及陈永华死后，克臧为董太妃及诸弟杀害。』",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        }
+      ],
+      "uncertain": [
+        "出自回末注文，未载立太子具体年份"
+      ],
+      "id": "NEW:鹿鼎-034-01bb:001",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "郑克臧执法招怨，诸叔弟诬其出身",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "郑克臧",
+        "诸叔",
+        "诸弟"
+      ],
+      "relationships": "郑克臧与诸叔、诸弟因执法结怨",
+      "description": "郑克臧执法一秉至公，诸叔及诸弟多怨恨他，扬言其母假娠，并称郑克臧是屠夫李某之子。",
+      "cause": "郑克臧执法一秉至公",
+      "effect": "诸叔及诸弟怨恨他并造谣诬其出身",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 15435,
+          "column_start": 20,
+          "column_end": 101,
+          "anchor": "克臧执法一秉至公，诸叔及诸弟多怨之",
+          "quote": "永华之婿，刚毅果断，郑经立为太子，出征时命其监国。克臧执法一秉至公，诸叔及诸弟多怨之，扬言其母假娠，克臧为屠夫李某之子。郑经及陈永华死后，克臧为董太妃及诸弟杀害。』",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        }
+      ],
+      "uncertain": [
+        "出自回末注文，造谣传播范围未详"
+      ],
+      "id": "NEW:鹿鼎-034-01bb:002",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "郑经陈永华死后郑克臧被董太妃及诸弟杀害",
+      "when": "郑经及陈永华死后",
+      "place": "未知",
+      "people": [
+        "郑克臧",
+        "董太妃",
+        "诸弟"
+      ],
+      "relationships": "郑克臧与董太妃、诸弟发生权力冲突",
+      "description": "郑经及陈永华死后，郑克臧被董太妃及诸弟杀害。",
+      "cause": "未知；原文仅记发生于郑经及陈永华死后",
+      "effect": "郑克臧死亡",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 15435,
+          "column_start": 64,
+          "column_end": 101,
+          "anchor": "克臧为董太妃及诸弟杀害",
+          "quote": "言其母假娠，克臧为屠夫李某之子。郑经及陈永华死后，克臧为董太妃及诸弟杀害。』",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        }
+      ],
+      "uncertain": [
+        "出自回末注文，具体杀害经过未详"
+      ],
+      "id": "NEW:鹿鼎-034-01bb:003",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "吴六奇与双儿结拜为兄妹",
+      "when": "韦小宝等告辞前不久",
+      "place": "未知",
+      "people": [
+        "吴六奇",
+        "双儿"
+      ],
+      "relationships": "二人结为义兄妹",
+      "description": "吴六奇认为双儿忠肝义胆，主动要求与她结拜；双儿先推辞，后答应，二人结为兄妹。",
+      "cause": "吴六奇敬重双儿忠肝义胆",
+      "effect": "吴六奇成为双儿的义兄",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 15439,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "我已跟她拜了把子，结成了兄妹",
+          "quote": "　　吴六奇道：“韦兄弟，你这个小丫头双儿，我已跟她拜了把子，结成了兄妹。”韦小宝和马超兴都吃了一惊，转头看双儿时，只见她低下了头，红晕双颊，神色甚是忸怩。韦小宝笑道：“吴大哥好会说笑话。”吴六奇正色道：“不是说笑。我这个义妹忠肝义胆，胜于须",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 15439,
+          "column_start": 83,
+          "column_end": 202,
+          "anchor": "我这个义妹忠肝义胆",
+          "quote": "：“吴大哥好会说笑话。”吴六奇正色道：“不是说笑。我这个义妹忠肝义胆，胜于须眉，正是我辈中人。做哥哥的对她好生相敬。我见你跟‘百胜刀王’胡逸之拜把子，拜得挺有劲，我见样学样，于是要跟双儿拜把子。她可说甚么也不肯，说是高攀不上。我一个老叫化，",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        }
+      ],
+      "uncertain": [
+        "结拜发生在韦小宝告辞前不久"
+      ],
+      "id": "NEW:鹿鼎-034-01bb:004",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "木桑道人创神行百变轻功",
+      "when": "当年；未知具体年份",
+      "place": "未知",
+      "people": [
+        "木桑道人",
+        "九难"
+      ],
+      "relationships": "木桑道人为九难恩师",
+      "description": "木桑道人创出“神行百变”，此功为天下轻功之首，当年威震武林；木桑道人已逝世。",
+      "cause": "未知",
+      "effect": "九难通晓此功并用以教授韦小宝",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 15451,
+          "column_start": 105,
+          "column_end": 206,
+          "anchor": "是我恩师木桑道人所创",
+          "quote": "的材料。这样罢，我铁剑门中有一项‘神行百变’功夫，是我恩师木桑道人所创，乃是天下轻功之首。这项轻功须以高深内功为根基，谅你也不能领会。你没一门傍身之技，日后遇到危难，如何得了？我只好教你一些逃跑的法门。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 15451,
+          "column_start": 116,
+          "column_end": 206,
+          "anchor": "乃是天下轻功之首",
+          "quote": "门中有一项‘神行百变’功夫，是我恩师木桑道人所创，乃是天下轻功之首。这项轻功须以高深内功为根基，谅你也不能领会。你没一门傍身之技，日后遇到危难，如何得了？我只好教你一些逃跑的法门。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 15453,
+          "column_start": 46,
+          "column_end": 135,
+          "anchor": "当年威震武林",
+          "quote": "。”九难微微摇头，说道：“‘神行百变’，世间无双，当年威震武林，今日却让你用来脚底抹油，恩师地下有知，定是不肯认你这个没出息的徒孙。不过除此之外，我也没甚么你学得会的本事传给你。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        }
+      ],
+      "uncertain": [
+        "木桑道人逝世时间原文未详"
+      ],
+      "id": "NEW:鹿鼎-034-01bb:005",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "九难以木桑道人为恩师，属铁剑门",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "九难",
+        "木桑道人"
+      ],
+      "relationships": "九难为铁剑门弟子，木桑道人为其恩师",
+      "description": "九难自称铁剑门中人，并称木桑道人为恩师。",
+      "cause": "未知",
+      "effect": "九难承铁剑门武功，能传“神行百变”身法",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 15451,
+          "column_start": 88,
+          "column_end": 206,
+          "anchor": "我铁剑门中有一项",
+          "quote": "有师徒之名，但瞧你性子，实不是学武的材料。这样罢，我铁剑门中有一项‘神行百变’功夫，是我恩师木桑道人所创，乃是天下轻功之首。这项轻功须以高深内功为根基，谅你也不能领会。你没一门傍身之技，日后遇到危难，如何得了？我只好教你一些逃跑的法门。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 15451,
+          "column_start": 105,
+          "column_end": 206,
+          "anchor": "是我恩师木桑道人",
+          "quote": "的材料。这样罢，我铁剑门中有一项‘神行百变’功夫，是我恩师木桑道人所创，乃是天下轻功之首。这项轻功须以高深内功为根基，谅你也不能领会。你没一门傍身之技，日后遇到危难，如何得了？我只好教你一些逃跑的法门。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        }
+      ],
+      "uncertain": [
+        "九难入铁剑门经过未详"
+      ],
+      "id": "NEW:鹿鼎-034-01bb:006",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "九难对袁承志有情而袁承志别有所钟",
+      "when": "二十多年来",
+      "place": "未知",
+      "people": [
+        "九难",
+        "袁承志"
+      ],
+      "relationships": "九难对袁承志有情，袁承志情有别钟",
+      "description": "九难对袁承志落花有意，袁承志却情有别钟；九难将这番情意深藏心底二十多年。",
+      "cause": "未知",
+      "effect": "九难长期隐忍这段感情",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 15471,
+          "column_start": 3,
+          "column_end": 74,
+          "anchor": "她对袁承志落花有意，袁承志却情有别钟",
+          "quote": "九难这时心中所想的，正是那个远在万里海外的袁承志。她对袁承志落花有意，袁承志却情有别钟。二十多年来这番情意深藏心底，这时却又给韦小宝撩拨了起来。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 15471,
+          "column_start": 22,
+          "column_end": 74,
+          "anchor": "二十多年来这番情意深藏心底",
+          "quote": "外的袁承志。她对袁承志落花有意，袁承志却情有别钟。二十多年来这番情意深藏心底，这时却又给韦小宝撩拨了起来。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        }
+      ],
+      "uncertain": [
+        "袁承志所爱之人及二人交往始末未详"
+      ],
+      "id": "NEW:鹿鼎-034-01bb:007",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "康熙复旨准许吴应熊来京完婚",
+      "when": "韦小宝等回京前",
+      "place": "北京",
+      "people": [
+        "康熙",
+        "吴应熊",
+        "建宁公主"
+      ],
+      "relationships": "康熙准许吴应熊与建宁公主完婚",
+      "description": "康熙早已接到奏章，复旨准许吴应熊来京与建宁公主完婚。",
+      "cause": "相关奏章已到",
+      "effect": "吴应熊获准来京完婚",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 15479,
+          "column_start": 1,
+          "column_end": 40,
+          "anchor": "已复旨准许吴应熊来京完婚",
+          "quote": "　　康熙早已接到奏章，已复旨准许吴应熊来京完婚，这时见到妹子和韦小宝，心下甚喜。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        }
+      ],
+      "uncertain": [
+        "具体完婚日期未定"
+      ],
+      "id": "NEW:鹿鼎-034-01bb:008",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "吴三桂勾结西藏、蒙古、罗刹国与神龙教",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "吴三桂",
+        "西藏",
+        "蒙古",
+        "罗刹国",
+        "神龙教"
+      ],
+      "relationships": "吴三桂与诸方勾结为外援",
+      "description": "韦小宝向康熙奏报，吴三桂跟西藏、蒙古、罗刹国、神龙教诸方勾结。",
+      "cause": "吴三桂图谋造反",
+      "effect": "康熙认为此事十分棘手",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 15491,
+          "column_start": 12,
+          "column_end": 131,
+          "anchor": "吴三桂如何跟西藏、蒙古、罗刹国、神龙教诸方勾结",
+          "quote": "头道：“吴三桂果然要反，你见到甚么？”韦小宝于是将吴三桂如何跟西藏、蒙古、罗刹国、神龙教诸方勾结的情形一一说了。康熙神色郑重，沉吟不语，过了好一会，才道：“这奸贼！竟勾结了这许多外援！”韦小宝也早知这事十分棘手，不敢作声。再过一会，康熙又问",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        }
+      ],
+      "uncertain": [
+        "勾结起始时间及具体约定未详"
+      ],
+      "id": "NEW:鹿鼎-034-01bb:009",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "韦小宝擒罕帖摩并假扮吴三桂小儿子套出真相",
+      "when": "此前",
+      "place": "未知",
+      "people": [
+        "韦小宝",
+        "罕帖摩",
+        "吴三桂"
+      ],
+      "relationships": "韦小宝冒充吴三桂小儿子",
+      "description": "韦小宝将蒙古王子的使者罕帖摩擒来，假装是吴三桂的小儿子，骗出真相。",
+      "cause": "查探吴三桂勾结外援的内情",
+      "effect": "韦小宝套出真相",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 15493,
+          "column_start": 1,
+          "column_end": 101,
+          "anchor": "已将蒙古王子的使者擒来",
+          "quote": "　　韦小宝说道已将蒙古王子的使者擒来，述说自己如何假装吴三桂的小儿子而骗出真相，吴应熊如何想夺回罕帖摩，在公主住处放火，反而惨遭阉割，自己又如何派遣部属化装为王府家将，在妓院中争风吃腊、假装杀死罕帖摩。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 15493,
+          "column_start": 1,
+          "column_end": 101,
+          "anchor": "假装吴三桂的小儿子而骗出真相",
+          "quote": "　　韦小宝说道已将蒙古王子的使者擒来，述说自己如何假装吴三桂的小儿子而骗出真相，吴应熊如何想夺回罕帖摩，在公主住处放火，反而惨遭阉割，自己又如何派遣部属化装为王府家将，在妓院中争风吃腊、假装杀死罕帖摩。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        }
+      ],
+      "uncertain": [
+        "擒获地点及骗出真相的细节未详"
+      ],
+      "id": "NEW:鹿鼎-034-01bb:010",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "吴应熊为夺回罕帖摩在公主住处放火反遭阉割",
+      "when": "此前",
+      "place": "公主住处",
+      "people": [
+        "吴应熊",
+        "罕帖摩",
+        "建宁公主"
+      ],
+      "relationships": "吴应熊与韦小宝一方争夺罕帖摩",
+      "description": "吴应熊想夺回罕帖摩，在公主住处放火，反而惨遭阉割。",
+      "cause": "吴应熊想夺回罕帖摩",
+      "effect": "吴应熊放火不成，反被阉割",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 15493,
+          "column_start": 28,
+          "column_end": 101,
+          "anchor": "在公主住处放火，反而惨遭阉割",
+          "quote": "吴三桂的小儿子而骗出真相，吴应熊如何想夺回罕帖摩，在公主住处放火，反而惨遭阉割，自己又如何派遣部属化装为王府家将，在妓院中争风吃腊、假装杀死罕帖摩。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        }
+      ],
+      "uncertain": [
+        "具体行凶者原文未明"
+      ],
+      "id": "NEW:鹿鼎-034-01bb:011",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "韦小宝遣部属化装王府家将，在妓院假装杀死罕帖摩",
+      "when": "此前",
+      "place": "妓院",
+      "people": [
+        "韦小宝",
+        "部属",
+        "罕帖摩"
+      ],
+      "relationships": "韦小宝部属伪装成吴三桂王府家将",
+      "description": "韦小宝派遣部属化装为王府家将，在妓院中争风吃腊，并假装杀死罕帖摩。",
+      "cause": "配合隐瞒罕帖摩真相的布局",
+      "effect": "外人误以为罕帖摩已死",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 15493,
+          "column_start": 52,
+          "column_end": 101,
+          "anchor": "化装为王府家将，在妓院中争风吃腊",
+          "quote": "，在公主住处放火，反而惨遭阉割，自己又如何派遣部属化装为王府家将，在妓院中争风吃腊、假装杀死罕帖摩。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 15493,
+          "column_start": 69,
+          "column_end": 101,
+          "anchor": "假装杀死罕帖摩",
+          "quote": "己又如何派遣部属化装为王府家将，在妓院中争风吃腊、假装杀死罕帖摩。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        }
+      ],
+      "uncertain": [
+        "假杀具体手法未详"
+      ],
+      "id": "NEW:鹿鼎-034-01bb:012",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "吴三桂带重兵来京祭拜，被顾命大臣阻于城外",
+      "when": "顺治驾崩消息传出后",
+      "place": "北京城外",
+      "people": [
+        "吴三桂",
+        "康熙",
+        "顾命大臣",
+        "顺治"
+      ],
+      "relationships": "吴三桂与清廷之间产生猜忌",
+      "description": "宫中传出顺治驾崩消息，吴三桂带重兵来京祭拜；几名顾命大臣防他拥兵入京生变，要他在北京城外搭孝棚拜祭，不许他进北京城。",
+      "cause": "顾命大臣防吴三桂拥兵入京生变",
+      "effect": "吴三桂不得进城拜祭；康熙认为其反谋种因于此",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 15495,
+          "column_start": 28,
+          "column_end": 116,
+          "anchor": "吴三桂带了重兵，来京祭拜",
+          "quote": "吴三桂这人，我没见过。那日宫中传出父王宾天的讯息，吴三桂带了重兵，来京祭拜。我原想见他一见，可是几名顾命大臣防他拥兵入京，忽然生变，要他在北京城外搭了孝棚拜祭，不许他进北京城。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 15495,
+          "column_start": 69,
+          "column_end": 116,
+          "anchor": "要他在北京城外搭了孝棚拜祭",
+          "quote": "见他一见，可是几名顾命大臣防他拥兵入京，忽然生变，要他在北京城外搭了孝棚拜祭，不许他进北京城。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 15497,
+          "column_start": 140,
+          "column_end": 178,
+          "anchor": "他的反谋，只怕就种因于此",
+          "quote": "！吴三桂知道朝廷对他疑忌，又怕了他，岂有不反之理？他的反谋，只怕就种因于此。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        }
+      ],
+      "uncertain": [
+        "“反谋种因于此”系康熙的判断"
+      ],
+      "id": "NEW:鹿鼎-034-01bb:013",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "康熙在昆明派驻探子，但查不到吴三桂勾结外援的大事",
+      "when": "未知",
+      "place": "昆明",
+      "people": [
+        "康熙",
+        "吴三桂",
+        "探子"
+      ],
+      "relationships": "康熙遣探子侦察吴三桂",
+      "description": "康熙在昆明派有不少探子，能查平西王府内外之事；但康熙自认探子查不到吴三桂勾结西藏、蒙古、罗刹国的大事。",
+      "cause": "知己知彼，防吴三桂造反",
+      "effect": "康熙掌握吴三桂部分情报，却查不到勾结外援的大秘密",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 15505,
+          "column_start": 38,
+          "column_end": 76,
+          "anchor": "皇上在昆明派得有不少探子",
+          "quote": "知道得比奴才还多。”突然恍然大悟，道：“啊，是了，皇上在昆明派得有不少探子。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 15507,
+          "column_start": 53,
+          "column_end": 102,
+          "anchor": "我那些探子就查不到",
+          "quote": "探明了吴三桂跟西藏、蒙古、罗刹国勾结。这桩大秘密，我那些探子就查不到。他们只能查小事，查不到大事。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 34
+        }
+      ],
+      "uncertain": [
+        "探子设立时间与规模未详"
+      ],
+      "id": "NEW:鹿鼎-034-01bb:014",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    }
+  ],
+  "cross_links": [
+    {
+      "topic": "九难与袁承志旧情",
+      "people": [
+        "九难",
+        "袁承志"
+      ],
+      "detail": "第34回仅证九难对袁承志有情而袁承志情有别钟，且九难深藏二十多年；二人相识及袁承志另爱之人等始末待核，不作断言。"
+    },
+    {
+      "topic": "铁剑门与神行百变传承",
+      "people": [
+        "九难",
+        "木桑道人"
+      ],
+      "detail": "第34回仅证木桑道人为九难恩师并创神行百变；铁剑门其他传承及木桑生平待核。"
+    },
+    {
+      "topic": "吴三桂勾结外援与神龙教",
+      "people": [
+        "吴三桂",
+        "神龙教",
+        "康熙",
+        "韦小宝"
+      ],
+      "detail": "本回证吴三桂与神龙教等诸方勾结；神龙教方面接头人、时间与具体约定待核。"
+    }
+  ],
+  "unresolved": [
+    "回末注文所载郑克臧被杀害的具体主谋与经过，正文未详。",
+    "吴应熊遭阉割的具体行凶者，原文未明。",
+    "吴三桂与西藏、蒙古、罗刹国、神龙教勾结的起始时间与具体条款，本回未详。",
+    "九难与袁承志旧情始末、袁承志所爱之人，本回未详。",
+    "木桑道人逝世时间及神行百变传入铁剑门的经过，本回未详。",
+    "康熙在昆明探子的规模与设立时间，本回未详。"
+  ],
+  "validation_issues": [],
+  "semantic_acceptance": "model_reviewed_not_independent_audit"
+}

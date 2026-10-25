@@ -1,0 +1,260 @@
+{
+  "observed_at": "2026-10-25T13:15:58.738Z",
+  "wave": {
+    "pid": 44044,
+    "status": "finished",
+    "task_ids": [
+      "鹿鼎-034-01",
+      "倚天-005-01",
+      "笑傲-005-02",
+      "天龙-006-01",
+      "射雕-005-02",
+      "神雕-006-01"
+    ],
+    "usage_before": {
+      "inputTokens": 1488552,
+      "cacheReadTokens": 68736,
+      "outputTokens": 2254680,
+      "total": 3811968
+    },
+    "reserved_tokens": 540000,
+    "outcomes": [
+      {
+        "id": "射雕-005-02",
+        "status": "reviewed",
+        "event_count": 5,
+        "issue_count": 0
+      },
+      {
+        "id": "倚天-005-01",
+        "status": "reviewed",
+        "event_count": 3,
+        "issue_count": 0
+      },
+      {
+        "id": "神雕-006-01",
+        "status": "reviewed",
+        "event_count": 7,
+        "issue_count": 0
+      },
+      {
+        "id": "笑傲-005-02",
+        "status": "reviewed",
+        "event_count": 9,
+        "issue_count": 0
+      },
+      {
+        "id": "天龙-006-01",
+        "status": "reviewed",
+        "event_count": 5,
+        "issue_count": 0
+      },
+      {
+        "id": "鹿鼎-034-01",
+        "status": "failed",
+        "error": "dsh failed: {\"kind\": \"max-tokens\"}"
+      }
+    ],
+    "usage_after": {
+      "inputTokens": 1561560,
+      "cacheReadTokens": 71808,
+      "outputTokens": 2360407,
+      "total": 3993775
+    }
+  },
+  "receipts": [
+    {
+      "id": "鹿鼎-034-01",
+      "sessionId": "session-c6da6b58-2ac8-45fe-bb1c-f3f79c42935e",
+      "headers": [
+        {
+          "config": {
+            "provider": "buddy",
+            "model": "deepseek-v4.1-flash",
+            "reasoningEffort": "low",
+            "maxTokens": 32768
+          },
+          "toolCount": 0,
+          "toolNames": []
+        }
+      ],
+      "steps": 1,
+      "ends": [
+        {
+          "reason": {
+            "kind": "max-tokens"
+          }
+        }
+      ],
+      "usage": [
+        {
+          "inputTokens": 11619,
+          "outputTokens": 32761,
+          "cacheReadTokens": 512,
+          "reasoningTokens": 32761
+        }
+      ]
+    },
+    {
+      "id": "倚天-005-01",
+      "sessionId": "session-99469945-3a36-4d0a-b58b-6b7410c758b8",
+      "headers": [
+        {
+          "config": {
+            "provider": "buddy",
+            "model": "deepseek-v4.1-flash",
+            "reasoningEffort": "low",
+            "maxTokens": 32768
+          },
+          "toolCount": 0,
+          "toolNames": []
+        }
+      ],
+      "steps": 1,
+      "ends": [
+        {
+          "reason": {
+            "kind": "completed"
+          }
+        }
+      ],
+      "usage": [
+        {
+          "inputTokens": 12754,
+          "outputTokens": 11744,
+          "cacheReadTokens": 512,
+          "reasoningTokens": 9826
+        }
+      ]
+    },
+    {
+      "id": "笑傲-005-02",
+      "sessionId": "session-8f82a989-122d-4258-851a-d810f96d8c76",
+      "headers": [
+        {
+          "config": {
+            "provider": "buddy",
+            "model": "deepseek-v4.1-flash",
+            "reasoningEffort": "low",
+            "maxTokens": 32768
+          },
+          "toolCount": 0,
+          "toolNames": []
+        }
+      ],
+      "steps": 1,
+      "ends": [
+        {
+          "reason": {
+            "kind": "completed"
+          }
+        }
+      ],
+      "usage": [
+        {
+          "inputTokens": 13023,
+          "outputTokens": 18959,
+          "cacheReadTokens": 512,
+          "reasoningTokens": 16377
+        }
+      ]
+    },
+    {
+      "id": "天龙-006-01",
+      "sessionId": "session-e66e917a-16e9-4311-8cbd-f00cc18e7bde",
+      "headers": [
+        {
+          "config": {
+            "provider": "buddy",
+            "model": "deepseek-v4.1-flash",
+            "reasoningEffort": "low",
+            "maxTokens": 32768
+          },
+          "toolCount": 0,
+          "toolNames": []
+        }
+      ],
+      "steps": 1,
+      "ends": [
+        {
+          "reason": {
+            "kind": "completed"
+          }
+        }
+      ],
+      "usage": [
+        {
+          "inputTokens": 12987,
+          "outputTokens": 18024,
+          "cacheReadTokens": 512,
+          "reasoningTokens": 15826
+        }
+      ]
+    },
+    {
+      "id": "射雕-005-02",
+      "sessionId": "session-3fb607a0-120d-44c3-9ad9-e53e6e635fda",
+      "headers": [
+        {
+          "config": {
+            "provider": "buddy",
+            "model": "deepseek-v4.1-flash",
+            "reasoningEffort": "low",
+            "maxTokens": 32768
+          },
+          "toolCount": 0,
+          "toolNames": []
+        }
+      ],
+      "steps": 1,
+      "ends": [
+        {
+          "reason": {
+            "kind": "completed"
+          }
+        }
+      ],
+      "usage": [
+        {
+          "inputTokens": 9043,
+          "outputTokens": 10576,
+          "cacheReadTokens": 512,
+          "reasoningTokens": 7931
+        }
+      ]
+    },
+    {
+      "id": "神雕-006-01",
+      "sessionId": "session-133b7dce-670f-4384-9770-78aebf48b6f8",
+      "headers": [
+        {
+          "config": {
+            "provider": "buddy",
+            "model": "deepseek-v4.1-flash",
+            "reasoningEffort": "low",
+            "maxTokens": 32768
+          },
+          "toolCount": 0,
+          "toolNames": []
+        }
+      ],
+      "steps": 1,
+      "ends": [
+        {
+          "reason": {
+            "kind": "completed"
+          }
+        }
+      ],
+      "usage": [
+        {
+          "inputTokens": 13582,
+          "outputTokens": 13663,
+          "cacheReadTokens": 512,
+          "reasoningTokens": 11248
+        }
+      ]
+    }
+  ],
+  "checks_passed": true
+}

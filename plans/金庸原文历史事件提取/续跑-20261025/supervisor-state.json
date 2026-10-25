@@ -1,21 +1,15 @@
 {
-  "pid": 44044,
-  "status": "running",
+  "pid": 35396,
+  "status": "needs_attention",
   "phase": "source",
-  "updated_at": "2026-10-25T20:31:26+0800",
+  "updated_at": "2026-10-25T22:19:46+0800",
   "usage": {
-    "inputTokens": 1278349,
-    "cacheReadTokens": 59008,
-    "outputTokens": 1936008,
-    "total": 3273365
+    "inputTokens": 1953987,
+    "cacheReadTokens": 92800,
+    "outputTokens": 3139762,
+    "total": 5186549
   },
-  "parallel_books": 6,
-  "books": [
-    "鹿鼎记",
-    "倚天屠龙记",
-    "笑傲江湖",
-    "天龙八部",
-    "射雕英雄传",
-    "神雕侠侣"
+  "failed": [
+    "射雕-008-01"
   ]
 }

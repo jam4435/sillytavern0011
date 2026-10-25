@@ -1,0 +1,392 @@
+{
+  "observed_at": "2026-10-25T12:43:32.355Z",
+  "controller": {
+    "pid": 44044,
+    "command": "python -X utf8 -B supervise.py --parallel-books 6",
+    "os_process_verified": true,
+    "child_dsh_pids": [
+      32276,
+      18368,
+      56276,
+      38676,
+      33204,
+      54924
+    ],
+    "existing_controller_retained": true
+  },
+  "wave_file": "handoff/parallel-waves/20261025-203834-f949eee0.json",
+  "checks_passed": true,
+  "receipts": [
+    {
+      "call_id": "review-鹿鼎-033-03-a1",
+      "session_ids": [
+        "session-73912843-234b-4f77-9695-b401d4ece907"
+      ],
+      "headers": [
+        {
+          "config": {
+            "provider": "buddy",
+            "model": "deepseek-v4.1-flash",
+            "reasoningEffort": "low",
+            "maxTokens": 32768
+          },
+          "toolCount": 0,
+          "toolNames": []
+        }
+      ],
+      "steps": 1,
+      "ends": [
+        {
+          "reason": {
+            "kind": "completed"
+          }
+        }
+      ],
+      "usage": [
+        {
+          "inputTokens": 3483,
+          "outputTokens": 13811,
+          "cacheReadTokens": 512,
+          "reasoningTokens": 11899
+        }
+      ],
+      "start": 1792931950283,
+      "end": 1792932033666
+    },
+    {
+      "call_id": "review-倚天-004-02-a1",
+      "session_ids": [
+        "session-d475bd07-706e-4e18-8b81-7aa09f371feb"
+      ],
+      "headers": [
+        {
+          "config": {
+            "provider": "buddy",
+            "model": "deepseek-v4.1-flash",
+            "reasoningEffort": "low",
+            "maxTokens": 32768
+          },
+          "toolCount": 0,
+          "toolNames": []
+        }
+      ],
+      "steps": 1,
+      "ends": [
+        {
+          "reason": {
+            "kind": "completed"
+          }
+        }
+      ],
+      "usage": [
+        {
+          "inputTokens": 2771,
+          "outputTokens": 9346,
+          "cacheReadTokens": 512,
+          "reasoningTokens": 8059
+        }
+      ],
+      "start": 1792931950553,
+      "end": 1792932007638
+    },
+    {
+      "call_id": "review-笑傲-005-01-a1",
+      "session_ids": [
+        "session-e816bf24-7d21-4b54-8553-c2643cb663cf"
+      ],
+      "headers": [
+        {
+          "config": {
+            "provider": "buddy",
+            "model": "deepseek-v4.1-flash",
+            "reasoningEffort": "low",
+            "maxTokens": 32768
+          },
+          "toolCount": 0,
+          "toolNames": []
+        }
+      ],
+      "steps": 1,
+      "ends": [
+        {
+          "reason": {
+            "kind": "completed"
+          }
+        }
+      ],
+      "usage": [
+        {
+          "inputTokens": 11576,
+          "outputTokens": 15925,
+          "cacheReadTokens": 512,
+          "reasoningTokens": 13163
+        }
+      ],
+      "start": 1792931950449,
+      "end": 1792932046232
+    },
+    {
+      "call_id": "review-天龙-005-02-a1",
+      "session_ids": [
+        "session-d133b659-704c-4ded-906e-120072846f2a"
+      ],
+      "headers": [
+        {
+          "config": {
+            "provider": "buddy",
+            "model": "deepseek-v4.1-flash",
+            "reasoningEffort": "low",
+            "maxTokens": 32768
+          },
+          "toolCount": 0,
+          "toolNames": []
+        }
+      ],
+      "steps": 1,
+      "ends": [
+        {
+          "reason": {
+            "kind": "completed"
+          }
+        }
+      ],
+      "usage": [
+        {
+          "inputTokens": 12024,
+          "outputTokens": 14883,
+          "cacheReadTokens": 512,
+          "reasoningTokens": 12225
+        }
+      ],
+      "start": 1792931950584,
+      "end": 1792932044895
+    },
+    {
+      "call_id": "review-射雕-005-01-a1",
+      "session_ids": [
+        "session-1d073f4f-aa25-405b-aba7-0d1e32eb706c"
+      ],
+      "headers": [
+        {
+          "config": {
+            "provider": "buddy",
+            "model": "deepseek-v4.1-flash",
+            "reasoningEffort": "low",
+            "maxTokens": 32768
+          },
+          "toolCount": 0,
+          "toolNames": []
+        }
+      ],
+      "steps": 1,
+      "ends": [
+        {
+          "reason": {
+            "kind": "completed"
+          }
+        }
+      ],
+      "usage": [
+        {
+          "inputTokens": 13542,
+          "outputTokens": 29959,
+          "cacheReadTokens": 512,
+          "reasoningTokens": 26449
+        }
+      ],
+      "start": 1792931950692,
+      "end": 1792932137863
+    },
+    {
+      "call_id": "review-神雕-005-02-a1",
+      "session_ids": [
+        "session-ffa7b4b8-da34-4074-b90d-1b1a0ecdf63b"
+      ],
+      "headers": [
+        {
+          "config": {
+            "provider": "buddy",
+            "model": "deepseek-v4.1-flash",
+            "reasoningEffort": "low",
+            "maxTokens": 32768
+          },
+          "toolCount": 0,
+          "toolNames": []
+        }
+      ],
+      "steps": 1,
+      "ends": [
+        {
+          "reason": {
+            "kind": "completed"
+          }
+        }
+      ],
+      "usage": [
+        {
+          "inputTokens": 11597,
+          "outputTokens": 10199,
+          "cacheReadTokens": 512,
+          "reasoningTokens": 7678
+        }
+      ],
+      "start": 1792931950695,
+      "end": 1792932016084
+    },
+    {
+      "call_id": "structure-review-倚天-004-02-a1",
+      "session_ids": [
+        "session-0e98db98-e0bb-4c26-86fc-5b2d9587767c"
+      ],
+      "headers": [
+        {
+          "config": {
+            "provider": "buddy",
+            "model": "deepseek-v4.1-flash",
+            "reasoningEffort": "low",
+            "maxTokens": 32768
+          },
+          "toolCount": 0,
+          "toolNames": []
+        }
+      ],
+      "steps": 1,
+      "ends": [
+        {
+          "reason": {
+            "kind": "completed"
+          }
+        }
+      ],
+      "usage": [
+        {
+          "inputTokens": 3650,
+          "outputTokens": 2263,
+          "cacheReadTokens": 256,
+          "reasoningTokens": 1964
+        }
+      ],
+      "start": 1792932150575,
+      "end": 1792932165210
+    }
+  ],
+  "resultChecks": [
+    {
+      "id": "鹿鼎-033-03",
+      "status": "reviewed",
+      "validation_issues": []
+    },
+    {
+      "id": "倚天-004-02",
+      "status": "reviewed",
+      "validation_issues": []
+    },
+    {
+      "id": "笑傲-005-01",
+      "status": "reviewed",
+      "validation_issues": []
+    },
+    {
+      "id": "天龙-005-02",
+      "status": "reviewed",
+      "validation_issues": []
+    },
+    {
+      "id": "射雕-005-01",
+      "status": "reviewed",
+      "validation_issues": []
+    },
+    {
+      "id": "神雕-005-02",
+      "status": "reviewed",
+      "validation_issues": []
+    }
+  ],
+  "progress": {
+    "statuses": {
+      "reviewed": 132,
+      "pending": 474
+    },
+    "by_book": {
+      "天龙八部": {
+        "reviewed": 11,
+        "pending": 103
+      },
+      "射雕英雄传": {
+        "reviewed": 10,
+        "pending": 79
+      },
+      "神雕侠侣": {
+        "reviewed": 10,
+        "pending": 77
+      },
+      "倚天屠龙记": {
+        "reviewed": 10,
+        "pending": 86
+      },
+      "笑傲江湖": {
+        "reviewed": 10,
+        "pending": 86
+      },
+      "鹿鼎记": {
+        "reviewed": 81,
+        "pending": 43
+      }
+    },
+    "usage": {
+      "inputTokens": 1488552,
+      "cacheReadTokens": 68736,
+      "outputTokens": 2254680,
+      "total": 3811968
+    },
+    "events": 1432,
+    "reviewed_legacy": 240,
+    "legacy_verdicts": {
+      "supported": 116,
+      "not_historical": 51,
+      "corrected": 72,
+      "insufficient": 1
+    },
+    "rejected_or_pending_legacy": 1313,
+    "source_stage_complete": false,
+    "diff_reviewed_events": 3,
+    "diff_stage_complete": false,
+    "cross_book_dedup_complete": false
+  },
+  "active": [
+    {
+      "id": "天龙-006-01",
+      "book": "天龙八部"
+    },
+    {
+      "id": "射雕-005-02",
+      "book": "射雕英雄传"
+    },
+    {
+      "id": "神雕-006-01",
+      "book": "神雕侠侣"
+    },
+    {
+      "id": "倚天-005-01",
+      "book": "倚天屠龙记"
+    },
+    {
+      "id": "笑傲-005-02",
+      "book": "笑傲江湖"
+    },
+    {
+      "id": "鹿鼎-034-01",
+      "book": "鹿鼎记"
+    }
+  ],
+  "accounting": {
+    "historical_total_before": 3653611,
+    "batch_tokens": 152188,
+    "repair_tokens": 6169,
+    "cumulative_total": 3811968,
+    "budget": 15000000,
+    "remaining": 11188032,
+    "historical_receipts_unchanged": true
+  },
+  "scope": "Only current state, exceptional tasks, selected wave receipts, and runtime guidance inspected. No controller restart, code change, final worldbook, pre-added event, or character snapshot modification. Existing reviewed status is program acceptance, not final independent semantic audit."
+}

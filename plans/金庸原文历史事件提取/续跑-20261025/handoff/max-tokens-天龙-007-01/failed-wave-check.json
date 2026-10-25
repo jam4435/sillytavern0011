@@ -1,0 +1,380 @@
+{
+  "wave": {
+    "pid": 16796,
+    "status": "finished",
+    "task_ids": [
+      "鹿鼎-034-03",
+      "倚天-005-03",
+      "笑傲-006-01",
+      "天龙-007-01",
+      "射雕-006-02",
+      "神雕-007-01"
+    ],
+    "usage_before": {
+      "inputTokens": 1651208,
+      "cacheReadTokens": 76928,
+      "outputTokens": 2566586,
+      "total": 4294722
+    },
+    "reserved_tokens": 540000,
+    "outcomes": [
+      {
+        "id": "倚天-005-03",
+        "status": "reviewed",
+        "event_count": 5,
+        "issue_count": 0
+      },
+      {
+        "id": "神雕-007-01",
+        "status": "reviewed",
+        "event_count": 9,
+        "issue_count": 0
+      },
+      {
+        "id": "笑傲-006-01",
+        "status": "reviewed",
+        "event_count": 9,
+        "issue_count": 0
+      },
+      {
+        "id": "鹿鼎-034-03",
+        "status": "reviewed",
+        "event_count": 20,
+        "issue_count": 0
+      },
+      {
+        "id": "射雕-006-02",
+        "status": "reviewed",
+        "event_count": 15,
+        "issue_count": 0
+      },
+      {
+        "id": "天龙-007-01",
+        "status": "failed",
+        "error": "dsh failed: {\"kind\": \"max-tokens\"}"
+      }
+    ],
+    "usage_after": {
+      "inputTokens": 1725071,
+      "cacheReadTokens": 80000,
+      "outputTokens": 2706708,
+      "total": 4511779
+    }
+  },
+  "receipts": [
+    {
+      "id": "鹿鼎-034-03",
+      "events": [
+        {
+          "sessionId": "session-807cbd65-8eaf-4e45-b482-54065be79c4e",
+          "type": "step/start",
+          "seq": 6,
+          "time": 1792935058800
+        },
+        {
+          "sessionId": "session-807cbd65-8eaf-4e45-b482-54065be79c4e",
+          "type": "request/header",
+          "seq": 10,
+          "time": 1792935058814,
+          "data": {
+            "config": {
+              "provider": "buddy",
+              "model": "deepseek-v4.1-flash",
+              "reasoningEffort": "low",
+              "maxTokens": 32768
+            },
+            "toolCount": 0,
+            "toolNames": []
+          }
+        },
+        {
+          "sessionId": "session-807cbd65-8eaf-4e45-b482-54065be79c4e",
+          "type": "assistant/message",
+          "seq": 13,
+          "time": 1792935217634,
+          "data": {
+            "usage": {
+              "inputTokens": 10783,
+              "outputTokens": 28205,
+              "cacheReadTokens": 512,
+              "reasoningTokens": 22695
+            }
+          }
+        },
+        {
+          "sessionId": "session-807cbd65-8eaf-4e45-b482-54065be79c4e",
+          "type": "turn/end",
+          "seq": 15,
+          "time": 1792935217656,
+          "data": {
+            "reason": {
+              "kind": "completed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "倚天-005-03",
+      "events": [
+        {
+          "sessionId": "session-0793e413-57c2-43b0-82cc-75599c56a8b2",
+          "type": "step/start",
+          "seq": 6,
+          "time": 1792935058813
+        },
+        {
+          "sessionId": "session-0793e413-57c2-43b0-82cc-75599c56a8b2",
+          "type": "request/header",
+          "seq": 10,
+          "time": 1792935058829,
+          "data": {
+            "config": {
+              "provider": "buddy",
+              "model": "deepseek-v4.1-flash",
+              "reasoningEffort": "low",
+              "maxTokens": 32768
+            },
+            "toolCount": 0,
+            "toolNames": []
+          }
+        },
+        {
+          "sessionId": "session-0793e413-57c2-43b0-82cc-75599c56a8b2",
+          "type": "assistant/message",
+          "seq": 13,
+          "time": 1792935136113,
+          "data": {
+            "usage": {
+              "inputTokens": 4830,
+              "outputTokens": 12380,
+              "cacheReadTokens": 512,
+              "reasoningTokens": 11135
+            }
+          }
+        },
+        {
+          "sessionId": "session-0793e413-57c2-43b0-82cc-75599c56a8b2",
+          "type": "turn/end",
+          "seq": 15,
+          "time": 1792935136122,
+          "data": {
+            "reason": {
+              "kind": "completed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "笑傲-006-01",
+      "events": [
+        {
+          "sessionId": "session-2ced50c6-9858-467b-9d9a-284ced15b803",
+          "type": "step/start",
+          "seq": 6,
+          "time": 1792935058529
+        },
+        {
+          "sessionId": "session-2ced50c6-9858-467b-9d9a-284ced15b803",
+          "type": "request/header",
+          "seq": 10,
+          "time": 1792935058566,
+          "data": {
+            "config": {
+              "provider": "buddy",
+              "model": "deepseek-v4.1-flash",
+              "reasoningEffort": "low",
+              "maxTokens": 32768
+            },
+            "toolCount": 0,
+            "toolNames": []
+          }
+        },
+        {
+          "sessionId": "session-2ced50c6-9858-467b-9d9a-284ced15b803",
+          "type": "assistant/message",
+          "seq": 13,
+          "time": 1792935182278,
+          "data": {
+            "usage": {
+              "inputTokens": 15245,
+              "outputTokens": 20656,
+              "cacheReadTokens": 512,
+              "reasoningTokens": 17181
+            }
+          }
+        },
+        {
+          "sessionId": "session-2ced50c6-9858-467b-9d9a-284ced15b803",
+          "type": "turn/end",
+          "seq": 15,
+          "time": 1792935182293,
+          "data": {
+            "reason": {
+              "kind": "completed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "天龙-007-01",
+      "events": [
+        {
+          "sessionId": "session-97bbf181-bb1b-4b43-a5df-12f958efd63d",
+          "type": "step/start",
+          "seq": 6,
+          "time": 1792935058726
+        },
+        {
+          "sessionId": "session-97bbf181-bb1b-4b43-a5df-12f958efd63d",
+          "type": "request/header",
+          "seq": 10,
+          "time": 1792935058788,
+          "data": {
+            "config": {
+              "provider": "buddy",
+              "model": "deepseek-v4.1-flash",
+              "reasoningEffort": "low",
+              "maxTokens": 32768
+            },
+            "toolCount": 0,
+            "toolNames": []
+          }
+        },
+        {
+          "sessionId": "session-97bbf181-bb1b-4b43-a5df-12f958efd63d",
+          "type": "assistant/message",
+          "seq": 13,
+          "time": 1792935238795,
+          "data": {
+            "usage": {
+              "inputTokens": 14190,
+              "outputTokens": 32767,
+              "cacheReadTokens": 512,
+              "reasoningTokens": 32767
+            }
+          }
+        },
+        {
+          "sessionId": "session-97bbf181-bb1b-4b43-a5df-12f958efd63d",
+          "type": "turn/end",
+          "seq": 15,
+          "time": 1792935238841,
+          "data": {
+            "reason": {
+              "kind": "max-tokens"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "射雕-006-02",
+      "events": [
+        {
+          "sessionId": "session-b2179340-742b-4cd4-93ca-dea88bbdbb4c",
+          "type": "step/start",
+          "seq": 6,
+          "time": 1792935058883
+        },
+        {
+          "sessionId": "session-b2179340-742b-4cd4-93ca-dea88bbdbb4c",
+          "type": "request/header",
+          "seq": 10,
+          "time": 1792935058897,
+          "data": {
+            "config": {
+              "provider": "buddy",
+              "model": "deepseek-v4.1-flash",
+              "reasoningEffort": "low",
+              "maxTokens": 32768
+            },
+            "toolCount": 0,
+            "toolNames": []
+          }
+        },
+        {
+          "sessionId": "session-b2179340-742b-4cd4-93ca-dea88bbdbb4c",
+          "type": "assistant/message",
+          "seq": 13,
+          "time": 1792935225904,
+          "data": {
+            "usage": {
+              "inputTokens": 12794,
+              "outputTokens": 28849,
+              "cacheReadTokens": 512,
+              "reasoningTokens": 23987
+            }
+          }
+        },
+        {
+          "sessionId": "session-b2179340-742b-4cd4-93ca-dea88bbdbb4c",
+          "type": "turn/end",
+          "seq": 15,
+          "time": 1792935225921,
+          "data": {
+            "reason": {
+              "kind": "completed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "神雕-007-01",
+      "events": [
+        {
+          "sessionId": "session-1abf2a61-0a3f-4d70-a1c1-57600344549a",
+          "type": "step/start",
+          "seq": 6,
+          "time": 1792935058872
+        },
+        {
+          "sessionId": "session-1abf2a61-0a3f-4d70-a1c1-57600344549a",
+          "type": "request/header",
+          "seq": 10,
+          "time": 1792935058885,
+          "data": {
+            "config": {
+              "provider": "buddy",
+              "model": "deepseek-v4.1-flash",
+              "reasoningEffort": "low",
+              "maxTokens": 32768
+            },
+            "toolCount": 0,
+            "toolNames": []
+          }
+        },
+        {
+          "sessionId": "session-1abf2a61-0a3f-4d70-a1c1-57600344549a",
+          "type": "assistant/message",
+          "seq": 13,
+          "time": 1792935161365,
+          "data": {
+            "usage": {
+              "inputTokens": 16021,
+              "outputTokens": 17265,
+              "cacheReadTokens": 512,
+              "reasoningTokens": 14109
+            }
+          }
+        },
+        {
+          "sessionId": "session-1abf2a61-0a3f-4d70-a1c1-57600344549a",
+          "type": "turn/end",
+          "seq": 15,
+          "time": 1792935161379,
+          "data": {
+            "reason": {
+              "kind": "completed"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "checks_passed": true,
+  "added_tokens": 217057
+}

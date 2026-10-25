@@ -1,0 +1,34 @@
+{
+  "reason": "parallel_jobs_failed",
+  "failed": [
+    {
+      "id": "天龙-007-01",
+      "book": "天龙八部",
+      "chapter": 7,
+      "title": "无计悔多情",
+      "start": 2615,
+      "end": 2858,
+      "legacy_uids": [
+        "批次B/B1-天龙第1-17回.md#EV-天龙-0225",
+        "批次B/B1-天龙第1-17回.md#EV-天龙-0226",
+        "批次B/B1-天龙第1-17回.md#EV-天龙-0236",
+        "批次B/B1-天龙第1-17回.md#EV-天龙-0237",
+        "批次B/B1-天龙第1-17回.md#EV-天龙-0238",
+        "批次B/B1-天龙第1-17回.md#EV-天龙-0239",
+        "批次B/B1-天龙第1-17回.md#EV-天龙-0317"
+      ],
+      "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+      "phase": "source_review",
+      "status": "failed",
+      "prompt_version": "source-review-v1",
+      "attempts": 1,
+      "error": "dsh failed: {\"kind\": \"max-tokens\"}"
+    }
+  ],
+  "usage": {
+    "inputTokens": 1725071,
+    "cacheReadTokens": 80000,
+    "outputTokens": 2706708,
+    "total": 4511779
+  }
+}

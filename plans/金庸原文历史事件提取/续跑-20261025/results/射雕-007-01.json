@@ -1,0 +1,412 @@
+{
+  "task_id": "射雕-007-01",
+  "coverage": {
+    "start": 2646,
+    "end": 2853,
+    "complete": true
+  },
+  "reviews": [
+    {
+      "uid": "批次C/C1-射雕第1-20回.md#EV-射雕-0143",
+      "verdict": "supported",
+      "reason": "行2662至2682的朱聪转述依次支持张骞献马、汉使椎破金马、大宛王杀使、李广利远征、围城四十余日、贵人斩王献马，以及野马交配与后代不神骏之说；旧卡标为传闻也恰当。",
+      "event": null
+    },
+    {
+      "uid": "批次C/C1-射雕第1-20回.md#EV-射雕-0227",
+      "verdict": "not_historical",
+      "reason": "行2688所载是柯镇恶在张家口饭店偷听白衣女子议论的当下场景，以及对彭连虎的静态背景介绍；旧卡所称与沙通天“互为奥援”引自第11回行2988，不在给定主文本或补充范围内，不能作为本窗口的过去事件。",
+      "event": null
+    }
+  ],
+  "events": [
+    {
+      "title": "李萍在乱军中产下郭靖",
+      "when": "当年（郭靖出生时；具体年月未知）",
+      "place": "乱军中（具体地点未知）",
+      "people": [
+        "李萍",
+        "郭靖"
+      ],
+      "relationships": "母子",
+      "description": "李萍望着郭靖骑小红马远去，想起当年在乱军中生下郭靖的情景，又欢喜又心酸。",
+      "cause": "原文未明",
+      "effect": "原文未明",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2635,
+          "column_start": 42,
+          "column_end": 91,
+          "anchor": "想起当年乱军中产子的情景",
+          "quote": "萍眼望着小红马上儿子高大的背影，在大漠上逐渐远去，想起当年乱军中产子的情景，不禁又是欢喜，又是心酸。",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        }
+      ],
+      "uncertain": [
+        "乱军所指与产子地点未说明"
+      ],
+      "id": "NEW:射雕-007-01:001",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "华筝父亲将华筝许配给郭靖",
+      "when": "郭靖离开蒙古前（具体时间未知）",
+      "place": "未知",
+      "people": [
+        "华筝",
+        "华筝父亲",
+        "郭靖"
+      ],
+      "relationships": "郭靖与华筝订有婚约",
+      "description": "华筝已知父亲将自己终身许配给郭靖；送行时她双颊红晕、脉脉不语。",
+      "cause": "原文未明",
+      "effect": "华筝因婚约对郭靖态度含羞",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2637,
+          "column_start": 56,
+          "column_end": 133,
+          "anchor": "父亲已把自己终身许配给他",
+          "quote": "更无一根杂毛，那也是从王罕的宝库中夺来的。华筝知道父亲已把自己终身许配给他，双颊红晕，脉脉不语。拖雷笑道：“妹子，你跟他说话啊！我不听就是。”说着纵马走开。",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        }
+      ],
+      "uncertain": [
+        "华筝父亲原文未具名；许婚经过与仪式未述"
+      ],
+      "id": "NEW:射雕-007-01:002",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "江南六怪传授郭靖武艺十余年",
+      "when": "郭靖少年至离蒙古前，十多年间",
+      "place": "未知",
+      "people": [
+        "郭靖",
+        "江南六怪"
+      ],
+      "relationships": "师徒；郭靖武功得自六怪所传",
+      "description": "郭靖与六位师父朝夕与共十多年，学得他们所传武艺；六怪日前见他独斗黄河四鬼，认为他已能善用所传。",
+      "cause": "原文未明",
+      "effect": "六怪此次放郭靖独自赴嘉兴历练",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2706,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "十多年来与六位师父朝夕与共",
+          "quote": "　　郭靖点头答应，向六位师父磕了头，上马向南而去。十多年来与六位师父朝夕与共，一旦分别，在马上不禁流下泪来，想起母亲孤身留在大漠，虽有成吉思汗、拖雷等人照料，衣食自必无缺，但终究寂寞，心中又是一阵难过。驰出十余里，地势陡高，道旁高山夹峙，怪",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 7
+        },
+        {
+          "book": "射雕英雄传",
+          "line": 2702,
+          "column_start": 3,
+          "column_end": 104,
+          "anchor": "已能善用所传武艺",
+          "quote": "当下郭靖向六位师父辞别。六怪日前见他独斗黄河四鬼，已能善用所传武艺，这次放他独行，一则是所听到的讯息只怕事关重大，若是置之不理，于心不安；二则也是让他孤身出去闯荡江湖，得些经历，那是任何师父所不能传授的。",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "六怪各自所授内容、开始授艺时间未在本回详述"
+      ],
+      "id": "NEW:射雕-007-01:003",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "张阿生逝世十多年",
+      "when": "叙述时十多年前",
+      "place": "未知",
+      "people": [
+        "张阿生",
+        "江南七怪"
+      ],
+      "relationships": "张阿生为江南七怪之一，死后六怪仍不将他除名",
+      "description": "张阿生已逝世十多年；六怪遇事仍自称“江南七怪”，从不把这位兄弟除开不算。",
+      "cause": "原文未明",
+      "effect": "六怪仍以江南七怪自称",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2700,
+          "column_start": 58,
+          "column_end": 125,
+          "anchor": "张阿生逝世已十多年",
+          "quote": "“这些女人要是胆敢作恶，江南七怪也决不能放过了。”张阿生逝世已十多年，但六怪说到甚么事，总仍是自称“江南七怪”，从不把这位兄弟除开不算。",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "死因与具体年月未说明"
+      ],
+      "id": "NEW:射雕-007-01:004",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "郭靖在土山顶独斗黄河四鬼",
+      "when": "日前（郭靖离师独行前数日）",
+      "place": "土山顶上",
+      "people": [
+        "郭靖",
+        "黄河四鬼",
+        "六位师父"
+      ],
+      "relationships": "郭靖与黄河四鬼敌对；六怪由此认可郭靖武功",
+      "description": "日前郭靖在土山顶上与黄河四鬼恶斗，六怪见他已能善用所传武艺，遂放心让他独自赴嘉兴。",
+      "cause": "原文未明",
+      "effect": "六怪认为郭靖已能善用武艺，放他独行",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2702,
+          "column_start": 1,
+          "column_end": 104,
+          "anchor": "日前见他独斗黄河四鬼，已能善用所传武艺",
+          "quote": "　　当下郭靖向六位师父辞别。六怪日前见他独斗黄河四鬼，已能善用所传武艺，这次放他独行，一则是所听到的讯息只怕事关重大，若是置之不理，于心不安；二则也是让他孤身出去闯荡江湖，得些经历，那是任何师父所不能传授的。",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 7
+        },
+        {
+          "book": "射雕英雄传",
+          "line": 2788,
+          "column_start": 39,
+          "column_end": 118,
+          "anchor": "曾在土山顶上与之恶斗",
+          "quote": "了一口凉气。原来四个人提刀执枪、挂鞭持斧，正是当日曾在土山顶上与之恶斗的黄河四鬼，另一个是四十岁左右的青脸瘦子，面颊极长，额角上肿起了三个大肉瘤，形相极是难看。",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "恶斗起因与详细经过未在本回展开"
+      ],
+      "id": "NEW:射雕-007-01:005",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "马钰传授郭靖打坐练功法",
+      "when": "此前（具体时间未知）",
+      "place": "未知",
+      "people": [
+        "郭靖",
+        "马钰"
+      ],
+      "relationships": "马钰曾授郭靖打坐练功法",
+      "description": "郭靖在张家口客店受黄河四鬼等监视时，仍依马钰所授法子打坐练功。",
+      "cause": "原文未明",
+      "effect": "郭靖在受监视时依此法练功",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2802,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "依着马钰所授法子打坐练功",
+          "quote": "　　郭靖坐在炕上，依着马钰所授法子打坐练功。钱青健在他身前挥动双斧，四下里空砍虚劈，口中大声吆喝，又指摘他打坐方法不对。郭靖也不理睬，眼见日将中天，站起身来，对钱青健道：“去罢！”付了房饭钱，两人并肩而行。向西走了十里，果见好一座松林，枝叶",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "传授时间、地点及功法内容未说明"
+      ],
+      "id": "NEW:射雕-007-01:006",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "黄蓉幼年丧母",
+      "when": "黄蓉幼年时（具体时间未知）",
+      "place": "未知",
+      "people": [
+        "黄蓉",
+        "黄蓉之母"
+      ],
+      "relationships": "母女；黄蓉从小失母",
+      "description": "黄蓉自述母亲早死，自己从小没有母亲。",
+      "cause": "原文未明",
+      "effect": "黄蓉自幼无母",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2772,
+          "column_start": 103,
+          "column_end": 222,
+          "anchor": "早死啦，我从小就没妈",
+          "quote": "靖道：“你爹爹这时怕在想你呢。你妈呢？”黄蓉道：“早死啦，我从小就没妈。”郭靖道：“你玩够之后，就回家去罢。”黄蓉流下泪来，道：“爹爹不要我啦。”郭靖道：“不会的。”黄蓉道：“那么他干么不来找我？”郭靖道：“或许他是找的，不过没找着。”黄蓉",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "其母姓名与死因未说明"
+      ],
+      "id": "NEW:射雕-007-01:007",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "黄蓉因接济被父亲关押者而离家",
+      "when": "黄蓉离家前（具体时间未知）",
+      "place": "黄蓉家（具体地点未知）",
+      "people": [
+        "黄蓉",
+        "黄蓉之父",
+        "被关押者"
+      ],
+      "relationships": "黄蓉因同情被关者与父亲冲突，随后离家",
+      "description": "黄蓉见父亲关住一人久不放，拿好酒好菜给那人吃并陪他说话；父亲恼了骂她，她便夜里偷偷逃出家门。",
+      "cause": "黄蓉可怜被父亲关押之人，且自己独处烦闷",
+      "effect": "黄蓉离家出走，流落江湖",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2772,
+          "column_start": 12,
+          "column_end": 131,
+          "anchor": "爹爹关住了一个人，老是不放",
+          "quote": "：“爹爹不要我啦。”郭靖道：“干么呀？”黄蓉道：“爹爹关住了一个人，老是不放，我见那人可怜，独个儿又闷得慌，便拿些好酒好菜给他吃，又陪他说话。爹爹恼了骂我，我就夜里偷偷逃了出来。”郭靖道：“你爹爹这时怕在想你呢。你妈呢？”黄蓉道：“早死啦，",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 7
+        },
+        {
+          "book": "射雕英雄传",
+          "line": 2772,
+          "column_start": 65,
+          "column_end": 184,
+          "anchor": "我就夜里偷偷逃了出来",
+          "quote": "，便拿些好酒好菜给他吃，又陪他说话。爹爹恼了骂我，我就夜里偷偷逃了出来。”郭靖道：“你爹爹这时怕在想你呢。你妈呢？”黄蓉道：“早死啦，我从小就没妈。”郭靖道：“你玩够之后，就回家去罢。”黄蓉流下泪来，道：“爹爹不要我啦。”郭靖道：“不会的。",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "被关者身份、关押原因及黄蓉父亲名讳本窗口未明"
+      ],
+      "id": "NEW:射雕-007-01:008",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "穆易携女历经七路比武招亲",
+      "when": "叙述前已大半年",
+      "place": "自南至北七路（具体地点未知）",
+      "people": [
+        "穆易",
+        "穆易之女"
+      ],
+      "relationships": "父女同行，以比武为女择婿",
+      "description": "穆易自述父女自南至北经历七路，以比武招亲择婿，已大半年，因成名豪杰多已婚配、少年英雄少肯下顾，始终未得良缘。",
+      "cause": "穆易之女年已及笄，尚未许婆家，曾许愿嫁武艺超群的好汉",
+      "effect": "至北京仍设“比武招亲”锦旗",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2822,
+          "column_start": 149,
+          "column_end": 266,
+          "anchor": "自南至北，经历七路",
+          "quote": "女一拳一脚的，在下即将小女许配于他。在下父女两人，自南至北，经历七路，只因成名的豪杰都已婚配，而少年英雄又少肯于下顾，是以始终未得良缘。”说到这里，顿了一顿，抱拳说道：“北京是卧虎藏龙之地，高人侠士必多，在下行事荒唐，请各位多多包涵。”",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 7
+        },
+        {
+          "book": "射雕英雄传",
+          "line": 2846,
+          "column_start": 93,
+          "column_end": 193,
+          "anchor": "经历七路，已有大半年了",
+          "quote": "女一眼，道：“你们比武招亲已有几日了？”穆易道：“经历七路，已有大半年了。”那公子奇道：“难道竟然无人胜得了她？这个我却不信了。”穆易微微一笑，说道：“想来武艺高强之人，不是已婚，就是不屑和小女动手。”",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "七路具体所指、其女姓名及穆易是否另有隐情未说明"
+      ],
+      "id": "NEW:射雕-007-01:009",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    }
+  ],
+  "cross_links": [
+    {
+      "topic": "白驼山少主与白衣女子赴京",
+      "people": [
+        "柯镇恶",
+        "白驼山少主",
+        "白衣女子"
+      ],
+      "detail": "本章仅见八名骑白驼的白衣女子称要夺汗血宝马献给“少主”，并说许多黑道人物赴京聚会；柯镇恶问“有谁知道白驼山么”，但她们的门派、少主身份与图谋未明，待核。"
+    },
+    {
+      "topic": "彭连虎与沙通天关系",
+      "people": [
+        "彭连虎",
+        "沙通天"
+      ],
+      "detail": "本窗口只支持彭连虎为河北、山西一带悍匪、手下赴京聚会；旧卡引第11回行2988称其与沙通天互为奥援，该行不在给定范围，待核。"
+    },
+    {
+      "topic": "黄蓉之父关押之人",
+      "people": [
+        "黄蓉",
+        "黄蓉之父",
+        "被关押者"
+      ],
+      "detail": "黄蓉自述父亲关住一人不放，她送酒饭并陪说话；被关者身份、关押原因及黄蓉父亲名讳在本窗口未明，待核。"
+    },
+    {
+      "topic": "嘉兴比武之约",
+      "people": [
+        "郭靖",
+        "六位师父",
+        "江南七怪"
+      ],
+      "detail": "朱聪嘱郭靖三月廿四中午到嘉兴府醉仙酒楼赴“嘉兴比武之约”；约的对方、缘起及与江南七怪的关系本窗口未说明，待核。"
+    }
+  ],
+  "unresolved": [
+    "郭靖与华筝婚约由华筝父亲何时、以何方式订下，原文未述",
+    "张阿生的死因及具体年月，原文未说明",
+    "马钰授郭靖打坐法的时间、地点与功法内容，原文未说明",
+    "嘉兴比武之约的对方、缘起及与江南七怪的关系，本窗口未说明",
+    "白驼山少主身份、八名白衣女子来历及赴京聚会图谋未知",
+    "黄蓉父亲所关之人身份及关押原因未知",
+    "穆易七路比武招亲的具体路线、其女姓名及是否另有隐情未说明"
+  ],
+  "validation_issues": [],
+  "semantic_acceptance": "model_reviewed_not_independent_audit"
+}

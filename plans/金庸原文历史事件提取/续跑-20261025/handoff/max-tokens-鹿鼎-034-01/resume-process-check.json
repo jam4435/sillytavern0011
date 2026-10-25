@@ -1,0 +1,60 @@
+{
+  "observed_at": "2026-10-25T13:28:06.192Z",
+  "state": {
+    "pid": 16796,
+    "status": "running",
+    "phase": "source",
+    "updated_at": "2026-10-25T21:27:24+0800",
+    "usage": {
+      "inputTokens": 1583054,
+      "cacheReadTokens": 73856,
+      "outputTokens": 2450468,
+      "total": 4107378
+    },
+    "parallel_books": 6,
+    "books": [
+      "鹿鼎记",
+      "倚天屠龙记",
+      "笑傲江湖",
+      "天龙八部",
+      "射雕英雄传",
+      "神雕侠侣"
+    ]
+  },
+  "active": [
+    {
+      "id": "天龙-006-02",
+      "book": "天龙八部"
+    },
+    {
+      "id": "射雕-006-01",
+      "book": "射雕英雄传"
+    },
+    {
+      "id": "神雕-006-02",
+      "book": "神雕侠侣"
+    },
+    {
+      "id": "倚天-005-02",
+      "book": "倚天屠龙记"
+    },
+    {
+      "id": "笑傲-005-03",
+      "book": "笑傲江湖"
+    },
+    {
+      "id": "鹿鼎-034-02",
+      "book": "鹿鼎记"
+    }
+  ],
+  "os_verified_controller": 16796,
+  "os_verified_dsh_children": [
+    55720,
+    50076,
+    38084,
+    54992,
+    53868,
+    30652
+  ],
+  "checks_passed": true
+}

@@ -1,6 +1,6 @@
 {
   "pid": 44044,
-  "status": "running",
+  "status": "finished",
   "task_ids": [
     "鹿鼎-033-01",
     "倚天-003-03",
@@ -16,5 +16,48 @@
     "total": 3273365
   },
   "reserved_tokens": 540000,
-  "outcomes": []
+  "outcomes": [
+    {
+      "id": "天龙-004-03",
+      "status": "reviewed",
+      "event_count": 5,
+      "issue_count": 0
+    },
+    {
+      "id": "神雕-004-02",
+      "status": "reviewed",
+      "event_count": 10,
+      "issue_count": 0
+    },
+    {
+      "id": "倚天-003-03",
+      "status": "reviewed",
+      "event_count": 11,
+      "issue_count": 0
+    },
+    {
+      "id": "笑傲-004-01",
+      "status": "reviewed",
+      "event_count": 9,
+      "issue_count": 0
+    },
+    {
+      "id": "鹿鼎-033-01",
+      "status": "reviewed",
+      "event_count": 8,
+      "issue_count": 0
+    },
+    {
+      "id": "射雕-004-01",
+      "status": "reviewed",
+      "event_count": 12,
+      "issue_count": 0
+    }
+  ],
+  "usage_after": {
+    "inputTokens": 1335540,
+    "cacheReadTokens": 62080,
+    "outputTokens": 2039701,
+    "total": 3437321
+  }
 }

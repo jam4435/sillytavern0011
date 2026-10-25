@@ -1,0 +1,65 @@
+{
+  "task_id": "倚天-004-02",
+  "raw_sha256": "7eefb842ef9c1c7a14ce044aa3ba519d30219c2ec572883a7dcaa776c71133d8",
+  "changes": [
+    {
+      "method": "model_repaired_rejected_entries",
+      "patch": {
+        "task_id": "倚天-004-02",
+        "reviews": [],
+        "new_events": [
+          {
+            "index": 2,
+            "event": {
+              "title": "龙门镖局数十口人命血案传遍临安",
+              "when": "张翠山前一夜在湖畔见到都大锦等三人死后的次日",
+              "place": "临安城",
+              "people": [
+                "张翠山"
+              ],
+              "relationships": "张翠山与龙门镖局血案：原文称临安城中无人疑心他涉及此案；更具体关系未交代",
+              "description": "临安城中传开龙门镖局数十口人命的大血案，人人皆知；张翠山因外貌蕴藉儒雅，未被疑心涉及此案。",
+              "cause": "原文未交代血案起因",
+              "effect": "血案传得人人皆知；张翠山暂未受疑",
+              "nature": "客观叙述",
+              "evidence": [
+                {
+                  "book": "倚天屠龙记",
+                  "line": 1523,
+                  "anchor": "龙门镖局数十口人命的大血案已传得人人皆知"
+                },
+                {
+                  "book": "倚天屠龙记",
+                  "line": 1523,
+                  "anchor": "张翠山外貌蕴藉儒雅"
+                }
+              ],
+              "uncertain": [
+                "血案行凶者、死者具体名单、案发具体时间与动机，原文均未交代",
+                "此案与张翠山前一夜在湖畔所见都大锦、祝史二镖头之死是否同一事件，原文未明"
+              ]
+            }
+          }
+        ],
+        "unresolved": []
+      }
+    }
+  ],
+  "usage_before": {
+    "inputTokens": 1484902,
+    "cacheReadTokens": 68480,
+    "outputTokens": 2252417,
+    "total": 3805799
+  },
+  "usage_after": {
+    "inputTokens": 1488552,
+    "cacheReadTokens": 68736,
+    "outputTokens": 2254680,
+    "total": 3811968
+  },
+  "repair_calls": [
+    "structure-review-倚天-004-02-a1"
+  ],
+  "validation_issues": [],
+  "semantic_scope": "Rejected entries semantically repaired by the required model; all accepted events unchanged."
+}

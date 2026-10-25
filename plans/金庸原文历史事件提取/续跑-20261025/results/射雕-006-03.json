@@ -1,0 +1,574 @@
+{
+  "task_id": "射雕-006-03",
+  "coverage": {
+    "start": 2629,
+    "end": 2645,
+    "complete": true
+  },
+  "reviews": [],
+  "events": [
+    {
+      "title": "成吉思汗与札木合结义多年",
+      "when": "多年前，具体未知",
+      "place": "未知",
+      "people": [
+        "成吉思汗",
+        "札木合"
+      ],
+      "relationships": "结义兄弟",
+      "description": "成吉思汗与札木合结义多年，此事众所周知；原文称札木合为成吉思汗的义弟。",
+      "cause": "原文未详",
+      "effect": "二人后因成吉思汗改变祖法、分配财物及招诱部属而失和断义",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2629,
+          "column_start": 193,
+          "column_end": 251,
+          "anchor": "结义多年，众所周知",
+          "quote": "士私有、并劝诱札木合的部属归附于己，只是他与札木合结义多年，众所周知，此时正好将一切过错尽数推在大金国与完颜洪烈头上。",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        }
+      ],
+      "uncertain": [
+        "结义具体时间、地点原文未载"
+      ],
+      "id": "NEW:射雕-006-03:001",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "成吉思汗改变祖法并招诱札木合部属，导致二人失和",
+      "when": "与札木合决裂前，具体未知",
+      "place": "蒙古诸部，具体未知",
+      "people": [
+        "成吉思汗",
+        "札木合"
+      ],
+      "relationships": "结义兄弟转为失和断义",
+      "description": "成吉思汗改变祖宗旧法，将分配财物改为归战士私有，并劝诱札木合的部属归附自己；叙述者点明这才是他与札木合失和断义的真正原因。",
+      "cause": "成吉思汗改变祖法、分配财物以归战士私有、并劝诱札木合的部属归附于己",
+      "effect": "成吉思汗与札木合失和断义；对外则把过错推给大金国与完颜洪烈",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2629,
+          "column_start": 156,
+          "column_end": 251,
+          "anchor": "改变祖法、分配财物以归战士私有",
+          "quote": "及早除去。至于他与札木合失和断义，真正原因还在自己改变祖法、分配财物以归战士私有、并劝诱札木合的部属归附于己，只是他与札木合结义多年，众所周知，此时正好将一切过错尽数推在大金国与完颜洪烈头上。",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        },
+        {
+          "book": "射雕英雄传",
+          "line": 2629,
+          "column_start": 138,
+          "column_end": 251,
+          "anchor": "他与札木合失和断义",
+          "quote": "道此人精明能干，于己大大不利，最好能及早除去。至于他与札木合失和断义，真正原因还在自己改变祖法、分配财物以归战士私有、并劝诱札木合的部属归附于己，只是他与札木合结义多年，众所周知，此时正好将一切过错尽数推在大金国与完颜洪烈头上。",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        }
+      ],
+      "uncertain": [
+        "失和的具体时间与过程原文未详"
+      ],
+      "id": "NEW:射雕-006-03:002",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "札木合与成吉思汗失和后身死",
+      "when": "与成吉思汗失和后，具体未知",
+      "place": "未知",
+      "people": [
+        "札木合",
+        "成吉思汗"
+      ],
+      "relationships": "结义兄弟失和，札木合死亡",
+      "description": "成吉思汗说义弟札木合与他失和，枉自送了性命；原文未载札木合具体死因与经过。",
+      "cause": "原文只称因失和而送命，具体未知",
+      "effect": "成吉思汗将此事归因于完颜洪烈，以掩盖自身改变祖法等真正原因",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2629,
+          "column_start": 37,
+          "column_end": 156,
+          "anchor": "枉自送了性命",
+          "quote": "六皇子完颜洪烈的脑袋给我提来。义弟札木合和我失和，枉自送了性命，全因完颜洪烈这厮而起。去干这件大事，你要带多少名勇士？”他混一蒙古诸部，眼前强敌，仅余大金，料知迟早不免与之一战。他与完颜洪烈数次会面，知道此人精明能干，于己大大不利，最好能及",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        }
+      ],
+      "uncertain": [
+        "具体死因、时间、地点原文未载；仅见成吉思汗自述"
+      ],
+      "id": "NEW:射雕-006-03:003",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "成吉思汗与完颜洪烈数次会面后决意除之",
+      "when": "郭靖南行前，具体未知",
+      "place": "未知",
+      "people": [
+        "成吉思汗",
+        "完颜洪烈"
+      ],
+      "relationships": "敌对；成吉思汗视完颜洪烈为大患",
+      "description": "成吉思汗此前与完颜洪烈数次会面，知道此人精明能干，于己大大不利，认为最好及早除去；随后命郭靖南下取完颜洪烈首级。",
+      "cause": "成吉思汗料知蒙古迟早与大金一战，且完颜洪烈精明于己不利",
+      "effect": "成吉思汗派郭靖南下去杀完颜洪烈",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2629,
+          "column_start": 101,
+          "column_end": 220,
+          "anchor": "他与完颜洪烈数次会面",
+          "quote": "古诸部，眼前强敌，仅余大金，料知迟早不免与之一战。他与完颜洪烈数次会面，知道此人精明能干，于己大大不利，最好能及早除去。至于他与札木合失和断义，真正原因还在自己改变祖法、分配财物以归战士私有、并劝诱札木合的部属归附于己，只是他与札木合结义多",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        },
+        {
+          "book": "射雕英雄传",
+          "line": 2629,
+          "column_start": 128,
+          "column_end": 247,
+          "anchor": "最好能及早除去",
+          "quote": "完颜洪烈数次会面，知道此人精明能干，于己大大不利，最好能及早除去。至于他与札木合失和断义，真正原因还在自己改变祖法、分配财物以归战士私有、并劝诱札木合的部属归附于己，只是他与札木合结义多年，众所周知，此时正好将一切过错尽数推在大金国与完颜洪",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        }
+      ],
+      "uncertain": [
+        "会面具体时间、地点原文未载"
+      ],
+      "id": "NEW:射雕-006-03:004",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "成吉思汗统一蒙古诸部，仅余大金为强敌",
+      "when": "郭靖南行前，具体未知",
+      "place": "蒙古",
+      "people": [
+        "成吉思汗"
+      ],
+      "relationships": "蒙古诸部归成吉思汗；与金敌对",
+      "description": "成吉思汗已混一蒙古诸部，眼前强敌仅余大金，料知迟早不免与之一战。",
+      "cause": "原文未详",
+      "effect": "成吉思汗筹划对金战事，并派郭靖南行",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2629,
+          "column_start": 72,
+          "column_end": 191,
+          "anchor": "他混一蒙古诸部，眼前强敌，仅余大金",
+          "quote": "颜洪烈这厮而起。去干这件大事，你要带多少名勇士？”他混一蒙古诸部，眼前强敌，仅余大金，料知迟早不免与之一战。他与完颜洪烈数次会面，知道此人精明能干，于己大大不利，最好能及早除去。至于他与札木合失和断义，真正原因还在自己改变祖法、分配财物以归",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        }
+      ],
+      "uncertain": [
+        "统一过程原文未载"
+      ],
+      "id": "NEW:射雕-006-03:005",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "李萍自幼向郭靖讲述旧事，使其憎恨大金",
+      "when": "郭靖自小至成年，具体未知",
+      "place": "蒙古",
+      "people": [
+        "郭靖",
+        "李萍"
+      ],
+      "relationships": "母子；李萍以旧事教养郭靖",
+      "description": "郭靖自小听母亲讲述旧事，向来对大金国十分憎恨。",
+      "cause": "原文未详",
+      "effect": "郭靖对完颜洪烈及大金敌视",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2631,
+          "column_start": 1,
+          "column_end": 118,
+          "anchor": "郭靖自小听母亲讲述旧事，向来对大金国十分憎恨",
+          "quote": "　　郭靖自小听母亲讲述旧事，向来对大金国十分憎恨，这次与完颜洪烈手下的黄河四鬼恶斗，又险些命丧其手，听了成吉思汗的话后，心想：“只要六位师父相助，大事必成，多带不会高来高去的勇士，反而碍事。”说道：“孩儿有六位师父同去，不必再带武士。”",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        }
+      ],
+      "uncertain": [
+        "所讲旧事具体内容原文未载"
+      ],
+      "id": "NEW:射雕-006-03:006",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "郭靖与黄河四鬼恶斗，险遭杀害",
+      "when": "此次南行前不久，具体未知",
+      "place": "未知",
+      "people": [
+        "郭靖",
+        "黄河四鬼",
+        "完颜洪烈"
+      ],
+      "relationships": "黄河四鬼为完颜洪烈手下，与郭靖敌对",
+      "description": "郭靖此前与完颜洪烈手下的黄河四鬼恶斗，险些命丧其手。",
+      "cause": "原文未详",
+      "effect": "郭靖对大金及完颜洪烈更加憎恨",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2631,
+          "column_start": 11,
+          "column_end": 118,
+          "anchor": "黄河四鬼恶斗，又险些命丧其手",
+          "quote": "述旧事，向来对大金国十分憎恨，这次与完颜洪烈手下的黄河四鬼恶斗，又险些命丧其手，听了成吉思汗的话后，心想：“只要六位师父相助，大事必成，多带不会高来高去的勇士，反而碍事。”说道：“孩儿有六位师父同去，不必再带武士。”",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        }
+      ],
+      "uncertain": [
+        "恶斗具体时间、地点原文未载"
+      ],
+      "id": "NEW:射雕-006-03:007",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "李萍于乱军中产下郭靖",
+      "when": "多年前，郭靖出生时",
+      "place": "乱军之中，具体地点未知",
+      "people": [
+        "李萍",
+        "郭靖"
+      ],
+      "relationships": "母子",
+      "description": "李萍在乱军中产下郭靖；多年后送子南行时想起当时情景，悲喜交集。",
+      "cause": "原文未详",
+      "effect": "郭靖生于患难；李萍对儿子远行悲喜交集",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2635,
+          "column_start": 42,
+          "column_end": 91,
+          "anchor": "想起当年乱军中产子的情景",
+          "quote": "萍眼望着小红马上儿子高大的背影，在大漠上逐渐远去，想起当年乱军中产子的情景，不禁又是欢喜，又是心酸。",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        }
+      ],
+      "uncertain": [
+        "乱军所属及具体地点原文未载"
+      ],
+      "id": "NEW:射雕-006-03:008",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "郭啸天与杨铁心指腹为婚",
+      "when": "郭靖出生前，具体未知",
+      "place": "未知",
+      "people": [
+        "郭啸天",
+        "杨铁心",
+        "李萍"
+      ],
+      "relationships": "郭啸天与杨铁心为义兄弟，约定子女婚配",
+      "description": "李萍说亡夫郭啸天昔年与义弟杨铁心指腹为婚；后因成吉思汗招郭靖为婿，李萍怕违约对不起亡夫与杨铁心。",
+      "cause": "二人义兄弟情谊",
+      "effect": "李萍请江南六怪作主；后得知杨铁心留下男孩，婚约无法按原设想履行",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2623,
+          "column_start": 39,
+          "column_end": 146,
+          "anchor": "亡夫昔年与义弟杨铁心指腹为婚",
+          "quote": "德。现下有一件为难之事，要请六位师父作主。”当下把亡夫昔年与义弟杨铁心指腹为婚之事说了，最后道：“大汗招我儿为婿，自是十分荣耀之事。不过倘若杨叔叔遗下了一个女孩，我不守约言，他日九泉之下，怎有脸去见我丈夫和杨叔叔？”",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        }
+      ],
+      "uncertain": [
+        "指腹为婚的具体约定原文未详"
+      ],
+      "id": "NEW:射雕-006-03:009",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "杨铁心留有男嗣，后文称杨康",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "杨铁心",
+        "杨康",
+        "朱聪"
+      ],
+      "relationships": "杨铁心之子杨康；郭靖的世兄",
+      "description": "朱聪说杨铁心果然留下后嗣，不是女儿而是男子；后文以杨康称之。中原朋友来信盼六怪带郭靖到江南与杨世兄见面切磋。",
+      "cause": "原文未详",
+      "effect": "李萍得知后大喜；六怪决定带郭靖南下会面",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2625,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "那位杨英雄果然留下了后嗣",
+          "quote": "　　朱聪微笑道：“嫂子却不必担心，那位杨英雄果然留下了后嗣，不过不是女儿，却是男子。”李萍又惊又喜，忙问：“朱师父怎地知道？”朱聪道：“中原一位朋友曾来信说及，并盼望我们把靖儿带到江南，和那位姓杨的世兄见面，大家切磋一下功夫。”原来江南六怪",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        },
+        {
+          "book": "射雕英雄传",
+          "line": 2625,
+          "column_start": 164,
+          "column_end": 222,
+          "anchor": "杨康的渊源",
+          "quote": "含糊其辞，不加明言。六人深知郭靖天性厚道，若是得悉杨康的渊源，比武时定会手下留情，该胜不胜，不该败反败，不免误了大事。",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        }
+      ],
+      "uncertain": [
+        "杨康此时年龄、所在及人品，六怪均不知"
+      ],
+      "id": "NEW:射雕-006-03:010",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "江南六怪与丘处机设下赌赛",
+      "when": "多年前，具体未知",
+      "place": "未知",
+      "people": [
+        "江南六怪",
+        "丘处机",
+        "郭靖",
+        "杨康"
+      ],
+      "relationships": "江南六怪与丘处机为赌赛双方",
+      "description": "江南六怪曾与丘处机赌赛，具体赌约原文未明；六怪始终不向李萍与郭靖说明情由。",
+      "cause": "原文未详",
+      "effect": "六怪带郭靖南下，欲与杨铁心子嗣会面比武；怕郭靖知杨康渊源后手下留情误事",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2625,
+          "column_start": 92,
+          "column_end": 211,
+          "anchor": "江南六怪于如何与丘处机赌赛的情由",
+          "quote": "南，和那位姓杨的世兄见面，大家切磋一下功夫。”原来江南六怪于如何与丘处机赌赛的情由，始终不对李萍与郭靖说知。郭靖问起那小道士尹志平的来历，六怪也含糊其辞，不加明言。六人深知郭靖天性厚道，若是得悉杨康的渊源，比武时定会手下留情，该胜不胜，不该",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        }
+      ],
+      "uncertain": [
+        "赌赛具体内容、胜负条件原文未载"
+      ],
+      "id": "NEW:射雕-006-03:011",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "江南六怪向李萍、郭靖隐瞒赌赛与尹志平来历",
+      "when": "多年来，具体未知",
+      "place": "蒙古",
+      "people": [
+        "江南六怪",
+        "李萍",
+        "郭靖",
+        "尹志平"
+      ],
+      "relationships": "师徒及长辈对郭靖保密",
+      "description": "江南六怪始终不对李萍与郭靖说明如何与丘处机赌赛的情由；郭靖问小道士尹志平的来历，六怪也含糊其辞。六人怕郭靖知杨康渊源后比武手下留情。",
+      "cause": "六人深知郭靖天性厚道，怕他该胜不胜、不该败反败，误了大事",
+      "effect": "郭靖不知赌赛与杨康渊源",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2625,
+          "column_start": 109,
+          "column_end": 222,
+          "anchor": "始终不对李萍与郭靖说知",
+          "quote": "一下功夫。”原来江南六怪于如何与丘处机赌赛的情由，始终不对李萍与郭靖说知。郭靖问起那小道士尹志平的来历，六怪也含糊其辞，不加明言。六人深知郭靖天性厚道，若是得悉杨康的渊源，比武时定会手下留情，该胜不胜，不该败反败，不免误了大事。",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        },
+        {
+          "book": "射雕英雄传",
+          "line": 2625,
+          "column_start": 121,
+          "column_end": 222,
+          "anchor": "郭靖问起那小道士尹志平的来历",
+          "quote": "于如何与丘处机赌赛的情由，始终不对李萍与郭靖说知。郭靖问起那小道士尹志平的来历，六怪也含糊其辞，不加明言。六人深知郭靖天性厚道，若是得悉杨康的渊源，比武时定会手下留情，该胜不胜，不该败反败，不免误了大事。",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        }
+      ],
+      "uncertain": [
+        "隐瞒从何时开始原文未载"
+      ],
+      "id": "NEW:射雕-006-03:012",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "成吉思汗招郭靖为婿，许配华筝",
+      "when": "郭靖南行前不久，具体未知",
+      "place": "蒙古，酒宴场合",
+      "people": [
+        "成吉思汗",
+        "郭靖",
+        "华筝",
+        "李萍"
+      ],
+      "relationships": "郭靖与华筝由兄妹般关系变为未婚夫妻",
+      "description": "成吉思汗在酒宴上表示招郭靖为婿，将华筝许配给他；郭靖向来把华筝当亲妹子，并无儿女私情，闻言茫然。李萍因亡夫与杨铁心旧约而为难。",
+      "cause": "成吉思汗器重郭靖",
+      "effect": "郭靖与华筝订婚；李萍请六怪商议旧约；华筝知婚事后含羞",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2623,
+          "column_start": 63,
+          "column_end": 146,
+          "anchor": "大汗招我儿为婿",
+          "quote": "把亡夫昔年与义弟杨铁心指腹为婚之事说了，最后道：“大汗招我儿为婿，自是十分荣耀之事。不过倘若杨叔叔遗下了一个女孩，我不守约言，他日九泉之下，怎有脸去见我丈夫和杨叔叔？”",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        },
+        {
+          "book": "射雕英雄传",
+          "line": 2637,
+          "column_start": 56,
+          "column_end": 133,
+          "anchor": "父亲已把自己终身许配给他",
+          "quote": "更无一根杂毛，那也是从王罕的宝库中夺来的。华筝知道父亲已把自己终身许配给他，双颊红晕，脉脉不语。拖雷笑道：“妹子，你跟他说话啊！我不听就是。”说着纵马走开。",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        }
+      ],
+      "uncertain": [
+        "成吉思汗当众说亲的完整原话未在本段出现"
+      ],
+      "id": "NEW:射雕-006-03:013",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "成吉思汗夺取王罕金器珍宝",
+      "when": "未知",
+      "place": "王罕处或宝库，具体未知",
+      "people": [
+        "成吉思汗",
+        "王罕"
+      ],
+      "relationships": "成吉思汗夺取王罕财物",
+      "description": "成吉思汗把从王罕那里抢来的金器珍宝赠给江南六怪；拖雷所赠貂裘也出自王罕宝库。",
+      "cause": "原文未详",
+      "effect": "成吉思汗与拖雷有财物可赏赠",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "射雕英雄传",
+          "line": 2633,
+          "column_start": 42,
+          "column_end": 148,
+          "anchor": "从王罕那里抢来的金器珍宝",
+          "quote": "点头答应。成吉思汗当下赏了十斤黄金，作为盘缠，又把从王罕那里抢来的金器珍宝赠了一批给江南六怪。拖雷、哲别等得知郭靖奉命南去，都有礼物赠送。拖雷道：“安答，南人说了话常常不算的，你可得小心，别上了当。”郭靖点头答应。",
+          "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+          "chapter": 6
+        }
+      ],
+      "uncertain": [
+        "夺取王罕宝库的经过原文未载"
+      ],
+      "id": "NEW:射雕-006-03:014",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    }
+  ],
+  "cross_links": [
+    {
+      "topic": "郭杨两家婚约与杨康身世",
+      "people": [
+        "郭啸天",
+        "杨铁心",
+        "郭靖",
+        "杨康",
+        "李萍"
+      ],
+      "detail": "本回确认郭啸天与杨铁心指腹为婚、杨铁心留有男嗣；杨康具体身世及杨铁心夫妇下落待后续核验。"
+    },
+    {
+      "topic": "江南六怪与丘处机赌赛",
+      "people": [
+        "江南六怪",
+        "丘处机",
+        "郭靖",
+        "杨康",
+        "尹志平"
+      ],
+      "detail": "本回只点出赌赛存在及六怪隐瞒，赌约内容、胜负条件与尹志平师承待核。"
+    },
+    {
+      "topic": "成吉思汗与札木合、王罕旧事",
+      "people": [
+        "成吉思汗",
+        "札木合",
+        "王罕",
+        "完颜洪烈"
+      ],
+      "detail": "本回提及结义、失和、札木合身死及夺取王罕宝库；具体战争过程与死因待核。"
+    }
+  ],
+  "unresolved": [
+    "札木合具体死因及成吉思汗与完颜洪烈会面详情，原文未载。",
+    "江南六怪与丘处机赌赛的具体赌约、胜负条件及尹志平来历，原文未载。",
+    "杨铁心夫妇是否在世、杨康人品如何，六怪均不知。",
+    "段天德与郭家的仇怨详情，本段仅提及报仇，未述经过。",
+    "张阿生何时何故去世，本段仅见其墓。"
+  ],
+  "validation_issues": [],
+  "semantic_acceptance": "model_reviewed_not_independent_audit"
+}

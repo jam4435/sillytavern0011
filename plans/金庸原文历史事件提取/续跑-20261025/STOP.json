@@ -1,0 +1,32 @@
+{
+  "reason": "parallel_jobs_failed",
+  "failed": [
+    {
+      "id": "射雕-008-01",
+      "book": "射雕英雄传",
+      "chapter": 8,
+      "title": "各显神通",
+      "start": 3071,
+      "end": 3282,
+      "legacy_uids": [
+        "批次C/C1-射雕第1-20回.md#EV-射雕-0152",
+        "批次C/C1-射雕第1-20回.md#EV-射雕-0220",
+        "批次C/C1-射雕第1-20回.md#EV-射雕-0224",
+        "批次C/C1-射雕第1-20回.md#EV-射雕-0226",
+        "批次C/C1-射雕第1-20回.md#EV-射雕-0228"
+      ],
+      "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
+      "phase": "source_review",
+      "status": "failed",
+      "prompt_version": "source-review-v1",
+      "attempts": 1,
+      "error": "dsh failed: {\"kind\": \"max-tokens\"}"
+    }
+  ],
+  "usage": {
+    "inputTokens": 1953987,
+    "cacheReadTokens": 92800,
+    "outputTokens": 3139762,
+    "total": 5186549
+  }
+}

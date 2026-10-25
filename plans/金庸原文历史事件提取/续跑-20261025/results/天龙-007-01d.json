@@ -1,0 +1,650 @@
+{
+  "task_id": "天龙-007-01d",
+  "coverage": {
+    "start": 2803,
+    "end": 2858,
+    "complete": true
+  },
+  "reviews": [],
+  "events": [
+    {
+      "title": "段正淳与甘宝宝曾有旧情",
+      "when": "昔日",
+      "place": "未知",
+      "people": [
+        "刀白凤",
+        "甘宝宝",
+        "段正淳",
+        "钟万仇"
+      ],
+      "relationships": "段正淳与甘宝宝为昔日情人；甘宝宝为钟万仇之妻；刀白凤为段正淳之妻",
+      "description": "刀白凤早知甘宝宝是丈夫段正淳昔日的情人之一，醋劲更大，遂陪同钟万仇前往镇南王府。",
+      "cause": "原文仅称甘宝宝是段正淳昔日情人之一，未述旧情缘起",
+      "effect": "刀白凤醋劲更加大，陪同钟万仇来到王府",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "天龙八部",
+          "line": 2805,
+          "column_start": 61,
+          "column_end": 121,
+          "anchor": "甘宝宝是丈夫昔日的情人之一",
+          "quote": "的姓名来历，原来他夫人便是甘宝宝。她早知“俏药叉”甘宝宝是丈夫昔日的情人之一，这醋劲可就更加大了，当即陪同钟万仇来到王府。",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "旧情发生时间、经过及是否仍有往来，本段未详"
+      ],
+      "id": "NEW:天龙-007-01d:001",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "秦红棉赴姑苏行刺不成，与木婉清失散",
+      "when": "未知",
+      "place": "姑苏",
+      "people": [
+        "秦红棉",
+        "木婉清"
+      ],
+      "relationships": "秦红棉称木婉清为爱女；二人此行后失散",
+      "description": "秦红棉赴姑苏行刺不成，反而与爱女木婉清失散，其后依约南来大理。",
+      "cause": "原文未述行刺对象与缘由",
+      "effect": "母女失散，秦红棉后来南来大理到师妹处相会",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "天龙八部",
+          "line": 2799,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "秦红棉赴姑苏行刺不成，反与爱女失散",
+          "quote": "　　原来秦红棉赴姑苏行刺不成，反与爱女失散，便依照约定，南来大理，到师妹处相会。姑苏王家派出的瑞婆婆、平婆婆等全力追击木婉清，秦红棉落后了八九日路程，倒是一路平安无事。来到万劫谷，问知情由，便与钟夫人一齐出来探访，途中遇到叶二娘、南海鳄神和",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "行刺对象、缘由及失散经过未知"
+      ],
+      "id": "NEW:天龙-007-01d:002",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "姑苏王家派瑞婆婆、平婆婆等追击木婉清",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "姑苏王家",
+        "瑞婆婆",
+        "平婆婆",
+        "木婉清",
+        "秦红棉"
+      ],
+      "relationships": "姑苏王家派人追击木婉清；秦红棉因此落后八九日路程",
+      "description": "姑苏王家派出瑞婆婆、平婆婆等全力追击木婉清，秦红棉因此落后了八九日路程，一路平安无事。",
+      "cause": "原文未述追击原因",
+      "effect": "秦红棉落后八九日路程，一路平安",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "天龙八部",
+          "line": 2799,
+          "column_start": 16,
+          "column_end": 135,
+          "anchor": "姑苏王家派出的瑞婆婆、平婆婆等全力追击木婉清",
+          "quote": "反与爱女失散，便依照约定，南来大理，到师妹处相会。姑苏王家派出的瑞婆婆、平婆婆等全力追击木婉清，秦红棉落后了八九日路程，倒是一路平安无事。来到万劫谷，问知情由，便与钟夫人一齐出来探访，途中遇到叶二娘、南海鳄神和云中鹤“三恶”。这“三恶”是钟",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "追击地点与结果未详"
+      ],
+      "id": "NEW:天龙-007-01d:003",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "钟万仇请三恶向段正淳为难",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "钟万仇",
+        "叶二娘",
+        "南海鳄神",
+        "云中鹤",
+        "段正淳",
+        "钟夫人"
+      ],
+      "relationships": "三恶受钟万仇请托，向段正淳为难；三恶曾向钟夫人说起经过",
+      "description": "钟万仇请来叶二娘、南海鳄神、云中鹤三恶，向段正淳为难；三恶在途中向钟夫人说起经过，但不说南海鳄神投入段誉门下的丑事。",
+      "cause": "钟万仇欲向段正淳为难",
+      "effect": "三恶介入钟万仇与段正淳的纠纷",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "天龙八部",
+          "line": 2799,
+          "column_start": 104,
+          "column_end": 210,
+          "anchor": "这“三恶”是钟万仇请来向段正淳为难的帮手",
+          "quote": "来探访，途中遇到叶二娘、南海鳄神和云中鹤“三恶”。这“三恶”是钟万仇请来向段正淳为难的帮手，当下向钟夫人说起经过。南海鳄神投入段誉门下的丑事，那自然是不说的。秦红棉一听得木婉清失陷在大理镇南王府之中，当即偕同前来。",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "请托时间、条件及三恶具体行动范围未详"
+      ],
+      "id": "NEW:天龙-007-01d:004",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "南海鳄神投入段誉门下",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "南海鳄神",
+        "段誉"
+      ],
+      "relationships": "南海鳄神投入段誉门下",
+      "description": "原文称南海鳄神投入段誉门下是一件丑事，三恶向钟夫人说起经过时自然不说。",
+      "cause": "未知",
+      "effect": "南海鳄神成为段誉门下，具体名分与经过未详",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "天龙八部",
+          "line": 2799,
+          "column_start": 136,
+          "column_end": 210,
+          "anchor": "南海鳄神投入段誉门下的丑事",
+          "quote": "万仇请来向段正淳为难的帮手，当下向钟夫人说起经过。南海鳄神投入段誉门下的丑事，那自然是不说的。秦红棉一听得木婉清失陷在大理镇南王府之中，当即偕同前来。",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "投入门下的具体经过、时间及实际关系未详"
+      ],
+      "id": "NEW:天龙-007-01d:005",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "木婉清失陷于大理镇南王府",
+      "when": "未知",
+      "place": "大理镇南王府",
+      "people": [
+        "木婉清",
+        "秦红棉",
+        "钟夫人"
+      ],
+      "relationships": "木婉清失陷后，秦红棉与钟夫人一同前来",
+      "description": "秦红棉得知木婉清失陷在大理镇南王府，当即偕同钟夫人前来。",
+      "cause": "未知",
+      "effect": "秦红棉与钟夫人前往镇南王府",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "天龙八部",
+          "line": 2799,
+          "column_start": 158,
+          "column_end": 210,
+          "anchor": "秦红棉一听得木婉清失陷在大理镇南王府之中",
+          "quote": "经过。南海鳄神投入段誉门下的丑事，那自然是不说的。秦红棉一听得木婉清失陷在大理镇南王府之中，当即偕同前来。",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "木婉清如何失陷、失陷期间情形未知"
+      ],
+      "id": "NEW:天龙-007-01d:006",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "秦红棉与甘宝宝为师姊妹",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "秦红棉",
+        "甘宝宝",
+        "段正淳"
+      ],
+      "relationships": "秦红棉与甘宝宝为师姊妹；段正淳与二人有风言风语",
+      "description": "原文称秦红棉、甘宝宝为师姊妹，段正淳对二人风言风语、打情骂俏；秦红棉曾到万劫谷与师妹甘宝宝相会。",
+      "cause": "未知",
+      "effect": "秦红棉到万劫谷与师妹相会",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "天龙八部",
+          "line": 2807,
+          "column_start": 29,
+          "column_end": 119,
+          "anchor": "秦红棉、甘宝宝师姊妹俩",
+          "quote": "阻拦，是以两人欺到暖阁之下，无人出声示警。段正淳对秦红棉、甘宝宝师姊妹俩这番风言风语、打情骂俏，窗外两人一一听入耳中，只恼得刀白凤没的气炸了胸膛。钟万仇听妻子以礼自防，却是大喜过望。",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        },
+        {
+          "book": "天龙八部",
+          "line": 2799,
+          "column_start": 9,
+          "column_end": 128,
+          "anchor": "到师妹处相会",
+          "quote": "姑苏行刺不成，反与爱女失散，便依照约定，南来大理，到师妹处相会。姑苏王家派出的瑞婆婆、平婆婆等全力追击木婉清，秦红棉落后了八九日路程，倒是一路平安无事。来到万劫谷，问知情由，便与钟夫人一齐出来探访，途中遇到叶二娘、南海鳄神和云中鹤“三恶”。",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "师门来历与二人结为师姊妹的经过未详"
+      ],
+      "id": "NEW:天龙-007-01d:007",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "钟万仇夜追妻子，与刀白凤交手",
+      "when": "半夜",
+      "place": "镇南王府之外",
+      "people": [
+        "钟万仇",
+        "刀白凤",
+        "钟夫人"
+      ],
+      "relationships": "钟万仇为钟夫人之夫；刀白凤为段正淳之妻；二人因言语不合动手",
+      "description": "钟万仇因妻子走后坐立不安，顾不得创伤未愈，半夜跟踪到镇南王府外，遇刀白凤忿忿而出，两人一言不合动手，斗到酣处刀白凤渐感不支。",
+      "cause": "钟万仇醋性奇重，妻子出走后坐立不安",
+      "effect": "刀白凤渐感不支；随后木婉清掠过，二人招呼不理",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "天龙八部",
+          "line": 2801,
+          "column_start": 21,
+          "column_end": 140,
+          "anchor": "半夜中跟踪而来",
+          "quote": "自她走后，坐立不安，心绪难宁，当下顾不得创伤未愈，半夜中跟踪而来。在镇南王府之外，正好遇到刀白凤忿忿而出，一肚子怨气没处发泄，两人一言不合，便即动手。斗到酣处，刀白凤渐感不支，突然一个黑衣人影从身旁掠过，掩面呜咽，却是木婉清。两人齐声招呼，",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        },
+        {
+          "book": "天龙八部",
+          "line": 2801,
+          "column_start": 59,
+          "column_end": 148,
+          "anchor": "两人一言不合，便即动手",
+          "quote": "之外，正好遇到刀白凤忿忿而出，一肚子怨气没处发泄，两人一言不合，便即动手。斗到酣处，刀白凤渐感不支，突然一个黑衣人影从身旁掠过，掩面呜咽，却是木婉清。两人齐声招呼，木婉清不理而去。",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        },
+        {
+          "book": "天龙八部",
+          "line": 2801,
+          "column_start": 76,
+          "column_end": 148,
+          "anchor": "刀白凤渐感不支",
+          "quote": "子怨气没处发泄，两人一言不合，便即动手。斗到酣处，刀白凤渐感不支，突然一个黑衣人影从身旁掠过，掩面呜咽，却是木婉清。两人齐声招呼，木婉清不理而去。",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "交手胜负与后续未详"
+      ],
+      "id": "NEW:天龙-007-01d:008",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "段誉被南海鳄神等掳走",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "段誉",
+        "南海鳄神",
+        "钟夫人",
+        "段正淳",
+        "钟万仇"
+      ],
+      "relationships": "段誉为段正淳之子；南海鳄神等掳走段誉；钟夫人称恶人未必肯听钟万仇放人",
+      "description": "钟夫人告诉段正淳，段誉给南海鳄神他们掳了去，钟万仇要他们放人，这几个恶人未必肯听。",
+      "cause": "未知",
+      "effect": "段正淳与钟万仇就放人交换发生争执",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "天龙八部",
+          "line": 2813,
+          "column_start": 1,
+          "column_end": 76,
+          "anchor": "公子给南海鳄神他们掳了去",
+          "quote": "　　钟夫人冷冷的道：“段王爷，公子给南海鳄神他们掳了去，拙夫要他们放，这几个恶人未必肯听。我和师姊回去，俟机解救，或有指望。至少也不让他们难为了公子。”",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "掳人者是否仅南海鳄神、掳走经过及地点未详"
+      ],
+      "id": "NEW:天龙-007-01d:009",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "木婉清身世揭明：生父段正淳、生母秦红棉",
+      "when": "未知（本回木婉清心中确认）",
+      "place": "未知",
+      "people": [
+        "木婉清",
+        "秦红棉",
+        "段正淳",
+        "段誉"
+      ],
+      "relationships": "秦红棉为木婉清生母兼师父；段正淳为木婉清生父；段誉与木婉清为同父异母兄妹",
+      "description": "木婉清心中确认：段誉并非负心，只因二人偏偏是同父的哥哥；师父原来便是亲娘；镇南王段正淳却是她的爹爹。",
+      "cause": "原文以阴差阳错解释木婉清与段誉的兄妹关系",
+      "effect": "木婉清对段誉的情意因兄妹关系无法如愿，陷入痛苦",
+      "nature": "揭密",
+      "evidence": [
+        {
+          "book": "天龙八部",
+          "line": 2853,
+          "column_start": 15,
+          "column_end": 134,
+          "anchor": "偏偏是我同父的哥哥",
+          "quote": "谁恼谁才好。“段郎并非对我负心薄幸，只因阴差阳错，偏偏是我同父的哥哥。师父原来便是我的亲娘。这十多年来，母亲含辛茹苦的将我抚养成人，恩重如山，如何能够怪她……镇南王却是我的爹爹，虽然他对我妈不起，但说不定其中有许多不得已的苦衷。他对我和颜悦",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        },
+        {
+          "book": "天龙八部",
+          "line": 2853,
+          "column_start": 25,
+          "column_end": 144,
+          "anchor": "师父原来便是我的亲娘",
+          "quote": "非对我负心薄幸，只因阴差阳错，偏偏是我同父的哥哥。师父原来便是我的亲娘。这十多年来，母亲含辛茹苦的将我抚养成人，恩重如山，如何能够怪她……镇南王却是我的爹爹，虽然他对我妈不起，但说不定其中有许多不得已的苦衷。他对我和颜悦色，极为慈爱，说道我",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        },
+        {
+          "book": "天龙八部",
+          "line": 2853,
+          "column_start": 69,
+          "column_end": 188,
+          "anchor": "镇南王却是我的爹爹",
+          "quote": "含辛茹苦的将我抚养成人，恩重如山，如何能够怪她……镇南王却是我的爹爹，虽然他对我妈不起，但说不定其中有许多不得已的苦衷。他对我和颜悦色，极为慈爱，说道我若是有甚么心愿，必当尽力使我如愿以偿。偏偏这个心愿他全然无能为力。妈不能跟爹爹成为夫妻，",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "身世揭明过程不在本段，仅见木婉清内心确认"
+      ],
+      "id": "NEW:天龙-007-01d:010",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "秦红棉抚养木婉清十余年",
+      "when": "十多年来",
+      "place": "未知",
+      "people": [
+        "秦红棉",
+        "木婉清"
+      ],
+      "relationships": "秦红棉实为木婉清生母，名分为师父；木婉清感念母亲抚养之恩",
+      "description": "木婉清想到师父原来便是亲娘，这十多年来母亲含辛茹苦将她抚养成人，恩重如山。",
+      "cause": "未知",
+      "effect": "木婉清难以责怪母亲",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "天龙八部",
+          "line": 2853,
+          "column_start": 36,
+          "column_end": 155,
+          "anchor": "这十多年来，母亲含辛茹苦的将我抚养成人",
+          "quote": "差阳错，偏偏是我同父的哥哥。师父原来便是我的亲娘。这十多年来，母亲含辛茹苦的将我抚养成人，恩重如山，如何能够怪她……镇南王却是我的爹爹，虽然他对我妈不起，但说不定其中有许多不得已的苦衷。他对我和颜悦色，极为慈爱，说道我若是有甚么心愿，必当尽",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "抚养地点与具体年月未详"
+      ],
+      "id": "NEW:天龙-007-01d:011",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "刀白凤出家作了道姑",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "刀白凤",
+        "段正淳",
+        "木婉清"
+      ],
+      "relationships": "刀白凤为段正淳之妻；木婉清推测段正淳对她不起",
+      "description": "木婉清想到刀白凤出家作了道姑，并推测段正淳很对她不起，令她伤心。",
+      "cause": "木婉清推测：段正淳很对刀白凤不起；原文未确证",
+      "effect": "刀白凤出家为道姑",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "天龙八部",
+          "line": 2853,
+          "column_start": 212,
+          "column_end": 328,
+          "anchor": "刀白凤出家作了道姑",
+          "quote": "心，我若嫁了段郎，也决不肯让他再有第二个女人，何况刀白凤出家作了道姑，想来爹爹也很对她不起，令她甚是伤心。我在玉虚观外射她两箭，她并不生气，在王府中又射她两箭，伤了她的独生爱儿，她仍没跟我为难，看来……看来她也不是凶狠恶毒的女子……”",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "出家原因、时间、地点及是否正式受戒未详"
+      ],
+      "id": "NEW:天龙-007-01d:012",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "秦红棉命木婉清杀刀白凤",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "秦红棉",
+        "木婉清",
+        "刀白凤",
+        "段正淳"
+      ],
+      "relationships": "秦红棉命女儿木婉清杀刀白凤；木婉清认为母亲因刀白凤作梗不能与段正淳成婚",
+      "description": "木婉清心中说，妈不能跟爹爹成为夫妻，定是刀白凤从中作梗，因此妈叫她杀刀白凤。",
+      "cause": "木婉清推断为刀白凤从中作梗，致秦红棉不能与段正淳成为夫妻",
+      "effect": "木婉清受母命杀刀白凤",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "天龙八部",
+          "line": 2853,
+          "column_start": 174,
+          "column_end": 293,
+          "anchor": "因此妈叫我杀她",
+          "quote": "能为力。妈不能跟爹爹成为夫妻，定是刀白凤从中作梗，因此妈叫我杀她……但将心比心，我若嫁了段郎，也决不肯让他再有第二个女人，何况刀白凤出家作了道姑，想来爹爹也很对她不起，令她甚是伤心。我在玉虚观外射她两箭，她并不生气，在王府中又射她两箭，伤了",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "秦红棉命杀的具体时间、原话及真实动机未确证，作梗之说为木婉清推断"
+      ],
+      "id": "NEW:天龙-007-01d:013",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "木婉清两次箭射刀白凤，第二次伤段誉",
+      "when": "未知",
+      "place": "玉虚观外；镇南王府",
+      "people": [
+        "木婉清",
+        "刀白凤",
+        "段誉"
+      ],
+      "relationships": "木婉清两次箭射刀白凤；第二次伤及刀白凤的独生爱子段誉；刀白凤未报复",
+      "description": "木婉清先在玉虚观外射刀白凤两箭，后在王府中又射两箭，伤了她的独生爱儿段誉；刀白凤仍没跟木婉清为难。",
+      "cause": "原文未明",
+      "effect": "段誉受伤；刀白凤未报复",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "天龙八部",
+          "line": 2853,
+          "column_start": 240,
+          "column_end": 328,
+          "anchor": "我在玉虚观外射她两箭",
+          "quote": "出家作了道姑，想来爹爹也很对她不起，令她甚是伤心。我在玉虚观外射她两箭，她并不生气，在王府中又射她两箭，伤了她的独生爱儿，她仍没跟我为难，看来……看来她也不是凶狠恶毒的女子……”",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        },
+        {
+          "book": "天龙八部",
+          "line": 2853,
+          "column_start": 257,
+          "column_end": 328,
+          "anchor": "在王府中又射她两箭",
+          "quote": "，令她甚是伤心。我在玉虚观外射她两箭，她并不生气，在王府中又射她两箭，伤了她的独生爱儿，她仍没跟我为难，看来……看来她也不是凶狠恶毒的女子……”",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        },
+        {
+          "book": "天龙八部",
+          "line": 2853,
+          "column_start": 267,
+          "column_end": 328,
+          "anchor": "伤了她的独生爱儿",
+          "quote": "玉虚观外射她两箭，她并不生气，在王府中又射她两箭，伤了她的独生爱儿，她仍没跟我为难，看来……看来她也不是凶狠恶毒的女子……”",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "两次箭射的具体时间、动机及段誉伤势未详"
+      ],
+      "id": "NEW:天龙-007-01d:014",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "木婉清在无量山高峰苦候段誉七日七夜",
+      "when": "此前，具体未知",
+      "place": "无量山高峰",
+      "people": [
+        "木婉清",
+        "段誉"
+      ],
+      "relationships": "木婉清对段誉情根深种",
+      "description": "木婉清在无量山高峰上苦候七日七夜，于望穿秋水之际已然情根深种，再也无法自拔。",
+      "cause": "原文称情网既陷",
+      "effect": "木婉清对段誉情根深种，难以忘怀",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "天龙八部",
+          "line": 2857,
+          "column_start": 1,
+          "column_end": 55,
+          "anchor": "在无量山高峰上苦候七日七夜",
+          "quote": "　　然而情网既陷，柔丝愈缠愈紧，她在无量山高峰上苦候七日七夜，于那望穿秋水之际，已然情根深种，再也无法自拔了。",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        },
+        {
+          "book": "天龙八部",
+          "line": 2857,
+          "column_start": 16,
+          "column_end": 55,
+          "anchor": "已然情根深种",
+          "quote": "，她在无量山高峰上苦候七日七夜，于那望穿秋水之际，已然情根深种，再也无法自拔了。",
+          "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
+          "chapter": 7
+        }
+      ],
+      "uncertain": [
+        "苦候的起止时间及段誉是否知情未详"
+      ],
+      "id": "NEW:天龙-007-01d:015",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    }
+  ],
+  "cross_links": [
+    {
+      "topic": "段正淳旧情与木婉清身世",
+      "people": [
+        "段正淳",
+        "秦红棉",
+        "甘宝宝",
+        "木婉清",
+        "钟万仇",
+        "刀白凤"
+      ],
+      "detail": "本回只提供段正淳与甘宝宝旧情、木婉清为段正淳与秦红棉之女等片段；这些关系如何形成、何时发生待核。"
+    },
+    {
+      "topic": "秦红棉姑苏行刺",
+      "people": [
+        "秦红棉",
+        "木婉清"
+      ],
+      "detail": "本回称赴姑苏行刺不成并与木婉清失散，未言行刺对象、缘由及姑苏王家追击的完整经过，待核。"
+    },
+    {
+      "topic": "段誉被掳与南海鳄神投入门下",
+      "people": [
+        "段誉",
+        "南海鳄神",
+        "叶二娘",
+        "云中鹤",
+        "钟万仇"
+      ],
+      "detail": "本回只称三恶为钟万仇请来、南海鳄神投入段誉门下、段誉被南海鳄神等掳去；具体时间线与掳人经过待核。"
+    }
+  ],
+  "unresolved": [
+    "秦红棉赴姑苏行刺的对象和缘由是什么？",
+    "木婉清如何失陷于大理镇南王府？",
+    "南海鳄神如何投入段誉门下？",
+    "段誉被掳的具体经过及掳人者范围？",
+    "刀白凤出家为道姑的原因和地点？",
+    "秦红棉命木婉清杀刀白凤是否确因刀白凤从中作梗，还是木婉清推测？"
+  ],
+  "validation_issues": [],
+  "semantic_acceptance": "model_reviewed_not_independent_audit"
+}
