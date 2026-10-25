@@ -2170,9 +2170,12 @@
     ],
     "source_sha256": "a553db6e2ca0d6c683bcc692fbc5efeb7b8c62b4021d3c91f7dc7949e27ea420",
     "phase": "source_review",
-    "status": "running",
+    "status": "reviewed",
     "prompt_version": "source-review-v1",
-    "attempts": 1
+    "attempts": 1,
+    "duration_ms": 201717.32769999653,
+    "event_count": 7,
+    "issue_count": 0
   },
   {
     "id": "射雕-001-02",
@@ -6561,9 +6564,12 @@
     ],
     "source_sha256": "8e5503344bb28d0964bd25363384acf721f183952d48290fcec665044a71e252",
     "phase": "source_review",
-    "status": "running",
+    "status": "reviewed",
     "prompt_version": "source-review-v1",
-    "attempts": 1
+    "attempts": 1,
+    "duration_ms": 169584.0867999941,
+    "event_count": 5,
+    "issue_count": 0
   },
   {
     "id": "笑傲-001-02",

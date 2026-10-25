@@ -1,21 +1,13 @@
 {
   "pid": 40060,
-  "status": "running",
+  "status": "paused",
   "phase": "source",
-  "updated_at": "2026-10-25T11:31:13+0800",
+  "updated_at": "2026-10-25T11:34:36+0800",
   "usage": {
-    "inputTokens": 731707,
-    "cacheReadTokens": 37248,
-    "outputTokens": 1168954,
-    "total": 1937909
+    "inputTokens": 806503,
+    "cacheReadTokens": 40320,
+    "outputTokens": 1268052,
+    "total": 2114875
   },
-  "parallel_books": 6,
-  "books": [
-    "鹿鼎记",
-    "倚天屠龙记",
-    "笑傲江湖",
-    "天龙八部",
-    "射雕英雄传",
-    "神雕侠侣"
-  ]
+  "reason": "bounded source wave completed"
 }
