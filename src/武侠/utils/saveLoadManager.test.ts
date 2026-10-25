@@ -770,6 +770,94 @@ describe('history tree v2 scanning', () => {
 });
 
 describe('history checkout', () => {
+  it('缺少分叉前见证时，以原内容节点 ID 证明身份并合并已有 MK 重复节点', async () => {
+    currentChat().messages = [
+      { message_id: 0, role: 'user', message: '我该往哪里走？' },
+      { message_id: 1, role: 'assistant', message: '第一回' },
+    ];
+    currentChat().variables.ERAMetaData = { SelectedMks: [null, null] };
+    const initial = await scanCurrentChat();
+    const targetId = initial.currentNodeId!;
+    expect(initial.tree.nodes[targetId].verification).toBeNull();
+
+    const mk = 'mk-retry-without-witness';
+    const staleChatId = 'fork-stale';
+    const staleChatName = '旧失败分支';
+    chats[staleChatId] = {
+      id: staleChatId,
+      name: staleChatName,
+      messages: [
+        { message_id: 0, role: 'user', message: '我该往哪里走？' },
+        {
+          message_id: 1,
+          role: 'assistant',
+          message: `<era_data>{"era-message-key"="${mk}","era-message-type"="assistant"}</era_data>第一回`,
+        },
+      ],
+      variables: { ERAMetaData: { SelectedMks: [null, mk] }, stat_data: {} },
+    };
+    const duplicateId = `history_node_${stableHistoryHash({
+      parentId: null, identity: `mk:${mk}`, swipeId: 0,
+    })}`;
+    const tree = loadHistoryTree();
+    tree.nodes[duplicateId] = {
+      id: duplicateId,
+      parentId: null,
+      locators: [{
+        chatId: staleChatId, chatName: staleChatName, userMessageId: 0,
+        assistantMessageId: 1, swipeId: 0,
+      }],
+      messageKey: mk,
+      label: null,
+      pinned: false,
+      preview: '第一回',
+      location: '',
+      worldTimeText: '',
+      createdAt: Date.now(),
+      verification: null,
+    };
+    const staleBranchId = `history_branch_${stableHistoryHash(staleChatId)}`;
+    tree.branches[staleBranchId] = {
+      id: staleBranchId,
+      chatId: staleChatId,
+      chatName: staleChatName,
+      originNodeId: targetId,
+      headNodeId: duplicateId,
+      createdAt: Date.now(),
+      status: 'recovery_failed',
+    };
+    persistTreeDirect(tree);
+
+    eventOn('manual_full_sync', () => {
+      if (!currentChatId.startsWith('fork-')) return;
+      currentChat().messages[1].message =
+        `<era_data>{"era-message-key"="${mk}","era-message-type"="assistant"}</era_data>第一回`;
+      currentChat().variables.ERAMetaData = { SelectedMks: [null, mk] };
+    });
+
+    // The old node is intentionally unsealed, so no transaction witness can be captured.
+    // A stale MK-keyed node with a locator from a previous failed branch already exists.
+    const result = await checkoutNode(targetId, { forceBranch: true });
+
+    expect(result.status).toBe('commit');
+    expect(result.currentNodeId).toBe(targetId);
+    const repaired = loadHistoryTree();
+    const branchChatId = repaired.branches[result.currentBranchId!].chatId;
+    expect(repaired.nodes[targetId].messageKeyAliases).toContain(mk);
+    expect(repaired.nodes[targetId].locators).toContainEqual(expect.objectContaining({
+      chatId: branchChatId,
+      assistantMessageId: 1,
+      swipeId: 0,
+    }));
+    expect(repaired.branches[result.currentBranchId!].headNodeId).toBe(targetId);
+    expect(repaired.nodes[duplicateId].locators.some(locator =>
+      locator.chatId === branchChatId,
+    )).toBe(false);
+    expect(repaired.nodes[targetId].verification?.selectedMksHash)
+      .toBe(stableHistoryHash([null, mk]));
+    expect(readHistoryCheckoutJournal()).toBeNull();
+  });
+
   it('分叉后同一正文首次出现 MK 时复用原节点并记录已验证的分支指纹', async () => {
     currentChat().messages = [{ message_id: 0, role: 'assistant', message: '第一回' }];
     currentChat().variables.ERAMetaData = { SelectedMks: [null] };

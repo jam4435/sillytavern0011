@@ -2089,18 +2089,45 @@ async function reconcileForkBranchMkIdentity(
   state: HistoryTreeViewState,
   targetNodeId: string,
 ): Promise<HistoryTreeViewState | null> {
+  const reject = (reason: string, detail: Record<string, unknown> = {}): null => {
+    recordEraDiagnostic('wuxia-history-checkout', 'history-branch-mk-identity-reconcile-skipped', {
+      transactionId: journal.transactionId,
+      targetNodeId,
+      reason,
+      ...detail,
+    });
+    return null;
+  };
   if (journal.actionKind !== 'fork_branch' || journal.stage !== 'verify' ||
-      state.currentChat.id !== journal.targetLocator.chatId) return null;
+      state.currentChat.id !== journal.targetLocator.chatId) {
+    return reject('transaction-or-chat-mismatch', {
+      actionKind: journal.actionKind,
+      stage: journal.stage,
+      currentChatId: state.currentChat.id,
+      targetChatId: journal.targetLocator.chatId,
+    });
+  }
   const sourceLocator = journal.branchSourceLocator;
   if (!sourceLocator || sourceLocator.chatId !== journal.sourceChatId ||
       sourceLocator.assistantMessageId !== journal.targetLocator.assistantMessageId ||
-      sourceLocator.swipeId !== journal.targetLocator.swipeId ||
-      !currentChatMatchesForkSnapshot(journal.targetLocator)) return null;
+      sourceLocator.swipeId !== journal.targetLocator.swipeId) {
+    return reject('source-locator-mismatch', {
+      sourceLocator: sourceLocator ?? null,
+      sourceChatId: journal.sourceChatId,
+      targetLocator: journal.targetLocator,
+    });
+  }
 
   const target = state.tree.nodes[targetNodeId];
   const actual = state.currentNodeId ? state.tree.nodes[state.currentNodeId] : null;
-  if (!target || !target.verification || !actual || actual.parentId !== target.parentId) return null;
-  const targetVerification = target.verification;
+  if (!target || !actual || actual.parentId !== target.parentId) {
+    return reject('node-or-parent-mismatch', {
+      actualNodeId: actual?.id ?? null,
+      targetParentId: target?.parentId ?? null,
+      actualParentId: actual?.parentId ?? null,
+    });
+  }
+  const targetVerification = target.verification ?? null;
   const sourceLocatorOnTarget = target.locators.find(locator =>
     locator.chatId === sourceLocator.chatId &&
     locator.assistantMessageId === sourceLocator.assistantMessageId &&
@@ -2111,18 +2138,17 @@ async function reconcileForkBranchMkIdentity(
     locator.assistantMessageId === journal.targetLocator.assistantMessageId &&
     locator.swipeId === journal.targetLocator.swipeId,
   );
-  if (!sourceLocatorOnTarget || !branchLocator) return null;
-
-  const witness = readCheckoutSourceMkWitness(journal.transactionId);
-  if (!witness ||
-      witness.transactionId !== journal.transactionId ||
-      witness.targetNodeId !== target.id ||
-      witness.sourceChatId !== journal.sourceChatId ||
-      witness.targetMessageId !== journal.targetLocator.assistantMessageId ||
-      witness.targetSwipeId !== journal.targetLocator.swipeId ||
-      !nodeAcceptsMessageKey(target, witness.targetMk) ||
-      witness.originalSelectedMksHash !== targetVerification.selectedMksHash ||
-      witness.eventStateHash !== targetVerification.eventStateHash) return null;
+  if (!sourceLocatorOnTarget || !branchLocator) {
+    return reject('source-or-branch-locator-missing', {
+      hasSourceLocator: Boolean(sourceLocatorOnTarget),
+      hasBranchLocator: Boolean(branchLocator),
+      sourceChatId: sourceLocator.chatId,
+      branchChatId: state.currentChat.id,
+      sourceAssistantMessageId: sourceLocator.assistantMessageId,
+      branchAssistantMessageId: journal.targetLocator.assistantMessageId,
+      swipeId: journal.targetLocator.swipeId,
+    });
+  }
 
   const currentMessages = readAllHistoryMessages();
   const branchMessage = currentMessages.find(message =>
@@ -2131,7 +2157,14 @@ async function reconcileForkBranchMkIdentity(
   const branchSwipe = branchMessage ? getSwipeTexts(branchMessage) : null;
   const branchText = branchSwipe?.texts[journal.targetLocator.swipeId] ?? '';
   if (!branchMessage || !branchSwipe ||
-      branchSwipe.activeSwipeId !== journal.targetLocator.swipeId || !branchText.trim()) return null;
+      branchSwipe.activeSwipeId !== journal.targetLocator.swipeId || !branchText.trim()) {
+    return reject('branch-message-or-swipe-mismatch', {
+      foundBranchMessage: Boolean(branchMessage),
+      activeSwipeId: branchSwipe?.activeSwipeId ?? null,
+      expectedSwipeId: journal.targetLocator.swipeId,
+      hasBranchText: Boolean(branchText.trim()),
+    });
+  }
 
   let sourceText: string;
   try {
@@ -2146,15 +2179,69 @@ async function reconcileForkBranchMkIdentity(
       targetNodeId,
       reason: error instanceof Error ? error.message : String(error),
     });
-    return null;
+    return reject('source-message-read-failed');
   }
   const sourceMk = extractMessageKey(sourceText);
   const branchMk = extractMessageKey(branchText);
   const sourceContent = cleanStoryTextForIdentityComparison(sourceText);
   const branchContent = cleanStoryTextForIdentityComparison(branchText);
-  if (!sourceText.trim() || !sourceContent || sourceContent !== branchContent ||
-      sourceMk !== witness.targetMk || !branchMk || branchMk === sourceMk ||
-      !nodeAcceptsMessageKey(actual, branchMk)) return null;
+  if (!sourceText.trim() || !sourceContent || sourceContent !== branchContent) {
+    return reject('source-and-branch-content-differ', {
+      hasSourceText: Boolean(sourceText.trim()),
+      hasSourceContent: Boolean(sourceContent),
+      sourceContentHash: sourceContent ? stableHistoryHash(sourceContent) : null,
+      branchContentHash: branchContent ? stableHistoryHash(branchContent) : null,
+    });
+  }
+
+  const witness = readCheckoutSourceMkWitness(journal.transactionId);
+  const witnessMatches = Boolean(
+    witness &&
+    witness.transactionId === journal.transactionId &&
+    witness.targetNodeId === target.id &&
+    witness.sourceChatId === journal.sourceChatId &&
+    witness.targetMessageId === journal.targetLocator.assistantMessageId &&
+    witness.targetSwipeId === journal.targetLocator.swipeId &&
+    sourceMk === witness.targetMk &&
+    nodeAcceptsMessageKey(target, witness.targetMk) &&
+    (!targetVerification ||
+      (witness.originalSelectedMksHash === targetVerification.selectedMksHash &&
+       witness.eventStateHash === targetVerification.eventStateHash)),
+  );
+  // Older/unsealed nodes have no pre-fork witness. For those nodes, the stable content ID
+  // itself is a strong source identity proof: recomputing it from the exact source locator
+  // must reproduce the original node ID. Never use this fallback for an MK-keyed node.
+  const sourceContentIdentityMatches = target.messageKey === null &&
+    getNodeId(target.parentId, null, sourceText, sourceLocator.swipeId) === target.id;
+  if (!witnessMatches && !sourceContentIdentityMatches) {
+    return reject('no-trusted-source-identity-proof', {
+      witnessPresent: Boolean(witness),
+      witnessMatches,
+      sourceContentIdentityMatches,
+      sourceMk,
+      targetMessageKey: target.messageKey,
+      sourceContentNodeId: getNodeId(target.parentId, null, sourceText, sourceLocator.swipeId),
+    });
+  }
+  if (branchMk && !nodeAcceptsMessageKey(actual, branchMk)) {
+    return reject('branch-mk-not-accepted-by-actual-node', {
+      branchMk,
+      actualMessageKey: actual.messageKey,
+      actualMessageKeyAliases: actual.messageKeyAliases ?? [],
+    });
+  }
+  // If the scanner already resolved the exact same source/branch MK to the target,
+  // leave verification repair to the existing legacy-seal repair path below.
+  if (actual.id === targetNodeId && sourceMk === branchMk &&
+      nodeAcceptsMessageKey(target, branchMk)) return null;
+  if (actual.id !== targetNodeId &&
+      actual.id !== getNodeId(actual.parentId, branchMk, branchText, journal.targetLocator.swipeId)) {
+    return reject('actual-node-id-does-not-match-branch-message', {
+      actualNodeId: actual.id,
+      expectedActualNodeId: getNodeId(actual.parentId, branchMk, branchText, journal.targetLocator.swipeId),
+      branchMk,
+    });
+  }
 
   let alignedMks: (string | null)[];
   try {
@@ -2165,41 +2252,56 @@ async function reconcileForkBranchMkIdentity(
       targetNodeId,
       reason: error instanceof Error ? error.message : String(error),
     });
-    return null;
+    return reject('selected-mks-not-aligned');
   }
   const currentVerification = readCurrentVerification();
-  if (alignedMks.length !== journal.targetLocator.assistantMessageId + 1 ||
-      stableHistoryHash(alignedMks) !== currentVerification.selectedMksHash ||
-      currentVerification.eventStateHash !== targetVerification.eventStateHash) return null;
+  if (stableHistoryHash(alignedMks) !== currentVerification.selectedMksHash) {
+    return reject('selected-mks-hash-changed-during-verification', {
+      alignedMksHash: stableHistoryHash(alignedMks),
+      currentSelectedMksHash: currentVerification.selectedMksHash,
+    });
+  }
+  // Identity and event-seal validation are separate concerns. Reconcile the node identity
+  // even if the event seal later fails, but only whitelist the branch-local MK hash when
+  // the original event seal is still identical. commitVerification remains the authority
+  // that accepts or rejects the sealed event state.
+  const eventSealMatches = !targetVerification ||
+    currentVerification.eventStateHash === targetVerification.eventStateHash;
 
   const latest = cloneTree(loadHistoryTree());
   const latestTarget = latest.nodes[targetNodeId];
   const latestActual = latest.nodes[actual.id];
   const branch = latest.branches[state.currentBranchId];
-  if (!latestTarget?.verification || !latestActual || !branch ||
+  if (!latestTarget || !latestActual || !branch ||
       branch.chatId !== state.currentChat.id ||
-      latestTarget.verification.selectedMksHash !== targetVerification.selectedMksHash ||
-      latestTarget.verification.eventStateHash !== targetVerification.eventStateHash ||
+      (latestTarget.verification?.selectedMksHash ?? null) !== (targetVerification?.selectedMksHash ?? null) ||
+      (latestTarget.verification?.eventStateHash ?? null) !== (targetVerification?.eventStateHash ?? null) ||
       latestActual.parentId !== latestTarget.parentId ||
       !latestTarget.locators.some(locator =>
         locator.chatId === sourceLocator.chatId &&
         locator.assistantMessageId === sourceLocator.assistantMessageId &&
         locator.swipeId === sourceLocator.swipeId,
-      )) return null;
+      )) {
+    return reject('history-tree-changed-during-reconciliation');
+  }
 
-  const acceptedHashes = new Set(latestTarget.verification.acceptedSelectedMksHashes ?? []);
-  if (currentVerification.selectedMksHash !== latestTarget.verification.selectedMksHash) {
+  const acceptedHashes = new Set(latestTarget.verification?.acceptedSelectedMksHashes ?? []);
+  const isBranchMkVariant = Boolean(branchMk && (branchMk !== sourceMk || target.messageKey === null));
+  if (eventSealMatches && isBranchMkVariant && latestTarget.verification &&
+      currentVerification.selectedMksHash !== latestTarget.verification.selectedMksHash) {
     acceptedHashes.add(currentVerification.selectedMksHash);
   }
   const aliases = new Set(latestTarget.messageKeyAliases ?? []);
-  aliases.add(branchMk);
+  if (branchMk) aliases.add(branchMk);
   const nextTarget = appendLocator({
     ...latestTarget,
     messageKeyAliases: [...aliases],
-    verification: {
-      ...latestTarget.verification,
-      ...(acceptedHashes.size ? { acceptedSelectedMksHashes: [...acceptedHashes] } : {}),
-    },
+    verification: latestTarget.verification
+      ? {
+          ...latestTarget.verification,
+          ...(acceptedHashes.size ? { acceptedSelectedMksHashes: [...acceptedHashes] } : {}),
+        }
+      : null,
   }, branchLocator);
   latest.nodes[targetNodeId] = nextTarget;
 
@@ -2213,7 +2315,7 @@ async function reconcileForkBranchMkIdentity(
     ...branch,
     originNodeId: branch.originNodeId === actual.id ? targetNodeId : branch.originNodeId,
     headNodeId: targetNodeId,
-    status: 'active',
+    status: eventSealMatches ? branch.status : 'recovery_failed',
   };
 
   if (actual.id !== targetNodeId) {
@@ -2223,7 +2325,7 @@ async function reconcileForkBranchMkIdentity(
       const isReferenced = Object.values(latest.branches).some(candidate =>
         candidate.headNodeId === orphan.id || candidate.originNodeId === orphan.id,
       );
-      if (!hasChildren && !isReferenced) delete latest.nodes[orphan.id];
+      if (!hasChildren && !isReferenced) delete latest.nodes[actual.id];
     }
   }
 
@@ -2238,10 +2340,12 @@ async function reconcileForkBranchMkIdentity(
     branchMk,
     sourceContentHash: stableHistoryHash(sourceContent),
     branchContentHash: stableHistoryHash(branchContent),
-    originalSelectedMksHash: targetVerification.selectedMksHash,
-    acceptedSelectedMksHash: currentVerification.selectedMksHash,
+    originalSelectedMksHash: targetVerification?.selectedMksHash ?? null,
+    currentSelectedMksHash: currentVerification.selectedMksHash,
     eventStateHash: currentVerification.eventStateHash,
-    status: 'accepted',
+    eventSealMatches,
+    sourceProof: witnessMatches ? 'transaction-witness' : 'content-derived-node-id',
+    status: eventSealMatches ? 'identity-reconciled' : 'identity-reconciled-event-seal-mismatch',
   });
   const persisted = persistHistoryTree(latest);
   recordEraDiagnostic('wuxia-history-checkout', 'history-branch-mk-identity-reconciled', {
@@ -2250,7 +2354,11 @@ async function reconcileForkBranchMkIdentity(
     duplicateNodeId: actual.id === targetNodeId ? null : actual.id,
     sourceMk,
     branchMk,
-    acceptedSelectedMksHash: currentVerification.selectedMksHash,
+    eventSealMatches,
+    acceptedSelectedMksHash: eventSealMatches && targetVerification
+      ? currentVerification.selectedMksHash
+      : null,
+    sourceProof: witnessMatches ? 'transaction-witness' : 'content-derived-node-id',
   });
   return buildViewState(persisted, state.currentChat);
 }
