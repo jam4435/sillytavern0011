@@ -169,6 +169,7 @@ describe('summaryManager biography compression', () => {
     expect(() => parseSummaryResponse('{"阶段经历1-无日期":"没有日期"}')).toThrow(/时间前缀/);
     expect(() => parseSummaryResponse('{"阶段经历1-一":"（1200.11.1）一","阶段经历3-三":"（1200.11.3）三"}')).toThrow(/连续递增/);
     expect(() => parseSummaryResponse('{"阶段经历1-一":"（1200.11.1）一","阶段经历1-重复":"（1200.11.2）二"}')).toThrow(/连续递增/);
+    expect(() => parseSummaryResponse('{"阶段经历1-一":"（1200.11.1）一","阶段经历2-二":"（1200.11.2）二"}', 1)).toThrow(/多于本批/);
   });
 
   it('rebases generated stage keys after existing stage memories and excludes titled stage keys from raw counts', () => {
