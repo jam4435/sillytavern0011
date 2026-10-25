@@ -360,13 +360,6 @@
     "question": "柯镇恶失明原因、铁菱毒药来源本窗口未交代"
   },
   {
-    "task": "射雕-002-02",
-    "validation_issue": {
-      "uid": "批次C/C1-射雕第1-20回.md#EV-射雕-0119",
-      "error": "event requires one to eight evidence references"
-    }
-  },
-  {
     "task": "神雕-001-01",
     "question": "陆展元与李莫愁相识、定情、决裂的具体经过：原文仅“种下了情苗”“许多纠葛变故”两句概括。"
   },
@@ -497,14 +490,6 @@
   {
     "task": "神雕-003-01",
     "question": "补充行628—639所述武三娘之死早于本窗口起始行640，其完整因果须另回对勘"
-  },
-  {
-    "task": "神雕-003-01",
-    "validation_issue": {
-      "new_event": 8,
-      "title": "大金国为蒙古所灭，黄河以北尽归蒙古",
-      "error": "event people/uncertain must be arrays, with at least one person"
-    }
   },
   {
     "task": "笑傲-001-01",

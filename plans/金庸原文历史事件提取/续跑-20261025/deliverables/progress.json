@@ -1,8 +1,7 @@
 {
   "statuses": {
-    "reviewed": 100,
-    "pending": 504,
-    "needs_repair": 2
+    "reviewed": 102,
+    "pending": 504
   },
   "by_book": {
     "天龙八部": {
@@ -10,13 +9,11 @@
       "pending": 108
     },
     "射雕英雄传": {
-      "reviewed": 4,
-      "needs_repair": 1,
+      "reviewed": 5,
       "pending": 84
     },
     "神雕侠侣": {
-      "reviewed": 4,
-      "needs_repair": 1,
+      "reviewed": 5,
       "pending": 82
     },
     "倚天屠龙记": {
@@ -33,18 +30,18 @@
     }
   },
   "usage": {
-    "inputTokens": 1069050,
-    "cacheReadTokens": 52608,
-    "outputTokens": 1701365,
-    "total": 2823023
+    "inputTokens": 1119180,
+    "cacheReadTokens": 52864,
+    "outputTokens": 1708483,
+    "total": 2880527
   },
-  "events": 1125,
+  "events": 1126,
   "reviewed_legacy": 138,
   "legacy_verdicts": {
     "supported": 70,
-    "not_historical": 28,
+    "not_historical": 29,
     "corrected": 38,
-    "insufficient": 2
+    "insufficient": 1
   },
   "rejected_or_pending_legacy": 1393,
   "source_stage_complete": false,
