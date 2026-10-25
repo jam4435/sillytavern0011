@@ -592,6 +592,8 @@ export interface HistoryNode {
   parentId: string | null;
   locators: HistoryLocator[];
   messageKey: string | null;
+  /** MK values observed for the same content-identified legacy node after branch cloning. */
+  messageKeyAliases?: string[];
   label: string | null;
   pinned: boolean;
   preview: string;

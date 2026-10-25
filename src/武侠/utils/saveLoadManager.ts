@@ -147,6 +147,7 @@ export const HistoryNodeSchema = z
     parentId: z.string().nullable(),
     locators: z.array(HistoryLocatorSchema),
     messageKey: z.string().nullable(),
+    messageKeyAliases: z.array(z.string()).optional(),
     label: z.string().nullable(),
     pinned: z.boolean(),
     preview: z.string(),
@@ -468,6 +469,29 @@ function getNodeId(parentId: string | null, messageKey: string | null, text: str
   });
 }
 
+/**
+ * A node originally identified by content can later be observed with an ERA MK after
+ * /branch-create or a full sync. Keep its original ID and primary messageKey; aliases
+ * record the additional identity without rewriting the historical seal.
+ */
+function nodeAcceptsMessageKey(node: HistoryNode, messageKey: string | null): boolean {
+  return node.messageKey === messageKey ||
+    (messageKey !== null && (node.messageKeyAliases ?? []).includes(messageKey));
+}
+
+function canReuseContentIdentifiedNode(node: HistoryNode, messageKey: string): boolean {
+  const knownKeys = [node.messageKey, ...(node.messageKeyAliases ?? [])]
+    .filter((key): key is string => key !== null);
+  return knownKeys.length === 0 || knownKeys.includes(messageKey);
+}
+
+function appendMessageKeyAlias(node: HistoryNode, messageKey: string | null): HistoryNode {
+  if (!messageKey || node.messageKey === messageKey || (node.messageKeyAliases ?? []).includes(messageKey)) {
+    return node;
+  }
+  return { ...node, messageKeyAliases: [...(node.messageKeyAliases ?? []), messageKey] };
+}
+
 function locatorEquals(left: HistoryLocator, right: HistoryLocator): boolean {
   return (
     left.chatId === right.chatId &&
@@ -687,7 +711,21 @@ export async function scanCurrentChat(options: HistoryScanOptions = {}): Promise
       }
 
       const messageKey = extractMessageKey(rawText);
-      const id = getNodeId(currentParentId, messageKey, rawText, swipeId);
+      let id = getNodeId(currentParentId, messageKey, rawText, swipeId);
+      let existing = tree.nodes[id];
+      // Legacy nodes without an MK were keyed by parent + cleaned content + swipe.
+      // If the same content gains an MK after branching, reuse that node only when the
+      // MK is new to the node or already recorded as an alias. A different known MK
+      // must create a distinct node rather than silently merge two histories.
+      if (!existing && messageKey) {
+        const contentId = getNodeId(currentParentId, null, rawText, swipeId);
+        const contentNode = tree.nodes[contentId];
+        if (contentNode && contentNode.parentId === currentParentId &&
+            canReuseContentIdentifiedNode(contentNode, messageKey)) {
+          id = contentId;
+          existing = contentNode;
+        }
+      }
       const locator: HistoryLocator = {
         chatId: currentChat.id,
         chatName: currentChat.name,
@@ -695,10 +733,9 @@ export async function scanCurrentChat(options: HistoryScanOptions = {}): Promise
         assistantMessageId: message.message_id,
         swipeId,
       };
-      const existing = tree.nodes[id];
       // 已有节点也刷新 preview：预览受"仅格式显示"正则影响，正则配置变化后旧预览需要跟上
       const node: HistoryNode = existing
-        ? { ...appendLocator(existing, locator), preview: createPreview(rawText) }
+        ? { ...appendMessageKeyAlias(appendLocator(existing, locator), messageKey), preview: createPreview(rawText) }
         : {
             id,
             parentId: currentParentId,
@@ -809,7 +846,7 @@ function assertCurrentHistoryMksAligned(node?: HistoryNode): (string | null)[] {
     const target = messages.find(item => item.message_id === locator?.assistantMessageId);
     const targetSwipe = target ? getSwipeTexts(target) : null;
     const targetMk = targetSwipe ? extractMessageKey(targetSwipe.texts[targetSwipe.activeSwipeId] ?? '') : null;
-    if (!locator || !targetSwipe || targetMk !== node.messageKey || targetSwipe.activeSwipeId !== locator.swipeId) {
+    if (!locator || !targetSwipe || !nodeAcceptsMessageKey(node, targetMk) || targetSwipe.activeSwipeId !== locator.swipeId) {
       issues.push('目标节点的聊天、楼层、swipe 或 MK 身份不一致');
     }
   }
@@ -838,7 +875,7 @@ function captureCheckoutSourceMkWitness(journal: HistoryCheckoutJournal, node: H
     const swipe = target ? getSwipeTexts(target) : null;
     const targetMk = swipe ? extractMessageKey(swipe.texts[swipe.activeSwipeId] ?? '') : null;
     if (!target || !swipe || swipe.activeSwipeId !== locator.swipeId ||
-        targetMk !== node.messageKey || locator.assistantMessageId >= mks.length) {
+        !nodeAcceptsMessageKey(node, targetMk) || locator.assistantMessageId >= mks.length) {
       throw new Error('来源聊天的目标楼层、swipe 或 MK 与历史节点不符');
     }
     const witness: HistorySourceMkWitness = {
@@ -1849,7 +1886,7 @@ function tryApplyAutomaticLegacyMkRepair(
       witness.sourceChatId !== journal.sourceChatId ||
       witness.targetMessageId !== journal.targetLocator.assistantMessageId ||
       witness.targetSwipeId !== journal.targetLocator.swipeId ||
-      witness.targetMk !== node.messageKey ||
+      !nodeAcceptsMessageKey(node, witness.targetMk) ||
       witness.originalSelectedMksHash !== original.selectedMksHash ||
       witness.eventStateHash !== original.eventStateHash ||
       current.selectedMksHash !== witness.alignedPrefixHash) return null;
@@ -2427,7 +2464,7 @@ export async function repairLegacyCheckoutVerification(): Promise<HistoryCheckou
       witness.sourceChatId !== journal.sourceChatId ||
       witness.targetMessageId !== journal.targetLocator.assistantMessageId ||
       witness.targetSwipeId !== journal.targetLocator.swipeId ||
-      witness.targetMk !== node.messageKey ||
+      !nodeAcceptsMessageKey(node, witness.targetMk) ||
       witness.originalSelectedMksHash !== sealed.selectedMksHash ||
       witness.eventStateHash !== sealed.eventStateHash) {
     throw new Error('来源见证与恢复事务或节点原封存不一致，拒绝修复。');
@@ -2525,7 +2562,7 @@ export async function continueCheckoutWithEventDrift(): Promise<HistoryCheckoutR
       witness.targetNodeId !== node.id ||
       witness.targetMessageId !== journal.targetLocator.assistantMessageId ||
       witness.targetSwipeId !== journal.targetLocator.swipeId ||
-      witness.targetMk !== node.messageKey ||
+      !nodeAcceptsMessageKey(node, witness.targetMk) ||
       witness.originalSelectedMksHash !== node.verification.selectedMksHash ||
       witness.eventStateHash !== node.verification.eventStateHash) {
     throw new Error('缺少本次分叉前的有效来源见证，不能降级继续；请选择返回来源聊天。');
