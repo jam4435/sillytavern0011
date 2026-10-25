@@ -85,7 +85,6 @@ export interface BiographyCompressionPlan {
   originalBiography: Record<string, string>;
   sourceEntries: Record<string, string>;
   sourceKeys: string[];
-  summaryKey: string;
 }
 
 // =========================================
@@ -97,7 +96,49 @@ export function isCompressedBiographyKey(key: string): boolean {
 }
 
 function isCountedBiographyKey(key: string): boolean {
-  return !key.startsWith('
+  return !key.startsWith('$') && key !== LEGACY_SUMMARY_META_KEY && !isCompressedBiographyKey(key);
+}
+
+function getNextStageMemoryNumber(biography: Record<string, string>): number {
+  const highest = Object.keys(biography).reduce((max, key) => {
+    const match = key.match(COMPRESSED_BIOGRAPHY_KEY_RE);
+    return match ? Math.max(max, Number(match[1]) || 0) : max;
+  }, 0);
+  return highest + 1;
+}
+
+/**
+ * 将模型返回的阶段经历编号调整到现有记忆之后，避免覆盖旧阶段记忆。
+ * 模型输出中的编号只用于标识本次响应的顺序，持久化编号由程序统一分配。
+ */
+export function rebaseStageMemoryKeys(
+  stageMemories: Record<string, string>,
+  existingBiography: Record<string, string>,
+): Record<string, string> {
+  let nextNumber = getNextStageMemoryNumber(existingBiography);
+  const result: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(stageMemories)) {
+    const match = key.match(SUMMARY_STAGE_KEY_RE);
+    if (!match) {
+      throw new Error(`阶段记忆键名格式错误：${key}。键名必须以“阶段经历数字+标题”开头。`);
+    }
+
+    const cleanValue = value.trim();
+    if (!cleanValue) throw new Error(`阶段记忆“${key}”的内容为空。`);
+
+    const rebasedKey = `阶段经历${nextNumber}${match[2]}`;
+    if (Object.prototype.hasOwnProperty.call(existingBiography, rebasedKey) ||
+        Object.prototype.hasOwnProperty.call(result, rebasedKey)) {
+      throw new Error(`阶段记忆键名冲突：${rebasedKey}。`);
+    }
+    result[rebasedKey] = cleanValue;
+    nextNumber += 1;
+  }
+
+  if (Object.keys(result).length === 0) throw new Error('总结模型没有返回任何阶段记忆。');
+  return result;
+}
 
 export function buildBiographyCompressionPlan(
   biography: Record<string, string> | string | undefined,
