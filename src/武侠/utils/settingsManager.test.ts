@@ -261,7 +261,7 @@ describe('settingsManager ui theme', () => {
     expect('variableInputTemplate' in settings).toBe(false);
     expect(settings.variableStructureTemplate).toContain('<变量模板>');
     expect(settings.variableStructureTemplateCustomized).toBe(false);
-    expect(settings.variableGuidanceTemplate).toContain('# ERA 变量更新规则');
+    expect(settings.variableGuidanceTemplate).toContain('<变量更新规则>');
     expect(settings.variableGuidanceTemplate).toContain('最终执行：');
     expect(settings.variableGuidanceTemplateCustomized).toBe(false);
   });
