@@ -76,6 +76,12 @@ def reselect(task, event_index, event, indices, allowed, corpus, call_id):
 '''+json.dumps(dict(task_id=task['id'],event_index=event_index,event=event,
     rejected_evidence_indices=[i+1 for i in indices],
     source=[dict(book=b,line=n,text=text) for (b,n),text in sorted(source.items())]),ensure_ascii=False)
+    payload=model_json(prompt,call_id)
+    return validate_selection(payload,task['id'],event_index,event,indices,source)
+
+
+def model_json(prompt, call_id):
+    """Use one budgeted fixed-route call, retaining and verifying its receipt."""
     if len(prompt)>MAX_PROMPT_CHARS:
         raise ValueError('repair prompt exceeds bounded input limit')
     base=HERE/'runs'/call_id
@@ -99,4 +105,4 @@ def reselect(task, event_index, event, indices, allowed, corpus, call_id):
             raise ValueError('evidence reselection model call failed; inspect retained receipt')
         verify_receipt(receipt)
         text=result.text
-    return validate_selection(decode(text),task['id'],event_index,event,indices,source)
+    return decode(text)
