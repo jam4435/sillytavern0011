@@ -319,7 +319,16 @@ async function flushApiWriteQueue() {
           ? '找不到任何 AI 消息，无法执行 API 写入。'
           : `指定的 assistant 楼层 ${targetMessageId} 不存在，已取消写入；不会回退到最新楼层。`;
         logger.warn('flushApiWriteQueue', message);
-        throw new Error(message);
+        recordEraDiagnostic('api-command', 'target-message-not-found', {
+          targetMessageId: targetMessageId ?? null,
+          reason: message,
+          transactionIds,
+        }, flushId);
+        finishWatchdog('cancelled', {
+          targetMessageId: targetMessageId ?? null,
+          reason: 'target-message-not-found',
+        });
+        return;
       }
 
       const originalContent = getMessageContent(targetMessage) ?? '';
