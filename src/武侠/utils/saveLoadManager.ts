@@ -1019,8 +1019,14 @@ export async function finalizeCurrentTurn(options: FinalizeHistoryTurnOptions = 
     throw new Error('历史封存中止：两次读取 ERA SelectedMks 期间主干发生变化。');
   }
   // 重复封存只能保持同一指纹；不能让其它聊天或迟到的异步同步静默覆盖旧证据。
+  const preservesAcceptedMkVariant = Boolean(
+    node.verification &&
+    node.verification.selectedMksHash !== sealedVerification.selectedMksHash &&
+    acceptsSelectedMksHash(node.verification, sealedVerification.selectedMksHash) &&
+    node.verification.eventStateHash === sealedVerification.eventStateHash,
+  );
   if (node.verification &&
-      (node.verification.selectedMksHash !== sealedVerification.selectedMksHash ||
+      (!acceptsSelectedMksHash(node.verification, sealedVerification.selectedMksHash) ||
        node.verification.eventStateHash !== sealedVerification.eventStateHash)) {
     // 旧节点的原 verification 永久不可改写。对经用户确认的降级分支，
     // 重复保存当前楼层只重用已有节点；新一楼完成时仍按正常规则封存新节点。
@@ -1074,7 +1080,9 @@ export async function finalizeCurrentTurn(options: FinalizeHistoryTurnOptions = 
     ...node,
     location: options.location ?? node.location,
     worldTimeText: options.worldTimeText ?? node.worldTimeText,
-    verification: sealedVerification,
+    // Preserve the canonical source seal when the current chat is a verified MK variant
+    // of the same forked node; do not replace the primary baseline with branch-local IDs.
+    verification: preservesAcceptedMkVariant ? node.verification : sealedVerification,
   };
   const state = buildViewState(persistHistoryTree(tree), scanned.currentChat);
 
@@ -1690,7 +1698,7 @@ async function restoreSealedEventBaseline(journal: HistoryCheckoutJournal | null
   if (!baseline) return;
 
   const current = readCurrentVerification();
-  if (current.selectedMksHash !== baseline.selectedMksHash ||
+  if (!acceptsSelectedMksHash(baseline, current.selectedMksHash) ||
       current.eventStateHash === baseline.eventStateHash) return;
 
   const roots = loadHistoryEventSnapshot(baseline.eventStateHash);
@@ -1726,7 +1734,7 @@ async function restoreSealedEventBaseline(journal: HistoryCheckoutJournal | null
     changedPaths: describeChangedEventPaths(beforeRoots, readCheckoutEventRoots()),
   });
   if (restored.eventStateHash !== baseline.eventStateHash ||
-      restored.selectedMksHash !== baseline.selectedMksHash) {
+      !acceptsSelectedMksHash(baseline, restored.selectedMksHash)) {
     throw new Error('事件基准快照恢复后校验仍不一致');
   }
 }
