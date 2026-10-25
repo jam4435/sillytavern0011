@@ -498,7 +498,7 @@ function getLatestAssistantMessageId(): number | null {
     });
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       const messageId = messages[index]?.message_id;
-      if (Number.isInteger(messageId) && messageId >= 0) return messageId;
+      if (typeof messageId === 'number' && Number.isInteger(messageId) && messageId >= 0) return messageId;
     }
   } catch (error) {
     dataLogger.warn('[summaryManager] 无法读取当前 assistant 楼层 ID', error);
