@@ -33,9 +33,12 @@
     ],
     "source_sha256": "5833b2ae95e7a10fb6ce60f5fc65e3cb5b2ba6430417a746c40e3aa5276d0af4",
     "phase": "source_review",
-    "status": "running",
+    "status": "reviewed",
     "prompt_version": "source-review-v1",
-    "attempts": 1
+    "attempts": 1,
+    "duration_ms": 122008.83320000139,
+    "event_count": 6,
+    "issue_count": 0
   },
   {
     "id": "天龙-002-01",
