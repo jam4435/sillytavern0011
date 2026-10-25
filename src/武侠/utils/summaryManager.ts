@@ -4,6 +4,7 @@
  */
 
 import { emitSourcedEraVariableWriteAndWait } from '../../shared/directVariableWrite';
+import type { EraTransactionDetail, EraTransactionOperation } from '../../ERA变量框架/utils/constants';
 import { dataLogger } from './logger';
 import type {
   SummarySettings,
@@ -198,6 +199,58 @@ export function mergeBiographyCompression(
 
   if (!inserted) result[plan.summaryKey] = summaryValue;
   return result;
+}
+
+/**
+ * 构造总结回写的 ERA 操作。
+ *
+ * 正常对象结构只删除本批最旧经历和废弃的旧总结元数据，再插入新的阶段经历；
+ * 旧版字符串结构无法删除子键，因此先删除整个人物经历字段，再插入保留近期条目的规范化对象。
+ */
+export function buildBiographyCompressionOperations(
+  characterId: string,
+  plan: BiographyCompressionPlan,
+  summaryValue: string,
+  options: { replaceLegacyString?: boolean } = {},
+): EraTransactionOperation[] {
+  const characterName = characterId.startsWith('character:')
+    ? characterId.slice('character:'.length)
+    : characterId;
+
+  const makePayload = (biographyEntries: Record<string, unknown>): Record<string, unknown> => {
+    if (characterId === 'user') {
+      return { user数据: { 人物经历: biographyEntries } };
+    }
+    return {
+      角色数据: {
+        [characterName]: { 人物经历: biographyEntries },
+      },
+    };
+  };
+
+  if (options.replaceLegacyString) {
+    return [
+      { type: 'delete', payload: makePayload({}) },
+      {
+        type: 'insert',
+        payload: makePayload(mergeBiographyCompression(plan, summaryValue)),
+      },
+    ];
+  }
+
+  const keysToDelete = [...plan.sourceKeys];
+  if (Object.prototype.hasOwnProperty.call(plan.originalBiography, LEGACY_SUMMARY_META_KEY)) {
+    keysToDelete.push(LEGACY_SUMMARY_META_KEY);
+  }
+  const deleteEntries = Object.fromEntries(keysToDelete.map(key => [key, {}]));
+
+  return [
+    { type: 'delete', payload: makePayload(deleteEntries) },
+    {
+      type: 'insert',
+      payload: makePayload({ [plan.summaryKey]: summaryValue }),
+    },
+  ];
 }
 
 /**
@@ -416,19 +469,48 @@ function parseSummaryResponse(response: string): string {
   return response.trim();
 }
 
-function readCurrentCharacterBiography(characterId: string): Record<string, string> {
+function readCurrentCharacterBiographyValue(
+  characterId: string,
+): Record<string, string> | string | undefined {
   const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
   const statData = variables?.stat_data as Record<string, unknown> | undefined;
-  if (!statData) return {};
+  if (!statData) return undefined;
 
   if (characterId === 'user') {
     const userData = statData.user数据 as CharacterDataForSummary | undefined;
-    return normalizeBiography(userData?.人物经历);
+    return userData?.人物经历;
   }
 
   const characterName = characterId.replace('character:', '');
   const characters = statData.角色数据 as Record<string, CharacterDataForSummary> | undefined;
-  return normalizeBiography(characters?.[characterName]?.人物经历);
+  return characters?.[characterName]?.人物经历;
+}
+
+function readCurrentCharacterBiography(characterId: string): Record<string, string> {
+  return normalizeBiography(readCurrentCharacterBiographyValue(characterId));
+}
+
+function getLatestAssistantMessageId(): number | null {
+  try {
+    const messages = getChatMessages('0-{{lastMessageId}}', {
+      role: 'assistant',
+      include_swipes: true,
+    });
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const messageId = messages[index]?.message_id;
+      if (Number.isInteger(messageId) && messageId >= 0) return messageId;
+    }
+  } catch (error) {
+    dataLogger.warn('[summaryManager] 无法读取当前 assistant 楼层 ID', error);
+  }
+  return null;
+}
+
+function createSummaryTransactionId(targetMessageId: number, characterId: string): string {
+  const randomSuffix = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `summary:${targetMessageId}:${characterId}:${randomSuffix}`;
 }
 
 /**
@@ -441,6 +523,7 @@ function readCurrentCharacterBiography(characterId: string): Record<string, stri
 export async function executeSummary(
   settings: SummarySettings,
   character: PendingCharacterSummary,
+  targetMessageId: number,
 ): Promise<CharacterSummaryResult> {
   dataLogger.log(`[summaryManager] 开始总结角色: ${character.displayName}`);
 
@@ -485,34 +568,58 @@ export async function executeSummary(
     const summaryContent = parseSummaryResponse(response);
     result.summaryContent = summaryContent;
 
-    // 4. 只把本批旧经历替换为一个带游戏时间范围的阶段经历。
-    const summaryValue = buildBiographyStageSummaryValue(summaryContent, compressionPlan.sourceEntries);
-    const newBiography = mergeBiographyCompression(compressionPlan, summaryValue);
-
-    // 构建更新数据
-    const updateData: Record<string, unknown> = {};
-    if (character.characterId === 'user') {
-      updateData.user数据 = { 人物经历: newBiography };
-    } else {
-      const characterName = character.characterId.replace('character:', '');
-      updateData.角色数据 = {
-        [characterName]: { 人物经历: newBiography },
-      };
+    // 4. 回写前重新读取人物经历，防止模型请求期间新增或编辑的经历被覆盖/误删。
+    const latestRawBiography = readCurrentCharacterBiographyValue(character.characterId);
+    const latestBiography = normalizeBiography(latestRawBiography);
+    const changedSourceKeys = compressionPlan.sourceKeys.filter(
+      key => !Object.prototype.hasOwnProperty.call(latestBiography, key) ||
+        latestBiography[key] !== compressionPlan.sourceEntries[key],
+    );
+    if (changedSourceKeys.length > 0) {
+      throw new Error(
+        `人物经历在总结期间已变化（${changedSourceKeys.join('、')}），已取消写回以保护最新数据。`,
+      );
     }
 
-    dataLogger.log('[summaryManager] 写入更新数据:', JSON.stringify(updateData, null, 2));
+    const writePlan: BiographyCompressionPlan = {
+      ...compressionPlan,
+      originalBiography: latestBiography,
+      summaryKey: getNextSummaryKey(latestBiography),
+    };
+    const summaryValue = buildBiographyStageSummaryValue(summaryContent, compressionPlan.sourceEntries);
+    const operations = buildBiographyCompressionOperations(
+      character.characterId,
+      writePlan,
+      summaryValue,
+      { replaceLegacyString: typeof latestRawBiography === 'string' },
+    );
+    const transactionId = createSummaryTransactionId(targetMessageId, character.characterId);
+    const transaction: EraTransactionDetail = {
+      transactionId,
+      targetMessageId,
+      operations,
+    };
 
-    // 使用 updateByObject 替换人物经历
+    dataLogger.log('[summaryManager] 使用固定楼层的 Delete + Insert 事务写回总结:', {
+      targetMessageId,
+      characterId: character.characterId,
+      deletedKeys: writePlan.sourceKeys,
+      insertedKey: writePlan.summaryKey,
+      legacyStringBiography: typeof latestRawBiography === 'string',
+    });
+
     await emitSourcedEraVariableWriteAndWait({
       source: 'frontend',
-      operation: 'update',
+      operation: 'replace',
       reason: 'summary-write',
-      eventName: 'era:updateByObject',
+      eventName: 'era:transactionByObject',
       attribution: 'background',
-      detail: updateData,
+      detail: transaction,
       expectedAction: 'apiWrite',
-      timeoutMs: 3000,
-      timeoutMessage: '人物经历总结写回请求已发出，但 ERA 没有确认写入完成。',
+      expectedMessageId: targetMessageId,
+      expectedTransactionId: transactionId,
+      timeoutMs: 15000,
+      timeoutMessage: `人物经历总结已写入楼层 ${targetMessageId}，但 ERA 未在时限内确认 Delete + Insert 事务。`,
     });
 
     result.success = true;
@@ -536,6 +643,7 @@ export async function executeSummary(
 export async function executeAllPendingSummaries(
   settings: SummarySettings,
   characters?: PendingCharacterSummary[],
+  targetMessageId?: number,
 ): Promise<BatchSummaryResult> {
   const result: BatchSummaryResult = {
     success: false,
@@ -560,13 +668,18 @@ export async function executeAllPendingSummaries(
     return result;
   }
 
+  const resolvedTargetMessageId = targetMessageId ?? getLatestAssistantMessageId();
+  if (!Number.isInteger(resolvedTargetMessageId) || (resolvedTargetMessageId as number) < 0) {
+    throw new Error('无法确定总结写回的 assistant 楼层，已取消总结以避免写入错误楼层。');
+  }
+
   isSummarizing = true;
   dataLogger.log(`[summaryManager] 开始批量总结，共 ${targetCharacters.length} 个角色`);
 
   try {
     // 顺序执行总结（避免 API 过载）
     for (const character of targetCharacters) {
-      const summaryResult = await executeSummary(settings, character);
+      const summaryResult = await executeSummary(settings, character, resolvedTargetMessageId as number);
       result.results.push(summaryResult);
       result.totalProcessed++;
 
