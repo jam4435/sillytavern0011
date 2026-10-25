@@ -80,6 +80,8 @@ const COMPRESSED_BIOGRAPHY_KEY_RE = /^阶段经历(\d+)/;
 const SUMMARY_STAGE_KEY_RE = /^阶段经历([1-9]\d*)(.+)$/;
 const SUMMARY_DATE_PREFIX_RE =
   /^[（(](?:(?:\d{3,4}\.\d{1,2}\.\d{1,2})(?:\s*[~～—-]\s*\d{3,4}\.\d{1,2}\.\d{1,2})?|旧记录时间不详|时间不详)[）)]\s*\S/;
+const SUMMARY_DATE_RANGE_RE =
+  /^[（(](\d{3,4})\.(\d{1,2})\.(\d{1,2})(?:\s*[~～—-]\s*(\d{3,4})\.(\d{1,2})\.(\d{1,2}))?[）)]/;
 
 export interface BiographyCompressionPlan {
   originalBiography: Record<string, string>;
@@ -138,6 +140,32 @@ export function rebaseStageMemoryKeys(
 
   if (Object.keys(result).length === 0) throw new Error('总结模型没有返回任何阶段记忆。');
   return result;
+}
+
+function parseGameDateRange(value: string): { start: number; end: number } | null {
+  const match = value.trim().match(SUMMARY_DATE_RANGE_RE);
+  if (!match) return null;
+
+  const toDateNumber = (year: string, month: string, day: string) =>
+    Number(year) * 10000 + Number(month) * 100 + Number(day);
+  const start = toDateNumber(match[1], match[2], match[3]);
+  const end = match[4] && match[5] && match[6]
+    ? toDateNumber(match[4], match[5], match[6])
+    : start;
+  if (end < start) return null;
+  return { start, end };
+}
+
+function getSourceDateBounds(sourceEntries: Record<string, string>): { start: number; end: number } | null {
+  const ranges = Object.values(sourceEntries)
+    .map(parseGameDateRange)
+    .filter((range): range is { start: number; end: number } => range !== null);
+  if (ranges.length === 0) return null;
+
+  return {
+    start: Math.min(...ranges.map(range => range.start)),
+    end: Math.max(...ranges.map(range => range.end)),
+  };
 }
 
 export function buildBiographyCompressionPlan(
@@ -444,7 +472,7 @@ export function formatPromptForCharacter(
  * 严格解析人物经历压缩模型返回的 JSON 键值对。
  * 格式错误时直接拒绝写回，避免把解释文字或错误结构写进人物经历。
  */
-export function parseSummaryResponse(response: string, maxStageMemories?: number): Record<string, string> {
+export function parseSummaryResponse(response: string, maxStageMemories?: number, sourceEntries?: Record<string, string>): Record<string, string> {
   const raw = response.trim();
   let parsed: unknown;
   try {
@@ -469,6 +497,7 @@ export function parseSummaryResponse(response: string, maxStageMemories?: number
     throw new Error('总结 JSON 存在重复键或非预期的嵌套结构；已取消写回。');
   }
 
+  const sourceDateBounds = sourceEntries ? getSourceDateBounds(sourceEntries) : null;
   const result: Record<string, string> = {};
   entries.forEach(([key, value], index) => {
     const match = key.match(SUMMARY_STAGE_KEY_RE);
@@ -487,6 +516,18 @@ export function parseSummaryResponse(response: string, maxStageMemories?: number
       throw new Error(
         `阶段记忆“${key}”缺少有效的游戏内时间前缀；请使用“（1200.11.1~1200.11.5）”或“（旧记录时间不详）”。`,
       );
+    }
+
+    const outputDateRange = parseGameDateRange(cleanValue);
+    if (outputDateRange) {
+      if (!sourceDateBounds) {
+        throw new Error(`阶段记忆“${key}”使用了日期，但输入经历中没有可识别的游戏内日期。`);
+      }
+      if (outputDateRange.start < sourceDateBounds.start || outputDateRange.end > sourceDateBounds.end) {
+        throw new Error(`阶段记忆“${key}”的日期范围超出本批原始经历，已取消写回。`);
+      }
+    } else if (!/^[（(](?:旧记录时间不详|时间不详)[）)]/.test(cleanValue)) {
+      throw new Error(`阶段记忆“${key}”的日期范围无效或结束时间早于开始时间。`);
     }
     result[key] = cleanValue;
   });
@@ -590,7 +631,7 @@ export async function executeSummary(
     dataLogger.log(`[summaryManager] 收到响应，长度: ${response.length}`);
 
     // 3. 严格解析模型返回的多条阶段记忆 JSON
-    const summaryEntries = parseSummaryResponse(response, Object.keys(compressionPlan.sourceEntries).length);
+    const summaryEntries = parseSummaryResponse(response, Object.keys(compressionPlan.sourceEntries).length, compressionPlan.sourceEntries);
 
     // 4. 回写前重新读取人物经历，防止模型请求期间新增或编辑的经历被覆盖/误删。
     const latestRawBiography = readCurrentCharacterBiographyValue(character.characterId);
