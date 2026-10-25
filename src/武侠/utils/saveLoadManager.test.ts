@@ -465,6 +465,63 @@ describe('history tree v2 scanning', () => {
     expect(Object.values(second.tree.nodes).every(node => node.locators.length === 1)).toBe(true);
   });
 
+  it('重试扫描时优先复用已封存内容节点，即使 MK 重复节点已存在', async () => {
+    currentChat().messages = [{ message_id: 0, role: 'assistant', message: '第一回' }];
+    const initial = await scanCurrentChat();
+    const originalId = initial.currentNodeId!;
+    const mk = 'mk-retry';
+    const branchId = 'fork-retry';
+    const branchName = 'Branch #2';
+    const branchNodeId = `history_node_${stableHistoryHash({ parentId: null, identity: `mk:${mk}`, swipeId: 0 })}`;
+
+    chats[branchId] = {
+      id: branchId,
+      name: branchName,
+      messages: [{
+        message_id: 0, role: 'assistant',
+        message: `<era_data>{"era-message-key"="${mk}","era-message-type"="assistant"}</era_data>第一回`,
+      }],
+      variables: { ERAMetaData: { SelectedMks: [mk] }, stat_data: {} },
+    };
+    const tree = loadHistoryTree();
+    tree.nodes[branchNodeId] = {
+      id: branchNodeId,
+      parentId: null,
+      locators: [{
+        chatId: branchId, chatName: branchName, userMessageId: null,
+        assistantMessageId: 0, swipeId: 0,
+      }],
+      messageKey: mk,
+      label: null,
+      pinned: false,
+      preview: '第一回',
+      location: '',
+      worldTimeText: '',
+      createdAt: Date.now(),
+      verification: null,
+    };
+    const currentBranchId = `history_branch_${stableHistoryHash(branchId)}`;
+    tree.branches[currentBranchId] = {
+      id: currentBranchId,
+      chatId: branchId,
+      chatName: branchName,
+      originNodeId: originalId,
+      headNodeId: branchNodeId,
+      createdAt: Date.now(),
+      status: 'recovery_failed',
+    };
+    persistTreeDirect(tree);
+    currentChatId = branchId;
+    rawChatViewChatId = null;
+
+    const retried = await scanCurrentChat();
+
+    expect(retried.currentNodeId).toBe(originalId);
+    expect(retried.tree.nodes[originalId].messageKeyAliases).toContain(mk);
+    expect(retried.tree.nodes[branchNodeId]).toBeUndefined();
+    expect(retried.tree.branches[currentBranchId].headNodeId).toBe(originalId);
+  });
+
   it('旧内容身份在分叉后首次出现 MK 时保持稳定，并拒绝合并不同 MK', async () => {
     currentChat().messages = [{ message_id: 0, role: 'assistant', message: '第一回' }];
     const initial = await scanCurrentChat();
@@ -713,11 +770,12 @@ describe('history tree v2 scanning', () => {
 });
 
 describe('history checkout', () => {
-  it('分叉后同一正文首次出现 MK 时复用原节点并继续严格校验', async () => {
+  it('分叉后同一正文首次出现 MK 时复用原节点并记录已验证的分支指纹', async () => {
     currentChat().messages = [{ message_id: 0, role: 'assistant', message: '第一回' }];
     currentChat().variables.ERAMetaData = { SelectedMks: [null] };
-    const scanned = await scanCurrentChat();
-    const targetId = scanned.currentNodeId!;
+    const sealed = await finalizeCurrentTurn();
+    const targetId = sealed.currentNodeId!;
+    const originalSelectedMksHash = stableHistoryHash([null]);
 
     eventOn('manual_full_sync', () => {
       if (!currentChatId.startsWith('fork-')) return;
@@ -730,11 +788,20 @@ describe('history checkout', () => {
 
     expect(result.status).toBe('commit');
     expect(result.currentNodeId).toBe(targetId);
-    const tree = loadHistoryTree();
+    let tree = loadHistoryTree();
     expect(Object.keys(tree.nodes)).toHaveLength(1);
     expect(tree.nodes[targetId].messageKey).toBeNull();
     expect(tree.nodes[targetId].messageKeyAliases).toContain('mk-opening');
-    expect(tree.nodes[targetId].verification?.selectedMksHash).toBe(stableHistoryHash(['mk-opening']));
+    expect(tree.nodes[targetId].verification?.selectedMksHash).toBe(originalSelectedMksHash);
+    expect(tree.nodes[targetId].verification?.acceptedSelectedMksHashes)
+      .toContain(stableHistoryHash(['mk-opening']));
+
+    // A later turn finalization must not replace the canonical source seal with the branch-local MK hash.
+    await finalizeCurrentTurn();
+    tree = loadHistoryTree();
+    expect(tree.nodes[targetId].verification?.selectedMksHash).toBe(originalSelectedMksHash);
+    expect(tree.nodes[targetId].verification?.acceptedSelectedMksHashes)
+      .toContain(stableHistoryHash(['mk-opening']));
   });
 
   it('journal 创建前失败仍保存原始异常与失败步骤，不创建恢复锁；下一次成功后清理诊断', async () => {
