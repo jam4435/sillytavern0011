@@ -2099,7 +2099,8 @@ async function reconcileForkBranchMkIdentity(
 
   const target = state.tree.nodes[targetNodeId];
   const actual = state.currentNodeId ? state.tree.nodes[state.currentNodeId] : null;
-  if (!target?.verification || !actual || actual.parentId !== target.parentId) return null;
+  if (!target || !target.verification || !actual || actual.parentId !== target.parentId) return null;
+  const targetVerification = target.verification;
   const sourceLocatorOnTarget = target.locators.find(locator =>
     locator.chatId === sourceLocator.chatId &&
     locator.assistantMessageId === sourceLocator.assistantMessageId &&
@@ -2119,10 +2120,9 @@ async function reconcileForkBranchMkIdentity(
       witness.sourceChatId !== journal.sourceChatId ||
       witness.targetMessageId !== journal.targetLocator.assistantMessageId ||
       witness.targetSwipeId !== journal.targetLocator.swipeId ||
-      witness.targetMk === undefined ||
       !nodeAcceptsMessageKey(target, witness.targetMk) ||
-      witness.originalSelectedMksHash !== target.verification.selectedMksHash ||
-      witness.eventStateHash !== target.verification.eventStateHash) return null;
+      witness.originalSelectedMksHash !== targetVerification.selectedMksHash ||
+      witness.eventStateHash !== targetVerification.eventStateHash) return null;
 
   const currentMessages = readAllHistoryMessages();
   const branchMessage = currentMessages.find(message =>
@@ -2170,7 +2170,7 @@ async function reconcileForkBranchMkIdentity(
   const currentVerification = readCurrentVerification();
   if (alignedMks.length !== journal.targetLocator.assistantMessageId + 1 ||
       stableHistoryHash(alignedMks) !== currentVerification.selectedMksHash ||
-      currentVerification.eventStateHash !== target.verification.eventStateHash) return null;
+      currentVerification.eventStateHash !== targetVerification.eventStateHash) return null;
 
   const latest = cloneTree(loadHistoryTree());
   const latestTarget = latest.nodes[targetNodeId];
@@ -2178,8 +2178,8 @@ async function reconcileForkBranchMkIdentity(
   const branch = latest.branches[state.currentBranchId];
   if (!latestTarget?.verification || !latestActual || !branch ||
       branch.chatId !== state.currentChat.id ||
-      latestTarget.verification.selectedMksHash !== target.verification.selectedMksHash ||
-      latestTarget.verification.eventStateHash !== target.verification.eventStateHash ||
+      latestTarget.verification.selectedMksHash !== targetVerification.selectedMksHash ||
+      latestTarget.verification.eventStateHash !== targetVerification.eventStateHash ||
       latestActual.parentId !== latestTarget.parentId ||
       !latestTarget.locators.some(locator =>
         locator.chatId === sourceLocator.chatId &&
@@ -2238,7 +2238,7 @@ async function reconcileForkBranchMkIdentity(
     branchMk,
     sourceContentHash: stableHistoryHash(sourceContent),
     branchContentHash: stableHistoryHash(branchContent),
-    originalSelectedMksHash: target.verification.selectedMksHash,
+    originalSelectedMksHash: targetVerification.selectedMksHash,
     acceptedSelectedMksHash: currentVerification.selectedMksHash,
     eventStateHash: currentVerification.eventStateHash,
     status: 'accepted',
