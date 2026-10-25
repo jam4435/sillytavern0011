@@ -254,7 +254,7 @@ export async function dispatchAndExecuteTask(job: EventJob, mkToIgnore: IgnoreRu
             actionsTaken.rollback = true;
           }
         }
-        await runPhase('apply-variable-blocks', () => ApplyVarChange(apiWriteTargetMessageId));
+        await runPhase('apply-variable-blocks', () => ApplyVarChange());
         actionsTaken.apply = true;
       }
 
