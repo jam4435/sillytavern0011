@@ -1,0 +1,38 @@
+{
+  "wave": "handoff\\parallel-waves\\20261025-202830-60240942.json",
+  "rows": [
+    {
+      "task_id": "鹿鼎-032-02",
+      "events": 20,
+      "issues": 0
+    },
+    {
+      "task_id": "倚天-003-02",
+      "events": 6,
+      "issues": 0
+    },
+    {
+      "task_id": "笑傲-003-02",
+      "events": 11,
+      "issues": 0
+    },
+    {
+      "task_id": "天龙-004-02",
+      "events": 7,
+      "issues": 0
+    },
+    {
+      "task_id": "射雕-003-02",
+      "events": 6,
+      "issues": 0
+    },
+    {
+      "task_id": "神雕-004-01",
+      "events": 11,
+      "issues": 0
+    }
+  ],
+  "added_tokens": 199437,
+  "source_freeze": "unchanged",
+  "route": "buddy/deepseek-v4.1-flash"
+}
