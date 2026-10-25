@@ -2,12 +2,12 @@
   "pid": 44044,
   "status": "running",
   "phase": "source",
-  "updated_at": "2026-10-25T20:28:30+0800",
+  "updated_at": "2026-10-25T20:31:26+0800",
   "usage": {
-    "inputTokens": 1198666,
-    "cacheReadTokens": 55936,
-    "outputTokens": 1819326,
-    "total": 3073928
+    "inputTokens": 1278349,
+    "cacheReadTokens": 59008,
+    "outputTokens": 1936008,
+    "total": 3273365
   },
   "parallel_books": 6,
   "books": [

@@ -1,6 +1,6 @@
 {
   "pid": 44044,
-  "status": "running",
+  "status": "finished",
   "task_ids": [
     "鹿鼎-032-02",
     "倚天-003-02",
@@ -40,6 +40,24 @@
       "status": "reviewed",
       "event_count": 20,
       "issue_count": 0
+    },
+    {
+      "id": "笑傲-003-02",
+      "status": "reviewed",
+      "event_count": 11,
+      "issue_count": 0
+    },
+    {
+      "id": "射雕-003-02",
+      "status": "reviewed",
+      "event_count": 6,
+      "issue_count": 0
     }
-  ]
+  ],
+  "usage_after": {
+    "inputTokens": 1278349,
+    "cacheReadTokens": 59008,
+    "outputTokens": 1936008,
+    "total": 3273365
+  }
 }
