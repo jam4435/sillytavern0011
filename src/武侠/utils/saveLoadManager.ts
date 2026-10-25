@@ -56,6 +56,7 @@ export const WUXIA_HISTORY_REPAIR_AUDIT_KEY = 'wuxia_history_verification_repair
 /** 玩家明确允许事件状态不精确时，仅记录分支级降级审计，不修改共享节点原指纹。 */
 export const WUXIA_HISTORY_DEGRADED_AUDIT_KEY = 'wuxia_history_checkout_degraded_audit_v1';
 const HISTORY_REPAIR_WITNESS_PREFIX = 'wuxia_history_source_mk_witness_v1_';
+const WUXIA_HISTORY_IDENTITY_ALIAS_AUDIT_KEY = 'wuxia_history_identity_alias_audit_v1';
 
 interface HistorySourceMkWitness {
   version: 1;
@@ -158,6 +159,7 @@ export const HistoryNodeSchema = z
       .object({
         selectedMksHash: z.string(),
         eventStateHash: z.string(),
+        acceptedSelectedMksHashes: z.array(z.string()).optional(),
         /** 新封存节点可用：用于定位具体哪组事件状态变化；老节点仍能读取。 */
         eventPartHashes: z.record(z.string(), z.string()).optional(),
       })
@@ -374,6 +376,23 @@ function cleanStoryText(text: string): string {
     .trim();
 }
 
+/**
+ * Compare a source message with its branch clone while removing volatile ERA metadata
+ * before display normalization. This is comparison-only: it never changes node IDs.
+ */
+function cleanStoryTextForIdentityComparison(text: string): string {
+  ERA_DATA_BLOCK_REGEX.lastIndex = 0;
+  VARIABLE_BLOCK_REGEX.lastIndex = 0;
+  const withoutMetadata = text
+    .replace(ERA_DATA_BLOCK_REGEX, '\n')
+    .replace(VARIABLE_BLOCK_REGEX, '\n');
+  return normalizeDisplayedMessageContent(withoutMetadata)
+    .replace(ERA_DATA_BLOCK_REGEX, '\n')
+    .replace(VARIABLE_BLOCK_REGEX, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 function readAllTavernRegexes(): TavernRegex[] {
   if (typeof getTavernRegexes !== 'function') return [];
   try {
@@ -503,6 +522,16 @@ function locatorEquals(left: HistoryLocator, right: HistoryLocator): boolean {
 function appendLocator(node: HistoryNode, locator: HistoryLocator): HistoryNode {
   if (node.locators.some(current => locatorEquals(current, locator))) return node;
   return { ...node, locators: [...node.locators, locator] };
+}
+
+function acceptsSelectedMksHash(
+  verification: HistoryVerification | null | undefined,
+  selectedMksHash: string,
+): boolean {
+  return Boolean(verification && (
+    verification.selectedMksHash === selectedMksHash ||
+    (verification.acceptedSelectedMksHashes ?? []).includes(selectedMksHash)
+  ));
 }
 
 export function loadHistoryTree(): WuxiaHistoryTreeV2 {
@@ -691,6 +720,7 @@ export async function scanCurrentChat(options: HistoryScanOptions = {}): Promise
   let currentParentId: string | null = null;
   let pendingUserMessageId: number | null = null;
   let creationOffset = 0;
+  const supersededMessageKeyNodeIds = new Set<string>();
 
   for (const message of readAllHistoryMessages()) {
     if (!Number.isInteger(message.message_id) || message.is_hidden === true) continue;
@@ -711,19 +741,43 @@ export async function scanCurrentChat(options: HistoryScanOptions = {}): Promise
       }
 
       const messageKey = extractMessageKey(rawText);
-      let id = getNodeId(currentParentId, messageKey, rawText, swipeId);
-      let existing = tree.nodes[id];
-      // Legacy nodes without an MK were keyed by parent + cleaned content + swipe.
-      // If the same content gains an MK after branching, reuse that node only when the
-      // MK is new to the node or already recorded as an alias. A different known MK
-      // must create a distinct node rather than silently merge two histories.
-      if (!existing && messageKey) {
-        const contentId = getNodeId(currentParentId, null, rawText, swipeId);
-        const contentNode = tree.nodes[contentId];
-        if (contentNode && contentNode.parentId === currentParentId &&
-            canReuseContentIdentifiedNode(contentNode, messageKey)) {
-          id = contentId;
-          existing = contentNode;
+      const messageKeyId = getNodeId(currentParentId, messageKey, rawText, swipeId);
+      const keyedNode = tree.nodes[messageKeyId];
+      const contentId = getNodeId(currentParentId, null, rawText, swipeId);
+      const contentNode = tree.nodes[contentId];
+      // A previously failed checkout may already have persisted the MK-keyed duplicate.
+      // Prefer an explicitly recorded alias first, then a matching legacy content node
+      // if the duplicate has no other-chat locators. Do not let an existing duplicate
+      // suppress the fallback on retry.
+      const aliasNode = messageKey
+        ? Object.values(tree.nodes).find(node =>
+            node.id !== messageKeyId &&
+            node.parentId === currentParentId &&
+            (node.messageKeyAliases ?? []).includes(messageKey) &&
+            node.locators.some(locator => locator.swipeId === swipeId),
+          )
+        : undefined;
+      let id = messageKeyId;
+      let existing = keyedNode;
+      if (aliasNode) {
+        id = aliasNode.id;
+        existing = aliasNode;
+      } else if (
+        messageKey && contentNode && contentNode.id !== messageKeyId &&
+        contentNode.parentId === currentParentId &&
+        canReuseContentIdentifiedNode(contentNode, messageKey) &&
+        (!keyedNode || (
+          keyedNode.locators.length === 0 &&
+          !Object.values(tree.branches).some(branch =>
+            branch.id !== branchId &&
+            (branch.headNodeId === keyedNode.id || branch.originNodeId === keyedNode.id),
+          )
+        ))
+      ) {
+        id = contentId;
+        existing = contentNode;
+        if (keyedNode && keyedNode.locators.length === 0) {
+          supersededMessageKeyNodeIds.add(keyedNode.id);
         }
       }
       const locator: HistoryLocator = {
@@ -779,6 +833,17 @@ export async function scanCurrentChat(options: HistoryScanOptions = {}): Promise
     // 降级恢复代表此聊天的来源精确性已经让步，刷新页面不得悄悄清除标记。
     status: previousBranch?.status === 'degraded' ? 'degraded' : 'active',
   };
+  // Remove duplicate MK nodes left by an earlier failed scan only when they are now
+  // unreferenced and carry no independent history or user metadata.
+  for (const orphanId of supersededMessageKeyNodeIds) {
+    const orphan = tree.nodes[orphanId];
+    if (!orphan || orphan.locators.length > 0 || orphan.pinned || orphan.label || orphan.verification) continue;
+    const hasChildren = Object.values(tree.nodes).some(node => node.parentId === orphanId);
+    const isReferenced = Object.values(tree.branches).some(branch =>
+      branch.headNodeId === orphanId || branch.originNodeId === orphanId,
+    );
+    if (!hasChildren && !isReferenced) delete tree.nodes[orphanId];
+  }
 
   return buildViewState(persistHistoryTree(tree), currentChat);
 }
