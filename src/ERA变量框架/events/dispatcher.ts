@@ -13,7 +13,7 @@ import {
 } from '../api/command';
 import { forceRenderRecentMessages } from '../api/macro/patch';
 import { ApplyVarChange } from '../core/crud/patcher';
-import { ensureMkForLatestMessage, readMessageKey, updateLatestSelectedMk } from '../core/key/mk';
+import { ensureMessageKey, ensureMkForLatestMessage, readMessageKey, updateLatestSelectedMk } from '../core/key/mk';
 import { rollbackByMk } from '../core/rollback';
 import { resyncStateOnHistoryChange } from '../core/sync';
 import { recordHistoryBranchMkAudit } from '../../shared/historyBranchMkAudit';
@@ -154,6 +154,13 @@ export async function dispatchAndExecuteTask(job: EventJob, mkToIgnore: IgnoreRu
 
   // 在每轮任务开始时，初始化操作记录器
   const actionsTaken = { rollback: false, apply: false, resync: false, api: false, apiWrite: false };
+  const requestedApiWriteDetail = eventType === ERA_EVENT_EMITTER.API_WRITE
+    ? detail as Partial<ApiWriteEventPayload> | undefined
+    : undefined;
+  const apiWriteTargetMessageId = Number.isInteger(requestedApiWriteDetail?.messageId)
+    ? Number(requestedApiWriteDetail?.messageId)
+    : undefined;
+  let apiWriteTargetMessage: any = null;
 
   // 在 ensureMkForLatestMessage 之前观察状态，避免把 MK 补写误归因于 resync。
   if (eventGroup === 'SYNC') recordHistoryBranchMkAudit('era-sync-task-before-mk-ensure', eventType);
@@ -164,7 +171,30 @@ export async function dispatchAndExecuteTask(job: EventJob, mkToIgnore: IgnoreRu
       mk,
       message_id: msgId,
       isNewKey,
-    } = await runPhase('ensure-latest-message-mk', () => ensureMkForLatestMessage());
+    } = await runPhase('ensure-api-target-or-latest-message-mk', async () => {
+      if (apiWriteTargetMessageId === undefined) {
+        return ensureMkForLatestMessage();
+      }
+
+      const targetMessage = getChatMessages(apiWriteTargetMessageId, { include_swipes: true })?.[0];
+      if (
+        !targetMessage ||
+        targetMessage.message_id !== apiWriteTargetMessageId ||
+        targetMessage.role !== 'assistant'
+      ) {
+        throw new Error(
+          `API 变量写入指定的 assistant 楼层 ${apiWriteTargetMessageId} 不存在，已拒绝回退到最新楼层。`,
+        );
+      }
+
+      apiWriteTargetMessage = targetMessage;
+      const ensured = await ensureMessageKey(targetMessage);
+      return {
+        mk: ensured.mk,
+        message_id: targetMessage.message_id,
+        isNewKey: ensured.isNew,
+      };
+    });
     logContext.mk = mk;
     message_id = msgId;
 
@@ -189,20 +219,6 @@ export async function dispatchAndExecuteTask(job: EventJob, mkToIgnore: IgnoreRu
     // **任务分发**
     logger.debug('dispatchAndExecuteTask - task dispatch', `分发事件: ${eventType}`, { detail, eventGroup });
     if (eventGroup === 'WRITE') {
-      // 关键：写入前先回滚，确保操作的幂等性。
-      // 即使事件被意外触发多次，也只会产生一次有效写入。
-      const msg = getChatMessages(-1, { include_swipes: true })?.[0];
-      if (msg) {
-        const MK = readMessageKey(msg);
-        if (MK) {
-          await runPhase('rollback-latest-message', () => rollbackByMk(MK, true));
-          actionsTaken.rollback = true;
-        }
-      }
-      await runPhase('apply-variable-blocks', () => ApplyVarChange());
-      actionsTaken.apply = true;
-
-      // 如果是 API 触发的写入，则标记
       if (eventType === ERA_EVENT_EMITTER.API_WRITE) {
         actionsTaken.apiWrite = true;
         const apiWriteDetail = detail as Partial<ApiWriteEventPayload> | undefined;
@@ -216,6 +232,30 @@ export async function dispatchAndExecuteTask(job: EventJob, mkToIgnore: IgnoreRu
               : []),
           ]),
         );
+      }
+
+      const msg = apiWriteTargetMessage ?? getChatMessages(-1, { include_swipes: true })?.[0];
+      const latestMessage = getChatMessages(-1, { include_swipes: true })?.[0];
+      const isHistoricalApiWrite = eventType === ERA_EVENT_EMITTER.API_WRITE &&
+        apiWriteTargetMessageId !== undefined &&
+        latestMessage?.message_id !== apiWriteTargetMessageId;
+
+      if (isHistoricalApiWrite) {
+        // 目标楼层已不是聊天末尾时，必须全量回滚并重放历史，
+        // 否则后续楼层对同一变量的修改会覆盖/污染这次总结写回。
+        await runPhase('resync-targeted-api-write', () => resyncStateOnHistoryChange(true));
+        actionsTaken.resync = true;
+      } else {
+        // 关键：写入前先回滚目标楼层，确保操作的幂等性。
+        if (msg) {
+          const MK = readMessageKey(msg);
+          if (MK) {
+            await runPhase('rollback-target-message', () => rollbackByMk(MK, true));
+            actionsTaken.rollback = true;
+          }
+        }
+        await runPhase('apply-variable-blocks', () => ApplyVarChange(apiWriteTargetMessageId));
+        actionsTaken.apply = true;
       }
 
       // 在变量写入完成后，强制重新渲染消息以触发宏
