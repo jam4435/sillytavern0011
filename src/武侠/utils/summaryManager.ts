@@ -444,7 +444,7 @@ export function formatPromptForCharacter(
  * 严格解析人物经历压缩模型返回的 JSON 键值对。
  * 格式错误时直接拒绝写回，避免把解释文字或错误结构写进人物经历。
  */
-export function parseSummaryResponse(response: string): Record<string, string> {
+export function parseSummaryResponse(response: string, maxStageMemories?: number): Record<string, string> {
   const raw = response.trim();
   let parsed: unknown;
   try {
@@ -459,6 +459,9 @@ export function parseSummaryResponse(response: string): Record<string, string> {
 
   const entries = Object.entries(parsed as Record<string, unknown>);
   if (entries.length === 0) throw new Error('总结模型返回了空 JSON 对象。');
+  if (maxStageMemories !== undefined && entries.length > maxStageMemories) {
+    throw new Error(`总结模型返回了 ${entries.length} 条阶段记忆，多于本批 ${maxStageMemories} 条输入经历；已取消写回。`);
+  }
 
   // JSON.parse 会静默覆盖重复键，因此额外检查原始文本中的键数量。
   const rawKeys = [...raw.matchAll(/"((?:\\.|[^"\\])*)"\s*:/g)];
@@ -587,7 +590,7 @@ export async function executeSummary(
     dataLogger.log(`[summaryManager] 收到响应，长度: ${response.length}`);
 
     // 3. 严格解析模型返回的多条阶段记忆 JSON
-    const summaryEntries = parseSummaryResponse(response);
+    const summaryEntries = parseSummaryResponse(response, Object.keys(compressionPlan.sourceEntries).length);
 
     // 4. 回写前重新读取人物经历，防止模型请求期间新增或编辑的经历被覆盖/误删。
     const latestRawBiography = readCurrentCharacterBiographyValue(character.characterId);
