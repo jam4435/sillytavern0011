@@ -1,0 +1,98 @@
+{
+  "generated_at": "2026-10-25T10:58:11.707782+08:00",
+  "queue_sha256": "ab03e5c1d2c35c0b3c87bf5f43bf1de30e07aa2791ef90559ddc0c49a6a73445",
+  "statuses": {
+    "reviewed": 53,
+    "pending": 546,
+    "needs_repair": 5,
+    "failed": 1
+  },
+  "usage": {
+    "inputTokens": 604301,
+    "cacheReadTokens": 30080,
+    "outputTokens": 943421,
+    "total": 1577802
+  },
+  "supervisor": {
+    "pid": 48316,
+    "status": "needs_attention",
+    "phase": "source",
+    "updated_at": "2026-10-25T03:26:59+0800",
+    "usage": {
+      "inputTokens": 604301,
+      "cacheReadTokens": 30080,
+      "outputTokens": 943421,
+      "total": 1577802
+    },
+    "failed": [
+      "鹿鼎-024-02"
+    ]
+  },
+  "failed_tasks": [
+    {
+      "id": "鹿鼎-024-02",
+      "book": "鹿鼎记",
+      "chapter": 24,
+      "title": "爱河纵涸须千劫 苦海难量为一慈",
+      "start": 10875,
+      "end": 11009,
+      "legacy_uids": [],
+      "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+      "phase": "source_review",
+      "status": "failed",
+      "prompt_version": "source-review-v1",
+      "attempts": 1,
+      "error": "dsh failed: {\"kind\": \"max-tokens\"}"
+    }
+  ],
+  "repair_case_count": 5,
+  "progress": {
+    "statuses": {
+      "reviewed": 53,
+      "pending": 546,
+      "needs_repair": 5,
+      "failed": 1
+    },
+    "by_book": {
+      "天龙八部": {
+        "reviewed": 1,
+        "pending": 113
+      },
+      "射雕英雄传": {
+        "pending": 89
+      },
+      "神雕侠侣": {
+        "pending": 87
+      },
+      "倚天屠龙记": {
+        "pending": 96
+      },
+      "笑傲江湖": {
+        "pending": 96
+      },
+      "鹿鼎记": {
+        "reviewed": 52,
+        "needs_repair": 5,
+        "failed": 1,
+        "pending": 65
+      }
+    },
+    "usage": {
+      "inputTokens": 604301,
+      "cacheReadTokens": 30080,
+      "outputTokens": 943421,
+      "total": 1577802
+    },
+    "events": 608,
+    "reviewed_legacy": 4,
+    "legacy_verdicts": {
+      "supported": 3,
+      "corrected": 1
+    },
+    "rejected_or_pending_legacy": 1498,
+    "source_stage_complete": false,
+    "diff_reviewed_events": 3,
+    "diff_stage_complete": false,
+    "cross_book_dedup_complete": false
+  }
+}

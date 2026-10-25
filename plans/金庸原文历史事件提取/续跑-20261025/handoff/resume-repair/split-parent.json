@@ -1,0 +1,69 @@
+{
+  "parent": {
+    "id": "鹿鼎-024-02",
+    "book": "鹿鼎记",
+    "chapter": 24,
+    "title": "爱河纵涸须千劫 苦海难量为一慈",
+    "start": 10875,
+    "end": 11009,
+    "legacy_uids": [],
+    "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+    "phase": "source_review",
+    "status": "failed",
+    "prompt_version": "source-review-v1",
+    "attempts": 1,
+    "error": "dsh failed: {\"kind\": \"max-tokens\"}"
+  },
+  "children": [
+    {
+      "id": "鹿鼎-024-02a",
+      "book": "鹿鼎记",
+      "chapter": 24,
+      "title": "爱河纵涸须千劫 苦海难量为一慈",
+      "start": 10875,
+      "end": 10938,
+      "legacy_uids": [],
+      "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+      "phase": "source_review",
+      "status": "pending",
+      "prompt_version": "source-review-v1",
+      "attempts": 0
+    },
+    {
+      "id": "鹿鼎-024-02b",
+      "book": "鹿鼎记",
+      "chapter": 24,
+      "title": "爱河纵涸须千劫 苦海难量为一慈",
+      "start": 10939,
+      "end": 11009,
+      "legacy_uids": [],
+      "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+      "phase": "source_review",
+      "status": "pending",
+      "prompt_version": "source-review-v1",
+      "attempts": 0
+    }
+  ],
+  "reason": "max-tokens; split at source scene separator without raising output limit",
+  "original_call_files": [
+    {
+      "path": "runs\\review-鹿鼎-024-02-a1.events.jsonl",
+      "sha256": "f7ff0ba7fea897dbe10e37d1d296abb5052996b557d426876bca421ea877ab74"
+    },
+    {
+      "path": "runs\\review-鹿鼎-024-02-a1.prompt.txt",
+      "sha256": "aafdffd6ef65a199ade168ec88dbf8bc40b7ce24bb269c9fa21595bb43efbd97"
+    },
+    {
+      "path": "runs\\review-鹿鼎-024-02-a1.stdout.txt",
+      "sha256": "bdc0b21e5a984684b9956749dadb0815f0a7c095412a054dedd10928e491633b"
+    }
+  ],
+  "coverage_exact": true,
+  "usage": {
+    "inputTokens": 604301,
+    "cacheReadTokens": 30080,
+    "outputTokens": 943421,
+    "total": 1577802
+  }
+}

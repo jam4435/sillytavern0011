@@ -1,0 +1,450 @@
+{
+  "task_id": "鹿鼎-026-02",
+  "coverage": {
+    "start": 11685,
+    "end": 11916,
+    "complete": true
+  },
+  "reviews": [],
+  "events": [
+    {
+      "title": "欧阳锋创制化尸粉（据传）",
+      "when": "宋代（据传）",
+      "place": "西域（据传最初传出）",
+      "people": [
+        "欧阳锋"
+      ],
+      "relationships": "无",
+      "description": "原文称化尸粉最初传自西域，据传为宋代武林怪杰西毒欧阳锋所创，系以十余种毒蛇、毒虫的毒液合成；母毒既成后，可用血肉化成的黄水晒干续制。",
+      "cause": "据传系以十余种毒蛇、毒虫的毒液合成",
+      "effect": "母毒既成，此后不必再制；血肉化成的黄水晒干便成化尸毒粉",
+      "nature": "传闻",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11921,
+          "column_start": 117,
+          "column_end": 210,
+          "anchor": "据传为宋代武林怪杰西毒欧阳锋所创",
+          "quote": "尸粉遇血而成毒，可说是天下第一毒药，最初传自西域，据传为宋代武林怪杰西毒欧阳锋所创，系以十余种毒蛇、毒虫的毒液合成。母毒既成，此后便不必再制，只须将血肉化成的黄色毒水晒干，便成化尸毒粉了。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 26
+        }
+      ],
+      "uncertain": [
+        "仅为“据传”，非确证",
+        "具体创制时间、地点不明"
+      ],
+      "id": "NEW:鹿鼎-026-02:001",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "韦小宝从海大富处取得化尸粉",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "韦小宝",
+        "海大富"
+      ],
+      "relationships": "海大富处所得，物主转为韦小宝",
+      "description": "韦小宝持有从海大富处得来的化尸粉，原文称此粉最是厉害不过。",
+      "cause": "未知",
+      "effect": "韦小宝持有此粉",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11921,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "韦小宝从海大富处得来的这瓶化尸粉",
+          "quote": "　　韦小宝从海大富处得来的这瓶化尸粉最是厉害不过，倘若沾在完好肌肤之上，那是绝无害处，但只须碰到一滴血液，血液便化成黄水，腐蚀性极强，化烂血肉，又成为黄色毒水，越化越多，便似火石上爆出的一星火花，可以将一个大草料场烧成飞灰一般。这化尸粉遇血",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 26
+        }
+      ],
+      "uncertain": [
+        "取得化尸粉的具体经过、时间不明"
+      ],
+      "id": "NEW:鹿鼎-026-02:002",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "白衣尼此前负重伤",
+      "when": "此前",
+      "place": "未知",
+      "people": [
+        "白衣尼"
+      ],
+      "relationships": "无",
+      "description": "韦小宝看出桑结不知白衣尼已负重伤，仍忌惮其武功；白衣尼行动已需人扶持。",
+      "cause": "未知",
+      "effect": "桑结等不知其伤，仍忌惮其武功；白衣尼行动迟缓",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11697,
+          "column_start": 216,
+          "column_end": 277,
+          "anchor": "他不知师太已负重伤",
+          "quote": "情肃然，脸上竟微有惴惴不安之意，登时明白：“是了，他不知师太已负重伤，忌惮师太武功了得，正自拿不定主意，不知如何出手才好。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 26
+        }
+      ],
+      "uncertain": [
+        "受伤时间、地点、加害者及经过不明"
+      ],
+      "id": "NEW:鹿鼎-026-02:003",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "韦小宝此前杀死四名喇嘛",
+      "when": "此前",
+      "place": "未知",
+      "people": [
+        "韦小宝",
+        "四名喇嘛"
+      ],
+      "relationships": "敌对凶杀",
+      "description": "韦小宝心想桑结等可能知道那四个喇嘛是他杀的，故担心身份暴露。",
+      "cause": "未知",
+      "effect": "桑结等五名同门死亡，增强对白衣尼一方的忌惮",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11697,
+          "column_start": 92,
+          "column_end": 211,
+          "anchor": "那四个喇嘛是我杀的",
+          "quote": "巴音一救出，立时便知我跟师太是一伙，说不定还会知道那四个喇嘛是我杀的。那时候韦小宝不去阴世跟四个大喇嘛聚聚，只怕也难得很了。最怕他们先将我削成一根人棍，这可是我的法子。”想到即以其人之匕首，还削其人为人棍，不禁全身寒毛直竖，转头向桑结瞧去，",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 26
+        }
+      ],
+      "uncertain": [
+        "四名喇嘛的身份、被杀经过不明"
+      ],
+      "id": "NEW:鹿鼎-026-02:004",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "白衣尼以掌力杀死一名喇嘛",
+      "when": "此前",
+      "place": "未知",
+      "people": [
+        "白衣尼",
+        "一名喇嘛"
+      ],
+      "relationships": "敌对凶杀",
+      "description": "桑结等眼见五名同门死于非命，其中一人被掌力震得全身前后肋骨齐断；韦小宝心算八名死者中只有一名是白衣尼杀的。",
+      "cause": "未知",
+      "effect": "桑结等见死状后栗栗自惧",
+      "nature": "推断",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11709,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "其中一人更是被掌力震得全身前后肋骨齐断",
+          "quote": "　　殊不知桑结等一干人眼见五个同门死于非命，其中一人更是被掌力震得全身前后肋骨齐断，敌人武功之高，世所罕见，桑结自忖若和此人动手，只怕还是输面居多。在饭店中见白衣尼始终神色自若，的是大高手的风范，七人全神贯注，尽在注视她的动静，又怎会提防一",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 26
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 11765,
+          "column_start": 5,
+          "column_end": 124,
+          "anchor": "其中只有一名是白衣尼杀的",
+          "quote": "宝心道：“怎么已杀了他八名师弟？”一算果然是八个，其中只有一名是白衣尼杀的，眼见桑结说出了这句话后，又向后退了两步，显是颇有惧意，忍不住大声道：“我师父武功出神入化，天下更没第二个比得上，不过她老人家慈悲为怀，有好生之德，不想再杀人了。你们",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 26
+        }
+      ],
+      "uncertain": [
+        "死者身份、死亡时间地点不明",
+        "杀人的直接经过不明"
+      ],
+      "id": "NEW:鹿鼎-026-02:005",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "韦小宝曾在少林寺、清凉寺出家",
+      "when": "此前",
+      "place": "少林寺、清凉寺",
+      "people": [
+        "韦小宝"
+      ],
+      "relationships": "出家为僧",
+      "description": "韦小宝曾在少林寺、清凉寺出家，头发剃得精光，此时长起不过一寸多长。",
+      "cause": "未知",
+      "effect": "韦小宝此时头发极短，借光头形象诈骗喇嘛",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11833,
+          "column_start": 73,
+          "column_end": 192,
+          "anchor": "他在少林寺、清凉寺出家",
+          "quote": "头发练得一根都没有了，你就是砍在我胸口也不怕了。”他在少林寺、清凉寺出家，头发剃得精光，这时长起还不过一寸多长。当时除了和尚和天生秃头之外，男子人人都留辫子，似他这般头上只长一寸头发，确是世间所无。至于头发越练越短云云，是他记起了当日在康亲",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 26
+        }
+      ],
+      "uncertain": [
+        "出家具体时间、经过不明"
+      ],
+      "id": "NEW:鹿鼎-026-02:006",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "韦小宝在康亲王府见到吴应熊的金顶门随从",
+      "when": "当日（此前）",
+      "place": "康亲王府",
+      "people": [
+        "韦小宝",
+        "吴应熊",
+        "金顶门随从"
+      ],
+      "relationships": "无直接关系变化",
+      "description": "韦小宝记起当日在康亲王府中见到吴应熊那些“金顶门”随从的情景，因此知道金顶门铁头功夫的名头。",
+      "cause": "未知",
+      "effect": "韦小宝借“金顶门”名头恐吓喇嘛",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11833,
+          "column_start": 163,
+          "column_end": 214,
+          "anchor": "当日在康亲王府中，见到吴应熊那些“金顶门”随从",
+          "quote": "发，确是世间所无。至于头发越练越短云云，是他记起了当日在康亲王府中，见到吴应熊那些“金顶门”随从的情景。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 26
+        }
+      ],
+      "uncertain": [
+        "具体日期及前章经过不明"
+      ],
+      "id": "NEW:鹿鼎-026-02:007",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "阿珂曾两次砍韦小宝未伤",
+      "when": "此前",
+      "place": "未知",
+      "people": [
+        "阿珂",
+        "韦小宝"
+      ],
+      "relationships": "冲突",
+      "description": "因韦小宝穿有护身宝衣，阿珂曾两次砍他不伤；此次见他以头试刀，白衣尼和阿珂不以为奇。",
+      "cause": "韦小宝穿有护身宝衣",
+      "effect": "白衣尼和阿珂此次见其试刀不以为奇",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11855,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "阿珂曾两次砍他不伤",
+          "quote": "　　韦小宝穿有护身宝衣，白衣尼是知道的，阿珂曾两次砍他不伤，这一次倒也不以为奇，但他竟敢用脑袋试刀，不禁都佩服他的胆气。只是韦小宝刚才这一下只吓得尿水长流，裤裆中淋淋漓漓，除他自己之外，却是谁也不知道了。那喇嘛这一刀劲力甚重，撞得他背上肋骨",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 26
+        }
+      ],
+      "uncertain": [
+        "两次冲突的具体时间、地点、经过不明"
+      ],
+      "id": "NEW:鹿鼎-026-02:008",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "阿珂以白衣尼为师",
+      "when": "未知",
+      "place": "未知",
+      "people": [
+        "阿珂",
+        "白衣尼"
+      ],
+      "relationships": "阿珂为白衣尼弟子",
+      "description": "阿珂在危急中称白衣尼为“师父”，可见二人有师徒关系。",
+      "cause": "未知",
+      "effect": "阿珂随白衣尼同行并听其吩咐",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11783,
+          "column_start": 121,
+          "column_end": 168,
+          "anchor": "师父，你听，在这当口",
+          "quote": "太监，总而言之，我非娶你做老婆不可。”阿珂急道：“师父，你听，在这当口，他还在不干不净的瞎说。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 26
+        }
+      ],
+      "uncertain": [
+        "拜师时间、地点、经过不明"
+      ],
+      "id": "NEW:鹿鼎-026-02:009",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "桑结担任达赖喇嘛座下大护法",
+      "when": "未知",
+      "place": "西藏（自述所属）",
+      "people": [
+        "桑结",
+        "达赖喇嘛"
+      ],
+      "relationships": "桑结为达赖喇嘛座下大护法",
+      "description": "桑结自述法名桑结，是西藏达赖喇嘛活佛座下的大护法。",
+      "cause": "未知",
+      "effect": "桑结以达赖座下大护法身份率喇嘛行事",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11691,
+          "column_start": 27,
+          "column_end": 112,
+          "anchor": "我法名桑结，是西藏达赖喇嘛活佛座下的大护法",
+          "quote": "。阿珂站立不定，坐倒在凳，伏在桌上。那喇嘛笑道：“我法名桑结，是西藏达赖喇嘛活佛座下的大护法。你日后怎么样？想来找我报仇是不是？”郑克塽硬起了头皮，颤声道：“正……正是！”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 26
+        }
+      ],
+      "uncertain": [
+        "仅桑结自述，具体身份是否完全属实待核"
+      ],
+      "id": "NEW:鹿鼎-026-02:010",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "郑克塽为延平王府公子",
+      "when": "未知",
+      "place": "延平王府（所指）",
+      "people": [
+        "郑克塽",
+        "延平王府"
+      ],
+      "relationships": "郑克塽为延平王府公子",
+      "description": "郑克塽自居延平王府公子，原文称他是王府公子，向来给人奉承惯了；他因此认为藏身草堆有堕王府威风。",
+      "cause": "出身王府",
+      "effect": "他不愿藏身草堆，认为有堕延平王府威风",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11737,
+          "column_start": 4,
+          "column_end": 123,
+          "anchor": "我延平王府的威风",
+          "quote": "克塽怒道：“藏身草堆之中，倘若给人知道了，岂不堕了我延平王府的威风。”韦小宝道：“对！我们三个去躲在草堆里，请公子继续赶车急奔，好将追兵引开。”当下扶着白衣尼下车。阿珂一时拿不定主意。白衣尼道：“阿珂，你来！”阿珂向郑克塽招了招手，道：“你",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 26
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 11733,
+          "column_start": 58,
+          "column_end": 113,
+          "anchor": "他是王府公子，向来给人奉承惯了的",
+          "quote": "你上车。”说着口中吆喝，挥鞭赶骡。郑克塽自知失言，他是王府公子，向来给人奉承惯了的，给抢白了两句，登时满脸怒色。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 26
+        }
+      ],
+      "uncertain": [
+        "具体家世、成长经历不明"
+      ],
+      "id": "NEW:鹿鼎-026-02:011",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    }
+  ],
+  "cross_links": [
+    {
+      "topic": "化尸粉与西毒欧阳锋的跨书传闻",
+      "people": [
+        "欧阳锋",
+        "韦小宝",
+        "海大富"
+      ],
+      "detail": "本回仅称化尸粉据传为宋代欧阳锋所创、最初传自西域；待核其他书是否另有记载，不作断言。"
+    },
+    {
+      "topic": "韦小宝在康亲王府见吴应熊随从的前章事件",
+      "people": [
+        "韦小宝",
+        "吴应熊"
+      ],
+      "detail": "本回回忆当日在康亲王府见到吴应熊的“金顶门”随从；具体时间与经过待前章核对。"
+    },
+    {
+      "topic": "阿珂两次砍韦小宝的前章冲突",
+      "people": [
+        "阿珂",
+        "韦小宝"
+      ],
+      "detail": "本回称阿珂曾两次砍他不伤，因护身宝衣；两次冲突的章节与经过待核。"
+    },
+    {
+      "topic": "白衣尼负伤及五名喇嘛死亡的前章经过",
+      "people": [
+        "白衣尼",
+        "韦小宝",
+        "桑结"
+      ],
+      "detail": "本回只交代白衣尼已负重伤、桑结等五名同门先前死亡；具体加害者、时间地点待前章核对。"
+    },
+    {
+      "topic": "郑克塽与延平王府的家世",
+      "people": [
+        "郑克塽"
+      ],
+      "detail": "本回仅见郑克塽自居延平王府公子、向来受奉承；更具体家世待核。"
+    }
+  ],
+  "unresolved": [
+    "白衣尼负伤的时间、地点、加害者及经过未知。",
+    "韦小宝此前所杀四名喇嘛的身份与具体经过未知。",
+    "被白衣尼掌力震死的喇嘛身份、死亡时间地点未知。",
+    "韦小宝从海大富处取得化尸粉的经过未知。",
+    "阿珂拜白衣尼为师的时间、地点、经过未知。",
+    "郑克塽的具体家世及与延平王府的关系细节未知。",
+    "桑结自述为达赖喇嘛座下大护法，是否完全属实待核。",
+    "化尸粉为欧阳锋所创仅为传闻，待核。",
+    "韦小宝在康亲王府见吴应熊金顶门随从的具体时间待核。"
+  ],
+  "validation_issues": [],
+  "semantic_acceptance": "model_reviewed_not_independent_audit"
+}

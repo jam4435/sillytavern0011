@@ -1,0 +1,28 @@
+{
+  "task_id": "鹿鼎-025-02",
+  "raw_sha256": "b951e530d4c93b67b491b31cbc9a04e8fb1dae8d665840c7861441a24231b44b",
+  "changes": [
+    {
+      "new_event": 12,
+      "before": {
+        "book": "鹿鼎记",
+        "line": 11454,
+        "anchor": "安葬崇祯皇帝之所"
+      },
+      "after": {
+        "book": "鹿鼎记",
+        "line": 11354,
+        "anchor": "安葬崇祯皇帝之所"
+      },
+      "source_line": "　　次日白衣尼带了韦小宝，出京向西，来到昌平县锦屏山思陵，那是安葬崇祯皇帝之所。陵前乱草丛生，甚是荒凉。白衣尼一路之上不发一言，这时再也忍耐不住，伏在陵前大哭。"
+    }
+  ],
+  "usage_before": {
+    "inputTokens": 671998,
+    "cacheReadTokens": 34176,
+    "outputTokens": 1067066,
+    "total": 1773240
+  },
+  "validation_issues": [],
+  "semantic_scope": "Only coordinates repaired; original model assertions remain subject to review."
+}

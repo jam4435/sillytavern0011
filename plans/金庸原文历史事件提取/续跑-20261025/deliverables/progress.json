@@ -1,9 +1,7 @@
 {
   "statuses": {
-    "reviewed": 53,
-    "pending": 546,
-    "needs_repair": 5,
-    "failed": 1
+    "reviewed": 72,
+    "pending": 534
   },
   "by_book": {
     "天龙八部": {
@@ -23,25 +21,23 @@
       "pending": 96
     },
     "鹿鼎记": {
-      "reviewed": 52,
-      "needs_repair": 5,
-      "failed": 1,
-      "pending": 65
+      "reviewed": 71,
+      "pending": 53
     }
   },
   "usage": {
-    "inputTokens": 604301,
-    "cacheReadTokens": 30080,
-    "outputTokens": 943421,
-    "total": 1577802
+    "inputTokens": 731707,
+    "cacheReadTokens": 37248,
+    "outputTokens": 1168954,
+    "total": 1937909
   },
-  "events": 608,
+  "events": 806,
   "reviewed_legacy": 4,
   "legacy_verdicts": {
     "supported": 3,
     "corrected": 1
   },
-  "rejected_or_pending_legacy": 1498,
+  "rejected_or_pending_legacy": 1497,
   "source_stage_complete": false,
   "diff_reviewed_events": 3,
   "diff_stage_complete": false,

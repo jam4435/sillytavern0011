@@ -1,0 +1,991 @@
+{
+  "completed_at": "2026-10-25T10:58:37.8802883+08:00",
+  "removed_files": 164,
+  "removed_bytes": 177806313.0,
+  "files": [
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\批次E\\__pycache__\\_e2_anchors.cpython-311.pyc",
+      "bytes": 32107,
+      "sha256": "d011101cfae949670e16a9bf2516ecb2d3f931c4ccc206e7cfbfc45d04dc9d39",
+      "reason": "regenerable Python bytecode cache"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\__pycache__\\deduplicate.cpython-311.pyc",
+      "bytes": 16064,
+      "sha256": "4f7f57c38a5520556cec5383fc0ef4d3b8dd38f7d09ae1d58c46b4a26c9402e9",
+      "reason": "regenerable Python bytecode cache"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\__pycache__\\differ.cpython-311.pyc",
+      "bytes": 22364,
+      "sha256": "797ea8fcb8197e85a88299b5a1d86c0a0376cc0b52c427e7f7319700cae26ddf",
+      "reason": "regenerable Python bytecode cache"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\__pycache__\\dsh_calls.cpython-311.pyc",
+      "bytes": 7340,
+      "sha256": "18daa4f0cd2bef905269f5fcfb5ecbe012d342618acebf3663bf562fb103a6ad",
+      "reason": "regenerable Python bytecode cache"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\__pycache__\\export_results.cpython-311.pyc",
+      "bytes": 11537,
+      "sha256": "afb653f2de7ee886f3faeb8d7caf5405ba7813136bec512a6b49417b2ffc0b24",
+      "reason": "regenerable Python bytecode cache"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\__pycache__\\orchestrate.cpython-311.pyc",
+      "bytes": 33396,
+      "sha256": "d2dbded5379f8da972ec07b30fc75cd70d0d2638459d6546ad76c96726e47ae6",
+      "reason": "regenerable Python bytecode cache"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\__pycache__\\pipeline.cpython-311.pyc",
+      "bytes": 22725,
+      "sha256": "882a036a71a67aaa113e9f2c62eb2eb7ff0fac8e53302b9351d0d5d711a4780d",
+      "reason": "regenerable Python bytecode cache"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\__pycache__\\supervise.cpython-311.pyc",
+      "bytes": 10343,
+      "sha256": "49f8acafcfa4147ba6e0ef73eecd294fa9e1e4e9d3bc61442c078a5d6a6904d7",
+      "reason": "regenerable Python bytecode cache"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\__pycache__\\test_orchestrate.cpython-311.pyc",
+      "bytes": 5173,
+      "sha256": "70af2309bc437ee5fba91057f6889db352774364f852acdda1d350fb944e640a",
+      "reason": "regenerable Python bytecode cache"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\__pycache__\\test_pipeline.cpython-311.pyc",
+      "bytes": 7195,
+      "sha256": "5b6ae9f3dd98af13886013f0b3c09745b5eb49f2365d4776063dafc13d94e77c",
+      "reason": "regenerable Python bytecode cache"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\%SystemDrive%\\ProgramData\\Microsoft\\Windows\\Caches\\cversions.2.db",
+      "bytes": 16384,
+      "sha256": "c419af497210320643f78f116464d16210ef1358edc575e336fa3fdba903cbc4",
+      "reason": "Windows cache accidentally materialized beneath the task directory"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\%SystemDrive%\\ProgramData\\Microsoft\\Windows\\Caches\\{6AF0698E-D558-4F6E-9B3C-3716689AF493}.2.ver0x0000000000000001.db",
+      "bytes": 296296,
+      "sha256": "adfcf82d157b5d9783fafbfde656f6b5c7c6e9b91ce21e1ff501bec290627916",
+      "reason": "Windows cache accidentally materialized beneath the task directory"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\%SystemDrive%\\ProgramData\\Microsoft\\Windows\\Caches\\{DDF571F2-BE98-426D-8288-1A9A39C3FDA2}.2.ver0x0000000000000001.db",
+      "bytes": 638224,
+      "sha256": "50396b06ed24ce71e819df3bf82d43a33070df60250738013ac96ebba4205e5d",
+      "reason": "Windows cache accidentally materialized beneath the task directory"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\%SystemDrive%\\ProgramData\\Microsoft\\Windows\\Caches\\{E58A89BE-C459-461E-8427-94CD22413786}.2.ver0x0000000000000001.db",
+      "bytes": 1240,
+      "sha256": "6db2e3e7798a346d8a0937559cceebde84e77c0bd5eab42d00f77178407cfc59",
+      "reason": "Windows cache accidentally materialized beneath the task directory"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\d1a04241-05d4-42fa-847c-7484438dcee8.patch.yml",
+      "bytes": 2024,
+      "sha256": "14a60507a81f5b6f62cbbce2ea39856ffa98353fd416daa347675241bdb3807a",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\diff-00001.patch.yml",
+      "bytes": 1995,
+      "sha256": "31038dee935555edbf11f911159c3f80d103c3c831a6315dbb0eacf32a18f75f",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-天龙-001-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "717d24d3d524d9264f48f1363da19a05e5a85afdc967ac984c8663612b1f174e",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-001-01-a2.patch.yml",
+      "bytes": 2008,
+      "sha256": "bd0bfa687ce1e1475e25732ba136e9437da67fb8e3c92da0d6177abf90c6e8ab",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-001-01-a3.patch.yml",
+      "bytes": 2008,
+      "sha256": "aa3515fe7264478e97a2f2553cac55cd189df5e56e76fd0a59e344e54493acb9",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-001-01-a4.patch.yml",
+      "bytes": 2008,
+      "sha256": "27d2fb4c6e7abcdcc16d1d97f65050d2347e2af986b4f89830c91e350d44c963",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-001-01.patch.yml",
+      "bytes": 2006,
+      "sha256": "68e7294b4fcdf40fd319a563a77ff7130975edfae3c41dbbc3ca2a1a4d397230",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-001-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "ca78522e04259a63fa6357a4085b50511935fc7a44b51ad65cb25f89d1d78972",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-002-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "d0b89ba9d8d149bd39785d9c4a0caa9587e265a1e63e8e250141407695cb1111",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-002-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "c9328c5fade4c1633f01a7c3bb4442a1e26366227452f256de101d726a60f68d",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-002-03-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "4e5d6d7a6b2c3d5b2b2aeea669e4b30526f18166581b6ebf546bb55acb1f5221",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-003-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "22708687c03e7c5675c2f9f724f4501494e103c42b8e66168a61af963b906ed4",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-003-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "5cc17f325a8aa237944ce0c921a2a8a88b7a5aa0426b9a9d9e3e9159854180e1",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-004-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "113b1109075590f7af11f83f7d70f9f331c995db8fc50b4ecd5a1da7a23f778d",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-004-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "c6ef8a8f1bb10208094a1f4d02b3aa22c0febf97f1e7c73d6d8593fae42b6785",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-005-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "4520d741e8bf17b643cd2a69c8fe9d1e41c339f65011741faabf5d0d6e09985a",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-005-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "e427da7da0586dc132f507a7264e24392f76449e2f8071cb8f5802dc1deabb18",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-005-03-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "610da23df621ba605c531e4470fca84ffa5cfedae61bf81ba3e1ec4952ccef09",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-006-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "0d38927ead5c23169d7362b1097e28b7cb2cdf9fdc74b8b275f6e9b029891318",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-006-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "2c00dab6c26d2d74f22ea4749d48fdbd106c076069f49314ced525aa2d7e2eb4",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-007-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "ae1ba8204955b0294fdfa0c759c433daa6caf4eb6b24e2bdae00df5ef0f10384",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-007-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "8c7bb05d5357784c05f7451fddde8f0dcf650e9209f281a17c15eacf61959bd0",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-008-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "ba1b5ab91880961c223d2cc6e2cefbe368ba1695baf44d34ddf3d0bafa4be3df",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-008-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "81c9b1663df95195ecf85327a32a91cf756d49b5683fa0c7da9fd522a3c16165",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-009-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "33829ef9e07a1ddcc38e864ff7dac07cac08d4e8940bf68fd6ce397b47666369",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-009-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "65c0d515266835a4d9c6065f446b75d4a7d5ed8efd5594d5cf20d58a430c6689",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-009-03-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "0c391d38cd0bf7865b8e1c463dc67b4fd0de3a27f345fceba2fc8c833c7bebc9",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-010-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "56bdf713a83cf228007852fe876df1e2aeae99ed7e33616de83f6721fbafc25e",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-010-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "8e8cf171305985e6fd1e5fd790c2640647df4676f18cd5a95bed54773b9eb9ea",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-010-03-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "8049e3b22acc86ac1fd2dcb04fd0ceb8b5a47de6aa7c4c21f6ffde479994d809",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-011-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "346d9b53379a4caf43a20357edb2ce25615455d86dd920d1999e7d46a0d33b23",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-011-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "bcae53ca8cdc57672c1062924d026fce749a3f1d196440d7999f7e2ac1731f84",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-012-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "71c8ce0bcf7f2c388049ce18c921e2512260db7e4f7cc05752aff50b6c20102b",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-012-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "10d9ed990bc1eaa20b81162888504bdafcccfd97afd93ccf6f6368ae2eec9f1f",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-013-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "8d0aaef127a867f2eb72fe390461c5ce7564d2a6db02f531356b203ae2152f29",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-013-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "ec73a970ace4d4839a04ab5f6e1201161c280062385845cd154610e07a7480c1",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-013-03-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "64c9e5999df8e5b5e6ff9c2e18a90dc72f8a7d64646aba87f70b77f8f591a113",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-014-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "3271f1c32f270489958ad147445291b6478c81b1e0a1f971e187e1f77d365e32",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-014-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "13f080e181a282aca72fb5cbdab91ebd4e0c8841bae90d7a1788faffefd8f71a",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-014-03-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "53adc7d68e87ad830360d48bffd7150942ecd1965946cc77cd2866479eba0346",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-015-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "b31eefcbcac63e23adf2057efecef6db8279fcff6f6d2ce495941d3ce04deec5",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-015-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "4862437c465c6ad26f77d4799d07f47a3659461d1d2becb40968a520e7fea0d5",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-015-03-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "de3e868855f2f4b88f91cb0855992ad39913db14980dfefe9fb11d9e070c1dc0",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-016-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "52c1a4cc0235ed81490f1a46d330dd978a5ca1fafd6c8853f0f38e86c1947a3b",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-016-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "7dbf848ae40b8e8a1e6bdc900a65bceb09c38b1c7f032f4f9bf9e2de499ea046",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-017-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "22316d99400dc1ff3770478e5187235b47ce11c88ff0fe99aca64243e328f8f1",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-017-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "6c95e50f81b17aba886fa4178fb0eb9bd876245bb7b657e99510685da45bffd2",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-018-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "df7bebe23c35e61debe1e91e662effbc82d19cece923c653ee3f16d985e62dd6",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-018-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "2c6341c470cfda9578f59cddbaf92790f76851f56dac843c13c4799a3a7f6f54",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-018-03-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "f00aacc5d39b5694421f9522f7a1c96279ac78fe678fd7ecc5de7fa84c8e499b",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-019-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "7bdede06f502a8c46391c988c28f6e9bac2d51e570f30d4e4bb148bfd59f64e5",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-019-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "0440c11a8ac82130418809a39cfc7d0ad2a964d7d3c4a7bf9041e9e06a492283",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-020-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "248ad2e38598359ecd0f54a78275624c8cbd3d7ac247db8f316e07c26d48795d",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-020-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "78c6b6a72133a7878a87f179745cdd3ad97b0c9e6d230cfe6c4b1107e2a4d174",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-020-03-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "b34385728a8ecfa7db652fd061a407879f09f14f475428bc8773478d485867c1",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-021-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "c5354c1189105fa04d101da524eaf0046004d984abbf07859213fa7b7712a1dc",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-021-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "3b3c732b4dba97cca579b24772629ccba44ccc8ae2fb874d63aa1b0dfad7c486",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-022-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "50c3d06bd6e817199a1cd4e7ea0f815a62469b5f24dca1f8e1df7dabada06ee6",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-022-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "48d19db41cf4f21fa2fadb471699f6ba86bb2c4293eb7206497c2eb410240b22",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-022-03-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "dac23d62bf579f150c4bec284891e585f0120f40bdfa263f38433a0a8641f981",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-023-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "02150e41c7940c979268fe7aeba30254b1410005f5ebdb719d214f0e54bea1b4",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-023-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "b7c5eb4e3d6e4f49d87b38a1acf6739963f3e9df0a6d2aa002900d199c4c248f",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-024-01-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "8a188259bbc7978765499bd19c88eeae6ab15279ee1e435329418cb96fb459e2",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-024-02-a1.patch.yml",
+      "bytes": 2008,
+      "sha256": "8ff95190b3dfb5191a92ffd51bd2d1ae8b0217976be941d9565e3efe20a0d947",
+      "reason": "generated overlay reproducible by dsh_calls.prepare_overlay"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\diff-00001.stderr.txt",
+      "bytes": 4584,
+      "sha256": "286b06dc493ece1c417932cba9c6e4ffd71ab876fafd275dfb1eb62888cbbd13",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-天龙-001-01-a1.stderr.txt",
+      "bytes": 58122,
+      "sha256": "d47d30bc5fd062bdfbc66b83324cd440d69b12244e9c978770832692cfa26d1a",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-001-01-a3.stderr.txt",
+      "bytes": 42393,
+      "sha256": "191ff7a4743be671ced13b95b9d49cbe6d06043e478777383638dc993fd98a96",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-001-01-a4.stderr.txt",
+      "bytes": 41726,
+      "sha256": "cc48075c7fd4682742451c1127bb078cbd83aa46851def9a18ee31a3ac0065c7",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-001-01.stderr.txt",
+      "bytes": 46328,
+      "sha256": "ffb1f197791c14e7060b2b60571ec612d9a049c678587f1cf5c12e3329df9edb",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-001-02-a1.stderr.txt",
+      "bytes": 49924,
+      "sha256": "797dda9d05215951bf60c42bfca17487e5cf4d15ad69009d235ba9348f6ba59a",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-002-01-a1.stderr.txt",
+      "bytes": 32602,
+      "sha256": "40641ffb26cf35b234eb2f4afe4f95a97c9cb3f7ad7f47ae24ca04316e7a8a4f",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-002-02-a1.stderr.txt",
+      "bytes": 58428,
+      "sha256": "211091c117c124c05f91ddec7fee38b09d5eea534afcfe51687360e00c2119d6",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-002-03-a1.stderr.txt",
+      "bytes": 28436,
+      "sha256": "d8d79e33eb079455906b4f93a6178722024c0852d8dde73289a2644fb75a5dc9",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-003-01-a1.stderr.txt",
+      "bytes": 43294,
+      "sha256": "6634158120dfff5a0208c427c9e8a861b05be67fad24aa6ed8fb75024cba89ad",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-003-02-a1.stderr.txt",
+      "bytes": 26391,
+      "sha256": "1c65cf44499deb7a3e2a4501ae0287560fdbbdc62fb03dc0a5461483c338f223",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-004-01-a1.stderr.txt",
+      "bytes": 32643,
+      "sha256": "20c9e130f4863dbe82c41d573715c472372a25a7e5fce33c893dd9d0cf47aa43",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-004-02-a1.stderr.txt",
+      "bytes": 52847,
+      "sha256": "b4853615f14d540b468374e0a370a1a5fe92fee302cba720ab160b66cab8e32b",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-005-01-a1.stderr.txt",
+      "bytes": 34355,
+      "sha256": "03222ccf1adae307faae192ac7265f536c3af0d080c7ed4df7987b44375cd90b",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-005-02-a1.stderr.txt",
+      "bytes": 53580,
+      "sha256": "51f33d5ee27bc8c9286d5d93393f70cfc4f9764594ed03cc6a01e5d8fb870478",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-005-03-a1.stderr.txt",
+      "bytes": 25613,
+      "sha256": "30e7c01074acc98c6baab9b5f49d51b01345dcd9a4789e6e866d0989dc758029",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-006-01-a1.stderr.txt",
+      "bytes": 95201,
+      "sha256": "5333fe692ebc295b89165f974aa61efdfb3d62868221b9575e59ed93fc1ac6f6",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-006-02-a1.stderr.txt",
+      "bytes": 67950,
+      "sha256": "9e1265e69d395446072032d0d9a130a39a2ffa939b6e797e1af9aafcc4ff26c3",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-007-01-a1.stderr.txt",
+      "bytes": 51997,
+      "sha256": "8bb0fdb7c00fb682a5661a059802216a3e2e099a0522a70eba1e00906f2fed3a",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-007-02-a1.stderr.txt",
+      "bytes": 49096,
+      "sha256": "81befb30202f8a51f2c016b444e4fd8b5d127acf5b38ac7fc224cf1065fd4b7c",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-008-01-a1.stderr.txt",
+      "bytes": 61872,
+      "sha256": "0d9557a3940bbbf374e9224e2527459a6c5a602949435eb712651e8e1866fcbc",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-008-02-a1.stderr.txt",
+      "bytes": 43198,
+      "sha256": "7ffe7403184309bab395bf2b4a83c3c544f8c4b245b9791d9b35c3d50a68d5ca",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-009-01-a1.stderr.txt",
+      "bytes": 71567,
+      "sha256": "ac2200eeb264cebbf54d54dba5c1fab58468574fbbffd7c39dd2b20aaeae2a19",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-009-02-a1.stderr.txt",
+      "bytes": 41439,
+      "sha256": "3eb6cc7c7f954dbe31287b713277364e38b6d72b3d0df7f3bc3af18d8ec36236",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-009-03-a1.stderr.txt",
+      "bytes": 29780,
+      "sha256": "b8e040cea3c3691158f7d676ac7083befa8d388a2b36f532bc159706afaead04",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-010-01-a1.stderr.txt",
+      "bytes": 46342,
+      "sha256": "4de330ec04b827b3629543ebf190401d9450cef8f93092c8a2e800b1a6008297",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-010-02-a1.stderr.txt",
+      "bytes": 40976,
+      "sha256": "18bfac4c4845c12f19e19bd9956dbf7eb2b84a189f6d241872b4afbc501d1ff0",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-010-03-a1.stderr.txt",
+      "bytes": 39775,
+      "sha256": "b9d3372b2374ecac0ea02611765e6d1deffd00cbe799617628da5bc7f22838a2",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-011-01-a1.stderr.txt",
+      "bytes": 46536,
+      "sha256": "d5ad453eb184016e3e05aa79cd26f5c57d711bc3c3792a2204b42d25cc7ff601",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-011-02-a1.stderr.txt",
+      "bytes": 30342,
+      "sha256": "7f82779046be974c48e5a50be949bd2c840396d0e84d0cff7589ecd585aafe86",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-012-01-a1.stderr.txt",
+      "bytes": 61124,
+      "sha256": "77cea501ab9cfb64cb469b3fa9011357e7873878c39f9dcd7ba8d3c7390ee72b",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-012-02-a1.stderr.txt",
+      "bytes": 38483,
+      "sha256": "b89c678d57f19944bd965b8e3b39700ea017261e4541ac80ebe8b29cb1b4ee77",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-013-01-a1.stderr.txt",
+      "bytes": 61869,
+      "sha256": "fd3868530f358ca3a00ecb03a856b6fe28851d28ff40c9796e1e4ac78dae41b0",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-013-02-a1.stderr.txt",
+      "bytes": 71754,
+      "sha256": "a02f86c90b2a5efdff33cc861c81af1547af9c1057748129ec3426972d9fa15e",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-013-03-a1.stderr.txt",
+      "bytes": 34739,
+      "sha256": "a732beb82d0661ed54f414557d802ca550d23009b9dfb913b6696d7e1a67779b",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-014-01-a1.stderr.txt",
+      "bytes": 64841,
+      "sha256": "6764ecb297e34cae44baaf39a9525867fa67936fc6224c7b884b4ab1d5858f09",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-014-02-a1.stderr.txt",
+      "bytes": 79846,
+      "sha256": "00507e185cb6cd4fc88296335af2317c77ab9186f0d532a773182fe126fdb44f",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-014-03-a1.stderr.txt",
+      "bytes": 5484,
+      "sha256": "c7829f102c11fb8398969b6eb6982578dd1dad73efdc6dee695daa77e79dde04",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-015-01-a1.stderr.txt",
+      "bytes": 82388,
+      "sha256": "d7dcaa377f7a88fce3bba4ff0a6d98bb43bdefa524cc89f2bc0ebff280c09244",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-015-02-a1.stderr.txt",
+      "bytes": 79891,
+      "sha256": "6af19e037728e9480558545283ec715ca9b438980edccc14cebf1404886b80c7",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-015-03-a1.stderr.txt",
+      "bytes": 29006,
+      "sha256": "2a4d2da09ac489508aca4b395497eeffde2ad6247f88390d71ca373a18008a66",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-016-01-a1.stderr.txt",
+      "bytes": 22746,
+      "sha256": "a37a589ff6f38dcbb8bae71f392694403739ff109fd6d207fa2bfd5992f78246",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-016-02-a1.stderr.txt",
+      "bytes": 37954,
+      "sha256": "0536f45828e311384de59fe6d60b70ab93dab1e1702a12c7044e000f865f727e",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-017-01-a1.stderr.txt",
+      "bytes": 61240,
+      "sha256": "5b42b177f487dc851db045202f3db0c5906fadc1292b24219a560f3b0e7b03bc",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-017-02-a1.stderr.txt",
+      "bytes": 40067,
+      "sha256": "03f6b706dd6772b6f8d46f8c17fad9d862fe691b56361fc5372e4d12721597fb",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-018-01-a1.stderr.txt",
+      "bytes": 51787,
+      "sha256": "f40d1ca93d26698d83a0dfd84c44ec7fb48def5f7d8cbb3717b4d9b011eb6046",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-018-02-a1.stderr.txt",
+      "bytes": 70577,
+      "sha256": "2e7d55ee16fddd4f1781f7d6ee656c185cadf693843c68b640309b7e991efcbd",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-018-03-a1.stderr.txt",
+      "bytes": 35646,
+      "sha256": "f4eed84a8ba74ca9c6933b9cd50ad4b2136aa97adbc2322cec086d3ad6a37661",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-019-01-a1.stderr.txt",
+      "bytes": 54013,
+      "sha256": "4e0774eadf1c8b788b2281575c116781e7d13b2a730ec017d2cefbd494209666",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-019-02-a1.stderr.txt",
+      "bytes": 30473,
+      "sha256": "24f8a96bd9dca6641394f2004fc3b3115442c125c6c33516e5ef5e7543032655",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-020-01-a1.stderr.txt",
+      "bytes": 51461,
+      "sha256": "c875a1e0862522427061be912c40c356b570e76ec0ebaf8c299599eaf6921d04",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-020-02-a1.stderr.txt",
+      "bytes": 50243,
+      "sha256": "4c72c62e41c815efa9dfd66d8f69f7cf223a0e83c5019210acc3dcda154ad274",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-020-03-a1.stderr.txt",
+      "bytes": 32697,
+      "sha256": "dea4d32eaff799828adb352a1965f54312460410b89c2d1e87a83109c5f78a64",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-021-01-a1.stderr.txt",
+      "bytes": 53843,
+      "sha256": "8b88bec3cc4b1dc31e466434e3988f9c74a8e69c89f0c0c901981f678e39e403",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-021-02-a1.stderr.txt",
+      "bytes": 70543,
+      "sha256": "ebf6380a2579d7d5dd226f0d339307fcfaf37af6c7fbbddf2ca2e731f4151b7d",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-022-01-a1.stderr.txt",
+      "bytes": 56727,
+      "sha256": "d2c62c6722205c3a77bd4038bd8a83412fac2316cb6e8112ef6cf4f4c4a47a77",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-022-02-a1.stderr.txt",
+      "bytes": 37044,
+      "sha256": "09054dc2cc1db32fc3fdbc90e9a0deb49a48bde82f2b882f8aabf837856d067f",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-022-03-a1.stderr.txt",
+      "bytes": 28970,
+      "sha256": "e7ff9658b77c93368bb5c23580f79a5a8f7897e1ace52f248807e73429d08429",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-023-01-a1.stderr.txt",
+      "bytes": 37506,
+      "sha256": "39cdab40253d69ce41ed18e6bd9139de6980b192c6b7c657aadffd1fac0a736a",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-023-02-a1.stderr.txt",
+      "bytes": 80493,
+      "sha256": "70ac3c4c9cd61b73bbb92a801c23c62cdd607b9e3cf498d3e205fd10aead2f33",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-024-01-a1.stderr.txt",
+      "bytes": 33719,
+      "sha256": "a23b04976ba8ec2eb61908b266368f9cf230d311d2c741dbce9d005f97334870",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\runs\\review-鹿鼎-024-02-a1.stderr.txt",
+      "bytes": 111811,
+      "sha256": "d34a9380fd58e75cda1e79180945ccbad72c4c381d6f8a0890f3afa005c89f63",
+      "reason": "reasoning transcript; input, output, usage and end reason retained separately"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\diff-queue-first-draft.json",
+      "bytes": 994916,
+      "sha256": "7b90aba80b3db70a75c9260ccc141c990bb5bf8bc5a627ca501cd49b755b8704",
+      "reason": "obsolete calibration draft or empty log; active queue and receipts retained"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\dsh-bounded.patch.yml",
+      "bytes": 1702,
+      "sha256": "3f0e9ca29d08075fe245f2b1885af38229c3b0e601cce69b81bcfe1488492aa8",
+      "reason": "obsolete calibration draft or empty log; active queue and receipts retained"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\smoke.stdout.txt",
+      "bytes": 2,
+      "sha256": "7eb70257593da06f682a3ddda54a9d260d4fc514f645237f5ca74b08f8da61a6",
+      "reason": "obsolete calibration draft or empty log; active queue and receipts retained"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\smoke.stderr.txt",
+      "bytes": 124,
+      "sha256": "4039bdbd9937e77336f96d1672e4c9787581f67e489b454e977a1576c44c6631",
+      "reason": "obsolete calibration draft or empty log; active queue and receipts retained"
+    },
+    {
+      "path": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\supervisor.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reason": "obsolete calibration draft or empty log; active queue and receipts retained"
+    },
+    {
+      "path": "C:\\Users\\DELL\\.codex\\audit-af2f-01896aa1-3a9e-437f-93de-701f801060f0.json",
+      "bytes": 6452272,
+      "sha256": "ec410f90a0c665ff0b4c9007078f64189de36ef4ce65db5704e5053811329829",
+      "reason": "decoded Session duplicate; original compressed log, audit script and summary retained"
+    },
+    {
+      "path": "C:\\Users\\DELL\\.codex\\audit-af2f-0ca5d7af-7fb0-45f4-a9d0-b6fa5bcc11c1.json",
+      "bytes": 11907330,
+      "sha256": "69d465870e9f74aa39df511c9033ab5205b841ccf752fa524817e24f4b5d2564",
+      "reason": "decoded Session duplicate; original compressed log, audit script and summary retained"
+    },
+    {
+      "path": "C:\\Users\\DELL\\.codex\\audit-af2f-13514596-70ce-46bc-9349-fc5aaa79b0d3.json",
+      "bytes": 1965817,
+      "sha256": "f4adf4dcc08bc1c292d3e4b8f8595cf7b65277f59c9f42fbea41646ef90b7aa5",
+      "reason": "decoded Session duplicate; original compressed log, audit script and summary retained"
+    },
+    {
+      "path": "C:\\Users\\DELL\\.codex\\audit-af2f-3094252b-706d-4e14-bcee-438288f59597.json",
+      "bytes": 9948697,
+      "sha256": "ac385bf11091e4169a5b6bb2d59f1f8fde3afb0af01796f26b7d9f0db6f09d72",
+      "reason": "decoded Session duplicate; original compressed log, audit script and summary retained"
+    },
+    {
+      "path": "C:\\Users\\DELL\\.codex\\audit-af2f-33aed59b-ed13-4b7c-ae08-8055672d41b7.json",
+      "bytes": 7985164,
+      "sha256": "7360094d7389a2f2db5fb0d4b2648bffb9cd18e0a42367eac8b730e1772f2c34",
+      "reason": "decoded Session duplicate; original compressed log, audit script and summary retained"
+    },
+    {
+      "path": "C:\\Users\\DELL\\.codex\\audit-af2f-42cb087b-c4d0-454f-9ac3-cd8d4762a36f.json",
+      "bytes": 5767444,
+      "sha256": "e80025fb4427d0f4b5ae053b186a57101d68140cd79e089a167c663f4e93598f",
+      "reason": "decoded Session duplicate; original compressed log, audit script and summary retained"
+    },
+    {
+      "path": "C:\\Users\\DELL\\.codex\\audit-af2f-4347b4a6-4e12-4350-98f2-dc66f617ea66.json",
+      "bytes": 129113,
+      "sha256": "ae1ca0d6215feba9fd91613152b0203de4ad108c86e92f74f88884b23aa9799e",
+      "reason": "decoded Session duplicate; original compressed log, audit script and summary retained"
+    },
+    {
+      "path": "C:\\Users\\DELL\\.codex\\audit-af2f-539b8a88-52d4-4ee0-a568-6da8afd7b764.json",
+      "bytes": 6475449,
+      "sha256": "d3c0d92a50965f3957d0dca3d8a4c4f9867bbb58e2d58580dfe86d1698e9651c",
+      "reason": "decoded Session duplicate; original compressed log, audit script and summary retained"
+    },
+    {
+      "path": "C:\\Users\\DELL\\.codex\\audit-af2f-58c9f648-99a1-4498-b4f0-af981d810c7d.json",
+      "bytes": 10574087,
+      "sha256": "e8c5a219b0c91f7b5020fa55a65de646e8775dc353e7ef7c1b3683080a54f4aa",
+      "reason": "decoded Session duplicate; original compressed log, audit script and summary retained"
+    },
+    {
+      "path": "C:\\Users\\DELL\\.codex\\audit-af2f-5e8399cb-75fd-4bd1-b819-f0bd44935441.json",
+      "bytes": 7698249,
+      "sha256": "db7bfa8278f6ea85a0583d03acdb73d40bb7b7f0776c5647a9a9c2386c8e3ce5",
+      "reason": "decoded Session duplicate; original compressed log, audit script and summary retained"
+    },
+    {
+      "path": "C:\\Users\\DELL\\.codex\\audit-af2f-7210b275-a072-467b-b541-9e8806beb52a.json",
+      "bytes": 6952533,
+      "sha256": "c2facf6e60a93a06fd949ad2cb3a3aa9fac41157cc0f33da63eb54924ef627e2",
+      "reason": "decoded Session duplicate; original compressed log, audit script and summary retained"
+    },
+    {
+      "path": "C:\\Users\\DELL\\.codex\\audit-af2f-805c9305-1f33-4557-93c8-dc19468cb629.json",
+      "bytes": 5820680,
+      "sha256": "c1abaac06f70026aa80c8da7b821d37497d832ad03c2e81d8a06a869b93f8025",
+      "reason": "decoded Session duplicate; original compressed log, audit script and summary retained"
+    },
+    {
+      "path": "C:\\Users\\DELL\\.codex\\audit-af2f-88f2627a-9147-4873-8650-e89976885809.json",
+      "bytes": 10537876,
+      "sha256": "21590ea505bf924cd81dbf6e2cd3675d3d2b1ce065405c7a95cadb158227b356",
+      "reason": "decoded Session duplicate; original compressed log, audit script and summary retained"
+    },
+    {
+      "path": "C:\\Users\\DELL\\.codex\\audit-af2f-93b4e5d3-1afb-4877-85a7-9f181890b03b.json",
+      "bytes": 6349122,
+      "sha256": "14d91fc1a21a868b313c5133f8692fc3baeb83c164bb08034d315cec88c35a14",
+      "reason": "decoded Session duplicate; original compressed log, audit script and summary retained"
+    },
+    {
+      "path": "C:\\Users\\DELL\\.codex\\audit-af2f-a3862e1b-71a6-4d4b-83a5-261509393ca6.json",
+      "bytes": 11039353,
+      "sha256": "c4888b3ef7f8a89f684e703973347a8f77a105b3a059dc6a869ae7805939e808",
+      "reason": "decoded Session duplicate; original compressed log, audit script and summary retained"
+    },
+    {
+      "path": "C:\\Users\\DELL\\.codex\\audit-af2f-beef67f6-a561-41e3-b2f6-1ddc7a250bba.json",
+      "bytes": 8475853,
+      "sha256": "756bf1760ffedd7dbadb9f8b04c8562bf6f7fd2a8d89c746c452efee7ac52a72",
+      "reason": "decoded Session duplicate; original compressed log, audit script and summary retained"
+    },
+    {
+      "path": "C:\\Users\\DELL\\.codex\\audit-af2f-dc4d7edb-b4b6-4438-9ca4-11d81ab5a0b6.json",
+      "bytes": 8296978,
+      "sha256": "3b28dc6e44805f39919ec8a83f55cd96ed3308b0e38cf16c005d2bd565d9890b",
+      "reason": "decoded Session duplicate; original compressed log, audit script and summary retained"
+    },
+    {
+      "path": "C:\\Users\\DELL\\.codex\\audit-af2f-session-af2f3281-6a36-4df1-9d71-2a0f8b939638.json",
+      "bytes": 23089165,
+      "sha256": "1972c9736e96eade4be7ab228e80512cc7dcabc18bc588f5ec3fd9071a4473a7",
+      "reason": "decoded Session duplicate; original compressed log, audit script and summary retained"
+    },
+    {
+      "path": "C:\\Users\\DELL\\.codex\\session-af2f3281-audit.jsonl",
+      "bytes": 23089164,
+      "sha256": "23a31a05138ae90875a438bc75630e46b1bca281bb8dc76d9b9cebd674e9d8f0",
+      "reason": "decoded main Session duplicate; original compressed log retained"
+    }
+  ]
+}

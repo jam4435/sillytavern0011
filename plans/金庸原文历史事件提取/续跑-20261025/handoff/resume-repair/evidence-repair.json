@@ -1,0 +1,132 @@
+{
+  "usage_before": {
+    "inputTokens": 604301,
+    "cacheReadTokens": 30080,
+    "outputTokens": 943421,
+    "total": 1577802
+  },
+  "repairs": [
+    {
+      "task_id": "鹿鼎-001-02",
+      "raw_sha256": "bdaad5c390265d626b9bfa619f697eb5e66888307cffaa7ea593e8f97ea71220",
+      "changes": [
+        {
+          "before": {
+            "book": "鹿鼎记",
+            "line": 246,
+            "anchor": "欣然就道"
+          },
+          "after": {
+            "book": "鹿鼎记",
+            "line": 248,
+            "anchor": "欣然就道"
+          },
+          "source_line": "　　当下欣然就道，来到广州。吴六奇将军接入府中，神态极是恭谨，说道：“六奇流落江南，得蒙查先生不弃，当我是个朋友。请我喝酒，送我皮袍，倒是小事，在那破庙中肯和我同钵喝酒，手抓狗肉，那才是真正瞧得起我了。六奇其时穷途潦倒，到处遭人冷眼，查先生如此热肠相待，登时令六奇大为振奋。得有今日，都是出于查先生之赐。”查伊璜淡淡的道：“在晚生看来，今日的吴将军，也不见得就比当年的雪中奇丐高明了。”"
+        }
+      ],
+      "restored_event": "NEW:鹿鼎-001-02:007",
+      "semantic_scope": "Evidence coordinates only; original model claims remain subject to semantic review."
+    },
+    {
+      "task_id": "鹿鼎-006-01",
+      "raw_sha256": "9e9548e0acdcf28be6daf8f006d81946a7c2a03e71925f178f461e9a59f81c68",
+      "changes": [
+        {
+          "before": {
+            "book": "鹿鼎记",
+            "line": 2295,
+            "anchor": "全身骨骼寸断"
+          },
+          "after": {
+            "book": "鹿鼎记",
+            "line": 2293,
+            "anchor": "全身骨骼寸断"
+          },
+          "source_line": "　　过了一会，海老公道：“当时贞妃自杀殉主，朝中都称赞得了不得。但也有许多人悄悄的说，贞妃是给太后逼着殉葬的，自杀并非本意。”太后道：“这些无君无上的逆臣，早晚容他们不得。”海老公道：“不过他们的话倒也没全错，贞妃并不是甘心情愿自杀的。”太后道：“你也说贞妃是给我逼杀的？”海老公道：“这个‘逼’字，倒可以省去。”太后道：“你说什么？”海老公道：“贞妃是给人杀死的，不是逼得自杀。奴才曾详细问过殡殓贞妃的仵工，得知贞妃大殓之时，全身骨骼寸断，连头盖骨也都成为碎片。这门杀人的功夫，好像叫做‘化骨绵掌’，请问太后是不是？”太后道：“我怎知道？”"
+        },
+        {
+          "before": {
+            "book": "鹿鼎记",
+            "line": 2295,
+            "anchor": "这门杀人的功夫，好像叫做‘化骨绵掌’"
+          },
+          "after": {
+            "book": "鹿鼎记",
+            "line": 2293,
+            "anchor": "这门杀人的功夫，好像叫做‘化骨绵掌’"
+          },
+          "source_line": "　　过了一会，海老公道：“当时贞妃自杀殉主，朝中都称赞得了不得。但也有许多人悄悄的说，贞妃是给太后逼着殉葬的，自杀并非本意。”太后道：“这些无君无上的逆臣，早晚容他们不得。”海老公道：“不过他们的话倒也没全错，贞妃并不是甘心情愿自杀的。”太后道：“你也说贞妃是给我逼杀的？”海老公道：“这个‘逼’字，倒可以省去。”太后道：“你说什么？”海老公道：“贞妃是给人杀死的，不是逼得自杀。奴才曾详细问过殡殓贞妃的仵工，得知贞妃大殓之时，全身骨骼寸断，连头盖骨也都成为碎片。这门杀人的功夫，好像叫做‘化骨绵掌’，请问太后是不是？”太后道：“我怎知道？”"
+        }
+      ],
+      "restored_event": "NEW:鹿鼎-006-01:015",
+      "semantic_scope": "Evidence coordinates only; original model claims remain subject to semantic review."
+    },
+    {
+      "task_id": "鹿鼎-014-02",
+      "raw_sha256": "3ad3e49c8fbb0bb796e49fcba8a8ad9df97a088766b41cd8bdbc269c42d3f8bb",
+      "changes": [
+        {
+          "before": {
+            "book": "鹿鼎记",
+            "line": 5985,
+            "anchor": "太后差遣瑞栋去处死宗人府的镶红旗旗主和察博"
+          },
+          "after": {
+            "book": "鹿鼎记",
+            "line": 5985,
+            "anchor": "但她差遣瑞栋去处死宗人府的镶红旗旗主和察博"
+          },
+          "source_line": "　　太后不信瑞栋说过这种话，但她差遣瑞栋去处死宗人府的镶红旗旗主和察博，取了他府中所藏的《四十二章经》，却确是事实。当日瑞栋回报之时，她正急于要杀韦小宝灭口，来不及询问经书，此刻听他这么说，心下又怒又喜；怒的是瑞栋竟将经书交给了这小鬼，喜的是终于探得了下落，说道：“既是如此，柳燕，你就陪了这小鬼去取那经书来给我。倘若经书不假，咱们就饶了他性命，将他还给皇帝算啦。咱们永世不许他再进慈宁宫来，免得我见了这小鬼就生气。”"
+        }
+      ],
+      "restored_event": "NEW:鹿鼎-014-02:004",
+      "semantic_scope": "Evidence coordinates only; original model claims remain subject to semantic review."
+    },
+    {
+      "task_id": "鹿鼎-018-01",
+      "raw_sha256": "f881dfea9c2375960e5725abc05342e7b8b996e2b27484c1a2b493303b81db84",
+      "changes": [
+        {
+          "before": {
+            "book": "鹿鼎记",
+            "line": 7771,
+            "anchor": "胜罗陀师兄命我来找一个三十来岁的和尚"
+          },
+          "after": {
+            "book": "鹿鼎记",
+            "line": 7769,
+            "anchor": "胜罗陀师兄命我来找一个三十来岁的和尚"
+          },
+          "source_line": "　　韦小宝沉吟片刻，道：“好，那么我问你，是谁叫你到清凉寺来的？”巴颜道：“是菩萨顶真容院的大喇嘛，胜罗陀派我来的。”澄光道：“阿弥陀佛，五台山青庙黄庙，从无仇怨，菩萨顶的大喇嘛，怎么会叫你来捣乱？”巴颜道：“我也不是来捣乱。胜罗陀师兄命我来找一个三十来岁的和尚，说他盗了我们拉萨活佛的宝经，到清凉寺中躲了起来，因此非揪他出来不可。”澄光道：“阿弥陀佛，哪有此事？”"
+        }
+      ],
+      "restored_event": "NEW:鹿鼎-018-01:005",
+      "semantic_scope": "Evidence coordinates only; original model claims remain subject to semantic review."
+    },
+    {
+      "task_id": "鹿鼎-018-02",
+      "raw_sha256": "fc124209dda22d937c2cd4552604d8e43dcb5afe848322b6d507d3988f74eb4e",
+      "changes": [
+        {
+          "before": {
+            "book": "鹿鼎记",
+            "line": 8067,
+            "anchor": "胖头陀哪知柳燕已死"
+          },
+          "after": {
+            "book": "鹿鼎记",
+            "line": 8067,
+            "anchor": "那头陀哪知柳燕已死"
+          },
+          "source_line": "　　那头陀哪知柳燕已死，这话似是风言风语，其实是毒语相咒，怒道：“小孩子家胡说八道！”但对他的话却是信了，伸手在他小腹上轻轻一拍，解他穴道。不料这一记正拍在他怀中那部《四十二章经》上，拍的一声，穴道并未解开。"
+        }
+      ],
+      "restored_event": "NEW:鹿鼎-018-02:011",
+      "semantic_scope": "Evidence coordinates only; original model claims remain subject to semantic review."
+    }
+  ],
+  "semantic_limits": [
+    "贞妃事件依海老公转述，不独立确认其指控。",
+    "柳燕已死是否独立历史节点仍待语义审阅。"
+  ]
+}

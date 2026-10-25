@@ -1,0 +1,456 @@
+{
+  "task_id": "鹿鼎-025-01",
+  "coverage": {
+    "start": 11010,
+    "end": 11255,
+    "complete": true
+  },
+  "reviews": [],
+  "events": [
+    {
+      "title": "韦小宝自称扬州孤儿、父死入宫为太监",
+      "when": "幼年（原文未详）",
+      "place": "扬州；皇宫",
+      "people": [
+        "韦小宝"
+      ],
+      "relationships": "自称与父母、皇宫的关系；原文未证",
+      "description": "韦小宝对白衣尼自称是扬州穷人家孤儿，父亲被鞑子兵杀死，自幼被送进皇宫当小太监，名叫小桂子。",
+      "cause": "未知",
+      "effect": "白衣尼据此追问其与鳌拜之死的关系",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11024,
+          "column_start": 39,
+          "column_end": 109,
+          "anchor": "我是扬州穷人家的孤儿，爹爹给鞑子兵杀死了",
+          "quote": "她跟天地会是友是敌，还是暂不吐露的为妙。”便道：“我是扬州穷人家的孤儿，爹爹给鞑子兵杀死了，从小给送进了皇宫去当小太监，叫做小桂子。后来……”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 25
+        }
+      ],
+      "uncertain": [
+        "系韦小宝对白衣尼所言，真实性未证，可能为临时编造"
+      ],
+      "id": "NEW:鹿鼎-025-01:001",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "韦小宝奉康熙之命刺杀鳌拜",
+      "when": "此前（原文未详）",
+      "place": "宫中；囚室",
+      "people": [
+        "韦小宝",
+        "康熙",
+        "鳌拜"
+      ],
+      "relationships": "康熙与鳌拜君臣冲突；韦小宝奉康熙之命",
+      "description": "韦小宝自述：小皇帝下令动手，他冷不防向鳌拜刺了一刀，把香灰撒入鳌拜眼中，后来又在囚室中刺其背脊，擒杀鳌拜。",
+      "cause": "康熙下令动手",
+      "effect": "鳌拜死；韦小宝自称因此有功",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11028,
+          "column_start": 1,
+          "column_end": 102,
+          "anchor": "如何小皇帝下令动手，如何自己冷不防向鳌拜刺了一刀",
+          "quote": "　　韦小宝慢慢坐起，说了擒鳌拜的经过，如何小皇帝下令动手，如何自己冷不防向鳌拜刺了一刀，如何将香灰撒入他的眼中，后来又如何在囚室之中刺他背脊。这件事他已说过好几遍，每多说一次，油盐酱醋等等作料便加添一些。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 25
+        }
+      ],
+      "uncertain": [
+        "韦小宝自承每讲一次便添油加醋，细节有夸大"
+      ],
+      "id": "NEW:鹿鼎-025-01:002",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "康熙派韦小宝到少林寺出家、后转清凉寺",
+      "when": "此前（原文未详）",
+      "place": "少林寺；清凉寺",
+      "people": [
+        "康熙",
+        "韦小宝"
+      ],
+      "relationships": "君臣；康熙派韦小宝作替身",
+      "description": "韦小宝说，小皇帝派他作替身到少林寺出家，后来又派他去清凉寺。",
+      "cause": "康熙派他作替身",
+      "effect": "韦小宝以和尚身份居少林寺、清凉寺",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11032,
+          "column_start": 1,
+          "column_end": 111,
+          "anchor": "小皇帝派我作他替身，到少林寺出家",
+          "quote": "　　韦小宝心想老皇爷出家之事自当隐瞒，说道：“小皇帝派我作他替身，到少林寺出家，后来又派我去清凉寺。少林派的武功我学得很少，其实就算再学几十年，把什么韦陀掌、般若掌、拈花擒拿手等等都学全了，在你老人家面前，那也毫无用处。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 25
+        }
+      ],
+      "uncertain": [
+        "韦小宝自述，未展开原因与经过"
+      ],
+      "id": "NEW:鹿鼎-025-01:003",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "康熙因清军入关杀戮而欲上五台山礼佛并免扬州、嘉定钱粮",
+      "when": "此前（原文未详）",
+      "place": "五台山；扬州；嘉定",
+      "people": [
+        "康熙"
+      ],
+      "relationships": "无",
+      "description": "韦小宝称康熙因清军入关大杀百姓而心中不安，要上五台山烧香拜佛，并下旨免扬州、嘉定三年钱粮。",
+      "cause": "康熙对清军入关杀戮心中不安（韦小宝转述）",
+      "effect": "下旨免扬州、嘉定三年钱粮；上五台山礼佛",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11046,
+          "column_start": 90,
+          "column_end": 209,
+          "anchor": "要上五台山来烧香拜佛，还下旨免了扬州、嘉定三年钱粮",
+          "quote": "赌，简直是禽兽畜生做的事。他心里不安，所以……所以要上五台山来烧香拜佛，还下旨免了扬州、嘉定三年钱粮。”白衣尼点了点头。韦小宝又道：“鳌拜这大奸臣害死了许多忠良，小皇帝不许他害，他偏偏不听。小皇帝大怒，就叫我杀他。好师太，你倘若杀了小皇帝，",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 25
+        }
+      ],
+      "uncertain": [
+        "韦小宝为自保而言，可能夸大或编造"
+      ],
+      "id": "NEW:鹿鼎-025-01:004",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "崇祯在煤山自缢",
+      "when": "明亡时（原文未详）",
+      "place": "煤山",
+      "people": [
+        "崇祯"
+      ],
+      "relationships": "无",
+      "description": "韦小宝指煤山一株大树，说崇祯皇帝便在这株树上吊死。",
+      "cause": "未知",
+      "effect": "崇祯死",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11096,
+          "column_start": 12,
+          "column_end": 52,
+          "anchor": "崇祯皇上便是在这株树上吊死的",
+          "quote": "，片刻即到。来到山上，韦小宝指着一株大树，说道：“崇祯皇上便是在这株树上吊死的。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 25
+        }
+      ],
+      "uncertain": [
+        "仅韦小宝口述，细节未展开"
+      ],
+      "id": "NEW:鹿鼎-025-01:005",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "周皇后在坤宁宫自尽",
+      "when": "明亡时（原文未详）",
+      "place": "坤宁宫",
+      "people": [
+        "周皇后"
+      ],
+      "relationships": "无",
+      "description": "白衣尼在坤宁宫低声道，周皇后就是在这里自尽死的。",
+      "cause": "未知",
+      "effect": "周皇后死",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11120,
+          "column_start": 41,
+          "column_end": 111,
+          "anchor": "在这里自尽死的",
+          "quote": "只见她抬头瞧着屋梁，低声道：“周皇后，就是……就是在这里自尽死的。”韦小宝应道：“是。”心下更无怀疑，低声问道：“师太，你要不要见见我姑姑？”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 25
+        }
+      ],
+      "uncertain": [
+        "细节未展开"
+      ],
+      "id": "NEW:鹿鼎-025-01:006",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "李闯攻入北京后崇祯砍断长平公主手臂",
+      "when": "李闯攻入北京时",
+      "place": "北京宫中",
+      "people": [
+        "李闯",
+        "崇祯",
+        "长平公主",
+        "陶红英"
+      ],
+      "relationships": "崇祯与长平公主父女；陶红英服侍长平公主",
+      "description": "陶红英先前叙述：李闯攻入北京后，崇祯提剑要杀长平公主，砍断她手臂；陶红英在混乱中晕去，醒来皇帝和公主都不见。",
+      "cause": "李闯攻入北京",
+      "effect": "长平公主断臂；陶红英与崇祯、公主失散",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11142,
+          "column_start": 45,
+          "column_end": 164,
+          "anchor": "崇祯提剑要杀长公主，砍断了她手臂",
+          "quote": "是先朝宫中的宫女，一直服侍长公主，李闯攻入北京后，崇祯提剑要杀长公主，砍断了她手臂，陶红英在混乱中晕了过去，醒转来时，皇帝和公主都已不见。韦小宝向白衣尼望了一眼，心想：“她少了一条手臂，对宫中情形这样熟悉，又在坤宁宫中哭泣，我早该想到了。似",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 25
+        }
+      ],
+      "uncertain": [
+        "系叙述者转述陶红英先前所言，细节有限"
+      ],
+      "id": "NEW:鹿鼎-025-01:007",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "陶红英行刺太后未遂、藏身宫中",
+      "when": "此前（原文未详）",
+      "place": "宫中",
+      "people": [
+        "陶红英",
+        "太后"
+      ],
+      "relationships": "刺杀者与目标；陶红英忠于大明",
+      "description": "韦小宝说姑姑陶红英忠于大明，曾行刺鞑子太后，未刺死，只好在宫里躲躲藏藏，并与韦小宝约定暗号相见。",
+      "cause": "陶红英忠于大明",
+      "effect": "行刺未遂，陶红英藏身宫中",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11126,
+          "column_start": 23,
+          "column_end": 142,
+          "anchor": "曾行刺鞑子太后，可惜刺她不死",
+          "quote": "：“为什么？为什么？”韦小宝道：“我姑姑忠于大明，曾行刺鞑子太后，可惜刺她不死，只好在宫里躲躲藏藏。她要见到我的暗号之后，明晚才能相见。”白衣尼道：“很好，红英这丫头有气节。你做什么暗号？”韦小宝道：“我跟姑姑约好的。我在火场上堆一个石堆，",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 25
+        }
+      ],
+      "uncertain": [
+        "行刺时间、经过未详"
+      ],
+      "id": "NEW:鹿鼎-025-01:008",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "长平公主在宁寿宫旧居绘像并与一人同寝",
+      "when": "二十多年前",
+      "place": "宁寿宫",
+      "people": [
+        "长平公主",
+        "一人（姓名未明）"
+      ],
+      "relationships": "同被共枕的亲密关系，对象未明",
+      "description": "白衣尼在宁寿宫旧居回想二十多年前，自己曾在这里图绘一人肖像，又曾与此人同被共枕；那人远在绝域万里之外，今生难见。",
+      "cause": "未知",
+      "effect": "白衣尼伤怀；所念之人远隔",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11154,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "自己曾在这里图绘一人的肖像，又曾与此人同被共枕",
+          "quote": "　　白衣尼坐在床沿之上，回思二十多年前的往事，自己曾在这里图绘一人的肖像，又曾与此人同被共枕。现今天下都给鞑子占了去，自己这一间卧室，也给鞑子的公主占住了，那人更是远在绝域万里之外，今生今世，再也难以相见……（按：大明长平公主之事，请参阅拙",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 25
+        }
+      ],
+      "uncertain": [
+        "所绘、同寝者身份及绝域所指未明"
+      ],
+      "id": "NEW:鹿鼎-025-01:009",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "太后差建宁公主盗取《四十二章经》",
+      "when": "此前不久（原文未详）",
+      "place": "宫中",
+      "people": [
+        "太后",
+        "建宁公主"
+      ],
+      "relationships": "母女（名义）；太后主使、公主执行",
+      "description": "建宁公主对太后说，若皇帝查起知道是她拿的会生气；韦小宝由此推知太后差公主偷了《四十二章经》，经书在太后处。",
+      "cause": "太后欲得《四十二章经》",
+      "effect": "经书落入太后手中；建宁公主怕康熙查究",
+      "nature": "推断",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11186,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "倘若皇帝哥哥查起来，知道是我拿的",
+          "quote": "　　建宁公主道：“啊哟，这还是小事吗？倘若皇帝哥哥查起来，知道是我拿的，非大大生气不可。”太后坐了下来，道：“一部佛经，又有什么大不了的？我们去五台山进香，为的是求菩萨保祐，回宫之后，仍要诵经念佛，菩萨这才喜欢哪。”公主道：“既然没什么大不",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 25
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 11188,
+          "column_start": 1,
+          "column_end": 74,
+          "anchor": "原来你差公主去偷了经书来",
+          "quote": "　　韦小宝心中喜道：“妙极，原来你差公主去偷了经书来。”转念一想，又觉运气不好，倘若这次不是和白衣尼同来，这部经书大可落入自己手中，现下却没指望了。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 25
+        }
+      ],
+      "uncertain": [
+        "由对话推知，具体盗经经过未详"
+      ],
+      "id": "NEW:鹿鼎-025-01:010",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "太后自称武功由太监海大富传授",
+      "when": "早年（原文未详）",
+      "place": "宫中",
+      "people": [
+        "太后",
+        "海大富"
+      ],
+      "relationships": "师徒（太后自称）",
+      "description": "太后自称微末功夫是宫里太监海大富教的，并称海大富早已死了；白衣尼则指她所使为蛇岛武功、与神龙教有关。",
+      "cause": "未知",
+      "effect": "太后习得掌法",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11234,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "我这些微末功夫，是宫里一个太监教的",
+          "quote": "　　太后道：“我不知神龙教是什么。我这些微末功夫，是宫里一个太监教的。”白衣尼道：“太监？宫里的太监，怎会跟神龙教有关？他叫什么名字？”太后道：“他叫海大富，早已死了。”韦小宝肚里大笑，心道：“老婊子胡说八道之至。倘若她知道我躲在这里，可不",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 25
+        }
+      ],
+      "uncertain": [
+        "太后所言可能不实；白衣尼指为蛇岛武功，传承未明"
+      ],
+      "id": "NEW:鹿鼎-025-01:011",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
+      "title": "太后以化骨绵掌杀死董鄂妃姊妹及荣亲王",
+      "when": "当年",
+      "place": "宫中",
+      "people": [
+        "太后",
+        "董鄂妃",
+        "董鄂妃姊妹",
+        "荣亲王"
+      ],
+      "relationships": "太后与董鄂妃等同处后宫；具体关系原文未详",
+      "description": "叙述者说，太后当年以化骨绵掌拍死董鄂妃姊妹和董鄂妃的儿子荣亲王，三人临死惨状她亲眼目睹。",
+      "cause": "未知",
+      "effect": "董鄂妃姊妹及荣亲王死；太后深知化骨绵掌厉害",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 11256,
+          "column_start": 43,
+          "column_end": 162,
+          "anchor": "当年她以此掌力拍死董鄂妃姊妹、董鄂妃的儿子荣亲王",
+          "quote": "，寸寸断绝，终于遍体如绵，欲抬一根小指头也不可得。当年她以此掌力拍死董鄂妃姊妹、董鄂妃的儿子荣亲王，三人临死时的惨状，自己亲眼目睹。这白衣尼武功如此了得，而将敌人掌力逼回敌身，亦为武学中所常有，此言自非虚假，这等如有人将七掌“化骨绵掌”拍在",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 25
+        }
+      ],
+      "uncertain": [
+        "仅补叙一句，杀人动机与经过未详"
+      ],
+      "id": "NEW:鹿鼎-025-01:012",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    }
+  ],
+  "cross_links": [
+    {
+      "topic": "长平公主与《碧血剑》人物关系",
+      "people": [
+        "长平公主",
+        "一人（姓名未明）"
+      ],
+      "detail": "原文提及长平公主在宁寿宫绘像、与人同寝，并注《碧血剑》；所绘者身份、绝域所在待查，不断言另一书事实。"
+    },
+    {
+      "topic": "蛇岛、神龙教与太后武功传承",
+      "people": [
+        "太后",
+        "白衣尼",
+        "海大富"
+      ],
+      "detail": "白衣尼指太后武功为蛇岛一路并问其与神龙教关系，太后自称海大富所授；传承链条待核。"
+    },
+    {
+      "topic": "八部《四十二章经》与破龙脉之说",
+      "people": [
+        "陶红英",
+        "白衣尼",
+        "太后"
+      ],
+      "detail": "陶红英简述八部经书来历与破鞑子龙脉之说；经书具体藏秘及太后争夺缘由待查。"
+    }
+  ],
+  "unresolved": [
+    "白衣尼所绘像、同被共枕者身份及“绝域万里”所指，原文未明。",
+    "太后自称假太后、汉人，其真实身份、如何冒充及与神龙教关系未明。",
+    "海大富死因：太后称年老病死，韦小宝暗指其胡说，原文未给结论。",
+    "八部《四十二章经》的完整来历与破龙脉秘密细节未展开。",
+    "陶红英行刺太后的具体时间与经过未详。",
+    "韦小宝自述扬州孤儿、父死、入宫为太监，真实性未证，可能为编造。"
+  ],
+  "validation_issues": [],
+  "semantic_acceptance": "model_reviewed_not_independent_audit"
+}

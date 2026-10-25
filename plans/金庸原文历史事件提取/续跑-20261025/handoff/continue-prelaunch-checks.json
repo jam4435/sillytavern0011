@@ -1,0 +1,12 @@
+{
+  "queue_items": 606,
+  "attention": [],
+  "usage": {
+    "inputTokens": 671998,
+    "cacheReadTokens": 34176,
+    "outputTokens": 1067066,
+    "total": 1773240
+  },
+  "legacy_hashes_unchanged": true,
+  "tests_passed": 19
+}

@@ -1,0 +1,376 @@
+[
+  {
+    "task_id": "鹿鼎-001-02",
+    "task": {
+      "id": "鹿鼎-001-02",
+      "book": "鹿鼎记",
+      "chapter": 1,
+      "title": "纵横钩党清流祸 峭茜风期月旦评",
+      "start": 223,
+      "end": 376,
+      "legacy_uids": [],
+      "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+      "phase": "source_review",
+      "status": "needs_repair",
+      "prompt_version": "source-review-v1",
+      "attempts": 1,
+      "duration_ms": 123586.2524999975,
+      "event_count": 22,
+      "issue_count": 1
+    },
+    "issue": {
+      "new_event": 7,
+      "title": "吴宝宇持旧袍请查伊璜赴广东",
+      "error": "anchor not present verbatim on source line"
+    },
+    "event": {
+      "title": "吴宝宇持旧袍请查伊璜赴广东",
+      "when": "送礼后过了数月",
+      "place": "查府",
+      "people": [
+        "吴宝宇",
+        "查伊璜",
+        "吴六奇"
+      ],
+      "relationships": "吴宝宇奉父命拜见查世伯，旧羊皮袍确认吴六奇身份",
+      "description": "吴六奇之子吴宝宇带从人到查府，跪下称查世伯，说父亲吴六奇现居广东省通省水陆提督，命他来请查伊璜到广东盘桓；查伊璜推辞，吴宝宇取出敝旧羊皮袍为信物，查伊璜认出是昔年赠给雪中奇丐之物，遂欣然就道。",
+      "cause": "吴六奇命子相请，以旧袍为信物",
+      "effect": "查伊璜认出吴六奇即当年乞丐，赴广州",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 240,
+          "anchor": "查世伯，侄子吴宝宇拜见"
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 244,
+          "anchor": "十分敝旧的羊皮袍子"
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 246,
+          "anchor": "欣然就道"
+        }
+      ],
+      "uncertain": [
+        "系黄宗羲转述的查伊璜往事"
+      ]
+    },
+    "bad_references": [
+      {
+        "claimed_line": 246,
+        "anchor": "欣然就道",
+        "exact_match_lines": [
+          248
+        ],
+        "claimed_source_text": "　　查伊璜见到旧袍，记得是昔年赠给雪中奇丐的，这才恍然，原来这吴六奇将军，便是当年共醉的酒友，心中一动：“鞑子占我天下，若有手握兵符之人先建义旗，四方响应，说不定便能将鞑子逐出关外。这奇丐居然还记得我昔日一饭一袍之惠，不是没良心之人，我若动以大义，未始没有指望。男儿建功报国，正在此时，至不济他将我杀了，却又如何？”"
+      }
+    ],
+    "raw_output": "runs/review-鹿鼎-001-02-a1.stdout.txt",
+    "prompt": "runs/review-鹿鼎-001-02-a1.prompt.txt",
+    "result": "results/鹿鼎-001-02.json",
+    "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23"
+  },
+  {
+    "task_id": "鹿鼎-006-01",
+    "task": {
+      "id": "鹿鼎-006-01",
+      "book": "鹿鼎记",
+      "chapter": 6,
+      "title": "可知今日怜才意 即是当时种树心",
+      "start": 2063,
+      "end": 2306,
+      "legacy_uids": [],
+      "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+      "phase": "source_review",
+      "status": "needs_repair",
+      "prompt_version": "source-review-v1",
+      "attempts": 1,
+      "duration_ms": 177213.20399999968,
+      "event_count": 22,
+      "issue_count": 1
+    },
+    "issue": {
+      "new_event": 15,
+      "title": "贞妃被化骨绵掌杀死，非自愿殉主",
+      "error": "anchor not present verbatim on source line"
+    },
+    "event": {
+      "title": "贞妃被化骨绵掌杀死，非自愿殉主",
+      "when": "顺治崩驾/出家前后；此前",
+      "place": "宫中",
+      "people": [
+        "贞妃",
+        "未知凶手",
+        "太后"
+      ],
+      "relationships": "贞妃为顺治妃子；太后被海老公暗示涉案",
+      "description": "海老公称贞妃并非甘心情愿自杀，而是给人杀死；仵工验得贞妃大殓时全身骨骼寸断，连头盖骨都成碎片，杀人的功夫好像叫“化骨绵掌”。",
+      "cause": "被化骨绵掌所害",
+      "effect": "贞妃死，骨骼寸断；海老公以此质问太后",
+      "nature": "揭密",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 2293,
+          "anchor": "贞妃是给人杀死的，不是逼得自杀"
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 2295,
+          "anchor": "全身骨骼寸断"
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 2295,
+          "anchor": "这门杀人的功夫，好像叫做‘化骨绵掌’"
+        }
+      ],
+      "uncertain": [
+        "凶手身份未明；太后有重大嫌疑但未定案"
+      ]
+    },
+    "bad_references": [
+      {
+        "claimed_line": 2295,
+        "anchor": "全身骨骼寸断",
+        "exact_match_lines": [
+          2293
+        ],
+        "claimed_source_text": "　　海老公道：“奴才听说，世间有这样一门‘化骨绵掌’，打中人后，那人全身没半点异状，要过得一年半载之后，尸体的骨骼才慢慢的折断碎裂。但出手杀贞妃之人，显然功夫练得没到家。那仵作起初给贞妃的尸体整容收拾，也没什么特异，到得傍晚入殓，忽然尸体变得如同没有骨头了一般，全身绵软。他吓得什么似的，只道是尸变，当时一句话也没敢说。奴才威逼利诱，用上了不少苦刑，他才吐露真相。太后，凭您圣断，这门‘化骨绵掌’的功力，打中人后，两三天内骨骼便断，只怕还不算十分深厚，是不是？”"
+      },
+      {
+        "claimed_line": 2295,
+        "anchor": "这门杀人的功夫，好像叫做‘化骨绵掌’",
+        "exact_match_lines": [
+          2293
+        ],
+        "claimed_source_text": "　　海老公道：“奴才听说，世间有这样一门‘化骨绵掌’，打中人后，那人全身没半点异状，要过得一年半载之后，尸体的骨骼才慢慢的折断碎裂。但出手杀贞妃之人，显然功夫练得没到家。那仵作起初给贞妃的尸体整容收拾，也没什么特异，到得傍晚入殓，忽然尸体变得如同没有骨头了一般，全身绵软。他吓得什么似的，只道是尸变，当时一句话也没敢说。奴才威逼利诱，用上了不少苦刑，他才吐露真相。太后，凭您圣断，这门‘化骨绵掌’的功力，打中人后，两三天内骨骼便断，只怕还不算十分深厚，是不是？”"
+      }
+    ],
+    "raw_output": "runs/review-鹿鼎-006-01-a1.stdout.txt",
+    "prompt": "runs/review-鹿鼎-006-01-a1.prompt.txt",
+    "result": "results/鹿鼎-006-01.json",
+    "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23"
+  },
+  {
+    "task_id": "鹿鼎-014-02",
+    "task": {
+      "id": "鹿鼎-014-02",
+      "book": "鹿鼎记",
+      "chapter": 14,
+      "title": "放逐肯消亡国恨 岁时犹动楚人哀",
+      "start": 5915,
+      "end": 6166,
+      "legacy_uids": [],
+      "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+      "phase": "source_review",
+      "status": "needs_repair",
+      "prompt_version": "source-review-v1",
+      "attempts": 1,
+      "duration_ms": 140494.56390000705,
+      "event_count": 12,
+      "issue_count": 1
+    },
+    "issue": {
+      "new_event": 4,
+      "title": "太后遣瑞栋杀死和察博，夺取《四十二章经》",
+      "error": "anchor not present verbatim on source line"
+    },
+    "event": {
+      "title": "太后遣瑞栋杀死和察博，夺取《四十二章经》",
+      "when": "此前，未知具体时日",
+      "place": "和察博府中",
+      "people": [
+        "太后",
+        "瑞栋",
+        "和察博"
+      ],
+      "relationships": "太后差遣瑞栋去处死和察博并夺经；瑞栋事后回报",
+      "description": "太后差遣瑞栋去处死宗人府镶红旗旗主和察博，取走和察博府中所藏的一部《四十二章经》；瑞栋事后回报。太后当时急于杀韦小宝灭口，未及询问经书。",
+      "cause": "太后要取和察博府中所藏的《四十二章经》",
+      "effect": "瑞栋回报夺经之事；太后未及细问经书下落",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 5985,
+          "anchor": "太后差遣瑞栋去处死宗人府的镶红旗旗主和察博"
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 5985,
+          "anchor": "取了他府中所藏的《四十二章经》"
+        }
+      ],
+      "uncertain": [
+        "和察博因何被太后处死、经书原藏情况未明"
+      ]
+    },
+    "bad_references": [
+      {
+        "claimed_line": 5985,
+        "anchor": "太后差遣瑞栋去处死宗人府的镶红旗旗主和察博",
+        "exact_match_lines": [],
+        "claimed_source_text": "　　太后不信瑞栋说过这种话，但她差遣瑞栋去处死宗人府的镶红旗旗主和察博，取了他府中所藏的《四十二章经》，却确是事实。当日瑞栋回报之时，她正急于要杀韦小宝灭口，来不及询问经书，此刻听他这么说，心下又怒又喜；怒的是瑞栋竟将经书交给了这小鬼，喜的是终于探得了下落，说道：“既是如此，柳燕，你就陪了这小鬼去取那经书来给我。倘若经书不假，咱们就饶了他性命，将他还给皇帝算啦。咱们永世不许他再进慈宁宫来，免得我见了这小鬼就生气。”"
+      }
+    ],
+    "raw_output": "runs/review-鹿鼎-014-02-a1.stdout.txt",
+    "prompt": "runs/review-鹿鼎-014-02-a1.prompt.txt",
+    "result": "results/鹿鼎-014-02.json",
+    "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23"
+  },
+  {
+    "task_id": "鹿鼎-018-01",
+    "task": {
+      "id": "鹿鼎-018-01",
+      "book": "鹿鼎记",
+      "chapter": 18,
+      "title": "金刚宝杵卫帝释 雕篆石碣敲头陀",
+      "start": 7693,
+      "end": 7956,
+      "legacy_uids": [],
+      "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+      "phase": "source_review",
+      "status": "needs_repair",
+      "prompt_version": "source-review-v1",
+      "attempts": 1,
+      "duration_ms": 100687.32650000311,
+      "event_count": 9,
+      "issue_count": 1
+    },
+    "issue": {
+      "new_event": 5,
+      "title": "胜罗陀遣巴颜等赴清凉寺图谋劫持行痴",
+      "error": "anchor not present verbatim on source line"
+    },
+    "event": {
+      "title": "胜罗陀遣巴颜等赴清凉寺图谋劫持行痴",
+      "when": "本回之前；皇甫阁于前一夜到达",
+      "place": "五台山清凉寺",
+      "people": [
+        "胜罗陀",
+        "巴颜",
+        "心溪",
+        "皇甫阁",
+        "行痴",
+        "达和尔",
+        "桑结",
+        "神龙教"
+      ],
+      "relationships": "胜罗陀主使；巴颜搜寻；心溪受银陪同；皇甫阁受请相助；目标为行痴",
+      "description": "菩萨顶真容院大喇嘛胜罗陀派巴颜到五台山清凉寺，假称寻找一名盗走拉萨活佛秘密藏经《大毗卢遮那佛神变加持经》的三十来岁和尚，实为捉拿行痴；又送银请心溪陪同、请皇甫阁相助，并写信请北京达和尔多派高手，防备神龙教抢先，若桑结到北京则请其主持。",
+      "cause": "胜罗陀称行痴盗经；信中称神龙教要抢先行事",
+      "effect": "巴颜等赴清凉寺搜寻，引发本回冲突",
+      "nature": "人物自述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 7771,
+          "anchor": "胜罗陀师兄命我来找一个三十来岁的和尚"
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 7777,
+          "anchor": "神龙教要将他请去"
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 7781,
+          "anchor": "请北京的达和尔师兄急速多派高手，前来相助"
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 7785,
+          "anchor": "他是胜罗陀师兄请来的帮手，昨晚才到的"
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 7791,
+          "anchor": "菩萨顶真容院大喇嘛胜罗陀，叫人送了二百两银子给我"
+        }
+      ],
+      "uncertain": [
+        "巴颜、心溪供词各有避就；盗经之说是否纯属借口、神龙教实际动作未明"
+      ]
+    },
+    "bad_references": [
+      {
+        "claimed_line": 7771,
+        "anchor": "胜罗陀师兄命我来找一个三十来岁的和尚",
+        "exact_match_lines": [
+          7769
+        ],
+        "claimed_source_text": "　　韦小宝提起匕首，喝道：“你说谎，我削开你的头皮瞧瞧。”巴颜叫道：“没有，没有说谎。你不信去问胜罗陀师兄好了。他说，我们要假装走失了一个小喇嘛，其实是在找那中年和尚，又说那位皇甫先生认得这和尚，请他陪着来找人。胜罗陀师兄说，这和尚偷的是我们密宗的秘密藏经，‘大毗卢遮那佛神变加持经’，非同小可。如果我拿到了这和尚，那是一件大功，回到拉萨，活佛一定重重有赏。”"
+      }
+    ],
+    "raw_output": "runs/review-鹿鼎-018-01-a1.stdout.txt",
+    "prompt": "runs/review-鹿鼎-018-01-a1.prompt.txt",
+    "result": "results/鹿鼎-018-01.json",
+    "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23"
+  },
+  {
+    "task_id": "鹿鼎-018-02",
+    "task": {
+      "id": "鹿鼎-018-02",
+      "book": "鹿鼎记",
+      "chapter": 18,
+      "title": "金刚宝杵卫帝释 雕篆石碣敲头陀",
+      "start": 7957,
+      "end": 8197,
+      "legacy_uids": [],
+      "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+      "phase": "source_review",
+      "status": "needs_repair",
+      "prompt_version": "source-review-v1",
+      "attempts": 1,
+      "duration_ms": 130297.07010000129,
+      "event_count": 12,
+      "issue_count": 1
+    },
+    "issue": {
+      "new_event": 11,
+      "title": "柳燕已死",
+      "error": "anchor not present verbatim on source line"
+    },
+    "event": {
+      "title": "柳燕已死",
+      "when": "此前；具体未知",
+      "place": "未知",
+      "people": [
+        "柳燕",
+        "胖头陀",
+        "韦小宝"
+      ],
+      "relationships": "胖头陀不知柳燕已死；韦小宝借柳燕形貌编谎",
+      "description": "叙述者点明胖头陀哪知柳燕已死；韦小宝正利用柳燕的形貌和旧事编造言语骗他。",
+      "cause": "未知",
+      "effect": "胖头陀相信韦小宝与柳燕有关",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 8067,
+          "anchor": "胖头陀哪知柳燕已死"
+        }
+      ],
+      "uncertain": [
+        "柳燕死因、死亡时间及地点未说明"
+      ]
+    },
+    "bad_references": [
+      {
+        "claimed_line": 8067,
+        "anchor": "胖头陀哪知柳燕已死",
+        "exact_match_lines": [],
+        "claimed_source_text": "　　那头陀哪知柳燕已死，这话似是风言风语，其实是毒语相咒，怒道：“小孩子家胡说八道！”但对他的话却是信了，伸手在他小腹上轻轻一拍，解他穴道。不料这一记正拍在他怀中那部《四十二章经》上，拍的一声，穴道并未解开。"
+      }
+    ],
+    "raw_output": "runs/review-鹿鼎-018-02-a1.stdout.txt",
+    "prompt": "runs/review-鹿鼎-018-02-a1.prompt.txt",
+    "result": "results/鹿鼎-018-02.json",
+    "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23"
+  }
+]

@@ -599,6 +599,60 @@
       "diff_status": "pending"
     },
     {
+      "title": "贞妃被化骨绵掌杀死，非自愿殉主",
+      "when": "顺治崩驾/出家前后；此前",
+      "place": "宫中",
+      "people": [
+        "贞妃",
+        "未知凶手",
+        "太后"
+      ],
+      "relationships": "贞妃为顺治妃子；太后被海老公暗示涉案",
+      "description": "海老公称贞妃并非甘心情愿自杀，而是给人杀死；仵工验得贞妃大殓时全身骨骼寸断，连头盖骨都成碎片，杀人的功夫好像叫“化骨绵掌”。",
+      "cause": "被化骨绵掌所害",
+      "effect": "贞妃死，骨骼寸断；海老公以此质问太后",
+      "nature": "揭密",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 2293,
+          "column_start": 150,
+          "column_end": 269,
+          "anchor": "贞妃是给人杀死的，不是逼得自杀",
+          "quote": "，倒可以省去。”太后道：“你说什么？”海老公道：“贞妃是给人杀死的，不是逼得自杀。奴才曾详细问过殡殓贞妃的仵工，得知贞妃大殓之时，全身骨骼寸断，连头盖骨也都成为碎片。这门杀人的功夫，好像叫做‘化骨绵掌’，请问太后是不是？”太后道：“我怎知道",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 6
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 2293,
+          "column_start": 190,
+          "column_end": 271,
+          "anchor": "全身骨骼寸断",
+          "quote": "。奴才曾详细问过殡殓贞妃的仵工，得知贞妃大殓之时，全身骨骼寸断，连头盖骨也都成为碎片。这门杀人的功夫，好像叫做‘化骨绵掌’，请问太后是不是？”太后道：“我怎知道？”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 6
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 2293,
+          "column_start": 208,
+          "column_end": 271,
+          "anchor": "这门杀人的功夫，好像叫做‘化骨绵掌’",
+          "quote": "贞妃大殓之时，全身骨骼寸断，连头盖骨也都成为碎片。这门杀人的功夫，好像叫做‘化骨绵掌’，请问太后是不是？”太后道：“我怎知道？”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 6
+        }
+      ],
+      "uncertain": [
+        "凶手身份未明；太后有重大嫌疑但未定案"
+      ],
+      "id": "NEW:鹿鼎-006-01:015",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
       "title": "海老公两年前命仵作赴五台山清凉寺向顺治禀告宫闱命案",
       "when": "两年多以前",
       "place": "五台山清凉寺",
@@ -975,12 +1029,6 @@
     "海大富之子姓名死因、海大富师承门派及所练武功来源未知。",
     "顺治出家具体年份、玉林大师剃度细节及赫巴察随侍情况本窗口未详。"
   ],
-  "validation_issues": [
-    {
-      "new_event": 15,
-      "title": "贞妃被化骨绵掌杀死，非自愿殉主",
-      "error": "anchor not present verbatim on source line"
-    }
-  ],
+  "validation_issues": [],
   "semantic_acceptance": "model_reviewed_not_independent_audit"
 }

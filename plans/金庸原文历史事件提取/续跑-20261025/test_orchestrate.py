@@ -1,6 +1,6 @@
 """Reject malformed model evidence before it can become a generated citation."""
 import unittest
-from orchestrate import materialize_event, validate
+from orchestrate import materialize_event, validate, select_tasks
 from test_pipeline import FixtureCorpus
 
 
@@ -37,6 +37,25 @@ class ModelEvidenceTest(unittest.TestCase):
         payload=dict(task_id='t',coverage=dict(start=1,end=1,complete=False),reviews=[],new_events=[])
         with self.assertRaisesRegex(ValueError,'coverage'):
             validate(task,payload,{('天龙八部',1)},self.corpus)
+
+
+class TaskSelectionTest(unittest.TestCase):
+    def setUp(self):
+        self.tasks = [dict(id='earlier',book='鹿鼎记',status='pending'),
+                      dict(id='child',book='鹿鼎记',status='pending'),
+                      dict(id='done',book='鹿鼎记',status='reviewed')]
+
+    def test_exact_id_skips_earlier_pending(self):
+        self.assertEqual(select_tasks(self.tasks,1,['鹿鼎记'],'child'),[self.tasks[1]])
+
+    def test_invalid_explicit_requests_reject(self):
+        for task_id,books,limit in [('absent',None,1),('done',None,1),
+                                    ('child',['天龙八部'],1),('child',None,2)]:
+            with self.subTest(task_id=task_id,books=books,limit=limit):
+                with self.assertRaises(ValueError):
+                    select_tasks(self.tasks,limit,books,task_id)
+        with self.assertRaises(ValueError):
+            select_tasks(self.tasks+[self.tasks[1]],1,None,'child')
 
 
 if __name__=='__main__':

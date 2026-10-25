@@ -1,0 +1,42 @@
+{
+  "task_id": "鹿鼎-028-02",
+  "raw_sha256": "733095c69e73e3fdf140fb31d3cb87601e3fbc2ba282b69e750cbbe3c5de7ba8",
+  "changes": [
+    {
+      "new_event": 8,
+      "before": {
+        "book": "鹿鼎记",
+        "line": 12700,
+        "anchor": "这数十年来，我早已万念俱灰，尘心已断"
+      },
+      "after": {
+        "book": "鹿鼎记",
+        "line": 12699,
+        "anchor": "这数十年来，我早已万念俱灰，尘心已断"
+      },
+      "source_line": "　　九难见他有迟疑之色，只道他担心不能成功，说道：“这件事本来难期必成。大家尽心竭力，也就是了。这叫做谋事在人，成事在天。唉，也不知朱家是气数已尽呢，还是兴复有望？这数十年来，我早已万念俱灰，尘心已断，想不到遇见了你和红英之后，我本不想理会国家大事，国家大事却理到我头上来。”"
+    },
+    {
+      "new_event": 8,
+      "before": {
+        "book": "鹿鼎记",
+        "line": 12700,
+        "anchor": "想不到遇见了你和红英之后"
+      },
+      "after": {
+        "book": "鹿鼎记",
+        "line": 12699,
+        "anchor": "想不到遇见了你和红英之后"
+      },
+      "source_line": "　　九难见他有迟疑之色，只道他担心不能成功，说道：“这件事本来难期必成。大家尽心竭力，也就是了。这叫做谋事在人，成事在天。唉，也不知朱家是气数已尽呢，还是兴复有望？这数十年来，我早已万念俱灰，尘心已断，想不到遇见了你和红英之后，我本不想理会国家大事，国家大事却理到我头上来。”"
+    }
+  ],
+  "usage_before": {
+    "inputTokens": 703268,
+    "cacheReadTokens": 35712,
+    "outputTokens": 1111263,
+    "total": 1850243
+  },
+  "validation_issues": [],
+  "semantic_scope": "Only coordinates repaired; original model assertions remain subject to review."
+}

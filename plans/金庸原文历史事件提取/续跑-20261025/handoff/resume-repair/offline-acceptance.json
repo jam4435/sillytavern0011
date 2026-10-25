@@ -1,0 +1,15 @@
+{
+  "original_windows": 605,
+  "active_windows": 606,
+  "coverage_preserved": true,
+  "historical_receipts": 63,
+  "verified_original_files": 124,
+  "prior_documented_cleanup_files": 125,
+  "old_usage": 1577802,
+  "current_usage": {
+    "inputTokens": 604301,
+    "cacheReadTokens": 30080,
+    "outputTokens": 943421,
+    "total": 1577802
+  }
+}

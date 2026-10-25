@@ -277,6 +277,60 @@
       "diff_status": "pending"
     },
     {
+      "title": "吴宝宇持旧袍请查伊璜赴广东",
+      "when": "送礼后过了数月",
+      "place": "查府",
+      "people": [
+        "吴宝宇",
+        "查伊璜",
+        "吴六奇"
+      ],
+      "relationships": "吴宝宇奉父命拜见查世伯，旧羊皮袍确认吴六奇身份",
+      "description": "吴六奇之子吴宝宇带从人到查府，跪下称查世伯，说父亲吴六奇现居广东省通省水陆提督，命他来请查伊璜到广东盘桓；查伊璜推辞，吴宝宇取出敝旧羊皮袍为信物，查伊璜认出是昔年赠给雪中奇丐之物，遂欣然就道。",
+      "cause": "吴六奇命子相请，以旧袍为信物",
+      "effect": "查伊璜认出吴六奇即当年乞丐，赴广州",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 240,
+          "column_start": 52,
+          "column_end": 170,
+          "anchor": "查世伯，侄子吴宝宇拜见",
+          "quote": "，带着八名从人，一见查伊璜，便即跪下磕头，口称：“查世伯，侄子吴宝宇拜见。”查伊璜忙即扶起，道：“世伯之称，可不敢当。不知尊大人是谁？”那吴宝宇道：“家严名讳，上六下奇，现居广东省通省水陆提督之职，特命小侄造府，恭请世伯到广东盘桓数月。”",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 1
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 244,
+          "column_start": 40,
+          "column_end": 74,
+          "anchor": "十分敝旧的羊皮袍子",
+          "quote": "请看。”在从人手中接过一个包裹，打了开来，却是一件十分敝旧的羊皮袍子。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 1
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 248,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "欣然就道",
+          "quote": "　　当下欣然就道，来到广州。吴六奇将军接入府中，神态极是恭谨，说道：“六奇流落江南，得蒙查先生不弃，当我是个朋友。请我喝酒，送我皮袍，倒是小事，在那破庙中肯和我同钵喝酒，手抓狗肉，那才是真正瞧得起我了。六奇其时穷途潦倒，到处遭人冷眼，查先生",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 1
+        }
+      ],
+      "uncertain": [
+        "系黄宗羲转述的查伊璜往事"
+      ],
+      "id": "NEW:鹿鼎-001-02:007",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
       "title": "查伊璜到广州受吴六奇礼遇",
       "when": "查伊璜到广州后",
       "place": "广州提督府",
@@ -1003,12 +1057,6 @@
     "吴六奇参与天地会事，注文明确说正史及过去裨官皆所未载，待核。",
     "查嗣庭案注文列有“维民所止”试题说与《维止录》异说，何说为准待核。"
   ],
-  "validation_issues": [
-    {
-      "new_event": 7,
-      "title": "吴宝宇持旧袍请查伊璜赴广东",
-      "error": "anchor not present verbatim on source line"
-    }
-  ],
+  "validation_issues": [],
   "semantic_acceptance": "model_reviewed_not_independent_audit"
 }

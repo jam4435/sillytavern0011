@@ -151,6 +151,50 @@
       "diff_status": "pending"
     },
     {
+      "title": "太后遣瑞栋杀死和察博，夺取《四十二章经》",
+      "when": "此前，未知具体时日",
+      "place": "和察博府中",
+      "people": [
+        "太后",
+        "瑞栋",
+        "和察博"
+      ],
+      "relationships": "太后差遣瑞栋去处死和察博并夺经；瑞栋事后回报",
+      "description": "太后差遣瑞栋去处死宗人府镶红旗旗主和察博，取走和察博府中所藏的一部《四十二章经》；瑞栋事后回报。太后当时急于杀韦小宝灭口，未及询问经书。",
+      "cause": "太后要取和察博府中所藏的《四十二章经》",
+      "effect": "瑞栋回报夺经之事；太后未及细问经书下落",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 5985,
+          "column_start": 1,
+          "column_end": 120,
+          "anchor": "但她差遣瑞栋去处死宗人府的镶红旗旗主和察博",
+          "quote": "　　太后不信瑞栋说过这种话，但她差遣瑞栋去处死宗人府的镶红旗旗主和察博，取了他府中所藏的《四十二章经》，却确是事实。当日瑞栋回报之时，她正急于要杀韦小宝灭口，来不及询问经书，此刻听他这么说，心下又怒又喜；怒的是瑞栋竟将经书交给了这小鬼，喜的",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 14
+        },
+        {
+          "book": "鹿鼎记",
+          "line": 5985,
+          "column_start": 12,
+          "column_end": 131,
+          "anchor": "取了他府中所藏的《四十二章经》",
+          "quote": "种话，但她差遣瑞栋去处死宗人府的镶红旗旗主和察博，取了他府中所藏的《四十二章经》，却确是事实。当日瑞栋回报之时，她正急于要杀韦小宝灭口，来不及询问经书，此刻听他这么说，心下又怒又喜；怒的是瑞栋竟将经书交给了这小鬼，喜的是终于探得了下落，说道",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 14
+        }
+      ],
+      "uncertain": [
+        "和察博因何被太后处死、经书原藏情况未明"
+      ],
+      "id": "NEW:鹿鼎-014-02:004",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
       "title": "太后曾与老乌龟动手，柳燕未在场",
       "when": "此前，未知具体时日",
       "place": "慈宁宫",
@@ -557,12 +601,6 @@
     "太后与老乌龟动手的经过及老乌龟身份。",
     "天桥卖冰糖葫芦小贩是否确为太后所遣官差所杀，人数与范围。"
   ],
-  "validation_issues": [
-    {
-      "new_event": 4,
-      "title": "太后遣瑞栋杀死和察博，夺取《四十二章经》",
-      "error": "anchor not present verbatim on source line"
-    }
-  ],
+  "validation_issues": [],
   "semantic_acceptance": "model_reviewed_not_independent_audit"
 }

@@ -197,7 +197,24 @@ def usage_total():
     return {**totals, 'total':sum(totals.values())}
 
 
-def run(limit, books=None):
+def select_tasks(tasks, limit, books=None, task_id=None):
+    """Select pending work; an explicit ID must exist and match the book filter."""
+    if task_id is not None:
+        matches = [t for t in tasks if t['id'] == task_id]
+        if len(matches) != 1:
+            raise ValueError('task id must identify exactly one task')
+        task = matches[0]
+        if task['status'] != 'pending':
+            raise ValueError('explicit task must be pending')
+        if books and task['book'] not in books:
+            raise ValueError('explicit task does not match books')
+        if limit != 1:
+            raise ValueError('explicit task requires limit 1')
+        return matches
+    return [t for t in tasks if t['status']=='pending' and (not books or t['book'] in books)][:limit]
+
+
+def run(limit, books=None, task_id=None):
     """Complete a bounded tranche; record and stop on provider or budget failure."""
     lock = HERE / '.controller.lock'
     fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
@@ -207,7 +224,7 @@ def run(limit, books=None):
         corpus = Corpus()
         cards = {c['uid']:c for c in jsonl(HERE / 'inventory/cards.jsonl')}
         tasks = json.loads((HERE / 'queue.json').read_text(encoding='utf-8'))
-        chosen = [t for t in tasks if t['status']=='pending' and (not books or t['book'] in books)][:limit]
+        chosen = select_tasks(tasks, limit, books, task_id)
         for task in chosen:
             if usage_total()['total'] + 90000 > TOTAL_TOKEN_LIMIT:
                 dump(HERE / 'STOP.json', dict(reason='aggregate_token_limit', usage=usage_total()))
@@ -294,8 +311,9 @@ if __name__=='__main__':
     parser.add_argument('command',choices=['prepare','run','status','supplement'])
     parser.add_argument('--limit',type=int,default=1)
     parser.add_argument('--books',nargs='*')
+    parser.add_argument('--task-id',help='Run exactly this pending task (requires --limit 1).')
     args=parser.parse_args()
     if args.command=='prepare': prepare()
-    elif args.command=='run': run(args.limit,args.books)
+    elif args.command=='run': run(args.limit,args.books,args.task_id)
     elif args.command=='supplement':supplement_frontmatter()
     else: report()

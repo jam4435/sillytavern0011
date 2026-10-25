@@ -361,6 +361,40 @@
       "diff_status": "pending"
     },
     {
+      "title": "柳燕已死",
+      "when": "此前；具体未知",
+      "place": "未知",
+      "people": [
+        "柳燕",
+        "胖头陀",
+        "韦小宝"
+      ],
+      "relationships": "胖头陀不知柳燕已死；韦小宝借柳燕形貌编谎",
+      "description": "叙述者点明胖头陀哪知柳燕已死；韦小宝正利用柳燕的形貌和旧事编造言语骗他。",
+      "cause": "未知",
+      "effect": "胖头陀相信韦小宝与柳燕有关",
+      "nature": "客观叙述",
+      "evidence": [
+        {
+          "book": "鹿鼎记",
+          "line": 8067,
+          "column_start": 1,
+          "column_end": 104,
+          "anchor": "那头陀哪知柳燕已死",
+          "quote": "　　那头陀哪知柳燕已死，这话似是风言风语，其实是毒语相咒，怒道：“小孩子家胡说八道！”但对他的话却是信了，伸手在他小腹上轻轻一拍，解他穴道。不料这一记正拍在他怀中那部《四十二章经》上，拍的一声，穴道并未解开。",
+          "source_sha256": "ec5b42c6f62802b80d3c9c2fd8988b185a19d6b86d88922e3ca775d3060f1a23",
+          "chapter": 18
+        }
+      ],
+      "uncertain": [
+        "柳燕死因、死亡时间及地点未说明"
+      ],
+      "id": "NEW:鹿鼎-018-02:011",
+      "mechanical_status": "exact",
+      "semantic_status": "model_reviewed",
+      "diff_status": "pending"
+    },
+    {
       "title": "澄光曾与皇甫阁动手，胸口受伤",
       "when": "此前；具体未知",
       "place": "未知",
@@ -503,12 +537,6 @@
     "白寒枫如何给韦小宝苦头未说明。",
     "双儿所得高人身份未说明。"
   ],
-  "validation_issues": [
-    {
-      "new_event": 11,
-      "title": "柳燕已死",
-      "error": "anchor not present verbatim on source line"
-    }
-  ],
+  "validation_issues": [],
   "semantic_acceptance": "model_reviewed_not_independent_audit"
 }

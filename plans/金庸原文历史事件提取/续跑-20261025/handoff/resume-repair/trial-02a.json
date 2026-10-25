@@ -1,0 +1,37 @@
+{
+  "task_id": "鹿鼎-024-02a",
+  "headers": [
+    {
+      "config": {
+        "provider": "buddy",
+        "model": "deepseek-v4.1-flash",
+        "reasoningEffort": "low",
+        "maxTokens": 32768
+      },
+      "toolCount": 0,
+      "toolNames": []
+    }
+  ],
+  "steps": 1,
+  "messages": 1,
+  "end_reasons": [
+    {
+      "kind": "completed"
+    }
+  ],
+  "usage": [
+    {
+      "inputTokens": 4824,
+      "outputTokens": 11807,
+      "cacheReadTokens": 512,
+      "reasoningTokens": 7859
+    }
+  ],
+  "coverage": {
+    "start": 10875,
+    "end": 10938,
+    "complete": true
+  },
+  "validation_issues": [],
+  "event_count": 17
+}

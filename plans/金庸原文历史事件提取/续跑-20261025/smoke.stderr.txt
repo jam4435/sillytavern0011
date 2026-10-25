@@ -1,1 +1,0 @@
-dsh: UNSUPPORTED_REASONING_EFFORT: provider "buddy" model "deepseek-v4.1-flash" does not support reasoning effort "medium"

@@ -1,0 +1,20 @@
+{
+  "pid": 40060,
+  "status": "running",
+  "task_ids": [
+    "鹿鼎-029-03",
+    "倚天-001-01",
+    "笑傲-001-01",
+    "天龙-001-02",
+    "射雕-001-01",
+    "神雕-001-01"
+  ],
+  "usage_before": {
+    "inputTokens": 731707,
+    "cacheReadTokens": 37248,
+    "outputTokens": 1168954,
+    "total": 1937909
+  },
+  "reserved_tokens": 540000,
+  "outcomes": []
+}

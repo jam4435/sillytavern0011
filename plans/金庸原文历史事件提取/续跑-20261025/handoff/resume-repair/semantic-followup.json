@@ -1,0 +1,32 @@
+{
+  "provider": "buddy",
+  "model": "deepseek-v4.1-flash",
+  "items": [
+    {
+      "event_id": "NEW:鹿鼎-024-02a:010",
+      "reason": "需指定模型复核：是否为有因果的独立过去事件、来源性质是否保留；程序引文通过不回答此问题。",
+      "status": "pending_model_review"
+    },
+    {
+      "event_id": "NEW:鹿鼎-024-02a:011",
+      "reason": "需指定模型复核：是否为有因果的独立过去事件、来源性质是否保留；程序引文通过不回答此问题。",
+      "status": "pending_model_review"
+    },
+    {
+      "event_id": "NEW:鹿鼎-024-02a:017",
+      "reason": "需指定模型复核：是否为有因果的独立过去事件、来源性质是否保留；程序引文通过不回答此问题。",
+      "status": "pending_model_review"
+    },
+    {
+      "event_id": "NEW:鹿鼎-006-01:015",
+      "reason": "需指定模型复核：是否为有因果的独立过去事件、来源性质是否保留；程序引文通过不回答此问题。",
+      "status": "pending_model_review"
+    },
+    {
+      "event_id": "NEW:鹿鼎-018-02:011",
+      "reason": "需指定模型复核：是否为有因果的独立过去事件、来源性质是否保留；程序引文通过不回答此问题。",
+      "status": "pending_model_review"
+    }
+  ],
+  "scope": "Candidates for semantic review, not automatic exclusions."
+}

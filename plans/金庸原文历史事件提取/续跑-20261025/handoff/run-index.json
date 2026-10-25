@@ -1,0 +1,2185 @@
+[
+  {
+    "call_id": "d1a04241-05d4-42fa-847c-7484438dcee8",
+    "receipt": "runs/d1a04241-05d4-42fa-847c-7484438dcee8.events.jsonl",
+    "session_ids": [
+      "session-5278134f-2064-4520-b55c-168f74ee713d"
+    ],
+    "usage": {
+      "inputTokens": 0,
+      "cacheReadTokens": 0,
+      "outputTokens": 0
+    },
+    "end_reasons": [
+      {
+        "kind": "error",
+        "error": {
+          "message": "provider \"buddy\" model \"deepseek-v4.1-flash\" does not support reasoning effort \"medium\"",
+          "code": "UNSUPPORTED_REASONING_EFFORT"
+        }
+      }
+    ],
+    "headers": [],
+    "file_hashes": {
+      "d1a04241-05d4-42fa-847c-7484438dcee8.patch.yml": "14a60507a81f5b6f62cbbce2ea39856ffa98353fd416daa347675241bdb3807a"
+    }
+  },
+  {
+    "call_id": "diff-00001",
+    "receipt": "runs/diff-00001.events.jsonl",
+    "session_ids": [
+      "session-f10a8529-ed84-41be-803e-1edfd9766c6a"
+    ],
+    "usage": {
+      "inputTokens": 24896,
+      "cacheReadTokens": 0,
+      "outputTokens": 1800
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "diff-00001.prompt.txt": "72db9b03f31169d74bcf1aaa0f2fb329b8ec2f670410c0421945df6c4f480e96",
+      "diff-00001.stdout.txt": "f157c59a4c5589614d2f4ea8fa0ed144b0f37512a43bd433692f079ad38efb6a",
+      "diff-00001.stderr.txt": "286b06dc493ece1c417932cba9c6e4ffd71ab876fafd275dfb1eb62888cbbd13",
+      "diff-00001.patch.yml": "31038dee935555edbf11f911159c3f80d103c3c831a6315dbb0eacf32a18f75f"
+    }
+  },
+  {
+    "call_id": "review-天龙-001-01-a1",
+    "receipt": "runs/review-天龙-001-01-a1.events.jsonl",
+    "session_ids": [
+      "session-7b18706a-b413-4af0-8d5d-f6114526a884"
+    ],
+    "usage": {
+      "inputTokens": 13001,
+      "cacheReadTokens": 512,
+      "outputTokens": 17623
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-天龙-001-01-a1.prompt.txt": "c0eba710437b3c44b3d45a7c2c378418df537b38bd50a67a00a57cbd54b18137",
+      "review-天龙-001-01-a1.stdout.txt": "74b57e13673b8e41d73bd08c7ecbb1f67908c7880293b73c6977ea749540a722",
+      "review-天龙-001-01-a1.stderr.txt": "d47d30bc5fd062bdfbc66b83324cd440d69b12244e9c978770832692cfa26d1a",
+      "review-天龙-001-01-a1.patch.yml": "717d24d3d524d9264f48f1363da19a05e5a85afdc967ac984c8663612b1f174e"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-001-01-a3",
+    "receipt": "runs/review-鹿鼎-001-01-a3.events.jsonl",
+    "session_ids": [
+      "session-5cabc340-a982-42bd-a626-7309905800c7"
+    ],
+    "usage": {
+      "inputTokens": 11911,
+      "cacheReadTokens": 0,
+      "outputTokens": 11996
+    },
+    "end_reasons": [
+      {
+        "kind": "max-tokens"
+      }
+    ],
+    "headers": [],
+    "file_hashes": {
+      "review-鹿鼎-001-01-a3.prompt.txt": "7f5ca915271a5f8f05676b969e6a2cdbf67e59d844292f75b07e631aa7f31e62",
+      "review-鹿鼎-001-01-a3.stdout.txt": "7eb70257593da06f682a3ddda54a9d260d4fc514f645237f5ca74b08f8da61a6",
+      "review-鹿鼎-001-01-a3.stderr.txt": "191ff7a4743be671ced13b95b9d49cbe6d06043e478777383638dc993fd98a96",
+      "review-鹿鼎-001-01-a3.patch.yml": "aa3515fe7264478e97a2f2553cac55cd189df5e56e76fd0a59e344e54493acb9"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-001-01-a4",
+    "receipt": "runs/review-鹿鼎-001-01-a4.events.jsonl",
+    "session_ids": [
+      "session-f38df67f-75d4-425a-9a95-8cf8ef23caf8"
+    ],
+    "usage": {
+      "inputTokens": 11271,
+      "cacheReadTokens": 640,
+      "outputTokens": 15983
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-001-01-a4.prompt.txt": "c56a6c8309e247b307ac85029fbdd07c270b4199fc396e8e98bf232b1ce0a335",
+      "review-鹿鼎-001-01-a4.stdout.txt": "d76642901661d24a64517d4163d1fc188b5a2adb40e747d1eae05067e0bc9871",
+      "review-鹿鼎-001-01-a4.stderr.txt": "cc48075c7fd4682742451c1127bb078cbd83aa46851def9a18ee31a3ac0065c7",
+      "review-鹿鼎-001-01-a4.patch.yml": "27d2fb4c6e7abcdcc16d1d97f65050d2347e2af986b4f89830c91e350d44c963"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-001-01",
+    "receipt": "runs/review-鹿鼎-001-01.events.jsonl",
+    "session_ids": [
+      "session-abbdf8a3-b7a4-41b3-a617-87074e5f8781"
+    ],
+    "usage": {
+      "inputTokens": 11904,
+      "cacheReadTokens": 0,
+      "outputTokens": 11999
+    },
+    "end_reasons": [
+      {
+        "kind": "max-tokens"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "high",
+          "maxTokens": 12000
+        },
+        "toolCount": 1
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-001-01.prompt.txt": "5dce812b68806b6d551a8c4511eddfd5dd3ef678a6f53f59783667bc7ace7300",
+      "review-鹿鼎-001-01.stdout.txt": "7eb70257593da06f682a3ddda54a9d260d4fc514f645237f5ca74b08f8da61a6",
+      "review-鹿鼎-001-01.stderr.txt": "ffb1f197791c14e7060b2b60571ec612d9a049c678587f1cf5c12e3329df9edb",
+      "review-鹿鼎-001-01.patch.yml": "68e7294b4fcdf40fd319a563a77ff7130975edfae3c41dbbc3ca2a1a4d397230"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-001-02-a1",
+    "receipt": "runs/review-鹿鼎-001-02-a1.events.jsonl",
+    "session_ids": [
+      "session-fe723694-089e-4053-a2ee-a16cd8806411"
+    ],
+    "usage": {
+      "inputTokens": 10355,
+      "cacheReadTokens": 256,
+      "outputTokens": 19501
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-001-02-a1.prompt.txt": "3c8b40687a404d02536ba9af5c5a62194bcb7d9f8088f37dc290565177a07770",
+      "review-鹿鼎-001-02-a1.stdout.txt": "bdaad5c390265d626b9bfa619f697eb5e66888307cffaa7ea593e8f97ea71220",
+      "review-鹿鼎-001-02-a1.stderr.txt": "797dda9d05215951bf60c42bfca17487e5cf4d15ad69009d235ba9348f6ba59a",
+      "review-鹿鼎-001-02-a1.patch.yml": "ca78522e04259a63fa6357a4085b50511935fc7a44b51ad65cb25f89d1d78972"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-002-01-a1",
+    "receipt": "runs/review-鹿鼎-002-01-a1.events.jsonl",
+    "session_ids": [
+      "session-86cc514c-d41b-4d62-9c38-3261668815d3"
+    ],
+    "usage": {
+      "inputTokens": 11637,
+      "cacheReadTokens": 512,
+      "outputTokens": 10588
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-002-01-a1.prompt.txt": "768a7cdfc3637cb2fe188adeb169bdf191afee3b1c26a6b6d6f97eb5efc8e90b",
+      "review-鹿鼎-002-01-a1.stdout.txt": "9e2768aae22f84c36c3e67cb3a845e7e5629096b46a21f028d06957e38607a49",
+      "review-鹿鼎-002-01-a1.stderr.txt": "40641ffb26cf35b234eb2f4afe4f95a97c9cb3f7ad7f47ae24ca04316e7a8a4f",
+      "review-鹿鼎-002-01-a1.patch.yml": "d0b89ba9d8d149bd39785d9c4a0caa9587e265a1e63e8e250141407695cb1111"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-002-02-a1",
+    "receipt": "runs/review-鹿鼎-002-02-a1.events.jsonl",
+    "session_ids": [
+      "session-08546afd-d1d3-4386-92ac-8364f1067425"
+    ],
+    "usage": {
+      "inputTokens": 11491,
+      "cacheReadTokens": 512,
+      "outputTokens": 18463
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-002-02-a1.prompt.txt": "d18f8c4d32891e301c94d9388aac2801826e23903b4dfd00bfd20e75df1829b6",
+      "review-鹿鼎-002-02-a1.stdout.txt": "733b3c7423e9220081e5920e098eaeee369a9c67d47de3101df88196ea3b7325",
+      "review-鹿鼎-002-02-a1.stderr.txt": "211091c117c124c05f91ddec7fee38b09d5eea534afcfe51687360e00c2119d6",
+      "review-鹿鼎-002-02-a1.patch.yml": "c9328c5fade4c1633f01a7c3bb4442a1e26366227452f256de101d726a60f68d"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-002-03-a1",
+    "receipt": "runs/review-鹿鼎-002-03-a1.events.jsonl",
+    "session_ids": [
+      "session-e236449b-44b6-4a5a-be72-049baebc83ea"
+    ],
+    "usage": {
+      "inputTokens": 5771,
+      "cacheReadTokens": 512,
+      "outputTokens": 8821
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-002-03-a1.prompt.txt": "d051cb7a0dd77d21a7b1be06e586268ea7f3f4b5741b19f1613eb5ee12d884a0",
+      "review-鹿鼎-002-03-a1.stdout.txt": "0466e3c87cdcf9da20f808d6413975696d47a5d7dec2c7c754e144633b761644",
+      "review-鹿鼎-002-03-a1.stderr.txt": "d8d79e33eb079455906b4f93a6178722024c0852d8dde73289a2644fb75a5dc9",
+      "review-鹿鼎-002-03-a1.patch.yml": "4e5d6d7a6b2c3d5b2b2aeea669e4b30526f18166581b6ebf546bb55acb1f5221"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-003-01-a1",
+    "receipt": "runs/review-鹿鼎-003-01-a1.events.jsonl",
+    "session_ids": [
+      "session-1092bd46-9241-4306-a994-a3fc034e8c81"
+    ],
+    "usage": {
+      "inputTokens": 11392,
+      "cacheReadTokens": 512,
+      "outputTokens": 12924
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-003-01-a1.prompt.txt": "f51673c0c7bbd1f352fd07ef80248286f7421efb70a22d8f0a1640f6b19fbd05",
+      "review-鹿鼎-003-01-a1.stdout.txt": "abc410345f6eca57009b6cf5317ab8e5e6a60dfdda8188609e5543f32a172629",
+      "review-鹿鼎-003-01-a1.stderr.txt": "6634158120dfff5a0208c427c9e8a861b05be67fad24aa6ed8fb75024cba89ad",
+      "review-鹿鼎-003-01-a1.patch.yml": "22708687c03e7c5675c2f9f724f4501494e103c42b8e66168a61af963b906ed4"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-003-02-a1",
+    "receipt": "runs/review-鹿鼎-003-02-a1.events.jsonl",
+    "session_ids": [
+      "session-e45de052-cbc6-4751-a4fa-5ca85e07f086"
+    ],
+    "usage": {
+      "inputTokens": 4488,
+      "cacheReadTokens": 512,
+      "outputTokens": 7882
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-003-02-a1.prompt.txt": "fbe11c7968ec05f3ecb2fc440d5092d4a98333092a8ac06e1f5901df7e489781",
+      "review-鹿鼎-003-02-a1.stdout.txt": "604e20cfe87e4bf757afb12cbfe1c85b631f70ee97e1df5bcd8979863a4297dd",
+      "review-鹿鼎-003-02-a1.stderr.txt": "1c65cf44499deb7a3e2a4501ae0287560fdbbdc62fb03dc0a5461483c338f223",
+      "review-鹿鼎-003-02-a1.patch.yml": "5cc17f325a8aa237944ce0c921a2a8a88b7a5aa0426b9a9d9e3e9159854180e1"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-004-01-a1",
+    "receipt": "runs/review-鹿鼎-004-01-a1.events.jsonl",
+    "session_ids": [
+      "session-ddc07faf-2a35-488a-93e6-3c55eedc000c"
+    ],
+    "usage": {
+      "inputTokens": 11607,
+      "cacheReadTokens": 512,
+      "outputTokens": 9788
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-004-01-a1.prompt.txt": "a9f483cc12b24a8364607e328100df21f9b051196c26aa2d540d3473fa840c1d",
+      "review-鹿鼎-004-01-a1.stdout.txt": "3385ff334b6dd4d02380f43ab88739107eb9810a5338fb4f113318632a7f0fab",
+      "review-鹿鼎-004-01-a1.stderr.txt": "20c9e130f4863dbe82c41d573715c472372a25a7e5fce33c893dd9d0cf47aa43",
+      "review-鹿鼎-004-01-a1.patch.yml": "113b1109075590f7af11f83f7d70f9f331c995db8fc50b4ecd5a1da7a23f778d"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-004-02-a1",
+    "receipt": "runs/review-鹿鼎-004-02-a1.events.jsonl",
+    "session_ids": [
+      "session-2011d1a9-753b-4f08-8ddf-b65801f14739"
+    ],
+    "usage": {
+      "inputTokens": 7838,
+      "cacheReadTokens": 512,
+      "outputTokens": 16723
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-004-02-a1.prompt.txt": "d14999b452dde3199ef08d38970a1ed8d23c0dcc7a2f9645a924ab9563079f9a",
+      "review-鹿鼎-004-02-a1.stdout.txt": "ea766a4813a98459e8df8acbea04d79058b09a0d5d896e96a3d163ff9f13fba0",
+      "review-鹿鼎-004-02-a1.stderr.txt": "b4853615f14d540b468374e0a370a1a5fe92fee302cba720ab160b66cab8e32b",
+      "review-鹿鼎-004-02-a1.patch.yml": "c6ef8a8f1bb10208094a1f4d02b3aa22c0febf97f1e7c73d6d8593fae42b6785"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-005-01-a1",
+    "receipt": "runs/review-鹿鼎-005-01-a1.events.jsonl",
+    "session_ids": [
+      "session-0e629eff-0ffd-48eb-8710-117ac947fa18"
+    ],
+    "usage": {
+      "inputTokens": 11149,
+      "cacheReadTokens": 512,
+      "outputTokens": 11570
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-005-01-a1.prompt.txt": "3f5b04ba374c807af1c2463b3df980eae560af041a9cf765ce5080287b71d432",
+      "review-鹿鼎-005-01-a1.stdout.txt": "181976f3f1e76460c9dbd88b24d99bd0a573370e0771e59c5359263f2acb7e68",
+      "review-鹿鼎-005-01-a1.stderr.txt": "03222ccf1adae307faae192ac7265f536c3af0d080c7ed4df7987b44375cd90b",
+      "review-鹿鼎-005-01-a1.patch.yml": "4520d741e8bf17b643cd2a69c8fe9d1e41c339f65011741faabf5d0d6e09985a"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-005-02-a1",
+    "receipt": "runs/review-鹿鼎-005-02-a1.events.jsonl",
+    "session_ids": [
+      "session-4285076e-6581-4045-acdf-73488a8b5070"
+    ],
+    "usage": {
+      "inputTokens": 11792,
+      "cacheReadTokens": 512,
+      "outputTokens": 17510
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-005-02-a1.prompt.txt": "9beb7e99eed9df47a412834ff94a51a6ae950ae257e054a540c0da03e20c904b",
+      "review-鹿鼎-005-02-a1.stdout.txt": "805f37ac02f3de974949f2c66b949965f1b7abe3df8b0510f223335df5493eb6",
+      "review-鹿鼎-005-02-a1.stderr.txt": "51f33d5ee27bc8c9286d5d93393f70cfc4f9764594ed03cc6a01e5d8fb870478",
+      "review-鹿鼎-005-02-a1.patch.yml": "e427da7da0586dc132f507a7264e24392f76449e2f8071cb8f5802dc1deabb18"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-005-03-a1",
+    "receipt": "runs/review-鹿鼎-005-03-a1.events.jsonl",
+    "session_ids": [
+      "session-5a5ba16f-b4ee-4fc9-944f-d64b409b41c8"
+    ],
+    "usage": {
+      "inputTokens": 4180,
+      "cacheReadTokens": 512,
+      "outputTokens": 8108
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-005-03-a1.prompt.txt": "df619d695fa6ee7e77e13d20e010e1ad6c684cbe4ed97b48ee17f42333438296",
+      "review-鹿鼎-005-03-a1.stdout.txt": "1c994c10c91de5fdbaa5b5dffa2f60ec0d9e631fba02891a0b23a6760196d97f",
+      "review-鹿鼎-005-03-a1.stderr.txt": "30e7c01074acc98c6baab9b5f49d51b01345dcd9a4789e6e866d0989dc758029",
+      "review-鹿鼎-005-03-a1.patch.yml": "610da23df621ba605c531e4470fca84ffa5cfedae61bf81ba3e1ec4952ccef09"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-006-01-a1",
+    "receipt": "runs/review-鹿鼎-006-01-a1.events.jsonl",
+    "session_ids": [
+      "session-46a7d5be-295d-4e4a-8f31-f9620c8032c3"
+    ],
+    "usage": {
+      "inputTokens": 11398,
+      "cacheReadTokens": 512,
+      "outputTokens": 30998
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-006-01-a1.prompt.txt": "9ee7d10adf3448ac26bd40d1be625bff64dbaa6adbcdd263a6f9b5296d1f137b",
+      "review-鹿鼎-006-01-a1.stdout.txt": "9e9548e0acdcf28be6daf8f006d81946a7c2a03e71925f178f461e9a59f81c68",
+      "review-鹿鼎-006-01-a1.stderr.txt": "5333fe692ebc295b89165f974aa61efdfb3d62868221b9575e59ed93fc1ac6f6",
+      "review-鹿鼎-006-01-a1.patch.yml": "0d38927ead5c23169d7362b1097e28b7cb2cdf9fdc74b8b275f6e9b029891318"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-006-02-a1",
+    "receipt": "runs/review-鹿鼎-006-02-a1.events.jsonl",
+    "session_ids": [
+      "session-ea53285e-be47-47b1-9201-4969d3c0b4f4"
+    ],
+    "usage": {
+      "inputTokens": 9458,
+      "cacheReadTokens": 512,
+      "outputTokens": 21329
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-006-02-a1.prompt.txt": "bbbfa27fc2d4292c81c2b083b8318ed241d831a0601e87f28c9422682042e7cd",
+      "review-鹿鼎-006-02-a1.stdout.txt": "0e9a7a777388bbfd3c44af14d6739b3c8d8f43617d0013096d188b285111c78a",
+      "review-鹿鼎-006-02-a1.stderr.txt": "9e1265e69d395446072032d0d9a130a39a2ffa939b6e797e1af9aafcc4ff26c3",
+      "review-鹿鼎-006-02-a1.patch.yml": "2c00dab6c26d2d74f22ea4749d48fdbd106c076069f49314ced525aa2d7e2eb4"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-007-01-a1",
+    "receipt": "runs/review-鹿鼎-007-01-a1.events.jsonl",
+    "session_ids": [
+      "session-61623f18-c5c8-445f-8505-d2d0ba295043"
+    ],
+    "usage": {
+      "inputTokens": 11337,
+      "cacheReadTokens": 512,
+      "outputTokens": 17053
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-007-01-a1.prompt.txt": "20b34ceecd34c5b658bdf64c429e9618e5dc89a2a5ed9bc1a389a27b686837a0",
+      "review-鹿鼎-007-01-a1.stdout.txt": "acceb81bc08b58a12a5a989adc0ea771c43fdc9d754d48c9b079aa550fd70efa",
+      "review-鹿鼎-007-01-a1.stderr.txt": "8bb0fdb7c00fb682a5661a059802216a3e2e099a0522a70eba1e00906f2fed3a",
+      "review-鹿鼎-007-01-a1.patch.yml": "ae1ba8204955b0294fdfa0c759c433daa6caf4eb6b24e2bdae00df5ef0f10384"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-007-02-a1",
+    "receipt": "runs/review-鹿鼎-007-02-a1.events.jsonl",
+    "session_ids": [
+      "session-539077c1-be8b-47bf-9d52-6a81018cabc6"
+    ],
+    "usage": {
+      "inputTokens": 9542,
+      "cacheReadTokens": 512,
+      "outputTokens": 16388
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-007-02-a1.prompt.txt": "55d03147bfda8a30fcbe1823466aee88d6cd1336ccae03a537462aa5f5d1f62b",
+      "review-鹿鼎-007-02-a1.stdout.txt": "79da9e7671943edc53ea5e02780b97c427d63358c05d757583b4fa3b6b9b096f",
+      "review-鹿鼎-007-02-a1.stderr.txt": "81befb30202f8a51f2c016b444e4fd8b5d127acf5b38ac7fc224cf1065fd4b7c",
+      "review-鹿鼎-007-02-a1.patch.yml": "8c7bb05d5357784c05f7451fddde8f0dcf650e9209f281a17c15eacf61959bd0"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-008-01-a1",
+    "receipt": "runs/review-鹿鼎-008-01-a1.events.jsonl",
+    "session_ids": [
+      "session-7d69278d-b33b-42bc-b93f-ff9722f90ea4"
+    ],
+    "usage": {
+      "inputTokens": 12029,
+      "cacheReadTokens": 512,
+      "outputTokens": 19389
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-008-01-a1.prompt.txt": "dfd6c94c03750fc6d5e64b3941563d79f3d6ca6e3f0d20864daeff2c0edc8cd4",
+      "review-鹿鼎-008-01-a1.stdout.txt": "d755ed710a38f3b2676ad268a0556a9e98219be2ec275879714e663497a3dc49",
+      "review-鹿鼎-008-01-a1.stderr.txt": "0d9557a3940bbbf374e9224e2527459a6c5a602949435eb712651e8e1866fcbc",
+      "review-鹿鼎-008-01-a1.patch.yml": "ba1b5ab91880961c223d2cc6e2cefbe368ba1695baf44d34ddf3d0bafa4be3df"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-008-02-a1",
+    "receipt": "runs/review-鹿鼎-008-02-a1.events.jsonl",
+    "session_ids": [
+      "session-5f4e0a05-c286-449d-85be-8e6533997151"
+    ],
+    "usage": {
+      "inputTokens": 4757,
+      "cacheReadTokens": 512,
+      "outputTokens": 13917
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-008-02-a1.prompt.txt": "4b83a1d52e0f3a28eb2908bbf60fb52f042eea5a6c04d3341fa69770e8a4b371",
+      "review-鹿鼎-008-02-a1.stdout.txt": "6fe1ebe5b18df6ffed3a264d555918eaee2f550d60ef27dbb2bf4958db3c0810",
+      "review-鹿鼎-008-02-a1.stderr.txt": "7ffe7403184309bab395bf2b4a83c3c544f8c4b245b9791d9b35c3d50a68d5ca",
+      "review-鹿鼎-008-02-a1.patch.yml": "81c9b1663df95195ecf85327a32a91cf756d49b5683fa0c7da9fd522a3c16165"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-009-01-a1",
+    "receipt": "runs/review-鹿鼎-009-01-a1.events.jsonl",
+    "session_ids": [
+      "session-37acf6b2-acc6-4cdb-a422-9dbd1f9d34d2"
+    ],
+    "usage": {
+      "inputTokens": 11430,
+      "cacheReadTokens": 512,
+      "outputTokens": 23476
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-009-01-a1.prompt.txt": "e34af266770b03a45474fcabbedd2293012bff398b6aa47ac57e388a24b1e1d4",
+      "review-鹿鼎-009-01-a1.stdout.txt": "ed1971d717a33b42a2ef7f7c61f15a8b1fa66ee0b249790315804ac0ff6c0dee",
+      "review-鹿鼎-009-01-a1.stderr.txt": "ac2200eeb264cebbf54d54dba5c1fab58468574fbbffd7c39dd2b20aaeae2a19",
+      "review-鹿鼎-009-01-a1.patch.yml": "33829ef9e07a1ddcc38e864ff7dac07cac08d4e8940bf68fd6ce397b47666369"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-009-02-a1",
+    "receipt": "runs/review-鹿鼎-009-02-a1.events.jsonl",
+    "session_ids": [
+      "session-a97b8fdc-96fe-4e8f-99f9-427dbd19da9b"
+    ],
+    "usage": {
+      "inputTokens": 11782,
+      "cacheReadTokens": 512,
+      "outputTokens": 14149
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-009-02-a1.prompt.txt": "63654e01035ddfb6b050dec3df408ea9ce8f5e6e5e211a35f82cf0ceb91dd442",
+      "review-鹿鼎-009-02-a1.stdout.txt": "40d77eb673fe044f8c1654dfc0561e83c9a5333de2b0ab4cab942d1f54a88c37",
+      "review-鹿鼎-009-02-a1.stderr.txt": "3eb6cc7c7f954dbe31287b713277364e38b6d72b3d0df7f3bc3af18d8ec36236",
+      "review-鹿鼎-009-02-a1.patch.yml": "65c0d515266835a4d9c6065f446b75d4a7d5ed8efd5594d5cf20d58a430c6689"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-009-03-a1",
+    "receipt": "runs/review-鹿鼎-009-03-a1.events.jsonl",
+    "session_ids": [
+      "session-89773839-36fe-4e3f-8217-cd15892281e3"
+    ],
+    "usage": {
+      "inputTokens": 3732,
+      "cacheReadTokens": 512,
+      "outputTokens": 7813
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-009-03-a1.prompt.txt": "324eb477946a9cb169621f57c6fbec96edca9106d922a204ec7e16a2f949bc65",
+      "review-鹿鼎-009-03-a1.stdout.txt": "b75de9a644429311fa3fa5607f3baf138531aa28cd5e035ecbfe234ed8d18015",
+      "review-鹿鼎-009-03-a1.stderr.txt": "b8e040cea3c3691158f7d676ac7083befa8d388a2b36f532bc159706afaead04",
+      "review-鹿鼎-009-03-a1.patch.yml": "0c391d38cd0bf7865b8e1c463dc67b4fd0de3a27f345fceba2fc8c833c7bebc9"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-010-01-a1",
+    "receipt": "runs/review-鹿鼎-010-01-a1.events.jsonl",
+    "session_ids": [
+      "session-e413ecfc-98a4-4c0b-ab4f-da37b4dfa3bd"
+    ],
+    "usage": {
+      "inputTokens": 11346,
+      "cacheReadTokens": 512,
+      "outputTokens": 14182
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-010-01-a1.prompt.txt": "47140107aab0dc2d76e80916359ff6cc9dc044a4a6914901e0a03d0623a46374",
+      "review-鹿鼎-010-01-a1.stdout.txt": "d7fa539655aa5331d08e9c02620f8ae9033bc49ec3c83610b39d6dad5fd26214",
+      "review-鹿鼎-010-01-a1.stderr.txt": "4de330ec04b827b3629543ebf190401d9450cef8f93092c8a2e800b1a6008297",
+      "review-鹿鼎-010-01-a1.patch.yml": "56bdf713a83cf228007852fe876df1e2aeae99ed7e33616de83f6721fbafc25e"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-010-02-a1",
+    "receipt": "runs/review-鹿鼎-010-02-a1.events.jsonl",
+    "session_ids": [
+      "session-91564edd-3d1e-4f4e-85fe-d4d1a2775a73"
+    ],
+    "usage": {
+      "inputTokens": 12055,
+      "cacheReadTokens": 512,
+      "outputTokens": 13441
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-010-02-a1.prompt.txt": "972870fe17188adc8f7b12b9994b7b76c7d703910071105930120544ec875873",
+      "review-鹿鼎-010-02-a1.stdout.txt": "8e9e73ea5cad0d576dd11648842ce0a54ed3d6f0e3c01981f8c4f110f86bcdd7",
+      "review-鹿鼎-010-02-a1.stderr.txt": "18bfac4c4845c12f19e19bd9956dbf7eb2b84a189f6d241872b4afbc501d1ff0",
+      "review-鹿鼎-010-02-a1.patch.yml": "8e8cf171305985e6fd1e5fd790c2640647df4676f18cd5a95bed54773b9eb9ea"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-010-03-a1",
+    "receipt": "runs/review-鹿鼎-010-03-a1.events.jsonl",
+    "session_ids": [
+      "session-dccd31d9-ed2b-4243-8c96-7da97cd3706b"
+    ],
+    "usage": {
+      "inputTokens": 6236,
+      "cacheReadTokens": 512,
+      "outputTokens": 11544
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-010-03-a1.prompt.txt": "8b11587fa7a408049c727d688d516d40730cebfba293539b0f8237a2b2e033b6",
+      "review-鹿鼎-010-03-a1.stdout.txt": "2689b2469f1951b1e95d133716e197f826ebee6b43fd0946cc595978b23a5502",
+      "review-鹿鼎-010-03-a1.stderr.txt": "b9d3372b2374ecac0ea02611765e6d1deffd00cbe799617628da5bc7f22838a2",
+      "review-鹿鼎-010-03-a1.patch.yml": "8049e3b22acc86ac1fd2dcb04fd0ceb8b5a47de6aa7c4c21f6ffde479994d809"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-011-01-a1",
+    "receipt": "runs/review-鹿鼎-011-01-a1.events.jsonl",
+    "session_ids": [
+      "session-21ecad80-c1ca-47f7-8554-535bcc70cec3"
+    ],
+    "usage": {
+      "inputTokens": 11432,
+      "cacheReadTokens": 512,
+      "outputTokens": 14049
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-011-01-a1.prompt.txt": "2e8a91282bf5e215a52d08585a750719727f1137c789f478ff14b75e738b8ee6",
+      "review-鹿鼎-011-01-a1.stdout.txt": "0d70d1e0f8263bbf96e9de76af83af0332944f7e9ca694b4994e0d72ade81dba",
+      "review-鹿鼎-011-01-a1.stderr.txt": "d5ad453eb184016e3e05aa79cd26f5c57d711bc3c3792a2204b42d25cc7ff601",
+      "review-鹿鼎-011-01-a1.patch.yml": "346d9b53379a4caf43a20357edb2ce25615455d86dd920d1999e7d46a0d33b23"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-011-02-a1",
+    "receipt": "runs/review-鹿鼎-011-02-a1.events.jsonl",
+    "session_ids": [
+      "session-aa54f41a-246f-400e-a37d-faee3778a1b7"
+    ],
+    "usage": {
+      "inputTokens": 5834,
+      "cacheReadTokens": 512,
+      "outputTokens": 9723
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-011-02-a1.prompt.txt": "4e56ad36100baa82f14eaddc24e76b02b94881025dcb9b42d78e4e915866c80e",
+      "review-鹿鼎-011-02-a1.stdout.txt": "30061d846620d80b9459ed1ace99144c76f47291c197a9661d9d8bd63bcada22",
+      "review-鹿鼎-011-02-a1.stderr.txt": "7f82779046be974c48e5a50be949bd2c840396d0e84d0cff7589ecd585aafe86",
+      "review-鹿鼎-011-02-a1.patch.yml": "bcae53ca8cdc57672c1062924d026fce749a3f1d196440d7999f7e2ac1731f84"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-012-01-a1",
+    "receipt": "runs/review-鹿鼎-012-01-a1.events.jsonl",
+    "session_ids": [
+      "session-bcf30645-4f44-48e8-a502-f9ca324e96b8"
+    ],
+    "usage": {
+      "inputTokens": 11217,
+      "cacheReadTokens": 512,
+      "outputTokens": 18763
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-012-01-a1.prompt.txt": "91eaded1d3b3259e218b8d4fdcd07d13a83a495d4ff56548cc8348aaffa789b1",
+      "review-鹿鼎-012-01-a1.stdout.txt": "a4f3d34f1421df78024cccf591003bca9ea4aafc98cb736aea9be38ab1cfb360",
+      "review-鹿鼎-012-01-a1.stderr.txt": "77cea501ab9cfb64cb469b3fa9011357e7873878c39f9dcd7ba8d3c7390ee72b",
+      "review-鹿鼎-012-01-a1.patch.yml": "71c8ce0bcf7f2c388049ce18c921e2512260db7e4f7cc05752aff50b6c20102b"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-012-02-a1",
+    "receipt": "runs/review-鹿鼎-012-02-a1.events.jsonl",
+    "session_ids": [
+      "session-1f648882-44f9-4b11-84b3-38b5eaed2c3d"
+    ],
+    "usage": {
+      "inputTokens": 8024,
+      "cacheReadTokens": 512,
+      "outputTokens": 12083
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-012-02-a1.prompt.txt": "eb90046ad6a6168d337927ca1daf4727838d93e945c67b1e46af4a8d1f9c92c6",
+      "review-鹿鼎-012-02-a1.stdout.txt": "a989668d9310a3ef67c20ed669382b19180edcc3162a239f1e6d836f687e9daf",
+      "review-鹿鼎-012-02-a1.stderr.txt": "b89c678d57f19944bd965b8e3b39700ea017261e4541ac80ebe8b29cb1b4ee77",
+      "review-鹿鼎-012-02-a1.patch.yml": "10d9ed990bc1eaa20b81162888504bdafcccfd97afd93ccf6f6368ae2eec9f1f"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-013-01-a1",
+    "receipt": "runs/review-鹿鼎-013-01-a1.events.jsonl",
+    "session_ids": [
+      "session-e34185de-4080-4f30-af93-eb6142664245"
+    ],
+    "usage": {
+      "inputTokens": 11163,
+      "cacheReadTokens": 512,
+      "outputTokens": 19379
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-013-01-a1.prompt.txt": "23382397888b2d59b4e6d009e31e1f3afc341dde79e9bd6382e0d1282563ec36",
+      "review-鹿鼎-013-01-a1.stdout.txt": "c0d812540999f79212a9fd3a73fb3f94150429445cf663cc0fe1282c11bb0852",
+      "review-鹿鼎-013-01-a1.stderr.txt": "fd3868530f358ca3a00ecb03a856b6fe28851d28ff40c9796e1e4ac78dae41b0",
+      "review-鹿鼎-013-01-a1.patch.yml": "8d0aaef127a867f2eb72fe390461c5ce7564d2a6db02f531356b203ae2152f29"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-013-02-a1",
+    "receipt": "runs/review-鹿鼎-013-02-a1.events.jsonl",
+    "session_ids": [
+      "session-aea63e00-0f9e-40d9-ae98-a03613c35be5"
+    ],
+    "usage": {
+      "inputTokens": 11076,
+      "cacheReadTokens": 512,
+      "outputTokens": 21141
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-013-02-a1.prompt.txt": "66cec3c7566bb5dfb975c41358fc89369bda0311d1f3690e553a1d6c3b900d5b",
+      "review-鹿鼎-013-02-a1.stdout.txt": "1371e3a93539bdb44d39d61b1808e0e8173a89095394cc09a3d72dfd941aa25d",
+      "review-鹿鼎-013-02-a1.stderr.txt": "a02f86c90b2a5efdff33cc861c81af1547af9c1057748129ec3426972d9fa15e",
+      "review-鹿鼎-013-02-a1.patch.yml": "ec73a970ace4d4839a04ab5f6e1201161c280062385845cd154610e07a7480c1"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-013-03-a1",
+    "receipt": "runs/review-鹿鼎-013-03-a1.events.jsonl",
+    "session_ids": [
+      "session-02424398-e1c0-44e1-be5f-5660437c2ef3"
+    ],
+    "usage": {
+      "inputTokens": 2747,
+      "cacheReadTokens": 512,
+      "outputTokens": 9939
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-013-03-a1.prompt.txt": "bb55a7d60c24e07ff717e9ec5fd9b73856b1d811c42bcbbaee6cbc63de463952",
+      "review-鹿鼎-013-03-a1.stdout.txt": "54d28743120bef4e0dfbafc369213d8d11a007e542e54f8d5a9fb523891a0329",
+      "review-鹿鼎-013-03-a1.stderr.txt": "a732beb82d0661ed54f414557d802ca550d23009b9dfb913b6696d7e1a67779b",
+      "review-鹿鼎-013-03-a1.patch.yml": "64c9e5999df8e5b5e6ff9c2e18a90dc72f8a7d64646aba87f70b77f8f591a113"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-014-01-a1",
+    "receipt": "runs/review-鹿鼎-014-01-a1.events.jsonl",
+    "session_ids": [
+      "session-52c59d6c-070c-4ee1-b3be-b8e13795d0fb"
+    ],
+    "usage": {
+      "inputTokens": 11360,
+      "cacheReadTokens": 512,
+      "outputTokens": 21249
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-014-01-a1.prompt.txt": "1cbcf373e0c5ba5b07b5c1f370149b73a367e0cbc156318348de30ec1007a965",
+      "review-鹿鼎-014-01-a1.stdout.txt": "511f03406624d38c1f422a9f5cb8d5871c77eb94a31ae22ad3a7744525df6507",
+      "review-鹿鼎-014-01-a1.stderr.txt": "6764ecb297e34cae44baaf39a9525867fa67936fc6224c7b884b4ab1d5858f09",
+      "review-鹿鼎-014-01-a1.patch.yml": "3271f1c32f270489958ad147445291b6478c81b1e0a1f971e187e1f77d365e32"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-014-02-a1",
+    "receipt": "runs/review-鹿鼎-014-02-a1.events.jsonl",
+    "session_ids": [
+      "session-dc45845e-2e53-4d2f-bb7a-f8110765fd15"
+    ],
+    "usage": {
+      "inputTokens": 11219,
+      "cacheReadTokens": 512,
+      "outputTokens": 24661
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-014-02-a1.prompt.txt": "2e58c66abb7685c65632969fbd4c6a2228a0dc823ea8f0ae4669e4b0339e872c",
+      "review-鹿鼎-014-02-a1.stdout.txt": "3ad3e49c8fbb0bb796e49fcba8a8ad9df97a088766b41cd8bdbc269c42d3f8bb",
+      "review-鹿鼎-014-02-a1.stderr.txt": "00507e185cb6cd4fc88296335af2317c77ab9186f0d532a773182fe126fdb44f",
+      "review-鹿鼎-014-02-a1.patch.yml": "13f080e181a282aca72fb5cbdab91ebd4e0c8841bae90d7a1788faffefd8f71a"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-014-03-a1",
+    "receipt": "runs/review-鹿鼎-014-03-a1.events.jsonl",
+    "session_ids": [
+      "session-6f1f36c5-d6b7-4cb6-8c58-51d5e628a681"
+    ],
+    "usage": {
+      "inputTokens": 1855,
+      "cacheReadTokens": 512,
+      "outputTokens": 1581
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-014-03-a1.prompt.txt": "10028a86c9b6661b8e59c429b662eec14946f259625c58d98fa90b6d7dc15e68",
+      "review-鹿鼎-014-03-a1.stdout.txt": "3cde8e8266e40b6069f6fd9edf0b371fb3f1c132014e20028b660ee6575cbaac",
+      "review-鹿鼎-014-03-a1.stderr.txt": "c7829f102c11fb8398969b6eb6982578dd1dad73efdc6dee695daa77e79dde04",
+      "review-鹿鼎-014-03-a1.patch.yml": "53adc7d68e87ad830360d48bffd7150942ecd1965946cc77cd2866479eba0346"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-015-01-a1",
+    "receipt": "runs/review-鹿鼎-015-01-a1.events.jsonl",
+    "session_ids": [
+      "session-3b19c4b8-1e84-45db-8636-671fc666cd5e"
+    ],
+    "usage": {
+      "inputTokens": 11168,
+      "cacheReadTokens": 512,
+      "outputTokens": 26309
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-015-01-a1.prompt.txt": "80545b446e4e3bdd749c92c2a3f018261a586e3f5c078d1c9737339663979bba",
+      "review-鹿鼎-015-01-a1.stdout.txt": "4be41a9ccb585cb72029becd672d9adc0bdf1d24850ad63eb0f3d9ee1a54ceb7",
+      "review-鹿鼎-015-01-a1.stderr.txt": "d7dcaa377f7a88fce3bba4ff0a6d98bb43bdefa524cc89f2bc0ebff280c09244",
+      "review-鹿鼎-015-01-a1.patch.yml": "b31eefcbcac63e23adf2057efecef6db8279fcff6f6d2ce495941d3ce04deec5"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-015-02-a1",
+    "receipt": "runs/review-鹿鼎-015-02-a1.events.jsonl",
+    "session_ids": [
+      "session-b5e6f738-bdfe-4ae2-a05a-bc5675276e6b"
+    ],
+    "usage": {
+      "inputTokens": 11820,
+      "cacheReadTokens": 512,
+      "outputTokens": 25622
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-015-02-a1.prompt.txt": "c0755b92522a1d95db51bf8fcdd3e6e95f8af5e8b69f3a91c374bd85a7da5b2b",
+      "review-鹿鼎-015-02-a1.stdout.txt": "d9d9b0ff2f764b24a4c24093b822507646f6fd6bfea1bc8a805c8a4dad75e004",
+      "review-鹿鼎-015-02-a1.stderr.txt": "6af19e037728e9480558545283ec715ca9b438980edccc14cebf1404886b80c7",
+      "review-鹿鼎-015-02-a1.patch.yml": "4862437c465c6ad26f77d4799d07f47a3659461d1d2becb40968a520e7fea0d5"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-015-03-a1",
+    "receipt": "runs/review-鹿鼎-015-03-a1.events.jsonl",
+    "session_ids": [
+      "session-0082356c-d590-4344-b102-c8dfb3827f06"
+    ],
+    "usage": {
+      "inputTokens": 2732,
+      "cacheReadTokens": 512,
+      "outputTokens": 8426
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-015-03-a1.prompt.txt": "156318cab010565ae8679e81d63985aa373dc4a8a24a56764cd6c2746d08ed65",
+      "review-鹿鼎-015-03-a1.stdout.txt": "11da2a850251beb5de6b73a8e4e15bc5228f6914276a18fa0017730f25c20e31",
+      "review-鹿鼎-015-03-a1.stderr.txt": "2a4d2da09ac489508aca4b395497eeffde2ad6247f88390d71ca373a18008a66",
+      "review-鹿鼎-015-03-a1.patch.yml": "de3e868855f2f4b88f91cb0855992ad39913db14980dfefe9fb11d9e070c1dc0"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-016-01-a1",
+    "receipt": "runs/review-鹿鼎-016-01-a1.events.jsonl",
+    "session_ids": [
+      "session-8226ea68-2279-454d-8a05-f5244a94e95b"
+    ],
+    "usage": {
+      "inputTokens": 11217,
+      "cacheReadTokens": 512,
+      "outputTokens": 8467
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-016-01-a1.prompt.txt": "9fb58641d961f4ae157a55b7ca7c991888998445e2c6884a1420390de43b6db9",
+      "review-鹿鼎-016-01-a1.stdout.txt": "228ffee7e6c745a7f49a855431eb1fa52606015856dcf156d99a6a531562df96",
+      "review-鹿鼎-016-01-a1.stderr.txt": "a37a589ff6f38dcbb8bae71f392694403739ff109fd6d207fa2bfd5992f78246",
+      "review-鹿鼎-016-01-a1.patch.yml": "52c1a4cc0235ed81490f1a46d330dd978a5ca1fafd6c8853f0f38e86c1947a3b"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-016-02-a1",
+    "receipt": "runs/review-鹿鼎-016-02-a1.events.jsonl",
+    "session_ids": [
+      "session-69dad9dc-246d-45da-b569-ca9dabf44f2f"
+    ],
+    "usage": {
+      "inputTokens": 10071,
+      "cacheReadTokens": 512,
+      "outputTokens": 11445
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-016-02-a1.prompt.txt": "5eccedd8148462439a1cb636337927880123825f941133282074c00eb157f208",
+      "review-鹿鼎-016-02-a1.stdout.txt": "768add0efa96288cb9225f7326a7740247b78ee96efc6ec8a293b1e703b28ee1",
+      "review-鹿鼎-016-02-a1.stderr.txt": "0536f45828e311384de59fe6d60b70ab93dab1e1702a12c7044e000f865f727e",
+      "review-鹿鼎-016-02-a1.patch.yml": "7dbf848ae40b8e8a1e6bdc900a65bceb09c38b1c7f032f4f9bf9e2de499ea046"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-017-01-a1",
+    "receipt": "runs/review-鹿鼎-017-01-a1.events.jsonl",
+    "session_ids": [
+      "session-1b2d518e-0112-4570-b699-0ef0f5297c6b"
+    ],
+    "usage": {
+      "inputTokens": 11059,
+      "cacheReadTokens": 512,
+      "outputTokens": 19178
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-017-01-a1.prompt.txt": "02e44ad1f2127b41aab9d7ec5f3e4efcde9f6a6d2bf26cd0b6d25db3f4c74605",
+      "review-鹿鼎-017-01-a1.stdout.txt": "75ceb5a90fc9e1cd0f8fdff6e4c14e5b68bd5d31b9850404a4f9da869ae6747b",
+      "review-鹿鼎-017-01-a1.stderr.txt": "5b42b177f487dc851db045202f3db0c5906fadc1292b24219a560f3b0e7b03bc",
+      "review-鹿鼎-017-01-a1.patch.yml": "22316d99400dc1ff3770478e5187235b47ce11c88ff0fe99aca64243e328f8f1"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-017-02-a1",
+    "receipt": "runs/review-鹿鼎-017-02-a1.events.jsonl",
+    "session_ids": [
+      "session-ada75954-0269-43ee-bd4e-79bb0027bc4b"
+    ],
+    "usage": {
+      "inputTokens": 8465,
+      "cacheReadTokens": 512,
+      "outputTokens": 11346
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-017-02-a1.prompt.txt": "4a4ca9abf51bb401a9c8d0623628dad10e5933deafe486d9fd7dd719cb08043f",
+      "review-鹿鼎-017-02-a1.stdout.txt": "e9ced315c499b636914c00682e21c7cd62e5debd551358d9a4015214d1e5466f",
+      "review-鹿鼎-017-02-a1.stderr.txt": "03f6b706dd6772b6f8d46f8c17fad9d862fe691b56361fc5372e4d12721597fb",
+      "review-鹿鼎-017-02-a1.patch.yml": "6c95e50f81b17aba886fa4178fb0eb9bd876245bb7b657e99510685da45bffd2"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-018-01-a1",
+    "receipt": "runs/review-鹿鼎-018-01-a1.events.jsonl",
+    "session_ids": [
+      "session-32517eac-4fb4-411e-94cf-c66e3afae0b6"
+    ],
+    "usage": {
+      "inputTokens": 11088,
+      "cacheReadTokens": 512,
+      "outputTokens": 16362
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-018-01-a1.prompt.txt": "11ff31e6e43d412f9aa8dd555ce5ed76d3e0d7a099ed65d9ed966ea7eac47599",
+      "review-鹿鼎-018-01-a1.stdout.txt": "f881dfea9c2375960e5725abc05342e7b8b996e2b27484c1a2b493303b81db84",
+      "review-鹿鼎-018-01-a1.stderr.txt": "f40d1ca93d26698d83a0dfd84c44ec7fb48def5f7d8cbb3717b4d9b011eb6046",
+      "review-鹿鼎-018-01-a1.patch.yml": "df7bebe23c35e61debe1e91e662effbc82d19cece923c653ee3f16d985e62dd6"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-018-02-a1",
+    "receipt": "runs/review-鹿鼎-018-02-a1.events.jsonl",
+    "session_ids": [
+      "session-a3347359-e350-4e96-b418-ce4253f25598"
+    ],
+    "usage": {
+      "inputTokens": 12046,
+      "cacheReadTokens": 512,
+      "outputTokens": 21227
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-018-02-a1.prompt.txt": "cd415d6f260580409300a960781fc6e0350081e28f83e984c549431f6f23bf4d",
+      "review-鹿鼎-018-02-a1.stdout.txt": "fc124209dda22d937c2cd4552604d8e43dcb5afe848322b6d507d3988f74eb4e",
+      "review-鹿鼎-018-02-a1.stderr.txt": "2e7d55ee16fddd4f1781f7d6ee656c185cadf693843c68b640309b7e991efcbd",
+      "review-鹿鼎-018-02-a1.patch.yml": "2c6341c470cfda9578f59cddbaf92790f76851f56dac843c13c4799a3a7f6f54"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-018-03-a1",
+    "receipt": "runs/review-鹿鼎-018-03-a1.events.jsonl",
+    "session_ids": [
+      "session-dccf1e0b-7252-45aa-9fb7-c0229120dcc6"
+    ],
+    "usage": {
+      "inputTokens": 3950,
+      "cacheReadTokens": 512,
+      "outputTokens": 10376
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-018-03-a1.prompt.txt": "6ddc0f1088edce1024be6e818a86309f397cc8fa504aa5b669531631b8b31825",
+      "review-鹿鼎-018-03-a1.stdout.txt": "4701350f1d008c4c14b669f5ad5adab43a364c4a6e48232aa35c9d40adcd5541",
+      "review-鹿鼎-018-03-a1.stderr.txt": "f4eed84a8ba74ca9c6933b9cd50ad4b2136aa97adbc2322cec086d3ad6a37661",
+      "review-鹿鼎-018-03-a1.patch.yml": "f00aacc5d39b5694421f9522f7a1c96279ac78fe678fd7ecc5de7fa84c8e499b"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-019-01-a1",
+    "receipt": "runs/review-鹿鼎-019-01-a1.events.jsonl",
+    "session_ids": [
+      "session-7e0b531b-f542-4bbc-b2df-e9a21354e2ef"
+    ],
+    "usage": {
+      "inputTokens": 12169,
+      "cacheReadTokens": 512,
+      "outputTokens": 17251
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-019-01-a1.prompt.txt": "b9f86a2067ed4c80d3ba3b878f8a7e840c2910acfb8e17e77fb8b849506dcdcd",
+      "review-鹿鼎-019-01-a1.stdout.txt": "f4d41d506628c125c88a4b4fdf95c1cba013718b7e6ab9e9b11e333388d8477b",
+      "review-鹿鼎-019-01-a1.stderr.txt": "4e0774eadf1c8b788b2281575c116781e7d13b2a730ec017d2cefbd494209666",
+      "review-鹿鼎-019-01-a1.patch.yml": "7bdede06f502a8c46391c988c28f6e9bac2d51e570f30d4e4bb148bfd59f64e5"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-019-02-a1",
+    "receipt": "runs/review-鹿鼎-019-02-a1.events.jsonl",
+    "session_ids": [
+      "session-1a7d5e14-bfaa-4198-96cc-8b20b2e4024c"
+    ],
+    "usage": {
+      "inputTokens": 5548,
+      "cacheReadTokens": 512,
+      "outputTokens": 9360
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-019-02-a1.prompt.txt": "3807ae5cd5ae88595060b73a876e81e2d738ea947fcc785ebdd16491f035f899",
+      "review-鹿鼎-019-02-a1.stdout.txt": "492db748e90cb3e84c879ada8ad71c8b89454c62c7b6bab08a9deff8819f064b",
+      "review-鹿鼎-019-02-a1.stderr.txt": "24f8a96bd9dca6641394f2004fc3b3115442c125c6c33516e5ef5e7543032655",
+      "review-鹿鼎-019-02-a1.patch.yml": "0440c11a8ac82130418809a39cfc7d0ad2a964d7d3c4a7bf9041e9e06a492283"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-020-01-a1",
+    "receipt": "runs/review-鹿鼎-020-01-a1.events.jsonl",
+    "session_ids": [
+      "session-89b786bd-0586-4186-be54-d06871eaa95b"
+    ],
+    "usage": {
+      "inputTokens": 10949,
+      "cacheReadTokens": 512,
+      "outputTokens": 16741
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-020-01-a1.prompt.txt": "41dbfcf9605f272041bcaf625ae071946fa073b85b6d0cc4be31d1468f112c7a",
+      "review-鹿鼎-020-01-a1.stdout.txt": "bb2612a460b9bb23241e2f589e112b4ad7215955cad26292bcbac1e8e5c2e04a",
+      "review-鹿鼎-020-01-a1.stderr.txt": "c875a1e0862522427061be912c40c356b570e76ec0ebaf8c299599eaf6921d04",
+      "review-鹿鼎-020-01-a1.patch.yml": "248ad2e38598359ecd0f54a78275624c8cbd3d7ac247db8f316e07c26d48795d"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-020-02-a1",
+    "receipt": "runs/review-鹿鼎-020-02-a1.events.jsonl",
+    "session_ids": [
+      "session-3c1223a4-10fa-4fea-8f71-7c0af0a19a76"
+    ],
+    "usage": {
+      "inputTokens": 11492,
+      "cacheReadTokens": 512,
+      "outputTokens": 16651
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-020-02-a1.prompt.txt": "be1215a0336b03eb221c945f6741dee6c6db558eb8d09f7d01ee2c3caf97faa3",
+      "review-鹿鼎-020-02-a1.stdout.txt": "297b5d4e860196783e04486db48d9f545e59745ce7e5f8e217e65210c6d46e77",
+      "review-鹿鼎-020-02-a1.stderr.txt": "4c72c62e41c815efa9dfd66d8f69f7cf223a0e83c5019210acc3dcda154ad274",
+      "review-鹿鼎-020-02-a1.patch.yml": "78c6b6a72133a7878a87f179745cdd3ad97b0c9e6d230cfe6c4b1107e2a4d174"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-020-03-a1",
+    "receipt": "runs/review-鹿鼎-020-03-a1.events.jsonl",
+    "session_ids": [
+      "session-446d3b02-762e-4bad-b69a-eb0adea23e71"
+    ],
+    "usage": {
+      "inputTokens": 1869,
+      "cacheReadTokens": 512,
+      "outputTokens": 9307
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-020-03-a1.prompt.txt": "8a19141f1d7fcef4d9eea730264bb2acfe8788060a2a9c17a48c8b4ea6b0a79a",
+      "review-鹿鼎-020-03-a1.stdout.txt": "d625c71766e4dc067f046ff2b4fe3793ac3539c90fa2c0bb8b842dc7f6781982",
+      "review-鹿鼎-020-03-a1.stderr.txt": "dea4d32eaff799828adb352a1965f54312460410b89c2d1e87a83109c5f78a64",
+      "review-鹿鼎-020-03-a1.patch.yml": "b34385728a8ecfa7db652fd061a407879f09f14f475428bc8773478d485867c1"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-021-01-a1",
+    "receipt": "runs/review-鹿鼎-021-01-a1.events.jsonl",
+    "session_ids": [
+      "session-c9aeea30-731e-40c7-98c6-c3ef6cc703c7"
+    ],
+    "usage": {
+      "inputTokens": 11643,
+      "cacheReadTokens": 512,
+      "outputTokens": 18082
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-021-01-a1.prompt.txt": "81ea10867a6506287ab543009f1088ae0b4144b592e0205560efdb76cd32b705",
+      "review-鹿鼎-021-01-a1.stdout.txt": "f27d5c8139f89a017ed8ddb31f07693e19dab8a27cbea87910416f1e1a2a830d",
+      "review-鹿鼎-021-01-a1.stderr.txt": "8b88bec3cc4b1dc31e466434e3988f9c74a8e69c89f0c0c901981f678e39e403",
+      "review-鹿鼎-021-01-a1.patch.yml": "c5354c1189105fa04d101da524eaf0046004d984abbf07859213fa7b7712a1dc"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-021-02-a1",
+    "receipt": "runs/review-鹿鼎-021-02-a1.events.jsonl",
+    "session_ids": [
+      "session-1e9378b7-b5a6-43e9-8bd3-5c9d8119a979"
+    ],
+    "usage": {
+      "inputTokens": 8939,
+      "cacheReadTokens": 512,
+      "outputTokens": 22243
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-021-02-a1.prompt.txt": "7f4a79c55f5926e6b3b923b0d9dc63b88fe48366714160e0cb362be152918a3c",
+      "review-鹿鼎-021-02-a1.stdout.txt": "a8eac304ca1f888ebc80b0d624aec1672cba05766de1cee9741fd6b1089921ef",
+      "review-鹿鼎-021-02-a1.stderr.txt": "ebf6380a2579d7d5dd226f0d339307fcfaf37af6c7fbbddf2ca2e731f4151b7d",
+      "review-鹿鼎-021-02-a1.patch.yml": "3b3c732b4dba97cca579b24772629ccba44ccc8ae2fb874d63aa1b0dfad7c486"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-022-01-a1",
+    "receipt": "runs/review-鹿鼎-022-01-a1.events.jsonl",
+    "session_ids": [
+      "session-8475c784-24bf-4bf5-92e0-73e36c70b6dd"
+    ],
+    "usage": {
+      "inputTokens": 11906,
+      "cacheReadTokens": 512,
+      "outputTokens": 17900
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-022-01-a1.prompt.txt": "b1cbf1416b988a79377804a82b3eac0248bd90d57f42a245c051cdbca491af06",
+      "review-鹿鼎-022-01-a1.stdout.txt": "219fdebb0537a73df6e575a553a82d1c25bce045e5c66569ac168574992a4c3f",
+      "review-鹿鼎-022-01-a1.stderr.txt": "d2c62c6722205c3a77bd4038bd8a83412fac2316cb6e8112ef6cf4f4c4a47a77",
+      "review-鹿鼎-022-01-a1.patch.yml": "50c3d06bd6e817199a1cd4e7ea0f815a62469b5f24dca1f8e1df7dabada06ee6"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-022-02-a1",
+    "receipt": "runs/review-鹿鼎-022-02-a1.events.jsonl",
+    "session_ids": [
+      "session-63264860-4767-4df9-8c90-407298edccdc"
+    ],
+    "usage": {
+      "inputTokens": 11646,
+      "cacheReadTokens": 512,
+      "outputTokens": 11441
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-022-02-a1.prompt.txt": "01e814c7a7b628d0142d0a35ada3232bec86acf743f7a56515c8c7627e020b49",
+      "review-鹿鼎-022-02-a1.stdout.txt": "f9177c8a0a52135af98fd43aed8ed6cfb745dad96dd7912a151f3406a80f5919",
+      "review-鹿鼎-022-02-a1.stderr.txt": "09054dc2cc1db32fc3fdbc90e9a0deb49a48bde82f2b882f8aabf837856d067f",
+      "review-鹿鼎-022-02-a1.patch.yml": "48d19db41cf4f21fa2fadb471699f6ba86bb2c4293eb7206497c2eb410240b22"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-022-03-a1",
+    "receipt": "runs/review-鹿鼎-022-03-a1.events.jsonl",
+    "session_ids": [
+      "session-719d05c2-0a1d-46aa-9037-92465c8dc806"
+    ],
+    "usage": {
+      "inputTokens": 7286,
+      "cacheReadTokens": 512,
+      "outputTokens": 8418
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-022-03-a1.prompt.txt": "4cf6d3aef1acdb77bc27dc49909970da038ff25e61178191bc03c55a03a65af6",
+      "review-鹿鼎-022-03-a1.stdout.txt": "ae3d570fdb2fa5b309651cd4f2d04e2b42e38f2b608ec719b073bc373009d202",
+      "review-鹿鼎-022-03-a1.stderr.txt": "e7ff9658b77c93368bb5c23580f79a5a8f7897e1ace52f248807e73429d08429",
+      "review-鹿鼎-022-03-a1.patch.yml": "dac23d62bf579f150c4bec284891e585f0120f40bdfa263f38433a0a8641f981"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-023-01-a1",
+    "receipt": "runs/review-鹿鼎-023-01-a1.events.jsonl",
+    "session_ids": [
+      "session-ac2d99fc-155e-46e0-a4e9-26b9835a3b8a"
+    ],
+    "usage": {
+      "inputTokens": 11794,
+      "cacheReadTokens": 512,
+      "outputTokens": 11685
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-023-01-a1.prompt.txt": "239aa507c3eb090794b7244d6342e850b68aebd4a279848d6a521da72b968a6f",
+      "review-鹿鼎-023-01-a1.stdout.txt": "a0334a62066337f379f1f6c4056714c47fb5bda82cc8bcf7e67337dca993bf84",
+      "review-鹿鼎-023-01-a1.stderr.txt": "39cdab40253d69ce41ed18e6bd9139de6980b192c6b7c657aadffd1fac0a736a",
+      "review-鹿鼎-023-01-a1.patch.yml": "02150e41c7940c979268fe7aeba30254b1410005f5ebdb719d214f0e54bea1b4"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-023-02-a1",
+    "receipt": "runs/review-鹿鼎-023-02-a1.events.jsonl",
+    "session_ids": [
+      "session-d67637bb-f779-4341-b7b0-3fd5c14d8515"
+    ],
+    "usage": {
+      "inputTokens": 9844,
+      "cacheReadTokens": 512,
+      "outputTokens": 24273
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-023-02-a1.prompt.txt": "95ba57a09fa5a1921d58cc3412ff6d46c641844c1751dcfbd9ee83c7cdf5c111",
+      "review-鹿鼎-023-02-a1.stdout.txt": "48b5400ee5a85adf042834d878e26d90fe999caf2fbad7366b06cb1bbbf610e6",
+      "review-鹿鼎-023-02-a1.stderr.txt": "70ac3c4c9cd61b73bbb92a801c23c62cdd607b9e3cf498d3e205fd10aead2f33",
+      "review-鹿鼎-023-02-a1.patch.yml": "b7c5eb4e3d6e4f49d87b38a1acf6739963f3e9df0a6d2aa002900d199c4c248f"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-024-01-a1",
+    "receipt": "runs/review-鹿鼎-024-01-a1.events.jsonl",
+    "session_ids": [
+      "session-0cd32740-cba9-47ea-becf-7dae14ca56aa"
+    ],
+    "usage": {
+      "inputTokens": 12129,
+      "cacheReadTokens": 512,
+      "outputTokens": 11024
+    },
+    "end_reasons": [
+      {
+        "kind": "completed"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-024-01-a1.prompt.txt": "96f2ec0db90da61d3628306715953ea6cc44240eb26b000c0878d2d02a975fd5",
+      "review-鹿鼎-024-01-a1.stdout.txt": "22352973eae4397cae6307d08c92a3e103953cd662fe00ce50887ef34f971301",
+      "review-鹿鼎-024-01-a1.stderr.txt": "a23b04976ba8ec2eb61908b266368f9cf230d311d2c741dbce9d005f97334870",
+      "review-鹿鼎-024-01-a1.patch.yml": "8a188259bbc7978765499bd19c88eeae6ab15279ee1e435329418cb96fb459e2"
+    }
+  },
+  {
+    "call_id": "review-鹿鼎-024-02-a1",
+    "receipt": "runs/review-鹿鼎-024-02-a1.events.jsonl",
+    "session_ids": [
+      "session-b468c199-c23e-40b3-9a7c-2d854d028c31"
+    ],
+    "usage": {
+      "inputTokens": 7759,
+      "cacheReadTokens": 512,
+      "outputTokens": 32761
+    },
+    "end_reasons": [
+      {
+        "kind": "max-tokens"
+      }
+    ],
+    "headers": [
+      {
+        "config": {
+          "provider": "buddy",
+          "model": "deepseek-v4.1-flash",
+          "reasoningEffort": "low",
+          "maxTokens": 32768
+        },
+        "toolCount": 0,
+        "toolNames": []
+      }
+    ],
+    "file_hashes": {
+      "review-鹿鼎-024-02-a1.prompt.txt": "aafdffd6ef65a199ade168ec88dbf8bc40b7ce24bb269c9fa21595bb43efbd97",
+      "review-鹿鼎-024-02-a1.stdout.txt": "bdc0b21e5a984684b9956749dadb0815f0a7c095412a054dedd10928e491633b",
+      "review-鹿鼎-024-02-a1.stderr.txt": "d34a9380fd58e75cda1e79180945ccbad72c4c381d6f8a0890f3afa005c89f63",
+      "review-鹿鼎-024-02-a1.patch.yml": "8ff95190b3dfb5191a92ffd51bd2d1ae8b0217976be941d9565e3efe20a0d947"
+    }
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "pid": 42116,
+  "launched_at": "2026-10-25T11:08:04.0907871+08:00",
+  "stdout": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\handoff\\resume-repair\\supervisor.stdout.log",
+  "stderr": "F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\handoff\\resume-repair\\supervisor.stderr.log",
+  "retained": true,
+  "provider": "buddy",
+  "model": "deepseek-v4.1-flash",
+  "budget": 15000000,
+  "baseline_usage": 1613813
+}
