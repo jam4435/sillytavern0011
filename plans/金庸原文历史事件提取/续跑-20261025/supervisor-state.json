@@ -1,15 +1,13 @@
 {
-  "pid": 37012,
+  "pid": 36824,
   "status": "needs_attention",
   "phase": "source",
-  "updated_at": "2026-10-25T11:38:46+0800",
+  "updated_at": "2026-10-25T16:42:51+0800",
   "usage": {
-    "inputTokens": 883286,
-    "cacheReadTokens": 43392,
-    "outputTokens": 1403336,
-    "total": 2330014
+    "inputTokens": 1069050,
+    "cacheReadTokens": 52608,
+    "outputTokens": 1701365,
+    "total": 2823023
   },
-  "failed": [
-    "倚天-001-02"
-  ]
+  "error": "repair supports new-event misplaced exact anchors only"
 }

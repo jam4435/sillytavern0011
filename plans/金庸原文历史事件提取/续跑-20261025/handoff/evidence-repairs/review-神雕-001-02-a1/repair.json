@@ -1,0 +1,28 @@
+{
+  "task_id": "神雕-001-02",
+  "raw_sha256": "85bc94a4847c9575e5d777683b62aec0231c235c8103f5e0dada9a16b3ba5a2b",
+  "changes": [
+    {
+      "new_event": 3,
+      "before": {
+        "book": "神雕侠侣",
+        "line": 271,
+        "anchor": "两人在江湖上行走数月，不得不重回桃花岛，原来黄蓉有了身孕"
+      },
+      "after": {
+        "book": "神雕侠侣",
+        "line": 270,
+        "anchor": "两人在江湖上行走数月，不得不重回桃花岛，原来黄蓉有了身孕"
+      },
+      "source_line": "　　当年郭靖、黄蓉参与华山论剑之后，由黄药师主持成婚，在桃花岛归隐。黄药师性情怪僻，不喜热闹，与女儿女婿同处数月，不觉厌烦起来，留下一封书信，说要另寻清静之地闲居，径自飘然离岛。黄蓉知道父亲脾气，虽然不舍，却也无法可想。初时还道数月之内，父亲必有消息带来，哪知一别经年，音讯杳然。黄蓉思念父亲和师父洪七公，和郭靖出去寻访，两人在江湖上行走数月，不得不重回桃花岛，原来黄蓉有了身孕。"
+    }
+  ],
+  "usage_before": {
+    "inputTokens": 883286,
+    "cacheReadTokens": 43392,
+    "outputTokens": 1403336,
+    "total": 2330014
+  },
+  "validation_issues": [],
+  "semantic_scope": "Only coordinates repaired; original model assertions remain subject to review."
+}

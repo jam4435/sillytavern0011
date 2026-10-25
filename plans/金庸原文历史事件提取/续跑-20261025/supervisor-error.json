@@ -1,0 +1,4 @@
+{
+  "error": "repair supports new-event misplaced exact anchors only",
+  "traceback": "Traceback (most recent call last):\n  File \"F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\supervise.py\", line 65, in main\n    repair_evidence()\n  File \"F:\\Develop\\AI\\sillytavern\\plans\\金庸原文历史事件提取\\续跑-20261025\\repair_pending.py\", line 57, in main\n    raise ValueError('repair supports new-event misplaced exact anchors only')\nValueError: repair supports new-event misplaced exact anchors only\n"
+}

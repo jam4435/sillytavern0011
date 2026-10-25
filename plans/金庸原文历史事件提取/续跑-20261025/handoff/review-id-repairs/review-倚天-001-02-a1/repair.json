@@ -1,0 +1,26 @@
+{
+  "task_id": "倚天-001-02",
+  "changes": [
+    {
+      "before": "批次E/_body.md#EV-0010",
+      "after": "批次E/_body.md#EV-倚天-0010"
+    },
+    {
+      "before": "批次E/_body.md#EV-0011",
+      "after": "批次E/_body.md#EV-倚天-0011"
+    },
+    {
+      "before": "批次E/_body.md#EV-0012",
+      "after": "批次E/_body.md#EV-倚天-0012"
+    }
+  ],
+  "raw_sha256": "2aae824dcc1fa6c1a4b439f6a6b77e9305db8cce113955c465640bb71b23d0ad",
+  "usage_before": {
+    "inputTokens": 883286,
+    "cacheReadTokens": 43392,
+    "outputTokens": 1403336,
+    "total": 2330014
+  },
+  "validation_issues": [],
+  "scope": "Only supplied review identifiers restored; semantic decisions unchanged."
+}

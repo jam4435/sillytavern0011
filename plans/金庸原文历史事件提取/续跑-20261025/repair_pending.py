@@ -1,7 +1,8 @@
-"""Repair uniquely exact misplaced evidence lines while the controller is stopped.
+"""Repair evidence locators between complete extraction waves.
 
-Only evidence line numbers change. Original outputs, accepted events, and usage
-are preserved; rewritten or ambiguous anchors require a separate review.
+Unique exact anchors receive corrected line numbers. Other rejected anchors can
+be reselected by the fixed model from local source lines and must still pass the
+original exact validator. Original outputs and accepted events are preserved.
 """
 import json
 import os
@@ -50,18 +51,31 @@ def main():
         payload = decode(raw.read_text(encoding='utf-8'))
         _, allowed = prompt_for(task,corpus,cards)
         changes = []
+        repair_calls = []
         for issue in old['validation_issues']:
             if issue.get('error') != 'anchor not present verbatim on source line' or 'new_event' not in issue:
                 raise ValueError('repair supports new-event misplaced exact anchors only')
             event = payload['new_events'][issue['new_event']-1]
+            rejected=[]
             for i,ref in enumerate(event['evidence']):
                 source_line = corpus.texts[ref['book']].splitlines()[ref['line']-1]
                 if ref['anchor'] in source_line:
                     continue
-                fixed = corrected_reference(ref,allowed,corpus)
+                try:
+                    fixed = corrected_reference(ref,allowed,corpus)
+                except ValueError:
+                    rejected.append(i)
+                    continue
                 event['evidence'][i] = fixed
                 changes.append(dict(new_event=issue['new_event'],before=ref,after=fixed,
                     source_line=corpus.texts[fixed['book']].splitlines()[fixed['line']-1]))
+            if rejected:
+                from evidence_reselection import reselect
+                repair_id=f'evidence-{call_id}-event{issue["new_event"]}'
+                fixed_event,selected=reselect(task,issue['new_event'],event,rejected,allowed,corpus,repair_id)
+                payload['new_events'][issue['new_event']-1]=fixed_event
+                changes.extend(dict(new_event=issue['new_event'],method='model_reselected',**x) for x in selected)
+                repair_calls.append(repair_id)
         checked = validate(task,payload,allowed,corpus)
         if checked['validation_issues'] or not changes:
             raise ValueError('repair did not clear evidence issues')
@@ -74,23 +88,22 @@ def main():
         audit = HERE/'handoff/evidence-repairs'/call_id
         if audit.exists():
             raise ValueError('repair audit already exists')
-        staged.append((task,raw,result_path,payload,checked,changes,audit))
+        staged.append((task,raw,result_path,payload,checked,changes,audit,repair_calls))
     # Stage every backup before replacing any queue result.
-    for task,raw,path,payload,checked,changes,audit in staged:
+    for task,raw,path,payload,checked,changes,audit,repair_calls in staged:
         audit.mkdir(parents=True)
         (audit/'queue-before.json').write_bytes((HERE/'queue.json').read_bytes())
         (audit/'result-before.json').write_bytes(path.read_bytes())
         dump(audit/'payload.json',payload)
         dump(audit/'repair.json',dict(task_id=task['id'],raw_sha256=sha(raw),changes=changes,
-             usage_before=before_usage,validation_issues=checked['validation_issues'],
-             semantic_scope='Only coordinates repaired; original model assertions remain subject to review.'))
-    for task,raw,path,payload,checked,changes,audit in staged:
+             usage_before=before_usage,usage_after=usage_total(),repair_calls=repair_calls,validation_issues=checked['validation_issues'],
+             semantic_scope='Evidence locators only; original model assertions remain subject to review.'))
+    for task,raw,path,payload,checked,changes,audit,repair_calls in staged:
         dump(path,checked)
         task.update(status='reviewed',event_count=len(checked['events']),issue_count=0)
     if staged:
         dump(HERE/'queue.json',tasks)
-    assert usage_total() == before_usage
-    print(json.dumps(dict(repaired=[x[0]['id'] for x in staged],usage=before_usage),ensure_ascii=False))
+    print(json.dumps(dict(repaired=[x[0]['id'] for x in staged],usage=usage_total()),ensure_ascii=False))
 
 
 if __name__ == '__main__':

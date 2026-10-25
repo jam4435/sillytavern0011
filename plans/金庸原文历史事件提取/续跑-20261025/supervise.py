@@ -13,6 +13,7 @@ from differ import prepare_diff, run_diff
 import deduplicate
 from repair_pending import main as repair_evidence
 from parallel_source import run_wave
+from repair_review_ids import main as repair_review_ids, ERROR as REVIEW_ID_ERROR
 
 PRIORITY=['鹿鼎记','倚天屠龙记','笑傲江湖','天龙八部','射雕英雄传','神雕侠侣']
 
@@ -52,6 +53,11 @@ def main(parallel_books=1, source_waves=None):
             if usage_total()['total']+90000>TOTAL_TOKEN_LIMIT:
                 state('stopped','source',reason='aggregate_token_limit');return
             tasks=read_queue('queue.json')
+            if not any(t['status']=='running' for t in tasks) and any(
+                t['status']=='failed' and t.get('error')==REVIEW_ID_ERROR for t in tasks):
+                repair_review_ids()
+                assemble()
+                tasks=read_queue('queue.json')
             failed=[t['id'] for t in tasks if t['status'] in ['running','failed']]
             if failed:
                 state('needs_attention','source',failed=failed);return

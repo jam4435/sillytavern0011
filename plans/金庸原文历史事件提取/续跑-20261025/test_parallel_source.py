@@ -97,6 +97,22 @@ class ParallelSourceTest(unittest.TestCase):
                 self.assertEqual(state.call_args.args,('needs_attention','source'))
                 self.assertFalse((root/'.supervisor.lock').exists())
 
+    def test_supplied_id_repair_precedes_next_parallel_wave(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            tasks=[dict(id='old',book='鹿鼎记',status='failed',error=supervise.REVIEW_ID_ERROR),
+                   dict(id='next',book='鹿鼎记',status='pending')]
+            calls=[]
+            def repair():
+                calls.append('repair');tasks[0]['status']='reviewed';del tasks[0]['error']
+            def wave(*args):calls.append('wave')
+            with patch.multiple(supervise,HERE=root,assert_freeze=lambda:None,
+                                read_queue=lambda _:tasks,usage_total=lambda:dict(total=0),
+                                assemble=lambda:dict(),state=lambda *args,**kwargs:None,
+                                repair_review_ids=repair,run_wave=wave):
+                supervise.main(6,1)
+            self.assertEqual(calls,['repair','wave'])
+
 
 if __name__=='__main__':
     unittest.main()
