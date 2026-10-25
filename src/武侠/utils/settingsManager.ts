@@ -374,7 +374,28 @@ export const BUILTIN_LOCAL_REGEX_RULES: RegexRule[] = [
 export const BUILTIN_LOCAL_REGEX_IDS = new Set<string>(BUILTIN_LOCAL_REGEX_RULES.map(rule => rule.id));
 
 /** 默认总结提示词模板 */
-export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你负责压缩《金庸群侠传》角色的旧人物经历片段。只总结下面提供的旧条目，不改写近期经历，也不要补写未提供的事实。
+export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你负责将《金庸群侠传》角色的旧人物经历压缩成多条完整、可独立理解的阶段记忆。只依据下面提供的旧条目，不改写近期经历，不补写未提供的事实。
+
+角色名称：{{characterName}}
+待压缩的旧经历：
+{{biographyEntries}}
+
+强制要求：
+1. 保留会长期影响人物身份、关系、立场、伤病、生死、师承、重要物品、任务和重大事件认知的事实。
+2. 普通聊天、短时情绪、重复场景动作等无长期意义的细节可以合并或删除；不要为了凑数量而拆分。
+3. 根据事件连续性与阶段边界，把旧经历组织成一条或多条阶段记忆。每条都必须完整、清晰，脱离原始条目也能理解；整批输出必须涵盖旧条目中的所有重要长期事实。
+4. 输入值开头形如 (1200.11.26) 的内容是游戏内日期。不得把现实日期写入结果，不得猜测或虚构日期，不得改变明确日期先后。每条记忆的时间范围只能依据与该阶段相关的输入条目；无法确定时使用“（旧记录时间不详）”。
+5. 输出键名必须以“阶段经历”开头，后接从 1 开始连续编号和简短、具体的阶段标题，例如“阶段经历1-初入江湖”“阶段经历2-结识故人”。每条键名都必须不同；不要输出“经历1”“经历2”等原始经历键。
+6. 每个值必须以该阶段的游戏内时间范围开头，使用全角括号，例如“（1200.11.1~1200.11.5）”；单日可写“（1200.11.1）”。日期格式沿用输入中的游戏内日期格式。日期不详时以“（旧记录时间不详）”开头。括号之后直接写阶段记忆正文，不要再重复时间。
+7. 只输出一个严格合法的 JSON 对象。键是阶段记忆名称，值是包含时间范围和正文的字符串。不要输出 Markdown 代码围栏、注释、解释、前言或 JSON 之外的任何内容；不要使用数组、嵌套对象或额外字段。
+
+输出格式示例（内容仅示范格式，实际内容必须来自输入）：
+{
+  "阶段经历1-初入江湖": "（1200.11.1~1200.11.2）人物在这一阶段建立了重要关系，并形成后续行动的基础。",
+  "阶段经历2-结识故人": "（1200.11.3~1200.11.5）人物在后续事件中经历立场变化，并作出了影响后续剧情的决定。"
+}`;
+
+const LEGACY_DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你负责压缩《金庸群侠传》角色的旧人物经历片段。只总结下面提供的旧条目，不改写近期经历，也不要补写未提供的事实。
 
 角色名称：{{characterName}}
 待压缩的旧经历：
@@ -1082,8 +1103,12 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
       profileIds,
       legacySelection,
     ),
-    promptTemplate:
-      typeof summarySettings.promptTemplate === 'string' ? summarySettings.promptTemplate : defaults.promptTemplate,
+    promptTemplate: (() => {
+      const storedPrompt =
+        typeof summarySettings.promptTemplate === 'string' ? summarySettings.promptTemplate : defaults.promptTemplate;
+      // 只迁移旧版内置默认提示词；用户自己修改过的提示词继续保留。
+      return storedPrompt === LEGACY_DEFAULT_SUMMARY_PROMPT_TEMPLATE ? defaults.promptTemplate : storedPrompt;
+    })(),
     variableStructureTemplate: hasCustomVariableStructureTemplate
       ? summarySettings.variableStructureTemplate!
       : defaults.variableStructureTemplate,
