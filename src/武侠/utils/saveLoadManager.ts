@@ -2230,7 +2230,12 @@ async function reconcileForkBranchMkIdentity(
       actualMessageKeyAliases: actual.messageKeyAliases ?? [],
     });
   }
-  if (actual.id !== getNodeId(actual.parentId, branchMk, branchText, journal.targetLocator.swipeId)) {
+  // If the scanner already resolved the exact same source/branch MK to the target,
+  // leave verification repair to the existing legacy-seal repair path below.
+  if (actual.id === targetNodeId && sourceMk === branchMk &&
+      nodeAcceptsMessageKey(target, branchMk)) return null;
+  if (actual.id !== targetNodeId &&
+      actual.id !== getNodeId(actual.parentId, branchMk, branchText, journal.targetLocator.swipeId)) {
     return reject('actual-node-id-does-not-match-branch-message', {
       actualNodeId: actual.id,
       expectedActualNodeId: getNodeId(actual.parentId, branchMk, branchText, journal.targetLocator.swipeId),
@@ -2281,7 +2286,8 @@ async function reconcileForkBranchMkIdentity(
   }
 
   const acceptedHashes = new Set(latestTarget.verification?.acceptedSelectedMksHashes ?? []);
-  if (eventSealMatches && latestTarget.verification &&
+  const isBranchMkVariant = Boolean(branchMk && (branchMk !== sourceMk || target.messageKey === null));
+  if (eventSealMatches && isBranchMkVariant && latestTarget.verification &&
       currentVerification.selectedMksHash !== latestTarget.verification.selectedMksHash) {
     acceptedHashes.add(currentVerification.selectedMksHash);
   }
