@@ -2844,6 +2844,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
                 {!isConversationSummaryTraceStale &&
                   conversationSummaryTrace &&
+                  conversationSummaryTrace.mode !== 'off' &&
                   conversationSummaryTrace.olderFullReplyMessageIds.length > 0 && (
                     <div className="summary-backfill-error">
                       <strong>上下文异常：旧楼层完整正文仍在发送</strong>
