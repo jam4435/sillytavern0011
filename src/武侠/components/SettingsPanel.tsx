@@ -2842,6 +2842,35 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   </div>
                 )}
 
+                {!isConversationSummaryTraceStale &&
+                  conversationSummaryTrace &&
+                  conversationSummaryTrace.olderFullReplyMessageIds.length > 0 && (
+                    <div className="summary-backfill-error">
+                      <strong>上下文异常：旧楼层完整正文仍在发送</strong>
+                      <p>
+                        有 {conversationSummaryTrace.olderFullReplyMessageIds.length} 条超出保留范围的 Assistant 正文仍进入最终上下文。
+                        请检查对应楼层是否缺少可用小总结，或摘要压缩是否未生效。
+                      </p>
+                      <p>涉及楼层：{conversationSummaryTrace.olderFullReplyMessageIds.join('、')}</p>
+                    </div>
+                  )}
+
+                {!isConversationSummaryTraceStale &&
+                  conversationSummaryTrace &&
+                  conversationSummaryTrace.items.some(item => item.contextState === 'empty') && (
+                    <div className="summary-backfill-error">
+                      <strong>需要检查：存在空正文占位</strong>
+                      <p>
+                        以下 Assistant 楼层仍出现在最终上下文中，但发送内容为空：
+                        {' '}
+                        {conversationSummaryTrace.items
+                          .filter(item => item.contextState === 'empty')
+                          .map(item => item.messageId)
+                          .join('、')}
+                      </p>
+                    </div>
+                  )}
+
                 {!smallSummaryBackfillSnapshot ? (
                   <div className="summary-trace-empty">尚未扫描当前聊天。</div>
                 ) : smallSummaryItems.length === 0 ? (
