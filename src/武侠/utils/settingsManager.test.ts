@@ -176,20 +176,51 @@ describe('settingsManager ui theme', () => {
     expect(document.documentElement.style.colorScheme).toBe('light');
   });
 
-  it('defaults and migrates the extra-variable readonly context rounds to one or two', () => {
-    expect(createDefaultDisplaySettings().summarySettings.variableContextRounds).toBe(1);
+  it('defaults extra-variable readonly context rounds to zero and migrates legacy settings safely', () => {
+    expect(createDefaultDisplaySettings().summarySettings.variableContextRounds).toBe(0);
+    expect(createDefaultDisplaySettings().summarySettings.variableContextRoundsCustomized).toBe(false);
 
+    // The old default was 1 round. Treat an unmarked legacy 1 as the old default and migrate it to 0.
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({ summarySettings: { variableContextRounds: 1 } }),
+    );
+    expect(loadSettings().summarySettings.variableContextRounds).toBe(0);
+    expect(loadSettings().summarySettings.variableContextRoundsCustomized).toBe(false);
+
+    // 2 rounds could only have come from a non-default choice, so preserve it during migration.
     window.localStorage.setItem(
       'wuxia_display_settings',
       JSON.stringify({ summarySettings: { variableContextRounds: 2 } }),
     );
     expect(loadSettings().summarySettings.variableContextRounds).toBe(2);
+    expect(loadSettings().summarySettings.variableContextRoundsCustomized).toBe(true);
+
+    // Once the user explicitly chooses 1 round, preserve that choice on future loads.
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({ summarySettings: { variableContextRounds: 1, variableContextRoundsCustomized: true } }),
+    );
+    expect(loadSettings().summarySettings.variableContextRounds).toBe(1);
+    expect(loadSettings().summarySettings.variableContextRoundsCustomized).toBe(true);
 
     window.localStorage.setItem(
       'wuxia_display_settings',
-      JSON.stringify({ summarySettings: { variableContextRounds: 8 } }),
+      JSON.stringify({ summarySettings: { variableContextRounds: 0, variableContextRoundsCustomized: true } }),
     );
-    expect(loadSettings().summarySettings.variableContextRounds).toBe(1);
+    expect(loadSettings().summarySettings.variableContextRounds).toBe(0);
+
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({ summarySettings: { variableContextRounds: 8, variableContextRoundsCustomized: true } }),
+    );
+    expect(loadSettings().summarySettings.variableContextRounds).toBe(0);
+
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({ summarySettings: { enabled: true } }),
+    );
+    expect(loadSettings().summarySettings.variableContextRounds).toBe(0);
   });
 
   it('defaults and migrates conversation summary mode safely', () => {

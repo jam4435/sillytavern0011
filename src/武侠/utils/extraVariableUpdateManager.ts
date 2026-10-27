@@ -1196,7 +1196,7 @@ type PromptBodyMessage = {
 function getRecentBodyMessages(
   targetMessageId: number,
   latestRawReply: string,
-  contextRounds: 1 | 2,
+  contextRounds: 0 | 1 | 2,
   settings: SummarySettings,
 ): {
   serialized: string;
@@ -1259,8 +1259,10 @@ function getRecentBodyMessages(
     }
   }
 
-  const readonlyContextRounds = completeRounds
-    .slice(-contextRounds)
+  // slice(-0) 等于 slice(0)，会意外保留全部前文；0 轮必须显式返回空上下文。
+  const selectedReadonlyRounds =
+    contextRounds === 0 ? [] : completeRounds.slice(-contextRounds);
+  const readonlyContextRounds = selectedReadonlyRounds
     .map(([userMessage, assistantMessage]) => ['User:', userMessage.text, '正文:', assistantMessage.text].join('\n'))
     .join('\n\n');
 

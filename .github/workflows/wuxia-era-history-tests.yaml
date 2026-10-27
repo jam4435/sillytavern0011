@@ -47,6 +47,11 @@ jobs:
       - run: pnpm install
       - name: Core variable, event, save and history safety checks
         run: pnpm test:wuxia:smoke
+      - name: Zero-context variable update regressions
+        run: >-
+          pnpm exec vitest run --configLoader native --pool threads --reporter=default
+          src/武侠/utils/extraVariableUpdateManager.test.ts
+          -t "默认不发送前序只读上下文|零前序上下文时仍能根据连续剧情和当前变量快照正确更新 NPC 地点|显式配置一轮时只发送最近一轮完整只读上下文|可配置发送两轮完整只读上下文"
       - name: First-turn opening and debut settlement regressions
         run: >-
           pnpm exec vitest run --configLoader native --pool threads --reporter=default

@@ -78,7 +78,7 @@ export type SummaryVariableUpdateMode = 'extra';
 export type ConversationSummaryMode = 'card' | 'preset' | 'off';
 
 /** 额外变量更新读取的前序完整对话轮数 */
-export type VariableContextRounds = 1 | 2;
+export type VariableContextRounds = 0 | 1 | 2;
 
 /** 阈值设置 */
 export interface SummaryThresholds {
@@ -140,6 +140,8 @@ export interface SummarySettings {
   variableGuidanceTemplateCustomized: boolean;
   /** 最新正文之前作为只读上下文发送的完整 user + assistant 轮数 */
   variableContextRounds: VariableContextRounds;
+  /** 用户是否显式选择过只读上下文轮数；用于把旧默认值 1 轮迁移到新的 0 轮默认值。 */
+  variableContextRoundsCustomized: boolean;
   /** 额外变量正文中需要精确移除的 XML 附属块标签名，每行或逗号分隔 */
   variablePromptExcludedTags: string;
   /** 额外变量正文的开始边界；命中时丢弃边界及其之前的内容，每行一个 */
@@ -553,7 +555,8 @@ export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
   variableStructureTemplateCustomized: false,
   variableGuidanceTemplate: DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
   variableGuidanceTemplateCustomized: false,
-  variableContextRounds: 1,
+  variableContextRounds: 0,
+  variableContextRoundsCustomized: false,
   variablePromptExcludedTags: DEFAULT_VARIABLE_PROMPT_EXCLUDED_TAGS,
   variablePromptBodyStartMarkers: DEFAULT_VARIABLE_PROMPT_BODY_START_MARKERS,
   thresholds: {
@@ -1117,7 +1120,20 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
       ? summarySettings.variableGuidanceTemplate!
       : defaults.variableGuidanceTemplate,
     variableGuidanceTemplateCustomized: hasCustomVariableGuidanceTemplate,
-    variableContextRounds: summarySettings.variableContextRounds === 2 ? 2 : 1,
+    variableContextRoundsCustomized:
+      summarySettings.variableContextRoundsCustomized === true || summarySettings.variableContextRounds === 2,
+    variableContextRounds:
+      summarySettings.variableContextRoundsCustomized === true
+        ? summarySettings.variableContextRounds === 2
+          ? 2
+          : summarySettings.variableContextRounds === 1
+            ? 1
+            : summarySettings.variableContextRounds === 0
+              ? 0
+              : defaults.variableContextRounds
+        : summarySettings.variableContextRounds === 2
+          ? 2
+          : defaults.variableContextRounds,
     variablePromptExcludedTags:
       typeof summarySettings.variablePromptExcludedTags === 'string'
         ? summarySettings.variablePromptExcludedTags

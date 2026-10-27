@@ -1011,7 +1011,7 @@ describe('executeExtraVariableUpdate', () => {
     expect(serialized).not.toContain('黄蓉正在事件中');
   });
 
-  it('默认发送一轮完整只读上下文，并将最新 user 输入与最新 assistant 正文结构化放入 payload', async () => {
+  it('默认不发送前序只读上下文，但仍保留本轮输入、正文和当前变量快照', async () => {
     requestConfiguredTextMock.mockResolvedValue('<VariableThink>无变化</VariableThink>');
 
     await executeExtraVariableUpdate({
@@ -1025,18 +1025,78 @@ describe('executeExtraVariableUpdate', () => {
 
     const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
     const readonlyMatch = prompt.match(/<前序只读轮次>\n([\s\S]*?)\n<\/前序只读轮次>/);
-    const userMatch = prompt.match(/<本轮User>\n([\s\S]*?)\n<\/本轮User>/);
-    const assistantMatch = prompt.match(/<本轮正文>\n([\s\S]*?)\n<\/本轮正文>/);
-    expect(JSON.parse(readonlyMatch?.[1] || '[]')).toEqual([
-      { user: { messageId: 20, content: '上一轮用户正文' }, assistant: { messageId: 21, content: '上一轮助手正文' } },
-    ]);
-    expect(JSON.parse(userMatch?.[1] || '{}')).toEqual({
-      messageId: 27, content: '触发本轮的用户输入', role: 'user', isCurrentTurnInput: true,
-    });
-    expect(JSON.parse(assistantMatch?.[1] || '{}')).toEqual({
-      messageId: 28, content: '洪七公忽然现身。', role: 'assistant', isCurrentTurnOutcome: true,
-    });
+
+    expect(DEFAULT_SUMMARY_SETTINGS.variableContextRounds).toBe(0);
+    expect(readonlyMatch?.[1]).toBe('(无)');
     expect(prompt).not.toContain('更早用户正文');
+    expect(prompt).not.toContain('更早助手正文');
+    expect(prompt).not.toContain('上一轮用户正文');
+    expect(prompt).not.toContain('上一轮助手正文');
+    expect(prompt).toContain('触发本轮的用户输入');
+    expect(prompt).toContain('洪七公忽然现身。');
+    expect(prompt).toContain('1219');
+    expect(prompt).toContain('牛家村');
+  });
+
+  it('零前序上下文时仍能根据连续剧情和当前变量快照正确更新 NPC 地点', async () => {
+    const currentUser = '我请洪七公到村西树林一叙。';
+    const currentOutcome = '洪七公应约来到村西树林。';
+    const nextLocation = '大宋/临安府/牛家村/村西树林';
+    chatMessages = chatMessages.map(message =>
+      message.message_id === 27
+        ? { ...message, message: currentUser, swipes: [currentUser] }
+        : message,
+    );
+    assistantMessage = {
+      ...assistantMessage,
+      message: currentOutcome,
+      swipes: [currentOutcome],
+    };
+    requestConfiguredTextMock.mockResolvedValue(
+      '<VariableThink>最新正文明确写明洪七公已抵达村西树林；该地点属于当前活动区，更新其现有所在位置。</VariableThink>' +
+        '<VariableEdit>' +
+        JSON.stringify({ 角色数据: { 洪七公: { 所在位置: nextLocation } } }) +
+        '</VariableEdit>',
+    );
+    emitSourcedEraVariableWriteAndWaitMock.mockImplementation(async () => {
+      const statData = variableSnapshot.stat_data as Record<string, unknown>;
+      const characters = statData.角色数据 as Record<string, Record<string, unknown>>;
+      characters['洪七公']['所在位置'] = nextLocation;
+      return {
+        version: 1,
+        writeId: 'extra-sync-location',
+        source: 'frontend',
+        operation: 'update',
+        reason: 'extra-variable-api-write',
+        eventName: 'era:apiWrite',
+        attribution: 'ai',
+        message_id: 28,
+        actions: { apiWrite: true },
+      };
+    });
+
+    const result = await executeExtraVariableUpdate({
+      settings: {
+        ...DEFAULT_SUMMARY_SETTINGS,
+        variableUpdateMode: 'extra',
+      },
+      assistantMessageId: 28,
+      latestRawReply: currentOutcome,
+    });
+
+    const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
+    expect(prompt).not.toContain('更早用户正文');
+    expect(prompt).not.toContain('上一轮助手正文');
+    expect(prompt).toContain(currentUser);
+    expect(prompt).toContain(currentOutcome);
+    expect(prompt).toContain('大宋/嘉兴府/嘉兴城/烟雨楼');
+    expect(result.appended).toBe(true);
+    expect(result.actionBlockCount).toBe(1);
+    expect(
+      ((variableSnapshot.stat_data as Record<string, unknown>).角色数据 as Record<string, Record<string, unknown>>)[
+        '洪七公'
+      ]['所在位置'],
+    ).toBe(nextLocation);
   });
 
   it('先应用当前酒馆提示词正则，再按额外变量设置精确剥离规划前缀和附属标签', async () => {
@@ -1078,6 +1138,27 @@ describe('executeExtraVariableUpdate', () => {
     });
   });
 
+  it('显式配置一轮时只发送最近一轮完整只读上下文', async () => {
+    requestConfiguredTextMock.mockResolvedValue('<VariableThink>无变化</VariableThink>');
+
+    await executeExtraVariableUpdate({
+      settings: {
+        ...DEFAULT_SUMMARY_SETTINGS,
+        variableUpdateMode: 'extra',
+        variableContextRounds: 1,
+      },
+      assistantMessageId: 28,
+      latestRawReply: '正文内容',
+    });
+
+    const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
+    const readonlyMatch = prompt.match(/<前序只读轮次>\n([\s\S]*?)\n<\/前序只读轮次>/);
+    expect(readonlyMatch?.[1]).toContain('上一轮用户正文');
+    expect(readonlyMatch?.[1]).toContain('上一轮助手正文');
+    expect(readonlyMatch?.[1]).not.toContain('更早用户正文');
+    expect(readonlyMatch?.[1]).not.toContain('更早助手正文');
+  });
+
   it('可配置发送两轮完整只读上下文', async () => {
     requestConfiguredTextMock.mockResolvedValue('<VariableThink>无变化</VariableThink>');
 
@@ -1093,9 +1174,10 @@ describe('executeExtraVariableUpdate', () => {
 
     const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
     const readonlyMatch = prompt.match(/<前序只读轮次>\n([\s\S]*?)\n<\/前序只读轮次>/);
-    expect(JSON.parse(readonlyMatch?.[1] || '[]')).toHaveLength(2);
-    expect(prompt).toContain('更早用户正文');
-    expect(prompt).toContain('上一轮助手正文');
+    expect(readonlyMatch?.[1]).toContain('更早用户正文');
+    expect(readonlyMatch?.[1]).toContain('更早助手正文');
+    expect(readonlyMatch?.[1]).toContain('上一轮用户正文');
+    expect(readonlyMatch?.[1]).toContain('上一轮助手正文');
   });
 
   it('EjsTemplate 正常读取与聊天变量 fallback 共享同一专用投影构建器', async () => {
