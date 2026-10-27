@@ -3300,12 +3300,17 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <select
                     id="extra-variable-context-rounds"
                     value={settings.summarySettings.variableContextRounds}
-                    onChange={e =>
-                      updateSummarySetting(
-                        'variableContextRounds',
-                        e.target.value === '2' ? 2 : e.target.value === '1' ? 1 : 0,
-                      )
-                    }
+                    onChange={e => {
+                      const variableContextRounds = e.target.value === '2' ? 2 : e.target.value === '1' ? 1 : 0;
+                      onSettingsChange({
+                        ...settings,
+                        summarySettings: {
+                          ...settings.summarySettings,
+                          variableContextRounds,
+                          variableContextRoundsCustomized: true,
+                        },
+                      });
+                    }}
                     className="settings-select"
                   >
                     <option value={0}>0 轮（仅本轮）</option>
