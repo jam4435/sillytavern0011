@@ -1138,6 +1138,27 @@ describe('executeExtraVariableUpdate', () => {
     });
   });
 
+  it('显式配置一轮时只发送最近一轮完整只读上下文', async () => {
+    requestConfiguredTextMock.mockResolvedValue('<VariableThink>无变化</VariableThink>');
+
+    await executeExtraVariableUpdate({
+      settings: {
+        ...DEFAULT_SUMMARY_SETTINGS,
+        variableUpdateMode: 'extra',
+        variableContextRounds: 1,
+      },
+      assistantMessageId: 28,
+      latestRawReply: '正文内容',
+    });
+
+    const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
+    const readonlyMatch = prompt.match(/<前序只读轮次>\n([\s\S]*?)\n<\/前序只读轮次>/);
+    expect(readonlyMatch?.[1]).toContain('上一轮用户正文');
+    expect(readonlyMatch?.[1]).toContain('上一轮助手正文');
+    expect(readonlyMatch?.[1]).not.toContain('更早用户正文');
+    expect(readonlyMatch?.[1]).not.toContain('更早助手正文');
+  });
+
   it('可配置发送两轮完整只读上下文', async () => {
     requestConfiguredTextMock.mockResolvedValue('<VariableThink>无变化</VariableThink>');
 
@@ -1153,9 +1174,10 @@ describe('executeExtraVariableUpdate', () => {
 
     const prompt = requestConfiguredTextMock.mock.calls.at(-1)?.[0].prompt as string;
     const readonlyMatch = prompt.match(/<前序只读轮次>\n([\s\S]*?)\n<\/前序只读轮次>/);
-    expect(JSON.parse(readonlyMatch?.[1] || '[]')).toHaveLength(2);
-    expect(prompt).toContain('更早用户正文');
-    expect(prompt).toContain('上一轮助手正文');
+    expect(readonlyMatch?.[1]).toContain('更早用户正文');
+    expect(readonlyMatch?.[1]).toContain('更早助手正文');
+    expect(readonlyMatch?.[1]).toContain('上一轮用户正文');
+    expect(readonlyMatch?.[1]).toContain('上一轮助手正文');
   });
 
   it('EjsTemplate 正常读取与聊天变量 fallback 共享同一专用投影构建器', async () => {
