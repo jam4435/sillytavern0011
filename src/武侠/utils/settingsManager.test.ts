@@ -176,8 +176,8 @@ describe('settingsManager ui theme', () => {
     expect(document.documentElement.style.colorScheme).toBe('light');
   });
 
-  it('defaults and migrates the extra-variable readonly context rounds to one or two', () => {
-    expect(createDefaultDisplaySettings().summarySettings.variableContextRounds).toBe(1);
+  it('defaults extra-variable readonly context rounds to zero and preserves explicit choices', () => {
+    expect(createDefaultDisplaySettings().summarySettings.variableContextRounds).toBe(0);
 
     window.localStorage.setItem(
       'wuxia_display_settings',
@@ -187,9 +187,27 @@ describe('settingsManager ui theme', () => {
 
     window.localStorage.setItem(
       'wuxia_display_settings',
-      JSON.stringify({ summarySettings: { variableContextRounds: 8 } }),
+      JSON.stringify({ summarySettings: { variableContextRounds: 1 } }),
     );
     expect(loadSettings().summarySettings.variableContextRounds).toBe(1);
+
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({ summarySettings: { variableContextRounds: 0 } }),
+    );
+    expect(loadSettings().summarySettings.variableContextRounds).toBe(0);
+
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({ summarySettings: { variableContextRounds: 8 } }),
+    );
+    expect(loadSettings().summarySettings.variableContextRounds).toBe(0);
+
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({ summarySettings: { enabled: true } }),
+    );
+    expect(loadSettings().summarySettings.variableContextRounds).toBe(0);
   });
 
   it('defaults and migrates conversation summary mode safely', () => {
