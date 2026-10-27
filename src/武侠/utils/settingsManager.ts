@@ -78,7 +78,7 @@ export type SummaryVariableUpdateMode = 'extra';
 export type ConversationSummaryMode = 'card' | 'preset' | 'off';
 
 /** 额外变量更新读取的前序完整对话轮数 */
-export type VariableContextRounds = 1 | 2;
+export type VariableContextRounds = 0 | 1 | 2;
 
 /** 阈值设置 */
 export interface SummaryThresholds {
@@ -553,7 +553,7 @@ export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
   variableStructureTemplateCustomized: false,
   variableGuidanceTemplate: DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
   variableGuidanceTemplateCustomized: false,
-  variableContextRounds: 1,
+  variableContextRounds: 0,
   variablePromptExcludedTags: DEFAULT_VARIABLE_PROMPT_EXCLUDED_TAGS,
   variablePromptBodyStartMarkers: DEFAULT_VARIABLE_PROMPT_BODY_START_MARKERS,
   thresholds: {
@@ -1117,7 +1117,14 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
       ? summarySettings.variableGuidanceTemplate!
       : defaults.variableGuidanceTemplate,
     variableGuidanceTemplateCustomized: hasCustomVariableGuidanceTemplate,
-    variableContextRounds: summarySettings.variableContextRounds === 2 ? 2 : 1,
+    variableContextRounds:
+      summarySettings.variableContextRounds === 2
+        ? 2
+        : summarySettings.variableContextRounds === 1
+          ? 1
+          : summarySettings.variableContextRounds === 0
+            ? 0
+            : defaults.variableContextRounds,
     variablePromptExcludedTags:
       typeof summarySettings.variablePromptExcludedTags === 'string'
         ? summarySettings.variablePromptExcludedTags
