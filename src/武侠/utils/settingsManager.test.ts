@@ -299,14 +299,14 @@ describe('settingsManager ui theme', () => {
     expect(settings.variableGuidanceTemplateCustomized).toBe(false);
   });
 
-  it('uses strict multi-entry JSON for biography compression', () => {
+  it('uses strict JSON and compresses all biography entries into stage memories', () => {
     const template = createDefaultDisplaySettings().summarySettings.promptTemplate;
-    expect(template).toContain('只依据下面提供的旧条目');
-    expect(template).toContain('(1200.11.26)');
+    expect(template).toContain('只依据下面提供的经历条目');
+    expect(template).toContain('1200.11.1~1200.11.2');
     expect(template).toContain('不得把现实日期写入结果');
     expect(template).toContain('严格合法的 JSON 对象');
-    expect(template).toContain('"阶段经历1初入江湖"');
-    expect(template).toContain('整批输出必须涵盖旧条目中的所有重要长期事实');
+    expect(template).toContain('"初入江南"');
+    expect(template).toContain('必须将所有输入条目整合为一组新的阶段记忆');
     expect(template).not.toContain('<summary>');
   });
 
