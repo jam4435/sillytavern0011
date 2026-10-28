@@ -35,7 +35,7 @@ export interface SummaryTriggerResult {
   triggerReason: 'total_entries' | 'none';
   /** 待总结的角色列表 */
   pendingCharacters: PendingCharacterSummary[];
-  /** 所有角色的总经历条目数 */
+  /** 仅符合单角色阈值的人物的原始经历条目总数 */
   totalEntries: number;
 }
 
@@ -357,7 +357,7 @@ function formatBiographyForPrompt(biography: Record<string, string>): string {
 
 /**
  * 检测是否应该触发总结
- * 遍历所有角色（包括玩家和NPC），检查人物经历条目数
+ * 只把原始经历数严格超过单角色阈值的人物计入总量；总量严格超过总阈值才触发自动总结
  *
  * @param thresholds 阈值设置
  * @returns 检测结果
@@ -859,10 +859,10 @@ export async function triggerManualSummary(settings: SummarySettings): Promise<B
 }
 
 /**
- * 更新待处理队列
- * 在每回合检测后调用，将超过阈值的角色加入队列
+ * 更新待处理人物快照
+ * 每回合检测后以当前符合单角色阈值的人物列表替换旧快照
  *
- * @param characters 待加入队列的角色
+ * @param characters 当前符合单角色阈值的人物
  */
 export function updatePendingQueue(characters: PendingCharacterSummary[]): void {
   // 以本轮重新扫描结果为准，移除已经低于阈值或已完成压缩的旧队列项目。
