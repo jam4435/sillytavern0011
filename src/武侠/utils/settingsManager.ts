@@ -19,9 +19,6 @@ import eventScrollRightUrl from '../assets/ui/event-scroll-right.webp?url';
 import {
   DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
   DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
-  getPromptTemplateSignature,
-  KNOWN_VARIABLE_GUIDANCE_DEFAULT_SIGNATURES,
-  KNOWN_VARIABLE_STRUCTURE_DEFAULT_SIGNATURES,
 } from '../prompts/variablePromptDefaults';
 
 // =========================================
@@ -133,22 +130,16 @@ export interface SummarySettings {
   variableApiSelection: SummaryApiSelection;
   /** 人物经历总结提示词模板 */
   promptTemplate: string;
-  /** 用户是否显式修改过总结提示词模板 */
+  /** 用户是否修改过总结提示词模板；false 时自动跟随当前默认值 */
   promptTemplateCustomized: boolean;
-  /** 自定义总结提示词基于哪个默认版本；与当前默认签名不同即提示升级 */
-  promptTemplateBaseSignature: string;
   /** 变量结构与写入权限模板 */
   variableStructureTemplate: string;
-  /** 用户是否显式修改过变量结构模板；false 时始终跟随项目当前默认值 */
+  /** 用户是否修改过变量结构模板；false 时自动跟随当前默认值 */
   variableStructureTemplateCustomized: boolean;
-  /** 自定义变量结构模板基于哪个默认版本 */
-  variableStructureTemplateBaseSignature: string;
   /** 变量领域更新规则 */
   variableGuidanceTemplate: string;
-  /** 用户是否显式修改过变量指导；false 时始终跟随项目当前默认值 */
+  /** 用户是否修改过变量指导；false 时自动跟随当前默认值 */
   variableGuidanceTemplateCustomized: boolean;
-  /** 自定义变量指导基于哪个默认版本 */
-  variableGuidanceTemplateBaseSignature: string;
   /** 最新正文之前作为只读上下文发送的完整 user + assistant 轮数 */
   variableContextRounds: VariableContextRounds;
   /** 用户是否显式选择过只读上下文轮数；用于把旧默认值 1 轮迁移到新的 0 轮默认值。 */
@@ -408,45 +399,12 @@ export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你负责将《金庸群侠传�
   "阶段经历2结识故人": "（1200.11.3~1200.11.5）人物在后续事件中经历立场变化，并作出了影响后续剧情的决定。"
 }`;
 
-const LEGACY_DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你负责压缩《金庸群侠传》角色的旧人物经历片段。只总结下面提供的旧条目，不改写近期经历，也不要补写未提供的事实。
-
-角色名称：{{characterName}}
-待压缩的旧经历：
-{{biographyEntries}}
-
-强制要求：
-1. 保留会长期影响人物身份、关系、立场、伤病、生死、师承、重要物品或重大事件认知的事实。
-2. 普通聊天、短时情绪、连续场景动作等无长期意义的细节可以合并或删除。
-3. 输入值开头形如 (1200.11.26) 的内容是游戏内日期。不得把现实日期写入结果，不得猜测缺失日期，不得改变明确日期先后。
-4. 只输出一段精炼的阶段经历，尽量控制在 1～3 句；不要生成新的“经历1/经历2”键。
-
-输出格式：
-<summary>
-[阶段经历内容]
-</summary>`;
-
-const LEGACY_SUMMARY_PROMPT_TEMPLATE_DEFAULT_SIGNATURES = [
-  // Keep prior defaults here whenever DEFAULT_SUMMARY_PROMPT_TEMPLATE changes, including releases users may skip.
-  getPromptTemplateSignature(LEGACY_DEFAULT_SUMMARY_PROMPT_TEMPLATE),
-  '929:0ca7008d',
-] as const;
-
 export const SUMMARY_PROMPT_TEMPLATE_UPDATE_NOTES =
   '新版改为严格 JSON 对象输出，支持按阶段生成多条独立记忆，并约束游戏内日期、唯一键名和事实来源。';
 export const VARIABLE_STRUCTURE_TEMPLATE_UPDATE_NOTES =
   '新版重新整理了可写路径、对象结构与字段权限，进一步明确参与事件差分、人物经历及物品等数据的写入边界。';
 export const VARIABLE_GUIDANCE_TEMPLATE_UPDATE_NOTES =
   '新版更新了时间、事件、地点与长期经历的处理规则，并明确 Insert、Edit、Delete 的使用边界。';
-
-export function isTemplateUpdateAvailable(
-  customized: boolean,
-  baseSignature: string,
-  currentDefaultTemplate: string,
-): boolean {
-  return customized && baseSignature !== getPromptTemplateSignature(currentDefaultTemplate);
-}
-
-export { getPromptTemplateSignature };
 
 export {
   DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
@@ -586,13 +544,10 @@ export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
   variableApiSelection: PRESET_SUMMARY_API_SELECTION,
   promptTemplate: DEFAULT_SUMMARY_PROMPT_TEMPLATE,
   promptTemplateCustomized: false,
-  promptTemplateBaseSignature: getPromptTemplateSignature(DEFAULT_SUMMARY_PROMPT_TEMPLATE),
   variableStructureTemplate: DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
   variableStructureTemplateCustomized: false,
-  variableStructureTemplateBaseSignature: getPromptTemplateSignature(DEFAULT_VARIABLE_STRUCTURE_TEMPLATE),
   variableGuidanceTemplate: DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
   variableGuidanceTemplateCustomized: false,
-  variableGuidanceTemplateBaseSignature: getPromptTemplateSignature(DEFAULT_VARIABLE_GUIDANCE_TEMPLATE),
   variableContextRounds: 0,
   variableContextRoundsCustomized: false,
   variablePromptExcludedTags: DEFAULT_VARIABLE_PROMPT_EXCLUDED_TAGS,
@@ -1062,47 +1017,19 @@ function normalizeSummaryApiSelection(
   return cloneSummaryApiSelection(fallback);
 }
 
-interface NormalizedEditableTemplate {
-  template: string;
-  customized: boolean;
-  baseSignature: string;
-}
-
 /**
- * Upgrade known unchanged defaults automatically, but never overwrite a value that may be user-authored.
- * Legacy settings without a customization flag are classified by historical default signatures.
- * Unknown legacy values are preserved and shown as upgradeable custom templates in the settings UI.
+ * The customization flag is the sole source of truth.
+ * Uncustomized templates always adopt the current built-in default; customized text is preserved.
  */
 function normalizeEditableTemplate(
   storedTemplate: unknown,
   storedCustomized: unknown,
-  storedBaseSignature: unknown,
   currentDefaultTemplate: string,
-  knownDefaultSignatures: readonly string[] = [],
-): NormalizedEditableTemplate {
-  const currentSignature = getPromptTemplateSignature(currentDefaultTemplate);
-  if (typeof storedTemplate !== 'string') {
-    return { template: currentDefaultTemplate, customized: false, baseSignature: currentSignature };
+): { template: string; customized: boolean } {
+  if (storedCustomized === true && typeof storedTemplate === 'string') {
+    return { template: storedTemplate, customized: true };
   }
-
-  if (storedCustomized === true) {
-    return {
-      template: storedTemplate,
-      customized: true,
-      baseSignature: typeof storedBaseSignature === 'string' ? storedBaseSignature : '',
-    };
-  }
-
-  if (storedCustomized === false) {
-    return { template: currentDefaultTemplate, customized: false, baseSignature: currentSignature };
-  }
-
-  const storedSignature = getPromptTemplateSignature(storedTemplate);
-  if (storedSignature === currentSignature || knownDefaultSignatures.includes(storedSignature)) {
-    return { template: currentDefaultTemplate, customized: false, baseSignature: currentSignature };
-  }
-
-  return { template: storedTemplate, customized: true, baseSignature: '' };
+  return { template: currentDefaultTemplate, customized: false };
 }
 
 function normalizeSummarySettings(summarySettings: StoredSummarySettings | undefined): SummarySettings {
@@ -1142,23 +1069,17 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
   const promptTemplate = normalizeEditableTemplate(
     summarySettings.promptTemplate,
     summarySettings.promptTemplateCustomized,
-    summarySettings.promptTemplateBaseSignature,
     defaults.promptTemplate,
-    LEGACY_SUMMARY_PROMPT_TEMPLATE_DEFAULT_SIGNATURES,
   );
   const variableStructureTemplate = normalizeEditableTemplate(
     summarySettings.variableStructureTemplate,
     summarySettings.variableStructureTemplateCustomized,
-    summarySettings.variableStructureTemplateBaseSignature,
     defaults.variableStructureTemplate,
-    KNOWN_VARIABLE_STRUCTURE_DEFAULT_SIGNATURES,
   );
   const variableGuidanceTemplate = normalizeEditableTemplate(
     summarySettings.variableGuidanceTemplate,
     summarySettings.variableGuidanceTemplateCustomized,
-    summarySettings.variableGuidanceTemplateBaseSignature,
     defaults.variableGuidanceTemplate,
-    KNOWN_VARIABLE_GUIDANCE_DEFAULT_SIGNATURES,
   );
 
   return {
@@ -1204,13 +1125,10 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
     ),
     promptTemplate: promptTemplate.template,
     promptTemplateCustomized: promptTemplate.customized,
-    promptTemplateBaseSignature: promptTemplate.baseSignature,
     variableStructureTemplate: variableStructureTemplate.template,
     variableStructureTemplateCustomized: variableStructureTemplate.customized,
-    variableStructureTemplateBaseSignature: variableStructureTemplate.baseSignature,
     variableGuidanceTemplate: variableGuidanceTemplate.template,
     variableGuidanceTemplateCustomized: variableGuidanceTemplate.customized,
-    variableGuidanceTemplateBaseSignature: variableGuidanceTemplate.baseSignature,
     variableContextRoundsCustomized:
       summarySettings.variableContextRoundsCustomized === true || summarySettings.variableContextRounds === 2,
     variableContextRounds:
