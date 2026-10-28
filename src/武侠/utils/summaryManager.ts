@@ -62,6 +62,124 @@ export interface BatchSummaryResult {
   totalFailed: number;
 }
 
+export type SummaryProgressSource = 'automatic' | 'manual';
+export type SummaryCharacterPhase = 'preparing' | 'generating' | 'validating' | 'waiting-write' | 'writing';
+export type SummaryProgressPhase = 'idle' | 'running' | 'completed' | 'failed';
+
+export interface ActiveSummaryCharacter {
+  characterId: string;
+  displayName: string;
+  index: number;
+  phase: SummaryCharacterPhase;
+}
+
+export interface SummaryProgressSnapshot {
+  active: boolean;
+  source: SummaryProgressSource | null;
+  phase: SummaryProgressPhase;
+  targetMessageId?: number;
+  total: number;
+  totalProcessed: number;
+  totalSuccess: number;
+  totalFailed: number;
+  activeCharacters: ActiveSummaryCharacter[];
+  results: CharacterSummaryResult[];
+  startedAt: number | null;
+  updatedAt: number;
+  message?: string;
+}
+
+const INITIAL_SUMMARY_PROGRESS: SummaryProgressSnapshot = {
+  active: false,
+  source: null,
+  phase: 'idle',
+  total: 0,
+  totalProcessed: 0,
+  totalSuccess: 0,
+  totalFailed: 0,
+  activeCharacters: [],
+  results: [],
+  startedAt: null,
+  updatedAt: 0,
+};
+
+let summaryProgressSnapshot: SummaryProgressSnapshot = INITIAL_SUMMARY_PROGRESS;
+const summaryProgressListeners = new Set<(snapshot: SummaryProgressSnapshot) => void>();
+
+function cloneSummaryProgressSnapshot(snapshot: SummaryProgressSnapshot): SummaryProgressSnapshot {
+  return {
+    ...snapshot,
+    activeCharacters: snapshot.activeCharacters.map(character => ({ ...character })),
+    results: snapshot.results.map(result => ({ ...result })),
+  };
+}
+
+function publishSummaryProgress(patch: Partial<SummaryProgressSnapshot>): void {
+  summaryProgressSnapshot = {
+    ...summaryProgressSnapshot,
+    ...patch,
+    activeCharacters: patch.activeCharacters
+      ? patch.activeCharacters.map(character => ({ ...character }))
+      : summaryProgressSnapshot.activeCharacters,
+    results: patch.results ? patch.results.map(result => ({ ...result })) : summaryProgressSnapshot.results,
+    updatedAt: Date.now(),
+  };
+  const snapshot = cloneSummaryProgressSnapshot(summaryProgressSnapshot);
+  for (const listener of summaryProgressListeners) {
+    try {
+      listener(snapshot);
+    } catch (error) {
+      dataLogger.warn('[summaryManager] 通知总结进度订阅者失败:', error);
+    }
+  }
+}
+
+export function getSummaryProgressSnapshot(): SummaryProgressSnapshot {
+  return cloneSummaryProgressSnapshot(summaryProgressSnapshot);
+}
+
+export function subscribeSummaryProgress(
+  listener: (snapshot: SummaryProgressSnapshot) => void,
+): () => void {
+  summaryProgressListeners.add(listener);
+  try {
+    listener(getSummaryProgressSnapshot());
+  } catch (error) {
+    dataLogger.warn('[summaryManager] 初始化总结进度订阅者失败:', error);
+  }
+  return () => summaryProgressListeners.delete(listener);
+}
+
+/** 有界并行执行任务；等待所有 worker 结束后再抛出意外异常。 */
+export async function runWithConcurrencyLimit<T>(
+  items: readonly T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<void>,
+): Promise<void> {
+  let nextIndex = 0;
+  const workerCount = Math.min(
+    items.length,
+    Math.max(1, Math.floor(Number.isFinite(concurrency) ? concurrency : 1)),
+  );
+  const errors: unknown[] = [];
+
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (true) {
+      const index = nextIndex++;
+      if (index >= items.length) return;
+      try {
+        await worker(items[index], index);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+  }));
+
+  if (errors.length > 0) {
+    throw errors[0];
+  }
+}
+
 // =========================================
 // 运行时状态
 // =========================================
@@ -71,6 +189,23 @@ let pendingQueue: PendingCharacterSummary[] = [];
 
 /** 是否正在执行总结 */
 let isSummarizing = false;
+
+/** 总结任务内部的 ERA 写回串行队列；模型请求可以并行，事务写回按队列顺序执行。 */
+let summaryWriteQueue: Promise<void> = Promise.resolve();
+
+async function withSummaryWriteLock<T>(task: () => Promise<T>): Promise<T> {
+  const previous = summaryWriteQueue;
+  let release!: () => void;
+  summaryWriteQueue = new Promise<void>(resolve => {
+    release = resolve;
+  });
+  await previous;
+  try {
+    return await task();
+  } finally {
+    release();
+  }
+}
 
 const LEGACY_SUMMARY_META_KEY = '【总结】';
 // 压缩结果对模型使用阶段总结名称；存储时保留内部编号前缀，以便识别已压缩经历。
@@ -649,7 +784,9 @@ export async function executeSummary(
   settings: SummarySettings,
   character: PendingCharacterSummary,
   targetMessageId: number,
+  onProgress?: (phase: SummaryCharacterPhase) => void,
 ): Promise<CharacterSummaryResult> {
+  onProgress?.('preparing');
   dataLogger.log(`[summaryManager] 开始总结角色: ${character.displayName}`);
 
   const result: CharacterSummaryResult = {
@@ -680,6 +817,7 @@ export async function executeSummary(
     dataLogger.log(`[summaryManager] 构建的提示词长度: ${prompt.length}`);
 
     // 2. 调用总结 API
+    onProgress?.('generating');
     const requestSettings = resolveConfiguredTextSettings(settings, 'summary');
     dataLogger.log('[summaryManager] 调用总结 API...', {
       apiMode: requestSettings.apiMode,
@@ -692,58 +830,67 @@ export async function executeSummary(
     // 3. 严格解析模型返回的多条阶段记忆 JSON
     const summaryEntries = parseSummaryResponse(response, Object.keys(compressionPlan.sourceEntries).length, compressionPlan.sourceEntries);
 
-    // 4. 回写前重新读取人物经历，防止模型请求期间新增或编辑的经历被覆盖/误删。
-    const latestRawBiography = readCurrentCharacterBiographyValue(character.characterId);
-    const latestBiography = normalizeBiography(latestRawBiography);
-    const changedSourceKeys = compressionPlan.sourceKeys.filter(
-      key => !Object.prototype.hasOwnProperty.call(latestBiography, key) ||
-        latestBiography[key] !== compressionPlan.sourceEntries[key],
-    );
-    if (changedSourceKeys.length > 0) {
-      throw new Error(
-        `人物经历在总结期间已变化（${changedSourceKeys.join('、')}），已取消写回以保护最新数据。`,
+    onProgress?.('validating');
+    // 3. 严格解析模型返回的多条阶段记忆 JSON
+    const summaryEntries = parseSummaryResponse(response, Object.keys(compressionPlan.sourceEntries).length, compressionPlan.sourceEntries);
+
+    // 模型请求并行，但每个人物的最终重读、冲突检查和 ERA 写回必须串行。
+    // 在取得写回队列后再重读，确保等待队列期间新增的经历也能被保留。
+    onProgress?.('waiting-write');
+    await withSummaryWriteLock(async () => {
+      const latestRawBiography = readCurrentCharacterBiographyValue(character.characterId);
+      const latestBiography = normalizeBiography(latestRawBiography);
+      const changedSourceKeys = compressionPlan.sourceKeys.filter(
+        key => !Object.prototype.hasOwnProperty.call(latestBiography, key) ||
+          latestBiography[key] !== compressionPlan.sourceEntries[key],
       );
-    }
+      if (changedSourceKeys.length > 0) {
+        throw new Error(
+          `人物经历在总结期间已变化（${changedSourceKeys.join('、')}），已取消写回以保护最新数据。`,
+        );
+      }
 
-    const writePlan: BiographyCompressionPlan = {
-      ...compressionPlan,
-      originalBiography: latestBiography,
-    };
-    const rebasedStageEntries = rebaseStageMemoryKeys(summaryEntries, getRetainedBiography(writePlan));
-    result.summaryContent = JSON.stringify(rebasedStageEntries, null, 2);
-    const operations = buildBiographyCompressionOperations(
-      character.characterId,
-      writePlan,
-      summaryEntries,
-      { replaceLegacyString: typeof latestRawBiography === 'string' },
-    );
-    const transactionId = createSummaryTransactionId(targetMessageId, character.characterId);
-    const transaction: EraTransactionDetail = {
-      transactionId,
-      targetMessageId,
-      operations,
-    };
+      const writePlan: BiographyCompressionPlan = {
+        ...compressionPlan,
+        originalBiography: latestBiography,
+      };
+      const rebasedStageEntries = rebaseStageMemoryKeys(summaryEntries, getRetainedBiography(writePlan));
+      result.summaryContent = JSON.stringify(rebasedStageEntries, null, 2);
+      const operations = buildBiographyCompressionOperations(
+        character.characterId,
+        writePlan,
+        summaryEntries,
+        { replaceLegacyString: typeof latestRawBiography === 'string' },
+      );
+      const transactionId = createSummaryTransactionId(targetMessageId, character.characterId);
+      const transaction: EraTransactionDetail = {
+        transactionId,
+        targetMessageId,
+        operations,
+      };
 
-    dataLogger.log('[summaryManager] 使用固定楼层的 Delete + Insert 事务写回总结:', {
-      targetMessageId,
-      characterId: character.characterId,
-      deletedKeys: writePlan.sourceKeys,
-      insertedKeys: Object.keys(rebasedStageEntries),
-      legacyStringBiography: typeof latestRawBiography === 'string',
-    });
+      dataLogger.log('[summaryManager] 使用固定楼层的 Delete + Insert 事务写回总结:', {
+        targetMessageId,
+        characterId: character.characterId,
+        deletedKeys: writePlan.sourceKeys,
+        insertedKeys: Object.keys(rebasedStageEntries),
+        legacyStringBiography: typeof latestRawBiography === 'string',
+      });
 
-    await emitSourcedEraVariableWriteAndWait({
-      source: 'frontend',
-      operation: 'replace',
-      reason: 'summary-write',
-      eventName: 'era:transactionByObject',
-      attribution: 'background',
-      detail: transaction,
-      expectedAction: 'apiWrite',
-      expectedMessageId: targetMessageId,
-      expectedTransactionId: transactionId,
-      timeoutMs: 15000,
-      timeoutMessage: `人物经历总结已写入楼层 ${targetMessageId}，但 ERA 未在时限内确认 Delete + Insert 事务。`,
+      onProgress?.('writing');
+      await emitSourcedEraVariableWriteAndWait({
+        source: 'frontend',
+        operation: 'replace',
+        reason: 'summary-write',
+        eventName: 'era:transactionByObject',
+        attribution: 'background',
+        detail: transaction,
+        expectedAction: 'apiWrite',
+        expectedMessageId: targetMessageId,
+        expectedTransactionId: transactionId,
+        timeoutMs: 15000,
+        timeoutMessage: `人物经历总结已写入楼层 ${targetMessageId}，但 ERA 未在时限内确认 Delete + Insert 事务。`,
+      });
     });
 
     result.success = true;
@@ -768,6 +915,7 @@ export async function executeAllPendingSummaries(
   settings: SummarySettings,
   characters?: PendingCharacterSummary[],
   targetMessageId?: number,
+  source: SummaryProgressSource = 'automatic',
 ): Promise<BatchSummaryResult> {
   const result: BatchSummaryResult = {
     success: false,
@@ -777,15 +925,12 @@ export async function executeAllPendingSummaries(
     totalFailed: 0,
   };
 
-  // 如果正在总结中，直接返回
   if (isSummarizing) {
     dataLogger.log('[summaryManager] 已有总结任务在执行中，跳过');
     return result;
   }
 
-  // 使用传入的角色列表或内部队列
   const targetCharacters = characters || pendingQueue;
-
   if (targetCharacters.length === 0) {
     dataLogger.log('[summaryManager] 没有待总结的角色');
     result.success = true;
@@ -798,38 +943,138 @@ export async function executeAllPendingSummaries(
   }
 
   isSummarizing = true;
-  dataLogger.log(`[summaryManager] 开始批量总结，共 ${targetCharacters.length} 个角色`);
+  const startedAt = Date.now();
+  const resultsByIndex: Array<CharacterSummaryResult | undefined> = new Array(targetCharacters.length);
+  publishSummaryProgress({
+    active: true,
+    source,
+    phase: 'running',
+    targetMessageId: resolvedTargetMessageId as number,
+    total: targetCharacters.length,
+    totalProcessed: 0,
+    totalSuccess: 0,
+    totalFailed: 0,
+    activeCharacters: [],
+    results: [],
+    startedAt,
+    message: source === 'automatic' ? '自动人物总结已启动' : '手动人物总结已启动',
+  });
+  dataLogger.log(`[summaryManager] 开始批量总结，共 ${targetCharacters.length} 个角色，并行数 ${settings.summaryConcurrency || 2}`);
+
+  const concurrency = Math.max(
+    1,
+    Math.min(5, Math.floor(Number.isFinite(settings.summaryConcurrency) ? settings.summaryConcurrency : 2)),
+  );
+
+  const updateCharacterPhase = (characterId: string, phase: SummaryCharacterPhase) => {
+    const snapshot = getSummaryProgressSnapshot();
+    publishSummaryProgress({
+      activeCharacters: snapshot.activeCharacters.map(activeCharacter =>
+        activeCharacter.characterId === characterId
+          ? { ...activeCharacter, phase }
+          : activeCharacter,
+      ),
+      message: `正在处理人物：${snapshot.activeCharacters.find(item => item.characterId === characterId)?.displayName || characterId}`,
+    });
+  };
 
   try {
-    // 顺序执行总结（避免 API 过载）
-    for (const character of targetCharacters) {
-      const summaryResult = await executeSummary(settings, character, resolvedTargetMessageId as number);
-      result.results.push(summaryResult);
-      result.totalProcessed++;
+    await runWithConcurrencyLimit(targetCharacters, concurrency, async (character, index) => {
+      const snapshot = getSummaryProgressSnapshot();
+      publishSummaryProgress({
+        activeCharacters: [
+          ...snapshot.activeCharacters,
+          {
+            characterId: character.characterId,
+            displayName: character.displayName,
+            index: index + 1,
+            phase: 'preparing',
+          },
+        ].sort((a, b) => a.index - b.index),
+        message: `准备总结人物：${character.displayName}`,
+      });
 
-      if (summaryResult.success) {
-        result.totalSuccess++;
-      } else {
-        result.totalFailed++;
+      let summaryResult: CharacterSummaryResult;
+      try {
+        summaryResult = await executeSummary(
+          settings,
+          character,
+          resolvedTargetMessageId as number,
+          phase => updateCharacterPhase(character.characterId, phase),
+        );
+      } catch (error) {
+        summaryResult = {
+          characterId: character.characterId,
+          displayName: character.displayName,
+          success: false,
+          originalCount: character.entriesCount,
+          error: error instanceof Error ? error.message : String(error),
+        };
       }
 
-      // 每个角色之间稍作延迟，避免请求过于频繁
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
+      resultsByIndex[index] = summaryResult;
+      const completedResults = resultsByIndex.filter(
+        (item): item is CharacterSummaryResult => item !== undefined,
+      );
+      const current = getSummaryProgressSnapshot();
+      publishSummaryProgress({
+        totalProcessed: completedResults.length,
+        totalSuccess: completedResults.filter(item => item.success).length,
+        totalFailed: completedResults.filter(item => !item.success).length,
+        results: completedResults,
+        activeCharacters: current.activeCharacters.filter(
+          activeCharacter => activeCharacter.characterId !== character.characterId,
+        ),
+        message: summaryResult.success
+          ? `人物总结完成：${character.displayName}`
+          : `人物总结失败：${character.displayName}`,
+      });
 
-    result.success = result.totalFailed === 0;
+      // 保留轻微节流，避免同一 worker 连续补位时瞬间发出下一批请求。
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    result.results = resultsByIndex.filter((item): item is CharacterSummaryResult => item !== undefined);
+    result.totalProcessed = result.results.length;
+    result.totalSuccess = result.results.filter(item => item.success).length;
+    result.totalFailed = result.results.filter(item => !item.success).length;
+    result.success = result.totalFailed === 0 && result.totalProcessed === targetCharacters.length;
 
     // 本轮所有待处理人物都已尝试完成；后续回合会重新计算阈值和队列。
     pendingQueue = [];
-
     dataLogger.log('[summaryManager] 批量总结完成:', {
       totalProcessed: result.totalProcessed,
       totalSuccess: result.totalSuccess,
       totalFailed: result.totalFailed,
+      concurrency,
     });
-
+    publishSummaryProgress({
+      active: false,
+      phase: 'completed',
+      totalProcessed: result.totalProcessed,
+      totalSuccess: result.totalSuccess,
+      totalFailed: result.totalFailed,
+      results: result.results,
+      activeCharacters: [],
+      message: result.totalFailed > 0 ? '总结已结束，部分人物失败' : '所有人物总结完成',
+    });
   } catch (error) {
     dataLogger.error('[summaryManager] 批量总结过程中发生错误:', error);
+    result.results = resultsByIndex.filter((item): item is CharacterSummaryResult => item !== undefined);
+    result.totalProcessed = result.results.length;
+    result.totalSuccess = result.results.filter(item => item.success).length;
+    result.totalFailed = result.results.filter(item => !item.success).length;
+    result.success = false;
+    publishSummaryProgress({
+      active: false,
+      phase: 'failed',
+      totalProcessed: result.totalProcessed,
+      totalSuccess: result.totalSuccess,
+      totalFailed: result.totalFailed,
+      results: result.results,
+      activeCharacters: [],
+      message: error instanceof Error ? error.message : String(error),
+    });
   } finally {
     isSummarizing = false;
   }
@@ -861,7 +1106,74 @@ export async function triggerManualSummary(settings: SummarySettings): Promise<B
   }
 
   // 执行总结
-  return executeAllPendingSummaries(settings, triggerResult.pendingCharacters);
+  return executeAllPendingSummaries(settings, triggerResult.pendingCharacters, undefined, 'manual');
+}
+
+/**
+ * 仅重试上一轮失败的人物；重新扫描当前经历，避免使用过期的失败前快照。
+ */
+export async function retryFailedSummaryCharacters(
+  settings: SummarySettings,
+  failedResults: CharacterSummaryResult[],
+  targetMessageId?: number,
+): Promise<BatchSummaryResult> {
+  if (failedResults.length === 0) {
+    return { success: true, results: [], totalProcessed: 0, totalSuccess: 0, totalFailed: 0 };
+  }
+  if (isSummarizing) {
+    throw new Error('已有总结任务在执行中，请稍后再试。');
+  }
+
+  const failedIds = new Set(failedResults.map(item => item.characterId));
+  const currentCandidates = checkSummaryTrigger(settings.thresholds).pendingCharacters
+    .filter(character => failedIds.has(character.characterId));
+  const candidateIds = new Set(currentCandidates.map(character => character.characterId));
+  const unavailableResults = failedResults
+    .filter(item => !candidateIds.has(item.characterId))
+    .map(item => ({
+      ...item,
+      success: false,
+      error: '当前人物经历已变化或不再满足单角色总结阈值，未重新发送模型请求。',
+    }));
+
+  let retried: BatchSummaryResult = {
+    success: true,
+    results: [],
+    totalProcessed: 0,
+    totalSuccess: 0,
+    totalFailed: 0,
+  };
+  if (currentCandidates.length > 0) {
+    retried = await executeAllPendingSummaries(settings, currentCandidates, targetMessageId, 'manual');
+  }
+
+  const retriedById = new Map(retried.results.map(item => [item.characterId, item]));
+  const unavailableById = new Map(unavailableResults.map(item => [item.characterId, item]));
+  const combinedResults = failedResults.map(item =>
+    retriedById.get(item.characterId) || unavailableById.get(item.characterId) || item,
+  );
+  const combined: BatchSummaryResult = {
+    success: combinedResults.every(item => item.success),
+    results: combinedResults,
+    totalProcessed: combinedResults.length,
+    totalSuccess: combinedResults.filter(item => item.success).length,
+    totalFailed: combinedResults.filter(item => !item.success).length,
+  };
+
+  publishSummaryProgress({
+    active: false,
+    phase: 'completed',
+    source: 'manual',
+    targetMessageId: targetMessageId ?? getLatestAssistantMessageId(),
+    total: combined.totalProcessed,
+    totalProcessed: combined.totalProcessed,
+    totalSuccess: combined.totalSuccess,
+    totalFailed: combined.totalFailed,
+    activeCharacters: [],
+    results: combined.results,
+    message: combined.totalFailed > 0 ? '失败人物重试结束，仍有失败项' : '失败人物重试完成',
+  });
+  return combined;
 }
 
 /**
