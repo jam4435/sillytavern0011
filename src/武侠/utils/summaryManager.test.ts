@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  BIOGRAPHY_RECENT_ENTRIES_TO_KEEP,
   buildBiographyCompressionPlan,
   buildBiographyCompressionOperations,
   parseSummaryResponse,
@@ -13,31 +12,70 @@ import {
 describe('summaryManager biography compression', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('lets one character trigger as soon as the per-character threshold is reached', () => {
+  const thresholds = {
+    totalEntriesThreshold: 50,
+    perCharacterEntriesThreshold: 10,
+  };
+
+  const makeBiography = (count: number, prefix = '经历') => Object.fromEntries(
+    Array.from({ length: count }, (_, index) => [
+      `${prefix}${index + 1}`,
+      `(1200.11.${index + 1}) 测试经历${index + 1}`,
+    ]),
+  );
+
+  it('triggers when one eligible character has more than the aggregate threshold', () => {
     vi.stubGlobal('getVariables', () => ({
       stat_data: {
         角色数据: {
-          包惜弱: {
-            人物经历: Object.fromEntries(
-              Array.from({ length: 10 }, (_, index) => [
-                `经历${index + 1}`,
-                `(1200.11.${index + 1}) 测试经历${index + 1}`,
-              ]),
-            ),
-          },
+          段誉: { 人物经历: makeBiography(51) },
+          王语嫣: { 人物经历: makeBiography(10) },
         },
       },
     }));
 
-    const result = checkSummaryTrigger({
-      pendingQueueThreshold: 5,
-      totalEntriesThreshold: 50,
-      perCharacterEntriesThreshold: 10,
-    });
+    const result = checkSummaryTrigger(thresholds);
 
     expect(result.shouldTrigger).toBe(true);
-    expect(result.triggerReason).toBe('per_character');
-    expect(result.pendingCharacters).toHaveLength(1);
+    expect(result.triggerReason).toBe('total_entries');
+    expect(result.pendingCharacters.map(character => character.displayName)).toEqual(['段誉']);
+    expect(result.totalEntries).toBe(51);
+  });
+
+  it('triggers when five eligible characters with eleven entries each exceed fifty in aggregate', () => {
+    vi.stubGlobal('getVariables', () => ({
+      stat_data: {
+        角色数据: Object.fromEntries(
+          ['甲', '乙', '丙', '丁', '戊'].map(name => [name, { 人物经历: makeBiography(11, `${name}经历`) }]),
+        ),
+      },
+    }));
+
+    const result = checkSummaryTrigger(thresholds);
+
+    expect(result.shouldTrigger).toBe(true);
+    expect(result.triggerReason).toBe('total_entries');
+    expect(result.pendingCharacters).toHaveLength(5);
+    expect(result.totalEntries).toBe(55);
+  });
+
+  it('does not trigger when eligible characters do not exceed fifty in aggregate', () => {
+    vi.stubGlobal('getVariables', () => ({
+      stat_data: {
+        角色数据: {
+          甲: { 人物经历: makeBiography(11, '甲经历') },
+          乙: { 人物经历: makeBiography(11, '乙经历') },
+          丙: { 人物经历: makeBiography(10, '丙经历') },
+        },
+      },
+    }));
+
+    const result = checkSummaryTrigger(thresholds);
+
+    expect(result.shouldTrigger).toBe(false);
+    expect(result.triggerReason).toBe('none');
+    expect(result.pendingCharacters.map(character => character.displayName)).toEqual(['甲', '乙']);
+    expect(result.totalEntries).toBe(22);
   });
 
   it('does not count old or titled stage memories toward the raw-entry threshold', () => {
@@ -51,7 +89,7 @@ describe('summaryManager biography compression', () => {
     ).toBe(2);
   });
 
-  it('compresses the oldest raw entries into multiple named stage memories and keeps recent/existing memories', () => {
+  it('compresses every biography entry in one pass, including existing stage memories', () => {
     const biography = {
       阶段经历1: '(1200.10.1~1200.10.5) 已压缩旧记忆',
       经历1: '(1200.11.1) 一',
@@ -68,22 +106,21 @@ describe('summaryManager biography compression', () => {
 
     const plan = buildBiographyCompressionPlan(biography);
     expect(plan).not.toBeNull();
-    expect(Object.keys(plan!.sourceEntries)).toEqual(['经历1', '经历2', '经历3', '经历4', '经历5']);
+    expect(Object.keys(plan!.sourceEntries)).toEqual(Object.keys(biography));
 
     const merged = mergeBiographyCompression(plan!, {
-      '初入江湖': '（1200.11.1~1200.11.3）前三条经历的完整阶段记忆。',
-      '关系变化': '（1200.11.4~1200.11.5）后两条经历的完整阶段记忆。',
+      '初入江湖': '（1200.10.1~1200.11.3）前期经历的完整阶段记忆。',
+      '关系变化': '（1200.11.4~1200.11.10）后续经历的完整阶段记忆。',
     });
 
-    expect(merged.阶段经历1).toBe('(1200.10.1~1200.10.5) 已压缩旧记忆');
-    expect(merged['阶段经历2-初入江湖']).toBe('（1200.11.1~1200.11.3）前三条经历的完整阶段记忆。');
-    expect(merged['阶段经历3-关系变化']).toBe('（1200.11.4~1200.11.5）后两条经历的完整阶段记忆。');
-    expect(merged.经历6).toBe('(1200.11.6) 六');
-    expect(merged.经历10).toBe('(1200.11.10) 十');
-    expect(Object.keys(merged)).toHaveLength(BIOGRAPHY_RECENT_ENTRIES_TO_KEEP + 3);
+    expect(merged).toEqual({
+      '阶段经历1-初入江湖': '（1200.10.1~1200.11.3）前期经历的完整阶段记忆。',
+      '阶段经历2-关系变化': '（1200.11.4~1200.11.10）后续经历的完整阶段记忆。',
+    });
+    expect(getBiographyEntryCount(merged)).toBe(0);
   });
 
-  it('writes Delete then Insert for multiple named stage memories without touching recent/old stage memories', () => {
+  it('deletes all submitted biography entries and inserts only the new stage memories', () => {
     const biography = {
       阶段经历1: '(1200.10.1~1200.10.5) 已压缩旧记忆',
       经历1: '(1200.11.1) 一',
@@ -99,8 +136,8 @@ describe('summaryManager biography compression', () => {
     };
     const plan = buildBiographyCompressionPlan(biography)!;
     const stageMemories = {
-      '初入江湖': '（1200.11.1~1200.11.3）前三条经历总结',
-      '关系变化': '（1200.11.4~1200.11.5）后两条经历总结',
+      '初入江湖': '（1200.10.1~1200.11.3）前期经历总结',
+      '关系变化': '（1200.11.4~1200.11.10）后续经历总结',
     };
     const operations = buildBiographyCompressionOperations(
       'character:包惜弱',
@@ -109,22 +146,16 @@ describe('summaryManager biography compression', () => {
     );
 
     expect(operations.map(operation => operation.type)).toEqual(['delete', 'insert']);
-    expect((operations[0].payload as any).角色数据.包惜弱.人物经历).toEqual({
-      经历1: {},
-      经历2: {},
-      经历3: {},
-      经历4: {},
-      经历5: {},
-    });
+    expect((operations[0].payload as any).角色数据.包惜弱.人物经历).toEqual(
+      Object.fromEntries(Object.keys(biography).map(key => [key, {}])),
+    );
     expect((operations[1].payload as any).角色数据.包惜弱.人物经历).toEqual({
-      '阶段经历2-初入江湖': '（1200.11.1~1200.11.3）前三条经历总结',
-      '阶段经历3-关系变化': '（1200.11.4~1200.11.5）后两条经历总结',
+      '阶段经历1-初入江湖': '（1200.10.1~1200.11.3）前期经历总结',
+      '阶段经历2-关系变化': '（1200.11.4~1200.11.10）后续经历总结',
     });
-    expect(JSON.stringify(operations)).not.toContain('经历6');
-    expect(JSON.stringify(operations)).not.toContain('阶段经历1:');
   });
 
-  it('normalizes legacy string biography by deleting the old field and inserting retained entries plus summary', () => {
+  it('replaces every legacy string biography line with stage memories in one pass', () => {
     const plan = buildBiographyCompressionPlan({
       条目1: '(1200.11.1) 一',
       条目2: '(1200.11.2) 二',
@@ -138,8 +169,8 @@ describe('summaryManager biography compression', () => {
       'user',
       plan,
       {
-        '旧事回顾': '（1200.11.1~1200.11.2）旧记录总结',
-        '人物关系': '（旧记录时间不详）另一条阶段记忆',
+        '旧事回顾': '（1200.11.1~1200.11.4）旧记录总结',
+        '人物关系': '（1200.11.5~1200.11.7）另一条阶段记忆',
       },
       { replaceLegacyString: true },
     );
@@ -147,10 +178,11 @@ describe('summaryManager biography compression', () => {
     expect(operations.map(operation => operation.type)).toEqual(['delete', 'insert']);
     expect((operations[0].payload as any).user数据.人物经历).toEqual({});
     const inserted = (operations[1].payload as any).user数据.人物经历;
-    expect(inserted['阶段经历1-旧事回顾']).toBe('（1200.11.1~1200.11.2）旧记录总结');
-    expect(inserted['阶段经历2-人物关系']).toBe('（旧记录时间不详）另一条阶段记忆');
-    expect(inserted.条目3).toBe('(1200.11.3) 三');
-    expect(inserted.条目7).toBe('(1200.11.7) 七');
+    expect(inserted).toEqual({
+      '阶段经历1-旧事回顾': '（1200.11.1~1200.11.4）旧记录总结',
+      '阶段经历2-人物关系': '（1200.11.5~1200.11.7）另一条阶段记忆',
+    });
+    expect(getBiographyEntryCount(inserted)).toBe(0);
   });
 
   it('parses a strict JSON object keyed by stage summary names', () => {
