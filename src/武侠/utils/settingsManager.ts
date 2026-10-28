@@ -378,7 +378,7 @@ export const BUILTIN_LOCAL_REGEX_RULES: RegexRule[] = [
 export const BUILTIN_LOCAL_REGEX_IDS = new Set<string>(BUILTIN_LOCAL_REGEX_RULES.map(rule => rule.id));
 
 /** 默认总结提示词模板 */
-export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = \`你负责将角色的旧人物经历压缩成多条完整、可独立理解的阶段记忆。只依据下面提供的旧条目，不改写近期经历，不补写未提供的事实。
+export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你负责将角色的旧人物经历压缩成多条完整、可独立理解的阶段记忆。只依据下面提供的旧条目，不改写近期经历，不补写未提供的事实。
 
 角色名称：{{characterName}}
 待压缩的旧经历：
@@ -405,7 +405,7 @@ export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = \`你负责将角色的旧人物�
 5. **近期经历优先保留细节。** 优先压缩较早且重复性高的内容。与当前剧情直接相关的近期经历应尽量保留，避免将正在发展的情节压缩成过于笼统的描述。这里只提供待压缩的旧经历，不得改写未提供的近期经历。
 6. **保持时间与因果连续性。** 不得编造日期、经历或人物关系，不得颠倒先后顺序。合并多条经历时，必须准确覆盖整个时间段内的重要变化。
 
-只输出严格合法的 JSON 对象，不要输出 Markdown 代码围栏、解释或 JSON 之外的任何内容。\`;
+只输出严格合法的 JSON 对象，不要输出 Markdown 代码围栏、解释或 JSON 之外的任何内容。`;
 
 export const SUMMARY_PROMPT_TEMPLATE_UPDATE_NOTES =
   '当前默认模板要求以阶段总结名称为键、以游戏内日期范围和摘要为值，合并旧经历并保留重要事实、个人视角与心绪。';
