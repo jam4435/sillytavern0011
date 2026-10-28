@@ -6,8 +6,6 @@ import {
   SUMMARY_PROMPT_TEMPLATE_UPDATE_NOTES,
   VARIABLE_STRUCTURE_TEMPLATE_UPDATE_NOTES,
   VARIABLE_GUIDANCE_TEMPLATE_UPDATE_NOTES,
-  getPromptTemplateSignature,
-  isTemplateUpdateAvailable,
   DisplaySettings,
   RegexRule,
   createDefaultDisplaySettings,
@@ -1608,20 +1606,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const updatePromptTemplateSetting = useCallback(
     (value: string, customized: boolean) => {
-      const defaultSignature = getPromptTemplateSignature(DEFAULT_SUMMARY_SETTINGS.promptTemplate);
-      const baseSignature = customized
-        ? settings.summarySettings.promptTemplateCustomized
-          ? settings.summarySettings.promptTemplateBaseSignature
-          : defaultSignature
-        : defaultSignature;
-
       onSettingsChange({
         ...settings,
         summarySettings: {
           ...settings.summarySettings,
           promptTemplate: value,
           promptTemplateCustomized: customized,
-          promptTemplateBaseSignature: baseSignature,
         },
       });
     },
@@ -1630,38 +1620,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const updateVariablePromptSetting = useCallback(
     (kind: 'structure' | 'guidance', value: string, customized: boolean) => {
-      if (kind === 'structure') {
-        const defaultSignature = getPromptTemplateSignature(DEFAULT_SUMMARY_SETTINGS.variableStructureTemplate);
-        const baseSignature = customized
-          ? settings.summarySettings.variableStructureTemplateCustomized
-            ? settings.summarySettings.variableStructureTemplateBaseSignature
-            : defaultSignature
-          : defaultSignature;
-        onSettingsChange({
-          ...settings,
-          summarySettings: {
-            ...settings.summarySettings,
-            variableStructureTemplate: value,
-            variableStructureTemplateCustomized: customized,
-            variableStructureTemplateBaseSignature: baseSignature,
-          },
-        });
-        return;
-      }
-
-      const defaultSignature = getPromptTemplateSignature(DEFAULT_SUMMARY_SETTINGS.variableGuidanceTemplate);
-      const baseSignature = customized
-        ? settings.summarySettings.variableGuidanceTemplateCustomized
-          ? settings.summarySettings.variableGuidanceTemplateBaseSignature
-          : defaultSignature
-        : defaultSignature;
       onSettingsChange({
         ...settings,
         summarySettings: {
           ...settings.summarySettings,
-          variableGuidanceTemplate: value,
-          variableGuidanceTemplateCustomized: customized,
-          variableGuidanceTemplateBaseSignature: baseSignature,
+          ...(kind === 'structure'
+            ? {
+                variableStructureTemplate: value,
+                variableStructureTemplateCustomized: customized,
+              }
+            : {
+                variableGuidanceTemplate: value,
+                variableGuidanceTemplateCustomized: customized,
+              }),
         },
       });
     },
@@ -3198,11 +3169,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
               <div className="summary-subsection">
                 <h5 className="summary-subsection-title">提示词模板</h5>
-                {isTemplateUpdateAvailable(
-                  settings.summarySettings.promptTemplateCustomized,
-                  settings.summarySettings.promptTemplateBaseSignature,
-                  DEFAULT_SUMMARY_SETTINGS.promptTemplate,
-                ) && (
+                {settings.summarySettings.promptTemplateCustomized && (
                   <div className="summary-api-status warning">
                     <div><strong>发现新版模板</strong></div>
                     <div>
@@ -3508,11 +3475,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
               <div className="summary-subsection">
                 <h5 className="summary-subsection-title">变量模板</h5>
-                {isTemplateUpdateAvailable(
-                  settings.summarySettings.variableStructureTemplateCustomized,
-                  settings.summarySettings.variableStructureTemplateBaseSignature,
-                  DEFAULT_SUMMARY_SETTINGS.variableStructureTemplate,
-                ) && (
+                {settings.summarySettings.variableStructureTemplateCustomized && (
                   <div className="summary-api-status warning">
                     <div><strong>发现新版模板</strong></div>
                     <div>
@@ -3557,11 +3520,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
               <div className="summary-subsection">
                 <h5 className="summary-subsection-title">变量指导</h5>
-                {isTemplateUpdateAvailable(
-                  settings.summarySettings.variableGuidanceTemplateCustomized,
-                  settings.summarySettings.variableGuidanceTemplateBaseSignature,
-                  DEFAULT_SUMMARY_SETTINGS.variableGuidanceTemplate,
-                ) && (
+                {settings.summarySettings.variableGuidanceTemplateCustomized && (
                   <div className="summary-api-status warning">
                     <div><strong>发现新版模板</strong></div>
                     <div>
