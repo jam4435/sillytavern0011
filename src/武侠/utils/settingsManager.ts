@@ -397,7 +397,7 @@ export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你负责将角色的全部人�
 ### 2. 压缩规则
 
 1. **保持数据结构不变。** 必须输出合法 JSON 对象，以阶段总结名称作为键，以日期范围和经历摘要组成的字符串作为值。不得改成数组、自由文本或独立的长期记忆、近期经历等分组结构。
-2. **保留日期范围。** 每条经历以“（开始日期~结束日期）”为前缀，日期使用游戏内历法，格式为“年.月.日”。单日经历的开始和结束日期相同；无法确定日期时使用“（旧记录时间不详）”，不得猜测或补写日期。
+2. **保留日期范围。** 每条经历以“（开始日期~结束日期）”为前缀，日期使用游戏内历法，格式为“年.月.日”。单日经历的开始和结束日期相同。只能沿用输入中已有的游戏内日期，不得把现实日期写入结果；无法确定日期时使用“（旧记录时间不详）”，不得猜测或补写日期。
 3. **阶段总结名称应简洁、具体且具有辨识度。** 使用能够概括该阶段核心内容的名称，例如“初入江南”“结识xxx”“珍珑棋局脱困”。避免使用“经历一”“其他内容”等含义模糊的名称。
 4. **一次性压缩全部输入经历。** 本次提供的是该人物当前全部可用经历，包括原始经历和已有阶段记忆。必须将所有输入条目整合为一组新的阶段记忆，不得原样保留某些输入条目，也不得只总结其中一部分。
 5. **保留近期经历的关键细节。** 虽然所有输入经历都要重新组织，但与当前剧情直接相关的近期经历、正在发展的情节、人物当时的个人角度和心绪应保留足够细节，不能压缩得过于笼统。
@@ -1157,8 +1157,14 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
         ? summarySettings.variablePromptBodyStartMarkers
         : defaults.variablePromptBodyStartMarkers,
     thresholds: {
-      ...defaults.thresholds,
-      ...summarySettings.thresholds,
+      totalEntriesThreshold: getNumberSetting(
+        summarySettings.thresholds?.totalEntriesThreshold,
+        defaults.thresholds.totalEntriesThreshold,
+      ),
+      perCharacterEntriesThreshold: getNumberSetting(
+        summarySettings.thresholds?.perCharacterEntriesThreshold,
+        defaults.thresholds.perCharacterEntriesThreshold,
+      ),
     },
   };
 }
