@@ -3,6 +3,9 @@ import {
   BUILTIN_LOCAL_REGEX_IDS,
   DEFAULT_SUMMARY_SETTINGS,
   DEFAULT_SUMMARY_TAB_SETTINGS,
+  SUMMARY_PROMPT_TEMPLATE_UPDATE_NOTES,
+  VARIABLE_STRUCTURE_TEMPLATE_UPDATE_NOTES,
+  VARIABLE_GUIDANCE_TEMPLATE_UPDATE_NOTES,
   DisplaySettings,
   RegexRule,
   createDefaultDisplaySettings,
@@ -1601,6 +1604,20 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     [settings, onSettingsChange],
   );
 
+  const updatePromptTemplateSetting = useCallback(
+    (value: string, customized: boolean) => {
+      onSettingsChange({
+        ...settings,
+        summarySettings: {
+          ...settings.summarySettings,
+          promptTemplate: value,
+          promptTemplateCustomized: customized,
+        },
+      });
+    },
+    [settings, onSettingsChange],
+  );
+
   const updateVariablePromptSetting = useCallback(
     (kind: 'structure' | 'guidance', value: string, customized: boolean) => {
       onSettingsChange({
@@ -3152,19 +3169,44 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
               <div className="summary-subsection">
                 <h5 className="summary-subsection-title">提示词模板</h5>
+                {settings.summarySettings.promptTemplateCustomized && (
+                  <div className="summary-api-status warning">
+                    <div><strong>模板已自定义</strong></div>
+                    <div>
+                      {SUMMARY_PROMPT_TEMPLATE_UPDATE_NOTES}
+                      已保留你的原文，不会自动覆盖。上方说明当前默认模板的主要规则；如需采用，请点击下方按钮。
+                    </div>
+                    <div className="summary-actions">
+                      <button
+                        type="button"
+                        className="settings-action-btn primary"
+                        onClick={() =>
+                          updatePromptTemplateSetting(DEFAULT_SUMMARY_SETTINGS.promptTemplate, false)
+                        }
+                      >
+                        更新为当前默认模板
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <p className="settings-hint">
-                  可用变量：{'{{characterName}}'} - 角色名称，{'{{biographyEntries}}'} - 经历条目
+                  可用变量：{'{{characterName}}'} - 角色名称，{'{{biographyEntries}}'} - 经历条目。
+                  当前状态：{settings.summarySettings.promptTemplateCustomized
+                    ? '已自定义，保留个人内容'
+                    : '跟随项目默认，版本更新自动更新'}。
                 </p>
                 <textarea
                   value={settings.summarySettings.promptTemplate}
-                  onChange={e => updateSummarySetting('promptTemplate', e.target.value)}
+                  onChange={e => updatePromptTemplateSetting(e.target.value, true)}
                   placeholder="请输入总结提示词模板..."
                   className="settings-textarea"
                   rows={8}
                 />
                 <button
                   className="settings-reset-template-btn"
-                  onClick={() => updateSummarySetting('promptTemplate', DEFAULT_SUMMARY_SETTINGS.promptTemplate)}
+                  onClick={() =>
+                    updatePromptTemplateSetting(DEFAULT_SUMMARY_SETTINGS.promptTemplate, false)
+                  }
                 >
                   恢复默认模板
                 </button>
@@ -3433,10 +3475,30 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
               <div className="summary-subsection">
                 <h5 className="summary-subsection-title">变量模板</h5>
+                {settings.summarySettings.variableStructureTemplateCustomized && (
+                  <div className="summary-api-status warning">
+                    <div><strong>模板已自定义</strong></div>
+                    <div>
+                      {VARIABLE_STRUCTURE_TEMPLATE_UPDATE_NOTES}
+                      已保留你的原文，不会自动覆盖。上方说明当前默认模板的主要规则；如需采用，请点击下方按钮。
+                    </div>
+                    <div className="summary-actions">
+                      <button
+                        type="button"
+                        className="settings-action-btn primary"
+                        onClick={() =>
+                          updateVariablePromptSetting('structure', DEFAULT_SUMMARY_SETTINGS.variableStructureTemplate, false)
+                        }
+                      >
+                        更新为当前默认模板
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <p className="settings-hint">
                   定义真实变量路径、结构、枚举与写入权限；这是可编辑的变量 Schema。
                   当前状态：{settings.summarySettings.variableStructureTemplateCustomized
-                    ? '已自定义，版本更新不会覆盖'
+                    ? '已自定义，保留个人内容'
                     : '跟随项目默认，版本更新自动更新'}。
                 </p>
                 <textarea
@@ -3458,11 +3520,31 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
               <div className="summary-subsection">
                 <h5 className="summary-subsection-title">变量指导</h5>
+                {settings.summarySettings.variableGuidanceTemplateCustomized && (
+                  <div className="summary-api-status warning">
+                    <div><strong>模板已自定义</strong></div>
+                    <div>
+                      {VARIABLE_GUIDANCE_TEMPLATE_UPDATE_NOTES}
+                      已保留你的原文，不会自动覆盖。上方说明当前默认模板的主要规则；如需采用，请点击下方按钮。
+                    </div>
+                    <div className="summary-actions">
+                      <button
+                        type="button"
+                        className="settings-action-btn primary"
+                        onClick={() =>
+                          updateVariablePromptSetting('guidance', DEFAULT_SUMMARY_SETTINGS.variableGuidanceTemplate, false)
+                        }
+                      >
+                        更新为当前默认模板
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <p className="settings-hint">
                   定义变量模型的判断、更新与输出规则。支持独占一行的
                   {' @if slot '} / {' @else '} / {' @endif '} 条件块。
                   当前状态：{settings.summarySettings.variableGuidanceTemplateCustomized
-                    ? '已自定义，版本更新不会覆盖'
+                    ? '已自定义，保留个人内容'
                     : '跟随项目默认，版本更新自动更新'}。
                 </p>
                 <textarea
