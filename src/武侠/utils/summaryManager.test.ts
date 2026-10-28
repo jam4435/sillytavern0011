@@ -43,6 +43,23 @@ describe('summaryManager biography compression', () => {
     expect(result.totalEntries).toBe(51);
   });
 
+  it('does not trigger when an eligible character has exactly fifty raw entries', () => {
+    vi.stubGlobal('getVariables', () => ({
+      stat_data: {
+        角色数据: {
+          段誉: { 人物经历: makeBiography(50) },
+        },
+      },
+    }));
+
+    const result = checkSummaryTrigger(thresholds);
+
+    expect(result.shouldTrigger).toBe(false);
+    expect(result.triggerReason).toBe('none');
+    expect(result.pendingCharacters).toHaveLength(1);
+    expect(result.totalEntries).toBe(50);
+  });
+
   it('triggers when five eligible characters with eleven entries each exceed fifty in aggregate', () => {
     vi.stubGlobal('getVariables', () => ({
       stat_data: {
