@@ -19,6 +19,9 @@ import eventScrollRightUrl from '../assets/ui/event-scroll-right.webp?url';
 import {
   DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
   DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
+  getPromptTemplateSignature,
+  KNOWN_VARIABLE_GUIDANCE_DEFAULT_SIGNATURES,
+  KNOWN_VARIABLE_STRUCTURE_DEFAULT_SIGNATURES,
 } from '../prompts/variablePromptDefaults';
 
 // =========================================
@@ -128,16 +131,24 @@ export interface SummarySettings {
   summaryApiSelection: SummaryApiSelection;
   /** 额外变量更新使用的 API */
   variableApiSelection: SummaryApiSelection;
-  /** 提示词模板 */
+  /** 人物经历总结提示词模板 */
   promptTemplate: string;
+  /** 用户是否显式修改过总结提示词模板 */
+  promptTemplateCustomized: boolean;
+  /** 自定义总结提示词基于哪个默认版本；与当前默认签名不同即提示升级 */
+  promptTemplateBaseSignature: string;
   /** 变量结构与写入权限模板 */
   variableStructureTemplate: string;
   /** 用户是否显式修改过变量结构模板；false 时始终跟随项目当前默认值 */
   variableStructureTemplateCustomized: boolean;
+  /** 自定义变量结构模板基于哪个默认版本 */
+  variableStructureTemplateBaseSignature: string;
   /** 变量领域更新规则 */
   variableGuidanceTemplate: string;
   /** 用户是否显式修改过变量指导；false 时始终跟随项目当前默认值 */
   variableGuidanceTemplateCustomized: boolean;
+  /** 自定义变量指导基于哪个默认版本 */
+  variableGuidanceTemplateBaseSignature: string;
   /** 最新正文之前作为只读上下文发送的完整 user + assistant 轮数 */
   variableContextRounds: VariableContextRounds;
   /** 用户是否显式选择过只读上下文轮数；用于把旧默认值 1 轮迁移到新的 0 轮默认值。 */
@@ -414,6 +425,27 @@ const LEGACY_DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你负责压缩《金庸群侠�
 [阶段经历内容]
 </summary>`;
 
+const LEGACY_SUMMARY_PROMPT_TEMPLATE_DEFAULT_SIGNATURES = [
+  // Previous built-in <summary> prompt, plus the first strict-JSON default shipped on 2026-10-25.
+  '349:05a0e5b9',
+  '929:0ca7008d',
+] as const;
+
+export const SUMMARY_PROMPT_TEMPLATE_UPDATE_NOTES =
+  '新版改为严格 JSON 对象输出，支持按阶段生成多条独立记忆，并约束游戏内日期、唯一键名和事实来源。';
+export const VARIABLE_STRUCTURE_TEMPLATE_UPDATE_NOTES =
+  '新版重新整理了可写路径、对象结构与字段权限，进一步明确参与事件差分、人物经历及物品等数据的写入边界。';
+export const VARIABLE_GUIDANCE_TEMPLATE_UPDATE_NOTES =
+  '新版更新了时间、事件、地点与长期经历的处理规则，并明确 Insert、Edit、Delete 的使用边界。';
+
+export function isTemplateUpdateAvailable(
+  customized: boolean,
+  baseSignature: string,
+  currentDefaultTemplate: string,
+): boolean {
+  return customized && baseSignature !== getPromptTemplateSignature(currentDefaultTemplate);
+}
+
 export {
   DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
   DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
@@ -551,10 +583,14 @@ export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
   summaryApiSelection: PRESET_SUMMARY_API_SELECTION,
   variableApiSelection: PRESET_SUMMARY_API_SELECTION,
   promptTemplate: DEFAULT_SUMMARY_PROMPT_TEMPLATE,
+  promptTemplateCustomized: false,
+  promptTemplateBaseSignature: getPromptTemplateSignature(DEFAULT_SUMMARY_PROMPT_TEMPLATE),
   variableStructureTemplate: DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
   variableStructureTemplateCustomized: false,
+  variableStructureTemplateBaseSignature: getPromptTemplateSignature(DEFAULT_VARIABLE_STRUCTURE_TEMPLATE),
   variableGuidanceTemplate: DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
   variableGuidanceTemplateCustomized: false,
+  variableGuidanceTemplateBaseSignature: getPromptTemplateSignature(DEFAULT_VARIABLE_GUIDANCE_TEMPLATE),
   variableContextRounds: 0,
   variableContextRoundsCustomized: false,
   variablePromptExcludedTags: DEFAULT_VARIABLE_PROMPT_EXCLUDED_TAGS,
@@ -1024,6 +1060,49 @@ function normalizeSummaryApiSelection(
   return cloneSummaryApiSelection(fallback);
 }
 
+interface NormalizedEditableTemplate {
+  template: string;
+  customized: boolean;
+  baseSignature: string;
+}
+
+/**
+ * Upgrade known unchanged defaults automatically, but never overwrite a value that may be user-authored.
+ * Legacy settings without a customization flag are classified by historical default signatures.
+ * Unknown legacy values are preserved and shown as upgradeable custom templates in the settings UI.
+ */
+function normalizeEditableTemplate(
+  storedTemplate: unknown,
+  storedCustomized: unknown,
+  storedBaseSignature: unknown,
+  currentDefaultTemplate: string,
+  knownDefaultSignatures: readonly string[] = [],
+): NormalizedEditableTemplate {
+  const currentSignature = getPromptTemplateSignature(currentDefaultTemplate);
+  if (typeof storedTemplate !== 'string') {
+    return { template: currentDefaultTemplate, customized: false, baseSignature: currentSignature };
+  }
+
+  if (storedCustomized === true) {
+    return {
+      template: storedTemplate,
+      customized: true,
+      baseSignature: typeof storedBaseSignature === 'string' ? storedBaseSignature : '',
+    };
+  }
+
+  if (storedCustomized === false) {
+    return { template: currentDefaultTemplate, customized: false, baseSignature: currentSignature };
+  }
+
+  const storedSignature = getPromptTemplateSignature(storedTemplate);
+  if (storedSignature === currentSignature || knownDefaultSignatures.includes(storedSignature)) {
+    return { template: currentDefaultTemplate, customized: false, baseSignature: currentSignature };
+  }
+
+  return { template: storedTemplate, customized: true, baseSignature: '' };
+}
+
 function normalizeSummarySettings(summarySettings: StoredSummarySettings | undefined): SummarySettings {
   const defaults = createDefaultSummarySettings();
   if (!summarySettings) {
@@ -1058,12 +1137,27 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
       ? { type: 'profile', profileId: 'legacy-custom-api' }
       : { type: 'preset' };
 
-  const hasCustomVariableStructureTemplate =
-    summarySettings.variableStructureTemplateCustomized === true &&
-    typeof summarySettings.variableStructureTemplate === 'string';
-  const hasCustomVariableGuidanceTemplate =
-    summarySettings.variableGuidanceTemplateCustomized === true &&
-    typeof summarySettings.variableGuidanceTemplate === 'string';
+  const promptTemplate = normalizeEditableTemplate(
+    summarySettings.promptTemplate,
+    summarySettings.promptTemplateCustomized,
+    summarySettings.promptTemplateBaseSignature,
+    defaults.promptTemplate,
+    LEGACY_SUMMARY_PROMPT_TEMPLATE_DEFAULT_SIGNATURES,
+  );
+  const variableStructureTemplate = normalizeEditableTemplate(
+    summarySettings.variableStructureTemplate,
+    summarySettings.variableStructureTemplateCustomized,
+    summarySettings.variableStructureTemplateBaseSignature,
+    defaults.variableStructureTemplate,
+    KNOWN_VARIABLE_STRUCTURE_DEFAULT_SIGNATURES,
+  );
+  const variableGuidanceTemplate = normalizeEditableTemplate(
+    summarySettings.variableGuidanceTemplate,
+    summarySettings.variableGuidanceTemplateCustomized,
+    summarySettings.variableGuidanceTemplateBaseSignature,
+    defaults.variableGuidanceTemplate,
+    KNOWN_VARIABLE_GUIDANCE_DEFAULT_SIGNATURES,
+  );
 
   return {
     ...defaults,
@@ -1106,20 +1200,15 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
       profileIds,
       legacySelection,
     ),
-    promptTemplate: (() => {
-      const storedPrompt =
-        typeof summarySettings.promptTemplate === 'string' ? summarySettings.promptTemplate : defaults.promptTemplate;
-      // 只迁移旧版内置默认提示词；用户自己修改过的提示词继续保留。
-      return storedPrompt === LEGACY_DEFAULT_SUMMARY_PROMPT_TEMPLATE ? defaults.promptTemplate : storedPrompt;
-    })(),
-    variableStructureTemplate: hasCustomVariableStructureTemplate
-      ? summarySettings.variableStructureTemplate!
-      : defaults.variableStructureTemplate,
-    variableStructureTemplateCustomized: hasCustomVariableStructureTemplate,
-    variableGuidanceTemplate: hasCustomVariableGuidanceTemplate
-      ? summarySettings.variableGuidanceTemplate!
-      : defaults.variableGuidanceTemplate,
-    variableGuidanceTemplateCustomized: hasCustomVariableGuidanceTemplate,
+    promptTemplate: promptTemplate.template,
+    promptTemplateCustomized: promptTemplate.customized,
+    promptTemplateBaseSignature: promptTemplate.baseSignature,
+    variableStructureTemplate: variableStructureTemplate.template,
+    variableStructureTemplateCustomized: variableStructureTemplate.customized,
+    variableStructureTemplateBaseSignature: variableStructureTemplate.baseSignature,
+    variableGuidanceTemplate: variableGuidanceTemplate.template,
+    variableGuidanceTemplateCustomized: variableGuidanceTemplate.customized,
+    variableGuidanceTemplateBaseSignature: variableGuidanceTemplate.baseSignature,
     variableContextRoundsCustomized:
       summarySettings.variableContextRoundsCustomized === true || summarySettings.variableContextRounds === 2,
     variableContextRounds:
