@@ -148,7 +148,9 @@ export function subscribeSummaryProgress(
   } catch (error) {
     dataLogger.warn('[summaryManager] 初始化总结进度订阅者失败:', error);
   }
-  return () => summaryProgressListeners.delete(listener);
+  return () => {
+    summaryProgressListeners.delete(listener);
+  };
 }
 
 /** 有界并行执行任务；等待所有 worker 结束后再抛出意外异常。 */
