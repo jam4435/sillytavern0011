@@ -2037,6 +2037,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         settings.summarySettings,
         failedResults,
         summaryProgress.targetMessageId,
+        summaryProgress.targetChatId,
       );
       setSummaryResult(result);
       if (result.totalFailed > 0) {
@@ -3277,7 +3278,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <div className="summary-progress">
                     <div className="summary-progress-header">
                       <span>人物总结进度 · {summaryProgress.source === 'automatic' ? '自动' : '手动'}</span>
-                      <span className={`summary-progress-badge ${summaryProgress.active ? 'running' : summaryProgress.totalFailed > 0 ? 'warning' : 'success'}`}>
+                      <span className={`summary-progress-badge ${summaryProgress.active ? 'running' : summaryProgress.phase === 'failed' || summaryProgress.totalFailed > 0 ? 'warning' : 'success'}`}>
                         {summaryProgress.active
                           ? '进行中'
                           : summaryProgress.phase === 'failed'
