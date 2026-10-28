@@ -3132,22 +3132,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       onChange={e => updateThreshold('perCharacterEntriesThreshold', parseInt(e.target.value) || 10)}
                       className="settings-number-input"
                     />
-                    <span className="settings-hint-inline">达到此原始条目数即可压缩该角色最旧经历；近期经历会保留</span>
-                  </div>
-                </div>
-
-                <div className="settings-row">
-                  <label className="settings-label">待处理队列阈值</label>
-                  <div className="settings-control">
-                    <input
-                      type="number"
-                      min="1"
-                      max="50"
-                      value={settings.summarySettings.thresholds.pendingQueueThreshold}
-                      onChange={e => updateThreshold('pendingQueueThreshold', parseInt(e.target.value) || 5)}
-                      className="settings-number-input"
-                    />
-                    <span className="settings-hint-inline">达到此数时标记为批量触发；不会阻塞单角色独立触发</span>
+                    <span className="settings-hint-inline">只有原始经历数严格超过此值的人物才参与总量统计</span>
                   </div>
                 </div>
 
@@ -3162,7 +3147,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       onChange={e => updateThreshold('totalEntriesThreshold', parseInt(e.target.value) || 50)}
                       className="settings-number-input"
                     />
-                    <span className="settings-hint-inline">总原始经历达到此值时标记为批量触发；不会阻塞单角色独立触发</span>
+                    <span className="settings-hint-inline">仅累计超过单角色阈值的人物；合计严格超过此值时，自动一次性压缩这些人物的全部经历</span>
                   </div>
                 </div>
               </div>
@@ -3240,7 +3225,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <div className="summary-status-header">
                       <span>检测结果</span>
                       <span className={`summary-status-badge ${summaryStatus.shouldTrigger ? 'warning' : 'ok'}`}>
-                        {summaryStatus.shouldTrigger ? '需要总结' : '正常'}
+                        {summaryStatus.shouldTrigger
+                          ? '需要总结'
+                          : summaryStatus.pendingCharacters.length > 0
+                            ? '等待总量阈值'
+                            : '正常'}
                       </span>
                     </div>
                     <div className="summary-status-body">
@@ -3249,7 +3238,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         <strong>{summaryStatus.pendingCharacters.length}</strong>
                       </div>
                       <div className="summary-status-item">
-                        <span>总经历条目数：</span>
+                        <span>符合条件人物的原始经历总数：</span>
                         <strong>{summaryStatus.totalEntries}</strong>
                       </div>
                       {summaryStatus.pendingCharacters.length > 0 && (
