@@ -1926,6 +1926,7 @@ const App: React.FC = () => {
   return (
     <>
       {eventNotificationLayer}
+      {summaryProgressIndicator}
       <div className={`app-container ${shouldStackCustomBackground ? 'has-custom-bg' : ''}`}>
         <StatusToast state={toastState} onDismiss={dismissToast} autoHideDelay={8000} />
 
