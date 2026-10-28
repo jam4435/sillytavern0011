@@ -493,7 +493,7 @@ export function formatPromptForCharacter(
   if (
     template.includes('一次性压缩全部输入经历') &&
     template.includes('不得只总结其中一部分') &&
-    template.includes('近期经历也必须纳入总结')
+    template.includes('虽然所有输入经历都要重新组织')
   ) {
     return formattedPrompt;
   }
