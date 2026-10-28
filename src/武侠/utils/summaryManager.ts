@@ -78,6 +78,7 @@ export interface SummaryProgressSnapshot {
   source: SummaryProgressSource | null;
   phase: SummaryProgressPhase;
   targetMessageId?: number;
+  targetChatId?: string;
   total: number;
   totalProcessed: number;
   totalSuccess: number;
@@ -750,6 +751,28 @@ function readCurrentCharacterBiography(characterId: string): Record<string, stri
   return normalizeBiography(readCurrentCharacterBiographyValue(characterId));
 }
 
+function readCurrentSummaryChatId(): string | null {
+  try {
+    type SummaryTavernApi = { getCurrentChatId?: () => string | number | null | undefined };
+    const currentWindow = globalThis as typeof globalThis & { SillyTavern?: SummaryTavernApi };
+    const parentWindow = typeof window !== 'undefined'
+      ? window.parent as Window & typeof globalThis & { SillyTavern?: SummaryTavernApi }
+      : undefined;
+    const chatId = currentWindow.SillyTavern?.getCurrentChatId?.()
+      ?? parentWindow?.SillyTavern?.getCurrentChatId?.();
+    if (typeof chatId === 'string') {
+      const normalized = chatId.trim();
+      return normalized || null;
+    }
+    if (typeof chatId === 'number' && Number.isFinite(chatId)) {
+      return String(chatId);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function getLatestAssistantMessageId(): number | null {
   try {
     const messages = getChatMessages('0-{{lastMessageId}}', {
@@ -785,6 +808,7 @@ export async function executeSummary(
   character: PendingCharacterSummary,
   targetMessageId: number,
   onProgress?: (phase: SummaryCharacterPhase) => void,
+  expectedChatId?: string | null,
 ): Promise<CharacterSummaryResult> {
   onProgress?.('preparing');
   dataLogger.log(`[summaryManager] 开始总结角色: ${character.displayName}`);
@@ -835,6 +859,9 @@ export async function executeSummary(
     // 在取得写回队列后再重读，确保等待队列期间新增的经历也能被保留。
     onProgress?.('waiting-write');
     await withSummaryWriteLock(async () => {
+      if (expectedChatId && readCurrentSummaryChatId() !== expectedChatId) {
+        throw new Error('总结期间当前聊天已切换，已取消写回，避免将人物经历写入其他聊天。');
+      }
       const latestRawBiography = readCurrentCharacterBiographyValue(character.characterId);
       const latestBiography = normalizeBiography(latestRawBiography);
       const changedSourceKeys = compressionPlan.sourceKeys.filter(
@@ -913,6 +940,7 @@ export async function executeAllPendingSummaries(
   characters?: PendingCharacterSummary[],
   targetMessageId?: number,
   source: SummaryProgressSource = 'automatic',
+  targetChatId?: string | null,
 ): Promise<BatchSummaryResult> {
   const result: BatchSummaryResult = {
     success: false,
@@ -935,6 +963,7 @@ export async function executeAllPendingSummaries(
   }
 
   const resolvedTargetMessageId = targetMessageId ?? getLatestAssistantMessageId();
+  const resolvedTargetChatId = targetChatId === undefined ? readCurrentSummaryChatId() : targetChatId;
   if (!Number.isInteger(resolvedTargetMessageId) || (resolvedTargetMessageId as number) < 0) {
     throw new Error('无法确定总结写回的 assistant 楼层，已取消总结以避免写入错误楼层。');
   }
@@ -947,6 +976,7 @@ export async function executeAllPendingSummaries(
     source,
     phase: 'running',
     targetMessageId: resolvedTargetMessageId as number,
+    targetChatId: resolvedTargetChatId ?? undefined,
     total: targetCharacters.length,
     totalProcessed: 0,
     totalSuccess: 0,
@@ -998,6 +1028,7 @@ export async function executeAllPendingSummaries(
           character,
           resolvedTargetMessageId as number,
           phase => updateCharacterPhase(character.characterId, phase),
+          resolvedTargetChatId,
         );
       } catch (error) {
         summaryResult = {
@@ -1113,12 +1144,16 @@ export async function retryFailedSummaryCharacters(
   settings: SummarySettings,
   failedResults: CharacterSummaryResult[],
   targetMessageId?: number,
+  targetChatId?: string,
 ): Promise<BatchSummaryResult> {
   if (failedResults.length === 0) {
     return { success: true, results: [], totalProcessed: 0, totalSuccess: 0, totalFailed: 0 };
   }
   if (isSummarizing) {
     throw new Error('已有总结任务在执行中，请稍后再试。');
+  }
+  if (targetChatId && readCurrentSummaryChatId() !== targetChatId) {
+    throw new Error('当前聊天与失败总结所属聊天不同，请切回原聊天后再重试。');
   }
 
   const failedIds = new Set(failedResults.map(item => item.characterId));
@@ -1141,7 +1176,7 @@ export async function retryFailedSummaryCharacters(
     totalFailed: 0,
   };
   if (currentCandidates.length > 0) {
-    retried = await executeAllPendingSummaries(settings, currentCandidates, targetMessageId, 'manual');
+    retried = await executeAllPendingSummaries(settings, currentCandidates, targetMessageId, 'manual', targetChatId);
   }
 
   const retriedById = new Map(retried.results.map(item => [item.characterId, item]));
@@ -1162,6 +1197,7 @@ export async function retryFailedSummaryCharacters(
     phase: 'completed',
     source: 'manual',
     targetMessageId: targetMessageId ?? getLatestAssistantMessageId() ?? undefined,
+    targetChatId: targetChatId ?? readCurrentSummaryChatId() ?? undefined,
     total: combined.totalProcessed,
     totalProcessed: combined.totalProcessed,
     totalSuccess: combined.totalSuccess,
