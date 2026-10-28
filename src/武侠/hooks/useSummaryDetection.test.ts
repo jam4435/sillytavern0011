@@ -13,7 +13,7 @@ const summaryMocks = vi.hoisted(() => {
   }];
   const triggerResult = {
     shouldTrigger: true,
-    triggerReason: 'per_character' as const,
+    triggerReason: 'total_entries' as const,
     pendingCharacters,
     totalEntries: 10,
   };
@@ -50,7 +50,6 @@ describe('useSummaryDetection', () => {
     enabled: true,
     thresholds: {
       perCharacterEntriesThreshold: 10,
-      pendingQueueThreshold: 5,
       totalEntriesThreshold: 50,
     },
   } as SummarySettings;
