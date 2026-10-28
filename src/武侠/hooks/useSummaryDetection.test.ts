@@ -13,7 +13,7 @@ const summaryMocks = vi.hoisted(() => {
   }];
   const triggerResult = {
     shouldTrigger: true,
-    triggerReason: 'total_entries' as const,
+    triggerReason: 'total_entries' as 'total_entries' | 'none',
     pendingCharacters,
     totalEntries: 51,
   };
