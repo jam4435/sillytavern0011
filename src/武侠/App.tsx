@@ -1834,6 +1834,7 @@ const App: React.FC = () => {
     return (
       <>
         {eventNotificationLayer}
+        {summaryProgressIndicator}
         <StartScreen onStart={handleStart} />
       </>
     );
@@ -1843,6 +1844,7 @@ const App: React.FC = () => {
     return (
       <>
         {eventNotificationLayer}
+        {summaryProgressIndicator}
         <SplashScreen
           hasSavedGame={savedGameExists}
           onNewGame={handleNewGame}
@@ -1865,6 +1867,7 @@ const App: React.FC = () => {
     return (
       <>
         {eventNotificationLayer}
+        {summaryProgressIndicator}
         <StatusToast state={toastState} onDismiss={dismissToast} autoHideDelay={8000} />
         <NewGameSetup
           onSubmit={handleSetupSubmit}
@@ -1888,6 +1891,7 @@ const App: React.FC = () => {
     return (
       <>
         {eventNotificationLayer}
+        {summaryProgressIndicator}
         <StatusToast state={toastState} onDismiss={dismissToast} autoHideDelay={8000} />
         <OpeningScreen
           welcomeLine={openingWelcomeLine}
