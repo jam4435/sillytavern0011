@@ -3174,7 +3174,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <div><strong>模板已自定义</strong></div>
                     <div>
                       {SUMMARY_PROMPT_TEMPLATE_UPDATE_NOTES}
-                      已保留你的原文，不会自动覆盖。你可以继续使用自定义内容，或主动采用当前默认模板。
+                      已保留你的原文，不会自动覆盖。上方说明当前默认模板的主要规则；如需采用，请点击下方按钮。
                     </div>
                     <div className="summary-actions">
                       <button
@@ -3480,7 +3480,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <div><strong>模板已自定义</strong></div>
                     <div>
                       {VARIABLE_STRUCTURE_TEMPLATE_UPDATE_NOTES}
-                      已保留你的原文，不会自动覆盖。你可以继续使用自定义内容，或主动采用当前默认模板。
+                      已保留你的原文，不会自动覆盖。上方说明当前默认模板的主要规则；如需采用，请点击下方按钮。
                     </div>
                     <div className="summary-actions">
                       <button
@@ -3525,7 +3525,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <div><strong>模板已自定义</strong></div>
                     <div>
                       {VARIABLE_GUIDANCE_TEMPLATE_UPDATE_NOTES}
-                      已保留你的原文，不会自动覆盖。你可以继续使用自定义内容，或主动采用当前默认模板。
+                      已保留你的原文，不会自动覆盖。上方说明当前默认模板的主要规则；如需采用，请点击下方按钮。
                     </div>
                     <div className="summary-actions">
                       <button
