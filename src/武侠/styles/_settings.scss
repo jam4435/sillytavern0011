@@ -2619,6 +2619,47 @@
   }
 }
 
+// 主界面非阻塞人物总结状态
+.summary-global-progress {
+  position: fixed;
+  top: max(0.75rem, env(safe-area-inset-top));
+  right: 0.75rem;
+  z-index: 9999;
+  width: min(22rem, calc(100vw - 1.5rem));
+  padding: 0.75rem;
+  border: 1px solid rgba($amber-600, 0.35);
+  border-radius: 8px;
+  background: rgba(20, 18, 16, 0.94);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  color: $stone-200;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+
+  p {
+    margin: 0.55rem 0 0;
+    color: $stone-400;
+    font-size: 0.8rem;
+    overflow-wrap: anywhere;
+  }
+
+  .summary-progress-track {
+    margin-top: 0.55rem;
+  }
+}
+
+.summary-global-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+
+  span {
+    color: $stone-400;
+    white-space: nowrap;
+  }
+}
+
 // 人物总结实时进度与结果
 .summary-progress,
 .summary-status,
