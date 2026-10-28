@@ -85,10 +85,8 @@ export function useSummaryDetection({
     // 通知状态变化
     onStatusChangeRef.current?.(triggerResult);
 
-    // 更新待处理队列
-    if (triggerResult.pendingCharacters.length > 0) {
-      updatePendingQueue(triggerResult.pendingCharacters);
-    }
+    // 每轮都用最新扫描结果替换队列，避免已压缩或低于阈值的人物残留。
+    updatePendingQueue(triggerResult.pendingCharacters);
 
     // 如果需要触发总结
     if (triggerResult.shouldTrigger) {
