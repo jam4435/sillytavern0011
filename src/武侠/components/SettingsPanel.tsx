@@ -2051,7 +2051,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     } finally {
       setIsSummaryRunning(false);
     }
-  }, [settings.summarySettings, summaryProgress.results, summaryProgress.targetMessageId]);
+  }, [settings.summarySettings, summaryProgress.results, summaryProgress.targetMessageId, summaryProgress.targetChatId]);
 
   const handleCopyDebugRound = useCallback(async () => {
     if (!latestDebugRound) return;
