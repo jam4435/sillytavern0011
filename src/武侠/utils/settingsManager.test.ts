@@ -295,6 +295,13 @@ describe('settingsManager ui theme', () => {
     expect(settings.variableStructureTemplate).toContain('<变量模板>');
     expect(settings.promptTemplateCustomized).toBe(false);
     expect(settings.promptTemplateBaseSignature).toBe(getPromptTemplateSignature(settings.promptTemplate));
+    expect(
+      isTemplateUpdateAvailable(
+        true,
+        settings.promptTemplateBaseSignature,
+        settings.promptTemplate,
+      ),
+    ).toBe(false);
     expect(settings.variableStructureTemplateCustomized).toBe(false);
     expect(settings.variableStructureTemplateBaseSignature).toBe(
       getPromptTemplateSignature(settings.variableStructureTemplate),
@@ -426,7 +433,7 @@ describe('settingsManager ui theme', () => {
     )).toBe(true);
   });
 
-  it('preserves variable prompt text only when explicit customized flags are true', () => {
+  it('preserves explicitly customized variable templates and ignores retired prompt skeleton settings', () => {
     window.localStorage.setItem('wuxia_display_settings', JSON.stringify({
       summarySettings: {
         variablePromptTemplate: 'CUSTOM MAIN {{variableInputContext}}',
