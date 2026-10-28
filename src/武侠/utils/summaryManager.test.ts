@@ -71,8 +71,8 @@ describe('summaryManager biography compression', () => {
     expect(Object.keys(plan!.sourceEntries)).toEqual(['经历1', '经历2', '经历3', '经历4', '经历5']);
 
     const merged = mergeBiographyCompression(plan!, {
-      '阶段经历1-初入江湖': '（1200.11.1~1200.11.3）前三条经历的完整阶段记忆。',
-      '阶段经历2-关系变化': '（1200.11.4~1200.11.5）后两条经历的完整阶段记忆。',
+      '初入江湖': '（1200.11.1~1200.11.3）前三条经历的完整阶段记忆。',
+      '关系变化': '（1200.11.4~1200.11.5）后两条经历的完整阶段记忆。',
     });
 
     expect(merged.阶段经历1).toBe('(1200.10.1~1200.10.5) 已压缩旧记忆');
@@ -99,8 +99,8 @@ describe('summaryManager biography compression', () => {
     };
     const plan = buildBiographyCompressionPlan(biography)!;
     const stageMemories = {
-      '阶段经历1-初入江湖': '（1200.11.1~1200.11.3）前三条经历总结',
-      '阶段经历2-关系变化': '（1200.11.4~1200.11.5）后两条经历总结',
+      '初入江湖': '（1200.11.1~1200.11.3）前三条经历总结',
+      '关系变化': '（1200.11.4~1200.11.5）后两条经历总结',
     };
     const operations = buildBiographyCompressionOperations(
       'character:包惜弱',
@@ -138,8 +138,8 @@ describe('summaryManager biography compression', () => {
       'user',
       plan,
       {
-        '阶段经历1-旧事回顾': '（1200.11.1~1200.11.2）旧记录总结',
-        '阶段经历2-人物关系': '（旧记录时间不详）另一条阶段记忆',
+        '旧事回顾': '（1200.11.1~1200.11.2）旧记录总结',
+        '人物关系': '（旧记录时间不详）另一条阶段记忆',
       },
       { replaceLegacyString: true },
     );
@@ -153,16 +153,16 @@ describe('summaryManager biography compression', () => {
     expect(inserted.条目7).toBe('(1200.11.7) 七');
   });
 
-  it('parses a strict JSON object containing multiple titled stage memories', () => {
+  it('parses a strict JSON object keyed by stage summary names', () => {
     expect(parseSummaryResponse(`{
-      "阶段经历1-初入江湖": "（1200.11.1~1200.11.2）建立了重要关系。",
-      "阶段经历2-关系变化": "（旧记录时间不详）确认了长期立场。"
+      "初入江湖": "（1200.11.1~1200.11.2）建立了重要关系。",
+      "关系变化": "（旧记录时间不详）确认了长期立场。"
     }`, 2, {
       经历1: '(1200.11.1) 旧经历一',
       经历2: '(1200.11.2) 旧经历二',
     })).toEqual({
-      '阶段经历1-初入江湖': '（1200.11.1~1200.11.2）建立了重要关系。',
-      '阶段经历2-关系变化': '（旧记录时间不详）确认了长期立场。',
+      '初入江湖': '（1200.11.1~1200.11.2）建立了重要关系。',
+      '关系变化': '（旧记录时间不详）确认了长期立场。',
     });
   });
 
@@ -183,6 +183,18 @@ describe('summaryManager biography compression', () => {
       1,
       { 经历1: '旧存档没有日期', 经历2: '另一条也没有日期' },
     )).toThrow(/没有可识别的游戏内日期/);
+  });
+
+  it('rebases stage-summary-name keys into internal numbered storage keys', () => {
+    expect(rebaseStageMemoryKeys({
+      '初入江湖': '（1200.11.1）第一阶段',
+      '关系变化': '（1200.11.2）第二阶段',
+    }, {
+      '阶段经历1-旧记忆': '（1200.10.1）旧阶段',
+    })).toEqual({
+      '阶段经历2-初入江湖': '（1200.11.1）第一阶段',
+      '阶段经历3-关系变化': '（1200.11.2）第二阶段',
+    });
   });
 
   it('rebases generated stage keys after existing stage memories and excludes titled stage keys from raw counts', () => {
