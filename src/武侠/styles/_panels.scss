@@ -446,6 +446,53 @@
 .character-attributes-section {
   min-width: 0;
 }
+ 
+
+.character-traits-section {
+  min-width: 0;
+}
+ 
+
+.character-trait-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 0.55rem;
+}
+
+.character-trait-card {
+  min-width: 0;
+  padding: 0.62rem 0.72rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: var(--ui-surface-subtle);
+}
+
+.character-trait-name {
+  display: block;
+  color: var(--ui-accent);
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+
+.character-trait-description {
+  margin: 0.22rem 0 0;
+  color: var(--ui-text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.character-panel-empty-note {
+  margin: 0;
+  padding: 0.6rem 0.7rem;
+  border: 1px dashed var(--ui-border);
+  border-radius: 6px;
+  color: var(--ui-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
 
 .character-attributes-sheet {
   display: grid;

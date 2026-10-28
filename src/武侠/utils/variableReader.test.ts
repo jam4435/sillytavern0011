@@ -259,6 +259,68 @@ describe('getGameVariables ERA 展示投影', () => {
     expect(npc?.template.martialArts?.降龙十八掌.type).toBe('掌法');
   });
 
+  it('侠缘投影保留完整人物档案、属性和重要物品详情', () => {
+    getAllVariablesMock.mockReturnValue({
+      stat_data: {
+        世界信息: { 时间: { 年: 1219, 月: 3, 日: 12, 时: 10 } },
+        user数据: {
+          用户名: '玩家',
+          性别: '男',
+          境界: '不入流',
+          所在位置: '大宋/临安府/牛家村',
+          初始属性: { 臂力: 10, 根骨: 10, 机敏: 10, 悟性: 10, 洞察: 10 },
+          关系网: { 郭靖: '旧识' },
+        },
+        角色数据: {
+          郭靖: {
+            性别: '男',
+            出生年份: 1180,
+            状态: '轻伤',
+            境界: '一流初期',
+            修为: 2345,
+            外貌: '浓眉大眼，神情敦厚。',
+            所在位置: '大宋/临安府/牛家村',
+            身份: { 丐帮帮主: '九袋长老', 武林盟主: '统领群侠' },
+            初始属性: { 臂力: 16, 根骨: 12, 机敏: 11, 悟性: 14, 洞察: 10 },
+            属性: {
+              气血: '80/100',
+              内力: '25/60',
+              臂力: 21,
+              根骨: 19,
+              机敏: 18,
+              洞察: 17,
+            },
+            重要物品: {
+              打狗棒: { 类型: '武器', 品阶: '绝世', 物品描述: '丐帮历代相传的神兵。', 数量: 1 },
+            },
+          },
+        },
+      },
+    });
+
+    const npc = readGameDataSync()?.social?.find(item => item.name === '郭靖');
+    expect(npc).toMatchObject({
+      gender: '男',
+      birthYear: 1180,
+      status: '轻伤',
+      realm: '一流初期',
+      cultivation: 2345,
+      identities: { 丐帮帮主: '九袋长老', 武林盟主: '统领群侠' },
+      initialAttributes: { 臂力: 16, 根骨: 12, 机敏: 11, 悟性: 14, 洞察: 10 },
+      attributes: {
+        hp: 100, hpCurrent: 80, mp: 60, mpCurrent: 25,
+        臂力: 21, 根骨: 19, 机敏: 18, 洞察: 17,
+      },
+      keyItemDetails: [{
+        name: '打狗棒',
+        type: '武器',
+        rank: '绝世',
+        description: '丐帮历代相传的神兵。',
+        count: 1,
+      }],
+    });
+  });
+
   it('兼容旧聊天关系网中的数字关系值，不让状态、功法、行囊和侠缘整体读取失败', () => {
     completeMartialArtsMock.mockImplementation(arts =>
       Object.fromEntries(
