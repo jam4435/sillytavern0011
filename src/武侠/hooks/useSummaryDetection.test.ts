@@ -8,14 +8,14 @@ const summaryMocks = vi.hoisted(() => {
   const pendingCharacters = [{
     characterId: 'character:包惜弱',
     displayName: '包惜弱',
-    entriesCount: 10,
+    entriesCount: 51,
     biography: { 经历1: '旧经历' },
   }];
   const triggerResult = {
     shouldTrigger: true,
     triggerReason: 'total_entries' as const,
     pendingCharacters,
-    totalEntries: 10,
+    totalEntries: 51,
   };
   const result = {
     success: true,
@@ -95,6 +95,29 @@ describe('useSummaryDetection', () => {
     await waitFor(() => expect(onSummaryComplete).toHaveBeenCalledWith(summaryMocks.result));
     expect(summaryMocks.updatePendingQueue).toHaveBeenCalledWith(summaryMocks.pendingCharacters);
     unmount();
+  });
+
+  it('总量阈值未超过时不执行自动总结', async () => {
+    summaryMocks.checkSummaryTrigger.mockReturnValue({
+      shouldTrigger: false,
+      triggerReason: 'none',
+      pendingCharacters: summaryMocks.pendingCharacters,
+      totalEntries: 50,
+    });
+
+    renderHook(() => useSummaryDetection({ summarySettings: settings }));
+
+    await act(async () => {
+      await eventEmitMock('wuxia:turn-events-settled', {
+        status: 'success',
+        messageId: 43,
+        roundId: 'round-43',
+      });
+    });
+
+    await waitFor(() => expect(summaryMocks.checkSummaryTrigger).toHaveBeenCalled());
+    expect(summaryMocks.executeAllPendingSummaries).not.toHaveBeenCalled();
+    expect(summaryMocks.updatePendingQueue).toHaveBeenCalledWith(summaryMocks.pendingCharacters);
   });
 
   it('回合结算失败时不检查阈值、不调用总结 API', async () => {
