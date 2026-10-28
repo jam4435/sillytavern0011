@@ -3171,10 +3171,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <h5 className="summary-subsection-title">提示词模板</h5>
                 {settings.summarySettings.promptTemplateCustomized && (
                   <div className="summary-api-status warning">
-                    <div><strong>发现新版模板</strong></div>
+                    <div><strong>模板已自定义</strong></div>
                     <div>
                       {SUMMARY_PROMPT_TEMPLATE_UPDATE_NOTES}
-                      当前自定义内容已保留，不会被静默覆盖。若要采用新版，请点击下方按钮。
+                      已保留你的原文，不会自动覆盖。你可以继续使用自定义内容，或主动采用当前默认模板。
                     </div>
                     <div className="summary-actions">
                       <button
@@ -3184,7 +3184,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                           updatePromptTemplateSetting(DEFAULT_SUMMARY_SETTINGS.promptTemplate, false)
                         }
                       >
-                        更新为新版模板
+                        更新为当前默认模板
                       </button>
                     </div>
                   </div>
@@ -3477,10 +3477,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <h5 className="summary-subsection-title">变量模板</h5>
                 {settings.summarySettings.variableStructureTemplateCustomized && (
                   <div className="summary-api-status warning">
-                    <div><strong>发现新版模板</strong></div>
+                    <div><strong>模板已自定义</strong></div>
                     <div>
                       {VARIABLE_STRUCTURE_TEMPLATE_UPDATE_NOTES}
-                      当前自定义内容已保留，不会被静默覆盖。若要采用新版，请点击下方按钮。
+                      已保留你的原文，不会自动覆盖。你可以继续使用自定义内容，或主动采用当前默认模板。
                     </div>
                     <div className="summary-actions">
                       <button
@@ -3490,7 +3490,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                           updateVariablePromptSetting('structure', DEFAULT_SUMMARY_SETTINGS.variableStructureTemplate, false)
                         }
                       >
-                        更新为新版模板
+                        更新为当前默认模板
                       </button>
                     </div>
                   </div>
@@ -3522,10 +3522,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <h5 className="summary-subsection-title">变量指导</h5>
                 {settings.summarySettings.variableGuidanceTemplateCustomized && (
                   <div className="summary-api-status warning">
-                    <div><strong>发现新版模板</strong></div>
+                    <div><strong>模板已自定义</strong></div>
                     <div>
                       {VARIABLE_GUIDANCE_TEMPLATE_UPDATE_NOTES}
-                      当前自定义内容已保留，不会被静默覆盖。若要采用新版，请点击下方按钮。
+                      已保留你的原文，不会自动覆盖。你可以继续使用自定义内容，或主动采用当前默认模板。
                     </div>
                     <div className="summary-actions">
                       <button
@@ -3535,7 +3535,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                           updateVariablePromptSetting('guidance', DEFAULT_SUMMARY_SETTINGS.variableGuidanceTemplate, false)
                         }
                       >
-                        更新为新版模板
+                        更新为当前默认模板
                       </button>
                     </div>
                   </div>
