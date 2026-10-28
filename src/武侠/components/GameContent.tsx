@@ -222,7 +222,8 @@ const GameContent: React.FC<GameContentProps> = ({
                   event.stopPropagation();
                   onEditLatestReply();
                 }}
-                title={canEditLatestReply ? '编辑当前显示回合的 User 输入与 AI 输出' : '当前回复暂不可编辑，点击查看原因'}
+                disabled={!canEditLatestReply}
+                title={canEditLatestReply ? '编辑当前显示回合的 User 输入与 AI 输出' : '当前回复暂不可编辑'}
                 aria-label="编辑当前聊天回合"
                 data-wuxia-automation="open-latest-reply-editor"
                 data-wuxia-editable={canEditLatestReply ? 'true' : 'false'}
