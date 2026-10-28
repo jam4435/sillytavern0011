@@ -490,7 +490,13 @@ export function formatPromptForCharacter(
     .replace(/\{\{biographyEntries\}\}/g, biographyText);
 
   // 自定义旧模板可能仍要求保留近期条目；代码现在会替换全部输入经历，因此追加强制规则防止遗漏。
-  if (template.includes('一次性压缩全部输入经历')) return formattedPrompt;
+  if (
+    template.includes('一次性压缩全部输入经历') &&
+    template.includes('不得只总结其中一部分') &&
+    template.includes('近期经历也必须纳入总结')
+  ) {
+    return formattedPrompt;
+  }
 
   return `${formattedPrompt}
 
