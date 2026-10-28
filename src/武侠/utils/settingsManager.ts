@@ -82,8 +82,6 @@ export type VariableContextRounds = 0 | 1 | 2;
 
 /** 阈值设置 */
 export interface SummaryThresholds {
-  /** 待处理队列角色数阈值 (默认5) */
-  pendingQueueThreshold: number;
   /** 总条目数阈值 (默认50) */
   totalEntriesThreshold: number;
   /** 单角色条目阈值 (默认10) */
@@ -378,10 +376,10 @@ export const BUILTIN_LOCAL_REGEX_RULES: RegexRule[] = [
 export const BUILTIN_LOCAL_REGEX_IDS = new Set<string>(BUILTIN_LOCAL_REGEX_RULES.map(rule => rule.id));
 
 /** 默认总结提示词模板 */
-export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你负责将角色的旧人物经历压缩成多条完整、可独立理解的阶段记忆。只依据下面提供的旧条目，不改写近期经历，不补写未提供的事实。
+export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你负责将角色的全部人物经历压缩成多条完整、可独立理解的阶段记忆。只依据下面提供的经历条目，不补写未提供的事实。
 
 角色名称：{{characterName}}
-待压缩的旧经历：
+待压缩的全部人物经历（包括已有阶段记忆）：
 {{biographyEntries}}
 
 人物经历压缩与输出规范
@@ -401,14 +399,14 @@ export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你负责将角色的旧人物�
 1. **保持数据结构不变。** 必须输出合法 JSON 对象，以阶段总结名称作为键，以日期范围和经历摘要组成的字符串作为值。不得改成数组、自由文本或独立的长期记忆、近期经历等分组结构。
 2. **保留日期范围。** 每条经历以“（开始日期~结束日期）”为前缀，日期使用游戏内历法，格式为“年.月.日”。单日经历的开始和结束日期相同；无法确定日期时使用“（旧记录时间不详）”，不得猜测或补写日期。
 3. **阶段总结名称应简洁、具体且具有辨识度。** 使用能够概括该阶段核心内容的名称，例如“初入江南”“结识xxx”“珍珑棋局脱困”。避免使用“经历一”“其他内容”等含义模糊的名称。
-4. **合并经历。** 根据经历连续性与阶段边界，把多条旧经历压缩组织成一条或多条阶段记忆。每条都必须完整、清晰，脱离原始条目也能理解，但要比原条目简洁且连续；整批输出必须涵盖旧条目中的所有重要长期事实。并且保留部分角色经历时的个人角度和心绪。
-5. **近期经历优先保留细节。** 优先压缩较早且重复性高的内容。与当前剧情直接相关的近期经历应尽量保留，避免将正在发展的情节压缩成过于笼统的描述。这里只提供待压缩的旧经历，不得改写未提供的近期经历。
+4. **一次性压缩全部输入经历。** 本次提供的是该人物当前全部可用经历，包括原始经历和已有阶段记忆。必须将所有输入条目整合为一组新的阶段记忆，不得原样保留某些输入条目，也不得只总结其中一部分。
+5. **保留近期经历的关键细节。** 虽然所有输入经历都要重新组织，但与当前剧情直接相关的近期经历、正在发展的情节、人物当时的个人角度和心绪应保留足够细节，不能压缩得过于笼统。
 6. **保持时间与因果连续性。** 不得编造日期、经历或人物关系，不得颠倒先后顺序。合并多条经历时，必须准确覆盖整个时间段内的重要变化。
 
 只输出严格合法的 JSON 对象，不要输出 Markdown 代码围栏、解释或 JSON 之外的任何内容。`;
 
 export const SUMMARY_PROMPT_TEMPLATE_UPDATE_NOTES =
-  '当前默认模板要求以阶段总结名称为键、以游戏内日期范围和摘要为值，合并旧经历并保留重要事实、个人视角与心绪。';
+  '当前默认模板要求一次性压缩输入的全部人物经历（包括已有阶段记忆），以阶段总结名称为键、以游戏内日期范围和摘要为值，并保留重要事实、近期细节、个人视角与心绪。';
 export const VARIABLE_STRUCTURE_TEMPLATE_UPDATE_NOTES =
   '当前默认模板整理了可写路径、对象结构与字段权限，并明确参与事件差分、人物经历及物品等数据的写入边界。';
 export const VARIABLE_GUIDANCE_TEMPLATE_UPDATE_NOTES =
@@ -561,7 +559,6 @@ export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
   variablePromptExcludedTags: DEFAULT_VARIABLE_PROMPT_EXCLUDED_TAGS,
   variablePromptBodyStartMarkers: DEFAULT_VARIABLE_PROMPT_BODY_START_MARKERS,
   thresholds: {
-    pendingQueueThreshold: 5,
     totalEntriesThreshold: 50,
     perCharacterEntriesThreshold: 10,
   },
