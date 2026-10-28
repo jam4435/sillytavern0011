@@ -446,6 +446,8 @@ export function isTemplateUpdateAvailable(
   return customized && baseSignature !== getPromptTemplateSignature(currentDefaultTemplate);
 }
 
+export { getPromptTemplateSignature };
+
 export {
   DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
   DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
