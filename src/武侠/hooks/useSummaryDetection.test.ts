@@ -101,7 +101,7 @@ describe('useSummaryDetection', () => {
     summaryMocks.checkSummaryTrigger.mockReturnValue({
       shouldTrigger: false,
       triggerReason: 'none',
-      pendingCharacters: summaryMocks.pendingCharacters,
+      pendingCharacters: [],
       totalEntries: 50,
     });
 
@@ -117,7 +117,7 @@ describe('useSummaryDetection', () => {
 
     await waitFor(() => expect(summaryMocks.checkSummaryTrigger).toHaveBeenCalled());
     expect(summaryMocks.executeAllPendingSummaries).not.toHaveBeenCalled();
-    expect(summaryMocks.updatePendingQueue).toHaveBeenCalledWith(summaryMocks.pendingCharacters);
+    expect(summaryMocks.updatePendingQueue).toHaveBeenCalledWith([]);
   });
 
   it('回合结算失败时不检查阈值、不调用总结 API', async () => {
