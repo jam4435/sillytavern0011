@@ -3,6 +3,7 @@ import {
   buildBiographyCompressionPlan,
   buildBiographyCompressionOperations,
   parseSummaryResponse,
+  formatPromptForCharacter,
   rebaseStageMemoryKeys,
   checkSummaryTrigger,
   getBiographyEntryCount,
@@ -76,6 +77,27 @@ describe('summaryManager biography compression', () => {
     expect(result.triggerReason).toBe('none');
     expect(result.pendingCharacters.map(character => character.displayName)).toEqual(['甲', '乙']);
     expect(result.totalEntries).toBe(22);
+  });
+
+  it('adds a full-history safety rule to legacy custom prompts', () => {
+    const prompt = formatPromptForCharacter(
+      'Custom old prompt for {{characterName}}:\n{{biographyEntries}}\nDo not rewrite recent experiences.',
+      {
+        characterId: 'character:段誉',
+        displayName: '段誉',
+        entriesCount: 2,
+        biography: {
+          经历1: '（1200.11.1）原始经历',
+          '阶段经历1-旧阶段': '（1200.10.1~1200.10.5）已有阶段记忆',
+        },
+      },
+    );
+
+    expect(prompt).toContain('Custom old prompt for 段誉');
+    expect(prompt).toContain('经历1: （1200.11.1）原始经历');
+    expect(prompt).toContain('阶段经历1-旧阶段: （1200.10.1~1200.10.5）已有阶段记忆');
+    expect(prompt).toContain('【本次压缩的强制要求】');
+    expect(prompt).toContain('必须将全部输入条目中的重要事实整合进返回的阶段记忆');
   });
 
   it('does not count old or titled stage memories toward the raw-entry threshold', () => {
