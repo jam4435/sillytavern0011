@@ -223,6 +223,34 @@ describe('settingsManager ui theme', () => {
     expect(loadSettings().summarySettings.variableContextRounds).toBe(0);
   });
 
+  it('defaults summary concurrency to two and clamps persisted values to one through five', () => {
+    expect(createDefaultDisplaySettings().summarySettings.summaryConcurrency).toBe(2);
+
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({ summarySettings: { summaryConcurrency: 5 } }),
+    );
+    expect(loadSettings().summarySettings.summaryConcurrency).toBe(5);
+
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({ summarySettings: { summaryConcurrency: 9 } }),
+    );
+    expect(loadSettings().summarySettings.summaryConcurrency).toBe(5);
+
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({ summarySettings: { summaryConcurrency: 0 } }),
+    );
+    expect(loadSettings().summarySettings.summaryConcurrency).toBe(1);
+
+    window.localStorage.setItem(
+      'wuxia_display_settings',
+      JSON.stringify({ summarySettings: { summaryConcurrency: 'many' } }),
+    );
+    expect(loadSettings().summarySettings.summaryConcurrency).toBe(2);
+  });
+
   it('defaults and migrates conversation summary mode safely', () => {
     const defaults = createDefaultDisplaySettings().summarySettings;
     expect(defaults.conversationSummaryMode).toBe('off');
