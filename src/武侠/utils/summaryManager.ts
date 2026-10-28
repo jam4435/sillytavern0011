@@ -72,8 +72,6 @@ let pendingQueue: PendingCharacterSummary[] = [];
 /** 是否正在执行总结 */
 let isSummarizing = false;
 
-export const BIOGRAPHY_RECENT_ENTRIES_TO_KEEP = 5;
-export const BIOGRAPHY_COMPRESSION_BATCH_SIZE = 10;
 const LEGACY_SUMMARY_META_KEY = '【总结】';
 // 压缩结果对模型使用阶段总结名称；存储时保留内部编号前缀，以便识别已压缩经历。
 const COMPRESSED_BIOGRAPHY_KEY_RE = /^阶段经历(\d+)/;
@@ -97,8 +95,12 @@ export function isCompressedBiographyKey(key: string): boolean {
   return COMPRESSED_BIOGRAPHY_KEY_RE.test(key);
 }
 
+function isBiographyExperienceKey(key: string): boolean {
+  return !key.startsWith('$') && key !== LEGACY_SUMMARY_META_KEY;
+}
+
 function isCountedBiographyKey(key: string): boolean {
-  return !key.startsWith('$') && key !== LEGACY_SUMMARY_META_KEY && !isCompressedBiographyKey(key);
+  return isBiographyExperienceKey(key) && !isCompressedBiographyKey(key);
 }
 
 function getNextStageMemoryNumber(biography: Record<string, string>): number {
@@ -188,13 +190,11 @@ export function buildBiographyCompressionPlan(
   biography: Record<string, string> | string | undefined,
 ): BiographyCompressionPlan | null {
   const originalBiography = normalizeBiography(biography);
-  const candidates = Object.entries(originalBiography).filter(([key]) => isCountedBiographyKey(key));
-  const compressibleCount = candidates.length - BIOGRAPHY_RECENT_ENTRIES_TO_KEEP;
-  if (compressibleCount < 2) return null;
-
+  // 一旦人物符合触发条件，就把所有经历一次性送模，包括之前生成的阶段记忆。
   const sourceEntries = Object.fromEntries(
-    candidates.slice(0, Math.min(BIOGRAPHY_COMPRESSION_BATCH_SIZE, compressibleCount)),
+    Object.entries(originalBiography).filter(([key]) => isBiographyExperienceKey(key)),
   );
+  if (Object.keys(sourceEntries).length === 0) return null;
 
   return {
     originalBiography,
@@ -203,12 +203,23 @@ export function buildBiographyCompressionPlan(
   };
 }
 
+function getRetainedBiography(plan: BiographyCompressionPlan): Record<string, string> {
+  const sourceKeys = new Set(plan.sourceKeys);
+  const retained: Record<string, string> = {};
+  for (const [key, value] of Object.entries(plan.originalBiography)) {
+    if (!sourceKeys.has(key) && key !== LEGACY_SUMMARY_META_KEY) {
+      retained[key] = value;
+    }
+  }
+  return retained;
+}
+
 export function mergeBiographyCompression(
   plan: BiographyCompressionPlan,
   stageMemories: Record<string, string>,
 ): Record<string, string> {
-  const rebasedStageMemories = rebaseStageMemoryKeys(stageMemories, plan.originalBiography);
   const sourceKeys = new Set(plan.sourceKeys);
+  const rebasedStageMemories = rebaseStageMemoryKeys(stageMemories, getRetainedBiography(plan));
   const result: Record<string, string> = {};
   let inserted = false;
 
@@ -233,8 +244,8 @@ export function mergeBiographyCompression(
 /**
  * 构造总结回写的 ERA 操作。
  *
- * 正常对象结构只删除本批最旧经历和废弃的旧总结元数据，再一次性插入所有新阶段记忆；
- * 旧版字符串结构无法删除子键，因此先删除整个人物经历字段，再插入保留近期条目与新阶段记忆。
+ * 正常对象结构删除本次送模的全部经历和废弃的旧总结元数据，再一次性插入完整阶段记忆；
+ * 旧版字符串结构无法删除子键，因此先删除整个人物经历字段，再插入新阶段记忆。
  */
 export function buildBiographyCompressionOperations(
   characterId: string,
@@ -272,7 +283,7 @@ export function buildBiographyCompressionOperations(
     keysToDelete.push(LEGACY_SUMMARY_META_KEY);
   }
   const deleteEntries = Object.fromEntries(keysToDelete.map(key => [key, {}]));
-  const rebasedStageMemories = rebaseStageMemoryKeys(stageMemories, plan.originalBiography);
+  const rebasedStageMemories = rebaseStageMemoryKeys(stageMemories, getRetainedBiography(plan));
 
   return [
     { type: 'delete', payload: makePayload(deleteEntries) },
@@ -371,69 +382,69 @@ export function checkSummaryTrigger(thresholds: SummaryThresholds): SummaryTrigg
       return result;
     }
 
-    // 1. 检查玩家人物经历
+    const addEligibleCharacter = (
+      characterId: string,
+      displayName: string,
+      biography: Record<string, string> | string | undefined,
+    ) => {
+      if (!biography) return;
+      const count = getBiographyEntryCount(biography);
+
+      // 只有原始经历数严格超过单角色阈值的人物，才进入待处理名单并计入总量。
+      if (count <= thresholds.perCharacterEntriesThreshold) return;
+
+      result.totalEntries += count;
+      result.pendingCharacters.push({
+        characterId,
+        displayName,
+        entriesCount: count,
+        biography: normalizeBiography(biography),
+      });
+      dataLogger.log(
+        `[summaryManager] 角色 ${displayName} 超过单角色经历阈值: ${count} > ${thresholds.perCharacterEntriesThreshold}`,
+      );
+    };
+
     const userData = statData.user数据 as CharacterDataForSummary | undefined;
     if (userData?.人物经历) {
-      const count = getBiographyEntryCount(userData.人物经历);
-      result.totalEntries += count;
-
-      if (count >= thresholds.perCharacterEntriesThreshold) {
-        result.pendingCharacters.push({
-          characterId: 'user',
-          displayName: (userData as Record<string, unknown>).用户名 as string || '玩家',
-          entriesCount: count,
-          biography: normalizeBiography(userData.人物经历),
-        });
-        dataLogger.log(`[summaryManager] 玩家人物经历超过阈值: ${count} >= ${thresholds.perCharacterEntriesThreshold}`);
-      }
+      addEligibleCharacter(
+        'user',
+        (userData as Record<string, unknown>).用户名 as string || '玩家',
+        userData.人物经历,
+      );
     }
 
-    // 2. 检查角色数据中的NPC
     const characterData = statData.角色数据 as Record<string, CharacterDataForSummary> | undefined;
     if (characterData) {
       for (const [characterName, character] of Object.entries(characterData)) {
-        // 跳过模板和非对象数据
+        // 跳过模板和非对象数据。
         if (characterName.startsWith('$') || typeof character !== 'object' || character === null) {
           continue;
         }
-
-        if (character.人物经历) {
-          const count = getBiographyEntryCount(character.人物经历);
-          result.totalEntries += count;
-
-          if (count >= thresholds.perCharacterEntriesThreshold) {
-            result.pendingCharacters.push({
-              characterId: `character:${characterName}`,
-              displayName: characterName,
-              entriesCount: count,
-              biography: normalizeBiography(character.人物经历),
-            });
-            dataLogger.log(`[summaryManager] 角色 ${characterName} 人物经历超过阈值: ${count} >= ${thresholds.perCharacterEntriesThreshold}`);
-          }
-        }
+        addEligibleCharacter(`character:${characterName}`, characterName, character.人物经历);
       }
     }
 
-    // 3. 单角色达到阈值即可触发；队列/总量阈值只影响批量触发原因。
-    if (result.pendingCharacters.length >= thresholds.pendingQueueThreshold) {
-      result.shouldTrigger = true;
-      result.triggerReason = 'pending_queue';
-      dataLogger.log(`[summaryManager] 待处理角色数达到批量阈值: ${result.pendingCharacters.length} >= ${thresholds.pendingQueueThreshold}`);
-    } else if (result.pendingCharacters.length > 0 && result.totalEntries >= thresholds.totalEntriesThreshold) {
+    // 只按符合单角色条件的人物的原始经历总数触发；必须严格超过总量阈值。
+    if (result.pendingCharacters.length > 0 && result.totalEntries > thresholds.totalEntriesThreshold) {
       result.shouldTrigger = true;
       result.triggerReason = 'total_entries';
-      dataLogger.log(`[summaryManager] 总原始经历达到批量阈值: ${result.totalEntries} >= ${thresholds.totalEntriesThreshold}`);
-    } else if (result.pendingCharacters.length > 0) {
-      result.shouldTrigger = true;
-      result.triggerReason = 'per_character';
-      dataLogger.log('[summaryManager] 单角色达到阈值，立即触发分块压缩');
+      dataLogger.log(
+        `[summaryManager] 符合条件的人物经历总数超过阈值: ${result.totalEntries} > ${thresholds.totalEntriesThreshold}`,
+      );
+    } else {
+      dataLogger.log('[summaryManager] 尚未超过符合条件人物的经历总量阈值', {
+        eligibleCharacters: result.pendingCharacters.length,
+        eligibleEntries: result.totalEntries,
+        totalEntriesThreshold: thresholds.totalEntriesThreshold,
+      });
     }
 
     dataLogger.log('[summaryManager] 检测结果:', {
       shouldTrigger: result.shouldTrigger,
       triggerReason: result.triggerReason,
       pendingCount: result.pendingCharacters.length,
-      totalEntries: result.totalEntries,
+      eligibleEntries: result.totalEntries,
     });
 
     return result;
@@ -651,7 +662,7 @@ export async function executeSummary(
       biography: compressionPlan.sourceEntries,
     };
 
-    // 1. 只总结最旧的一批；近期经历和既有阶段经历不再次改写。
+    // 1. 将该人物的全部经历（包括已有阶段记忆）一次性发送给模型。
     const prompt = formatPromptForCharacter(settings.promptTemplate, sourceCharacter);
     dataLogger.log(`[summaryManager] 构建的提示词长度: ${prompt.length}`);
 
@@ -685,7 +696,7 @@ export async function executeSummary(
       ...compressionPlan,
       originalBiography: latestBiography,
     };
-    const rebasedStageEntries = rebaseStageMemoryKeys(summaryEntries, latestBiography);
+    const rebasedStageEntries = rebaseStageMemoryKeys(summaryEntries, getRetainedBiography(writePlan));
     result.summaryContent = JSON.stringify(rebasedStageEntries, null, 2);
     const operations = buildBiographyCompressionOperations(
       character.characterId,
