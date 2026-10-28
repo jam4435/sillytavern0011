@@ -110,8 +110,8 @@ function getNextStageMemoryNumber(biography: Record<string, string>): number {
 }
 
 /**
- * 将模型返回的阶段经历编号调整到现有记忆之后，避免覆盖旧阶段记忆。
- * 模型输出中的编号只用于标识本次响应的顺序，持久化编号由程序统一分配。
+ * 将模型返回的阶段总结名称转换为带内部编号的持久化键，避免覆盖旧阶段记忆。
+ * 同时兼容旧版自定义提示词返回的“阶段经历N-标题”键名。
  */
 export function rebaseStageMemoryKeys(
   stageMemories: Record<string, string>,
