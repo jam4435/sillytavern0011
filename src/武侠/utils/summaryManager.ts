@@ -827,9 +827,6 @@ export async function executeSummary(
     const response = await requestSummaryText({ prompt, settings });
     dataLogger.log(`[summaryManager] 收到响应，长度: ${response.length}`);
 
-    // 3. 严格解析模型返回的多条阶段记忆 JSON
-    const summaryEntries = parseSummaryResponse(response, Object.keys(compressionPlan.sourceEntries).length, compressionPlan.sourceEntries);
-
     onProgress?.('validating');
     // 3. 严格解析模型返回的多条阶段记忆 JSON
     const summaryEntries = parseSummaryResponse(response, Object.keys(compressionPlan.sourceEntries).length, compressionPlan.sourceEntries);
@@ -1164,7 +1161,7 @@ export async function retryFailedSummaryCharacters(
     active: false,
     phase: 'completed',
     source: 'manual',
-    targetMessageId: targetMessageId ?? getLatestAssistantMessageId(),
+    targetMessageId: targetMessageId ?? getLatestAssistantMessageId() ?? undefined,
     total: combined.totalProcessed,
     totalProcessed: combined.totalProcessed,
     totalSuccess: combined.totalSuccess,
