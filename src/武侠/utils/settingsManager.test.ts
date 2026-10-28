@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
   DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
-  getPromptTemplateSignature,
 } from '../prompts/variablePromptDefaults';
 import {
   applyRegexRules,
@@ -19,7 +18,6 @@ import {
   getRegexRuleContentSignature,
   getRegexRulesForDisplay,
   getThemeAppearanceDefaults,
-  isTemplateUpdateAvailable,
   loadSettings,
   normalizePresetXmlModuleInput,
   saveSettings,
@@ -292,26 +290,13 @@ describe('settingsManager ui theme', () => {
     expect(settings.variableUpdateMode).toBe('extra');
     expect('variablePromptTemplate' in settings).toBe(false);
     expect('variableInputTemplate' in settings).toBe(false);
-    expect(settings.variableStructureTemplate).toContain('<变量模板>');
+    expect(settings.promptTemplate).toBe(DEFAULT_SUMMARY_PROMPT_TEMPLATE);
     expect(settings.promptTemplateCustomized).toBe(false);
-    expect(settings.promptTemplateBaseSignature).toBe(getPromptTemplateSignature(settings.promptTemplate));
-    expect(
-      isTemplateUpdateAvailable(
-        true,
-        settings.promptTemplateBaseSignature,
-        settings.promptTemplate,
-      ),
-    ).toBe(false);
+    expect(settings.variableStructureTemplate).toContain('<变量模板>');
     expect(settings.variableStructureTemplateCustomized).toBe(false);
-    expect(settings.variableStructureTemplateBaseSignature).toBe(
-      getPromptTemplateSignature(settings.variableStructureTemplate),
-    );
     expect(settings.variableGuidanceTemplate).toContain('<变量更新规则>');
     expect(settings.variableGuidanceTemplate).toContain('最终执行：');
     expect(settings.variableGuidanceTemplateCustomized).toBe(false);
-    expect(settings.variableGuidanceTemplateBaseSignature).toBe(
-      getPromptTemplateSignature(settings.variableGuidanceTemplate),
-    );
   });
 
   it('uses strict multi-entry JSON for biography compression', () => {
@@ -325,117 +310,48 @@ describe('settingsManager ui theme', () => {
     expect(template).not.toContain('<summary>');
   });
 
-  it('migrates the old built-in XML summary prompt while preserving custom prompts', () => {
-    const legacyPrompt = `你负责压缩《金庸群侠传》角色的旧人物经历片段。只总结下面提供的旧条目，不改写近期经历，也不要补写未提供的事实。
-
-角色名称：{{characterName}}
-待压缩的旧经历：
-{{biographyEntries}}
-
-强制要求：
-1. 保留会长期影响人物身份、关系、立场、伤病、生死、师承、重要物品或重大事件认知的事实。
-2. 普通聊天、短时情绪、连续场景动作等无长期意义的细节可以合并或删除。
-3. 输入值开头形如 (1200.11.26) 的内容是游戏内日期。不得把现实日期写入结果，不得猜测缺失日期，不得改变明确日期先后。
-4. 只输出一段精炼的阶段经历，尽量控制在 1～3 句；不要生成新的“经历1/经历2”键。
-
-输出格式：
-<summary>
-[阶段经历内容]
-</summary>`;
-    window.localStorage.setItem('wuxia_display_settings', JSON.stringify({
-      summarySettings: { promptTemplate: legacyPrompt },
-    }));
-    const migratedLegacy = loadSettings().summarySettings;
-    expect(migratedLegacy.promptTemplate).toBe(DEFAULT_SUMMARY_PROMPT_TEMPLATE);
-    expect(migratedLegacy.promptTemplateCustomized).toBe(false);
-    expect(migratedLegacy.promptTemplateBaseSignature).toBe(
-      getPromptTemplateSignature(DEFAULT_SUMMARY_PROMPT_TEMPLATE),
-    );
-
-    // The first strict-JSON default from 2026-10-25 is also a known untouched default.
-    const previousJsonPrompt = DEFAULT_SUMMARY_PROMPT_TEMPLATE
-      .replace('。每条阶段记忆至少对应一条输入经历，输出条数不得超过本批输入条目数。', '。')
-      .split('阶段经历1初入江湖').join('阶段经历1-初入江湖')
-      .split('阶段经历2结识故人').join('阶段经历2-结识故人');
-    window.localStorage.setItem('wuxia_display_settings', JSON.stringify({
-      summarySettings: { promptTemplate: previousJsonPrompt },
-    }));
-    const migratedJson = loadSettings().summarySettings;
-    expect(migratedJson.promptTemplate).toBe(DEFAULT_SUMMARY_PROMPT_TEMPLATE);
-    expect(migratedJson.promptTemplateCustomized).toBe(false);
-
-    window.localStorage.setItem('wuxia_display_settings', JSON.stringify({
-      summarySettings: { promptTemplate: 'CUSTOM PROMPT' },
-    }));
-    const customPrompt = loadSettings().summarySettings;
-    expect(customPrompt.promptTemplate).toBe('CUSTOM PROMPT');
-    expect(customPrompt.promptTemplateCustomized).toBe(true);
-    expect(customPrompt.promptTemplateBaseSignature).toBe('');
-    expect(
-      isTemplateUpdateAvailable(
-        customPrompt.promptTemplateCustomized,
-        customPrompt.promptTemplateBaseSignature,
-        DEFAULT_SUMMARY_PROMPT_TEMPLATE,
-      ),
-    ).toBe(true);
-
-    // Old customized templates are not known defaults: preserve them and offer an explicit upgrade.
+  it('automatically uses the current default when a template is not marked customized', () => {
     window.localStorage.setItem('wuxia_display_settings', JSON.stringify({
       summarySettings: {
-        promptTemplate: `${legacyPrompt}\n用户自定义补充规则`,
+        promptTemplate: 'STALE SUMMARY TEMPLATE',
+        promptTemplateCustomized: false,
+        variableStructureTemplate: 'STALE VARIABLE SCHEMA',
+        variableStructureTemplateCustomized: false,
+        variableGuidanceTemplate: 'STALE VARIABLE RULES',
+        variableGuidanceTemplateCustomized: false,
       },
     }));
-    const customizedLegacyPrompt = loadSettings().summarySettings;
-    expect(customizedLegacyPrompt.promptTemplate).toBe(`${legacyPrompt}\n用户自定义补充规则`);
-    expect(customizedLegacyPrompt.promptTemplateCustomized).toBe(true);
-    expect(isTemplateUpdateAvailable(
-      customizedLegacyPrompt.promptTemplateCustomized,
-      customizedLegacyPrompt.promptTemplateBaseSignature,
-      DEFAULT_SUMMARY_PROMPT_TEMPLATE,
-    )).toBe(true);
-  });
 
-  it('automatically upgrades known defaults and preserves unknown legacy template edits', () => {
+    const loaded = loadSettings().summarySettings;
+    expect(loaded.promptTemplate).toBe(DEFAULT_SUMMARY_PROMPT_TEMPLATE);
+    expect(loaded.promptTemplateCustomized).toBe(false);
+    expect(loaded.variableStructureTemplate).toBe(DEFAULT_VARIABLE_STRUCTURE_TEMPLATE);
+    expect(loaded.variableStructureTemplateCustomized).toBe(false);
+    expect(loaded.variableGuidanceTemplate).toBe(DEFAULT_VARIABLE_GUIDANCE_TEMPLATE);
+    expect(loaded.variableGuidanceTemplateCustomized).toBe(false);
+
+    // This is a test build: settings without an explicit customization flag simply use current defaults.
     window.localStorage.setItem('wuxia_display_settings', JSON.stringify({
       summarySettings: {
-        variableStructureTemplate: DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
-        variableGuidanceTemplate: DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
+        promptTemplate: 'UNTRACKED TEMPLATE',
+        variableStructureTemplate: 'UNTRACKED SCHEMA',
+        variableGuidanceTemplate: 'UNTRACKED RULES',
       },
     }));
-    const knownDefaults = loadSettings().summarySettings;
-    expect(knownDefaults.variableStructureTemplate).toBe(DEFAULT_VARIABLE_STRUCTURE_TEMPLATE);
-    expect(knownDefaults.variableStructureTemplateCustomized).toBe(false);
-    expect(knownDefaults.variableGuidanceTemplate).toBe(DEFAULT_VARIABLE_GUIDANCE_TEMPLATE);
-    expect(knownDefaults.variableGuidanceTemplateCustomized).toBe(false);
-
-    window.localStorage.setItem('wuxia_display_settings', JSON.stringify({
-      summarySettings: {
-        variableStructureTemplate: 'OLD OR CUSTOM SCHEMA WITHOUT FLAG',
-        variableGuidanceTemplate: 'OLD OR CUSTOM RULES WITHOUT FLAG',
-      },
-    }));
-    const legacyCustom = loadSettings().summarySettings;
-    expect(legacyCustom.variableStructureTemplate).toBe('OLD OR CUSTOM SCHEMA WITHOUT FLAG');
-    expect(legacyCustom.variableStructureTemplateCustomized).toBe(true);
-    expect(legacyCustom.variableStructureTemplateBaseSignature).toBe('');
-    expect(legacyCustom.variableGuidanceTemplate).toBe('OLD OR CUSTOM RULES WITHOUT FLAG');
-    expect(legacyCustom.variableGuidanceTemplateCustomized).toBe(true);
-    expect(legacyCustom.variableGuidanceTemplateBaseSignature).toBe('');
-    expect(isTemplateUpdateAvailable(
-      legacyCustom.variableStructureTemplateCustomized,
-      legacyCustom.variableStructureTemplateBaseSignature,
-      DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
-    )).toBe(true);
-    expect(isTemplateUpdateAvailable(
-      legacyCustom.variableGuidanceTemplateCustomized,
-      legacyCustom.variableGuidanceTemplateBaseSignature,
-      DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
-    )).toBe(true);
+    const untracked = loadSettings().summarySettings;
+    expect(untracked.promptTemplate).toBe(DEFAULT_SUMMARY_PROMPT_TEMPLATE);
+    expect(untracked.promptTemplateCustomized).toBe(false);
+    expect(untracked.variableStructureTemplate).toBe(DEFAULT_VARIABLE_STRUCTURE_TEMPLATE);
+    expect(untracked.variableStructureTemplateCustomized).toBe(false);
+    expect(untracked.variableGuidanceTemplate).toBe(DEFAULT_VARIABLE_GUIDANCE_TEMPLATE);
+    expect(untracked.variableGuidanceTemplateCustomized).toBe(false);
   });
 
   it('preserves explicitly customized variable templates and ignores retired prompt skeleton settings', () => {
     window.localStorage.setItem('wuxia_display_settings', JSON.stringify({
       summarySettings: {
+        promptTemplate: 'CUSTOM SUMMARY',
+        promptTemplateCustomized: true,
         variablePromptTemplate: 'CUSTOM MAIN {{variableInputContext}}',
         variableInputTemplate: '<x>{{playerContext}}</x>',
         variableStructureTemplate: 'CUSTOM SCHEMA',
@@ -449,22 +365,12 @@ describe('settingsManager ui theme', () => {
     expect(loaded.variableUpdateMode).toBe('extra');
     expect('variablePromptTemplate' in loaded).toBe(false);
     expect('variableInputTemplate' in loaded).toBe(false);
+    expect(loaded.promptTemplate).toBe('CUSTOM SUMMARY');
+    expect(loaded.promptTemplateCustomized).toBe(true);
     expect(loaded.variableStructureTemplate).toBe('CUSTOM SCHEMA');
     expect(loaded.variableStructureTemplateCustomized).toBe(true);
-    expect(loaded.variableStructureTemplateBaseSignature).toBe('');
     expect(loaded.variableGuidanceTemplate).toBe('CUSTOM RULES');
     expect(loaded.variableGuidanceTemplateCustomized).toBe(true);
-    expect(loaded.variableGuidanceTemplateBaseSignature).toBe('');
-    expect(isTemplateUpdateAvailable(
-      loaded.variableStructureTemplateCustomized,
-      loaded.variableStructureTemplateBaseSignature,
-      DEFAULT_VARIABLE_STRUCTURE_TEMPLATE,
-    )).toBe(true);
-    expect(isTemplateUpdateAvailable(
-      loaded.variableGuidanceTemplateCustomized,
-      loaded.variableGuidanceTemplateBaseSignature,
-      DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
-    )).toBe(true);
   });
 
   describe('preset storage cleanup', () => {
