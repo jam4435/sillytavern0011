@@ -2619,7 +2619,8 @@
   }
 }
 
-// 状态显示
+// 人物总结实时进度与结果
+.summary-progress,
 .summary-status,
 .summary-result {
   background: rgba(255, 255, 255, 0.02);
@@ -2628,6 +2629,7 @@
   margin-top: 1rem;
 }
 
+.summary-progress-header,
 .summary-status-header,
 .summary-result-header {
   display: flex;
@@ -2662,9 +2664,106 @@
   }
 }
 
+.summary-progress-body,
 .summary-status-body,
 .summary-result-body {
   padding: 0.75rem;
+}
+
+.summary-progress-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+
+  &.running {
+    background: rgba($amber-600, 0.1);
+    color: $amber-600;
+  }
+
+  &.warning {
+    background: rgba($red-500, 0.1);
+    color: $red-500;
+  }
+
+  &.success {
+    background: rgba($green-500, 0.1);
+    color: $green-500;
+  }
+}
+
+.summary-progress-counts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem;
+  color: $stone-400;
+  font-size: 0.85rem;
+
+  strong {
+    color: $stone-200;
+    font-size: 0.95rem;
+  }
+}
+
+.summary-progress-track {
+  height: 6px;
+  margin-top: 0.7rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.summary-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: $amber-600;
+  transition: width 180ms ease;
+}
+
+.summary-progress-message {
+  margin: 0.65rem 0 0;
+  color: $stone-400;
+  font-size: 0.82rem;
+}
+
+.summary-progress-active-list,
+.summary-progress-failures {
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  color: $stone-400;
+  font-size: 0.82rem;
+
+  ul {
+    display: grid;
+    gap: 0.4rem;
+    margin: 0.45rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    align-items: flex-start;
+    color: $stone-300;
+  }
+}
+
+.summary-progress-failures li {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.summary-progress-error {
+  color: $red-500;
+}
+
+.summary-progress-actions {
+  margin-top: 0.75rem;
+  margin-bottom: 0;
 }
 
 .summary-status-item,
