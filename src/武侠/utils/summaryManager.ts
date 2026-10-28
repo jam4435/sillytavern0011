@@ -31,8 +31,8 @@ interface CharacterDataForSummary {
 export interface SummaryTriggerResult {
   /** 是否应该触发总结 */
   shouldTrigger: boolean;
-  /** 触发原因 */
-  triggerReason: 'per_character' | 'pending_queue' | 'total_entries' | 'none';
+  /** 触发原因：仅当符合单角色阈值的人物经历总数严格超过总量阈值时触发 */
+  triggerReason: 'total_entries' | 'none';
   /** 待总结的角色列表 */
   pendingCharacters: PendingCharacterSummary[];
   /** 所有角色的总经历条目数 */
@@ -485,10 +485,17 @@ export function formatPromptForCharacter(
   character: PendingCharacterSummary,
 ): string {
   const biographyText = formatBiographyForPrompt(character.biography);
-
-  return template
+  const formattedPrompt = template
     .replace(/\{\{characterName\}\}/g, character.displayName)
     .replace(/\{\{biographyEntries\}\}/g, biographyText);
+
+  // 自定义旧模板可能仍要求保留近期条目；代码现在会替换全部输入经历，因此追加强制规则防止遗漏。
+  if (template.includes('一次性压缩全部输入经历')) return formattedPrompt;
+
+  return `${formattedPrompt}
+
+【本次压缩的强制要求】
+本次输入包含该人物当前全部人物经历，包括原始经历和已有阶段记忆。写回时，这些输入条目会被整体替换。必须将全部输入条目中的重要事实整合进返回的阶段记忆，不得只总结一部分，也不得要求保留未总结的原始条目。近期经历也必须纳入总结，并保留其与当前剧情有关的关键细节、个人视角和心绪。只依据输入内容，不得编造事实。输出仍须为严格合法的 JSON 对象。`;
 }
 
 // =========================================
@@ -652,7 +659,7 @@ export async function executeSummary(
     const compressionPlan = buildBiographyCompressionPlan(initialBiography);
     if (!compressionPlan) {
       result.success = true;
-      dataLogger.log(`[summaryManager] 角色 ${character.displayName} 没有足够旧经历可分块压缩，跳过`);
+      dataLogger.log(`[summaryManager] 角色 ${character.displayName} 没有人物经历可压缩，跳过`);
       return result;
     }
 
@@ -806,10 +813,8 @@ export async function executeAllPendingSummaries(
 
     result.success = result.totalFailed === 0;
 
-    // 清空内部队列（如果使用的是内部队列）
-    if (!characters) {
-      pendingQueue = [];
-    }
+    // 本轮所有待处理人物都已尝试完成；后续回合会重新计算阈值和队列。
+    pendingQueue = [];
 
     dataLogger.log('[summaryManager] 批量总结完成:', {
       totalProcessed: result.totalProcessed,
@@ -860,20 +865,12 @@ export async function triggerManualSummary(settings: SummarySettings): Promise<B
  * @param characters 待加入队列的角色
  */
 export function updatePendingQueue(characters: PendingCharacterSummary[]): void {
-  // 合并新角色到队列（避免重复）
-  for (const character of characters) {
-    const exists = pendingQueue.some(c => c.characterId === character.characterId);
-    if (!exists) {
-      pendingQueue.push(character);
-      dataLogger.log(`[summaryManager] 角色 ${character.displayName} 加入待处理队列`);
-    } else {
-      // 更新已存在角色的信息
-      const index = pendingQueue.findIndex(c => c.characterId === character.characterId);
-      if (index >= 0) {
-        pendingQueue[index] = character;
-      }
-    }
-  }
+  // 以本轮重新扫描结果为准，移除已经低于阈值或已完成压缩的旧队列项目。
+  pendingQueue = [...characters];
+  dataLogger.log('[summaryManager] 更新待处理人物快照:', pendingQueue.map(character => ({
+    characterId: character.characterId,
+    entriesCount: character.entriesCount,
+  })));
 }
 
 /**
