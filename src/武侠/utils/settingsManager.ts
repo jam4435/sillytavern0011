@@ -400,11 +400,11 @@ export const DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你负责将《金庸群侠传�
 }`;
 
 export const SUMMARY_PROMPT_TEMPLATE_UPDATE_NOTES =
-  '新版改为严格 JSON 对象输出，支持按阶段生成多条独立记忆，并约束游戏内日期、唯一键名和事实来源。';
+  '当前默认模板采用严格 JSON 对象输出，支持按阶段生成多条独立记忆，并约束游戏内日期、唯一键名和事实来源。';
 export const VARIABLE_STRUCTURE_TEMPLATE_UPDATE_NOTES =
-  '新版重新整理了可写路径、对象结构与字段权限，进一步明确参与事件差分、人物经历及物品等数据的写入边界。';
+  '当前默认模板整理了可写路径、对象结构与字段权限，并明确参与事件差分、人物经历及物品等数据的写入边界。';
 export const VARIABLE_GUIDANCE_TEMPLATE_UPDATE_NOTES =
-  '新版更新了时间、事件、地点与长期经历的处理规则，并明确 Insert、Edit、Delete 的使用边界。';
+  '当前默认模板明确时间、事件、地点与长期经历的处理规则，以及 Insert、Edit、Delete 的使用边界。';
 
 export {
   DEFAULT_VARIABLE_GUIDANCE_TEMPLATE,
