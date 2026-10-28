@@ -348,8 +348,8 @@ describe('settingsManager ui theme', () => {
     // The first strict-JSON default from 2026-10-25 is also a known untouched default.
     const previousJsonPrompt = DEFAULT_SUMMARY_PROMPT_TEMPLATE
       .replace('。每条阶段记忆至少对应一条输入经历，输出条数不得超过本批输入条目数。', '。')
-      .replace('阶段经历1初入江湖', '阶段经历1-初入江湖')
-      .replace('阶段经历2结识故人', '阶段经历2-结识故人');
+      .split('阶段经历1初入江湖').join('阶段经历1-初入江湖')
+      .split('阶段经历2结识故人').join('阶段经历2-结识故人');
     window.localStorage.setItem('wuxia_display_settings', JSON.stringify({
       summarySettings: { promptTemplate: previousJsonPrompt },
     }));
@@ -375,11 +375,11 @@ describe('settingsManager ui theme', () => {
     // Old customized templates are not known defaults: preserve them and offer an explicit upgrade.
     window.localStorage.setItem('wuxia_display_settings', JSON.stringify({
       summarySettings: {
-        promptTemplate: `${legacyPrompt}\\n用户自定义补充规则`,
+        promptTemplate: `${legacyPrompt}\n用户自定义补充规则`,
       },
     }));
     const customizedLegacyPrompt = loadSettings().summarySettings;
-    expect(customizedLegacyPrompt.promptTemplate).toBe(`${legacyPrompt}\\n用户自定义补充规则`);
+    expect(customizedLegacyPrompt.promptTemplate).toBe(`${legacyPrompt}\n用户自定义补充规则`);
     expect(customizedLegacyPrompt.promptTemplateCustomized).toBe(true);
     expect(isTemplateUpdateAvailable(
       customizedLegacyPrompt.promptTemplateCustomized,
