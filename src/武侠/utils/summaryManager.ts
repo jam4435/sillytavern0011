@@ -134,21 +134,21 @@ export function rebaseStageMemoryKeys(
         (/^阶段经历\d*/.test(normalizedKey) || /^(?:经历|条目)\d+$/.test(normalizedKey)))
     ) {
       throw new Error(
-        \`阶段记忆键名格式错误：\${key}。键名必须是简洁、具体的阶段总结名称，不要使用原始经历编号。\`,
+        `阶段记忆键名格式错误：${key}。键名必须是简洁、具体的阶段总结名称，不要使用原始经历编号。`,
       );
     }
     if (seenTitles.has(title)) {
-      throw new Error(\`阶段总结名称重复：\${title}。\`);
+      throw new Error(`阶段总结名称重复：${title}。`);
     }
     seenTitles.add(title);
 
     const cleanValue = value.trim();
-    if (!cleanValue) throw new Error(\`阶段记忆“\${key}”的内容为空。\`);
+    if (!cleanValue) throw new Error(`阶段记忆“${key}”的内容为空。`);
 
-    const rebasedKey = \`阶段经历\${nextNumber}-\${title}\`;
+    const rebasedKey = `阶段经历${nextNumber}-${title}`;
     if (Object.prototype.hasOwnProperty.call(existingBiography, rebasedKey) ||
         Object.prototype.hasOwnProperty.call(result, rebasedKey)) {
-      throw new Error(\`阶段记忆键名冲突：\${rebasedKey}。\`);
+      throw new Error(`阶段记忆键名冲突：${rebasedKey}。`);
     }
     result[rebasedKey] = cleanValue;
     nextNumber += 1;
@@ -530,40 +530,40 @@ export function parseSummaryResponse(response: string, maxStageMemories?: number
       (/^阶段经历\d*/.test(normalizedKey) || /^(?:经历|条目)\d+$/.test(normalizedKey))
     ) {
       throw new Error(
-        \`总结 JSON 的键名“\${key}”无效；请直接使用简洁、具体的阶段总结名称，不要使用原始经历编号。\`,
+        `总结 JSON 的键名“${key}”无效；请直接使用简洁、具体的阶段总结名称，不要使用原始经历编号。`,
       );
     }
 
     const stageTitle = (legacyMatch ? legacyMatch[2] : normalizedKey)
       .replace(/^[\s\-—–:：]+/, '')
       .trim();
-    if (!stageTitle) throw new Error(\`总结 JSON 的键名“\${key}”缺少阶段总结名称。\`);
+    if (!stageTitle) throw new Error(`总结 JSON 的键名“${key}”缺少阶段总结名称。`);
     if (seenStageTitles.has(stageTitle)) {
-      throw new Error(\`总结 JSON 的阶段总结名称重复：“\${stageTitle}”。\`);
+      throw new Error(`总结 JSON 的阶段总结名称重复：“${stageTitle}”。`);
     }
     seenStageTitles.add(stageTitle);
 
     if (typeof value !== 'string' || !value.trim()) {
-      throw new Error(\`阶段记忆“\${key}”必须对应非空字符串。\`);
+      throw new Error(`阶段记忆“${key}”必须对应非空字符串。`);
     }
 
     const cleanValue = value.trim();
     if (!SUMMARY_DATE_PREFIX_RE.test(cleanValue)) {
       throw new Error(
-        \`阶段记忆“\${key}”缺少有效的游戏内时间前缀；请使用“（1200.11.1~1200.11.5）”或“（旧记录时间不详）”。\`,
+        `阶段记忆“${key}”缺少有效的游戏内时间前缀；请使用“（1200.11.1~1200.11.5）”或“（旧记录时间不详）”。`,
       );
     }
 
     const outputDateRange = parseGameDateRange(cleanValue);
     if (outputDateRange && sourceEntries) {
       if (!sourceDateBounds) {
-        throw new Error(\`阶段记忆“\${key}”使用了日期，但输入经历中没有可识别的游戏内日期。\`);
+        throw new Error(`阶段记忆“${key}”使用了日期，但输入经历中没有可识别的游戏内日期。`);
       }
       if (outputDateRange.start < sourceDateBounds.start || outputDateRange.end > sourceDateBounds.end) {
-        throw new Error(\`阶段记忆“\${key}”的日期范围超出本批原始经历，已取消写回。\`);
+        throw new Error(`阶段记忆“${key}”的日期范围超出本批原始经历，已取消写回。`);
       }
     } else if (!outputDateRange && !/^[（(](?:旧记录时间不详|时间不详)[）)]/.test(cleanValue)) {
-      throw new Error(\`阶段记忆“\${key}”的日期范围无效或结束时间早于开始时间。\`);
+      throw new Error(`阶段记忆“${key}”的日期范围无效或结束时间早于开始时间。`);
     }
     result[normalizedKey] = cleanValue;
   });
