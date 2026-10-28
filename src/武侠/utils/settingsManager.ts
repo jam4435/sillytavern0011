@@ -426,7 +426,7 @@ const LEGACY_DEFAULT_SUMMARY_PROMPT_TEMPLATE = `你负责压缩《金庸群侠�
 </summary>`;
 
 const LEGACY_SUMMARY_PROMPT_TEMPLATE_DEFAULT_SIGNATURES = [
-  // Previous built-in <summary> prompt, plus the first strict-JSON default shipped on 2026-10-25.
+  // Keep prior defaults here whenever DEFAULT_SUMMARY_PROMPT_TEMPLATE changes, including releases users may skip.
   getPromptTemplateSignature(LEGACY_DEFAULT_SUMMARY_PROMPT_TEMPLATE),
   '929:0ca7008d',
 ] as const;
