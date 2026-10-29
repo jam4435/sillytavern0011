@@ -8,6 +8,7 @@ import {
   checkSummaryTrigger,
   getBiographyEntryCount,
   mergeBiographyCompression,
+  runWithConcurrencyLimit,
 } from './summaryManager';
 
 describe('summaryManager biography compression', () => {
@@ -24,6 +25,18 @@ describe('summaryManager biography compression', () => {
       `(1200.11.${index + 1}) 测试经历${index + 1}`,
     ]),
   );
+
+  it('limits concurrent workers to the configured maximum', async () => {
+    let active = 0;
+    let peak = 0;
+    await runWithConcurrencyLimit([1, 2, 3, 4, 5], 2, async () => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await new Promise(resolve => setTimeout(resolve, 5));
+      active -= 1;
+    });
+    expect(peak).toBe(2);
+  });
 
   it('triggers when one eligible character has more than the aggregate threshold', () => {
     vi.stubGlobal('getVariables', () => ({
@@ -192,6 +205,24 @@ describe('summaryManager biography compression', () => {
       '阶段经历1-初入江湖': '（1200.10.1~1200.11.3）前期经历总结',
       '阶段经历2-关系变化': '（1200.11.4~1200.11.10）后续经历总结',
     });
+  });
+
+  it('preserves newly appended biography entries outside the original compression keys', () => {
+    const originalBiography = makeBiography(11);
+    const plan = buildBiographyCompressionPlan(originalBiography)!;
+    const latestBiography = {
+      ...originalBiography,
+      经历12: '(1200.11.12) 总结模型运行期间新增的经历',
+    };
+    const rebasedPlan = { ...plan, originalBiography: latestBiography };
+    const operations = buildBiographyCompressionOperations(
+      'character:段誉',
+      rebasedPlan,
+      { 初入江湖: '（1200.11.1~1200.11.11）旧经历阶段总结' },
+    );
+    const deleted = (operations[0].payload as any).角色数据.段誉.人物经历;
+    expect(deleted).not.toHaveProperty('经历12');
+    expect(Object.keys(deleted)).toHaveLength(11);
   });
 
   it('replaces every legacy string biography line with stage memories in one pass', () => {

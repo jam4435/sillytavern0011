@@ -75,7 +75,11 @@ import {
 import {
   checkSummaryTrigger,
   triggerManualSummary,
+  retryFailedSummaryCharacters,
   getIsSummarizing,
+  getSummaryProgressSnapshot,
+  subscribeSummaryProgress,
+  type SummaryProgressSnapshot,
   type SummaryTriggerResult,
   type BatchSummaryResult,
 } from '../utils/summaryManager';
@@ -465,6 +469,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   // 自动总结相关状态
   const [summaryStatus, setSummaryStatus] = useState<SummaryTriggerResult | null>(null);
   const [isSummaryRunning, setIsSummaryRunning] = useState(false);
+  const [summaryProgress, setSummaryProgress] = useState<SummaryProgressSnapshot>(() => getSummaryProgressSnapshot());
   const [summaryResult, setSummaryResult] = useState<BatchSummaryResult | null>(null);
   const [summaryModelOptions, setSummaryModelOptions] = useState<string[]>([]);
   const [summaryModelStatus, setSummaryModelStatus] = useState('');
@@ -522,6 +527,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       window.removeEventListener(SMALL_SUMMARY_BACKFILL_EVENT, syncSmallSummaryBackfillSnapshot);
     };
   }, [refreshSmallSummaryBackfillWorkbench, syncSmallSummaryBackfillSnapshot]);
+
+  useEffect(() => subscribeSummaryProgress(setSummaryProgress), []);
 
   // 变量编辑相关状态
   const [variableBaseStatData, setVariableBaseStatData] = useState<Record<string, unknown> | null>(null);
@@ -2014,6 +2021,38 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   }, [settings.summarySettings]);
 
+  const handleRetryFailedSummaries = useCallback(async () => {
+    const failedResults = summaryProgress.results.filter(result => !result.success);
+    if (failedResults.length === 0) return;
+    if (getIsSummarizing()) {
+      alert('已有总结任务在执行中，请稍后再试');
+      return;
+    }
+    const confirmMessage = `准备重试 ${failedResults.length} 个失败人物：\n${failedResults.map(item => `• ${item.displayName}`).join('\n')}\n\n将重新读取当前人物经历后再发送模型请求。是否继续？`;
+    if (!confirm(confirmMessage)) return;
+
+    setIsSummaryRunning(true);
+    try {
+      const result = await retryFailedSummaryCharacters(
+        settings.summarySettings,
+        failedResults,
+        summaryProgress.targetMessageId,
+        summaryProgress.targetChatId,
+      );
+      setSummaryResult(result);
+      if (result.totalFailed > 0) {
+        alert(`重试结束，仍有 ${result.totalFailed} 个人物失败或已不再符合重试条件`);
+      } else {
+        alert(`重试完成！成功处理 ${result.totalSuccess} 个角色`);
+      }
+    } catch (error) {
+      uiLogger.error('重试人物总结失败:', error);
+      alert(`重试人物总结失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsSummaryRunning(false);
+    }
+  }, [settings.summarySettings, summaryProgress.results, summaryProgress.targetMessageId, summaryProgress.targetChatId]);
+
   const handleCopyDebugRound = useCallback(async () => {
     if (!latestDebugRound) return;
     try {
@@ -3150,6 +3189,22 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <span className="settings-hint-inline">仅累计超过单角色阈值的人物；合计严格超过此值时，自动一次性压缩这些人物的全部经历</span>
                   </div>
                 </div>
+
+                <div className="settings-row">
+                  <label className="settings-label">最大并行数</label>
+                  <div className="settings-control">
+                    <select
+                      value={settings.summarySettings.summaryConcurrency}
+                      onChange={e => updateSummarySetting('summaryConcurrency', Number(e.target.value))}
+                      className="settings-select"
+                    >
+                      {[1, 2, 3, 4, 5].map(value => (
+                        <option key={value} value={value}>{value}</option>
+                      ))}
+                    </select>
+                    <span className="settings-hint-inline">同时请求模型的人物数；默认 2。ERA 事务写回仍按顺序执行。</span>
+                  </div>
+                </div>
               </div>
 
               <div className="summary-subsection">
@@ -3204,7 +3259,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <button
                     className="settings-action-btn"
                     onClick={handleCheckSummaryStatus}
-                    disabled={isSummaryRunning}
+                    disabled={isSummaryRunning || summaryProgress.active}
                   >
                     <Icons.Debug size={16} />
                     <span>检测状态</span>
@@ -3212,12 +3267,105 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <button
                     className="settings-action-btn primary"
                     onClick={handleManualSummaryTrigger}
-                    disabled={isSummaryRunning}
+                    disabled={isSummaryRunning || summaryProgress.active}
                   >
                     <Icons.Scroll size={16} />
-                    <span>{isSummaryRunning ? '总结中...' : '手动触发总结'}</span>
+                    <span>{isSummaryRunning || summaryProgress.active ? '总结中...' : '手动触发总结'}</span>
                   </button>
                 </div>
+
+                {summaryProgress.total > 0 && (
+                  <div className="summary-progress">
+                    <div className="summary-progress-header">
+                      <span>人物总结进度 · {summaryProgress.source === 'automatic' ? '自动' : '手动'}</span>
+                      <span className={`summary-progress-badge ${summaryProgress.active ? 'running' : summaryProgress.phase === 'failed' || summaryProgress.totalFailed > 0 ? 'warning' : 'success'}`}>
+                        {summaryProgress.active
+                          ? '进行中'
+                          : summaryProgress.phase === 'failed'
+                            ? '任务异常'
+                            : summaryProgress.totalFailed > 0
+                              ? '完成（部分失败）'
+                              : '已完成'}
+                      </span>
+                    </div>
+                    <div className="summary-progress-body">
+                      <div className="summary-progress-counts">
+                        <strong>{summaryProgress.totalProcessed} / {summaryProgress.total}</strong>
+                        <span>已处理</span>
+                        <span>成功 {summaryProgress.totalSuccess}</span>
+                        <span className={summaryProgress.totalFailed > 0 ? 'summary-progress-error' : ''}>
+                          失败 {summaryProgress.totalFailed}
+                        </span>
+                      </div>
+                      <div
+                        className="summary-progress-track"
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={summaryProgress.total > 0
+                          ? Math.round(summaryProgress.totalProcessed / summaryProgress.total * 100)
+                          : 0}
+                      >
+                        <div
+                          className="summary-progress-fill"
+                          style={{
+                            width: `${summaryProgress.total > 0
+                              ? Math.round(summaryProgress.totalProcessed / summaryProgress.total * 100)
+                              : 0}%`,
+                          }}
+                        />
+                      </div>
+                      {summaryProgress.message && <p className="summary-progress-message">{summaryProgress.message}</p>}
+                      {summaryProgress.activeCharacters.length > 0 && (
+                        <div className="summary-progress-active-list">
+                          <strong>正在处理</strong>
+                          <ul>
+                            {summaryProgress.activeCharacters.map(activeCharacter => (
+                              <li key={activeCharacter.characterId}>
+                                <span>{activeCharacter.displayName}（{activeCharacter.index}/{summaryProgress.total}）</span>
+                                <span>{activeCharacter.phase === 'preparing'
+                                  ? '准备数据'
+                                  : activeCharacter.phase === 'generating'
+                                    ? '模型生成'
+                                    : activeCharacter.phase === 'validating'
+                                      ? '校验结果'
+                                      : activeCharacter.phase === 'waiting-write'
+                                        ? '等待写回队列'
+                                        : 'ERA 写回'}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {summaryProgress.results.some(result => !result.success) && (
+                        <div className="summary-progress-failures">
+                          <strong>失败详情</strong>
+                          <ul>
+                            {summaryProgress.results.filter(result => !result.success).map(result => (
+                              <li key={result.characterId}>
+                                <strong>{result.displayName}</strong>
+                                <span>{result.error || '未知错误'}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {!summaryProgress.active && summaryProgress.totalFailed > 0 && (
+                        <div className="summary-actions summary-progress-actions">
+                          <button
+                            type="button"
+                            className="settings-action-btn"
+                            onClick={handleRetryFailedSummaries}
+                            disabled={isSummaryRunning}
+                          >
+                            <Icons.Scroll size={16} />
+                            <span>重试失败人物</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* 状态显示 */}
                 {summaryStatus && (

@@ -108,6 +108,8 @@ export interface SummarySettings {
   variableUpdateMode: SummaryVariableUpdateMode;
   /** 是否启用流式生成 */
   stream: boolean;
+  /** 人物经历总结的最大并行模型请求数（1～5） */
+  summaryConcurrency: number;
   /** 对话摘要来源：卡内指令 / 兼容玩家预设 / 完全关闭 */
   conversationSummaryMode: ConversationSummaryMode;
   /** 卡内/预设摘要模式保留完整正文的最近 assistant 回复数 */
@@ -539,6 +541,7 @@ export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
   enabled: false,
   variableUpdateMode: 'extra',
   stream: false,
+  summaryConcurrency: 2,
   conversationSummaryMode: 'off',
   conversationSummaryRecentReplies: 5,
   conversationSummaryPresetTag: 'summary',
@@ -1092,6 +1095,10 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
     enabled: typeof summarySettings.enabled === 'boolean' ? summarySettings.enabled : defaults.enabled,
     variableUpdateMode: 'extra',
     stream: typeof summarySettings.stream === 'boolean' ? summarySettings.stream : defaults.stream,
+    summaryConcurrency:
+      typeof summarySettings.summaryConcurrency === 'number' && Number.isFinite(summarySettings.summaryConcurrency)
+        ? Math.max(1, Math.min(5, Math.floor(summarySettings.summaryConcurrency)))
+        : defaults.summaryConcurrency,
     conversationSummaryMode:
       summarySettings.conversationSummaryMode === 'card' ||
       summarySettings.conversationSummaryMode === 'preset' ||

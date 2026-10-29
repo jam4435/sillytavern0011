@@ -46,6 +46,7 @@ import {
 import { readLatestDebugRoundSnapshot } from './hooks/useDebugLogs';
 import { shouldDeferSetupEventNotifications } from './hooks/usePageFlow';
 import { ActivePanel, type ChronicleEntry, type FactionTask, InventoryItem, type MeridianNodeId, type MeridianUpgradeQuote } from './types';
+import { getSummaryProgressSnapshot, subscribeSummaryProgress, type SummaryProgressSnapshot } from './utils/summaryManager';
 import { claimFactionTaskReward } from './utils/factionManager';
 import { acceptFactionTaskOption, generateFactionTaskOptions } from './utils/factionTaskGenerator';
 import { getRandomOpeningLine, initializeNewGameSession, type NewGameFormData } from './utils/gameInitializer';
@@ -231,6 +232,9 @@ const App: React.FC = () => {
 
   // 显示设置状态
   const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => loadSettings());
+  const [summaryProgress, setSummaryProgress] = useState<SummaryProgressSnapshot>(() => getSummaryProgressSnapshot());
+
+  useEffect(() => subscribeSummaryProgress(setSummaryProgress), []);
   const initialConversationSummaryRef = useRef({
     mode: displaySettings.summarySettings.conversationSummaryMode,
     recentReplies: displaySettings.summarySettings.conversationSummaryRecentReplies,
@@ -565,6 +569,38 @@ const App: React.FC = () => {
       showError(`自动总结失败: ${error.message}`);
     },
   });
+
+  const summaryProgressIndicator = summaryProgress.active && activePanel === ActivePanel.NONE ? (
+    <div className="summary-global-progress" role="status" aria-live="polite">
+      <div className="summary-global-progress-header">
+        <strong>人物总结</strong>
+        <span>{summaryProgress.source === 'automatic' ? '自动' : '手动'} · {summaryProgress.totalProcessed}/{summaryProgress.total}</span>
+      </div>
+      <div
+        className="summary-progress-track"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={summaryProgress.total > 0
+          ? Math.round(summaryProgress.totalProcessed / summaryProgress.total * 100)
+          : 0}
+      >
+        <div
+          className="summary-progress-fill"
+          style={{
+            width: `${summaryProgress.total > 0
+              ? Math.round(summaryProgress.totalProcessed / summaryProgress.total * 100)
+              : 0}%`,
+          }}
+        />
+      </div>
+      <p>
+        {summaryProgress.activeCharacters.length > 0
+          ? summaryProgress.activeCharacters.map(character => character.displayName).join('、')
+          : summaryProgress.message || '正在处理人物经历'}
+      </p>
+    </div>
+  ) : null;
 
   useEffect(() => {
     const canUseChatInputRegenerate = currentPage === 'game' || currentPage === 'opening';
@@ -1788,6 +1824,7 @@ const App: React.FC = () => {
     return (
       <>
         {eventNotificationLayer}
+        {summaryProgressIndicator}
         <div className="booting-screen" aria-label="正在载入"></div>
       </>
     );
@@ -1797,6 +1834,7 @@ const App: React.FC = () => {
     return (
       <>
         {eventNotificationLayer}
+        {summaryProgressIndicator}
         <StartScreen onStart={handleStart} />
       </>
     );
@@ -1806,6 +1844,7 @@ const App: React.FC = () => {
     return (
       <>
         {eventNotificationLayer}
+        {summaryProgressIndicator}
         <SplashScreen
           hasSavedGame={savedGameExists}
           onNewGame={handleNewGame}
@@ -1828,6 +1867,7 @@ const App: React.FC = () => {
     return (
       <>
         {eventNotificationLayer}
+        {summaryProgressIndicator}
         <StatusToast state={toastState} onDismiss={dismissToast} autoHideDelay={8000} />
         <NewGameSetup
           onSubmit={handleSetupSubmit}
@@ -1851,6 +1891,7 @@ const App: React.FC = () => {
     return (
       <>
         {eventNotificationLayer}
+        {summaryProgressIndicator}
         <StatusToast state={toastState} onDismiss={dismissToast} autoHideDelay={8000} />
         <OpeningScreen
           welcomeLine={openingWelcomeLine}
@@ -1885,6 +1926,7 @@ const App: React.FC = () => {
   return (
     <>
       {eventNotificationLayer}
+      {summaryProgressIndicator}
       <div className={`app-container ${shouldStackCustomBackground ? 'has-custom-bg' : ''}`}>
         <StatusToast state={toastState} onDismiss={dismissToast} autoHideDelay={8000} />
 
