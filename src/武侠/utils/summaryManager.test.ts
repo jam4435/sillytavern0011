@@ -129,7 +129,9 @@ describe('summaryManager biography compression', () => {
     expect(prompt).toContain('【本次压缩的强制要求】');
     expect(prompt).toContain('必须将全部输入条目中的重要事实整合进返回的阶段记忆');
     expect(prompt).toContain('单行 JSON 字符串');
-    expect(prompt).toContain('严禁写成 \\~');
+    expect(prompt).toContain('日期前缀可以省略');
+    expect(prompt).toContain('程序会自动补齐缺失的时间前缀');
+    expect(prompt).toContain('严禁写成反斜杠加波浪号');
     expect(prompt).toContain('不得将小说章节号、回目编号或集数当作游戏内日期');
   });
 
@@ -304,10 +306,27 @@ describe('summaryManager biography compression', () => {
     expect(message.length).toBeLessThan(700);
   });
 
-  it('rejects non-JSON, invalid keys, missing dates, and non-contiguous stage numbers', () => {
+  it('automatically fills missing stage-memory date prefixes from source dates or the legacy fallback', () => {
+    expect(parseSummaryResponse(
+      '{"阶段经历1-补齐日期":"整合了事件。"}',
+      1,
+      { 经历1: '(1200.11.1) 一', 经历2: '(1200.11.5) 五' },
+    )).toEqual({
+      '阶段经历1-补齐日期': '（1200.11.1~1200.11.5）整合了事件。',
+    });
+
+    expect(parseSummaryResponse(
+      '{"阶段经历1-旧事回顾":"整合了旧事。"}',
+      1,
+      { 经历1: '(1200.11.1) 一', 经历2: '另一条旧记录没有日期' },
+    )).toEqual({
+      '阶段经历1-旧事回顾': '（旧记录时间不详）整合了旧事。',
+    });
+  });
+
+  it('rejects non-JSON, invalid keys, and non-contiguous stage numbers', () => {
     expect(() => parseSummaryResponse('<summary>不是 JSON</summary>')).toThrow(/合法 JSON/);
     expect(() => parseSummaryResponse('{"经历1":"（1200.11.1）内容"}')).toThrow(/键名/);
-    expect(() => parseSummaryResponse('{"阶段经历1-无日期":"没有日期"}')).toThrow(/时间前缀/);
     expect(() => parseSummaryResponse('{"阶段经历1-一":"（1200.11.1）一","阶段经历3-三":"（1200.11.3）三"}')).toThrow(/连续递增/);
     expect(() => parseSummaryResponse('{"阶段经历1-一":"（1200.11.1）一","阶段经历1-重复":"（1200.11.2）二"}')).toThrow(/连续递增/);
     expect(() => parseSummaryResponse('{"阶段经历1-一":"（1200.11.1）一","阶段经历2-二":"（1200.11.2）二"}', 1)).toThrow(/多于本批/);

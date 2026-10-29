@@ -89,7 +89,7 @@ function applyOpeningObjectPatch(target, action, patch) {
   apply(target, patch, action);
 }
 
-function applyOpeningCharacterDelta(statData, eventData, eventName) {
+function applyOpeningCharacterDelta(statData, eventData, eventName, gameTime) {
   if (!isPlainObject(statData.角色数据)) statData.角色数据 = {};
 
   for (const action of EVENT_DIFF_ACTIONS) {
@@ -101,16 +101,23 @@ function applyOpeningCharacterDelta(statData, eventData, eventName) {
         continue;
       }
       if (!isPlainObject(statData.角色数据[characterName])) statData.角色数据[characterName] = {};
-      applyOpeningObjectPatch(statData.角色数据[characterName], action, characterPatch);
+      const normalizedPatch = normalizeCharacterDeltaForEvent(
+        characterPatch,
+        eventName,
+        gameTime,
+        action !== 'delete',
+      );
+      applyOpeningObjectPatch(statData.角色数据[characterName], action, normalizedPatch);
     }
   }
 }
 
-function applyOpeningDebutDelta(statData, eventData, eventName) {
+function applyOpeningDebutDelta(statData, eventData, eventName, gameTime) {
   if (!isPlainObject(statData.角色数据)) statData.角色数据 = {};
   for (const [characterName, characterPatch] of Object.entries(eventData?.insert || {})) {
     if (!isPlainObject(statData.角色数据[characterName])) statData.角色数据[characterName] = {};
-    applyOpeningObjectPatch(statData.角色数据[characterName], 'insert', characterPatch);
+    const normalizedPatch = normalizeCharacterDeltaForEvent(characterPatch, eventName, gameTime);
+    applyOpeningObjectPatch(statData.角色数据[characterName], 'insert', normalizedPatch);
     log(`[开局登场] 添加角色 ${characterName} (${eventName})`);
   }
 }
@@ -214,15 +221,61 @@ function normalizeEventRecordName(sourceEventName, recordName) {
   return normalizeOrdinaryEventReference(recordName, sourceEventName);
 }
 
-function normalizeCharacterDeltaForEvent(delta, eventName) {
+const BIOGRAPHY_DATE_PREFIX_RE =
+  /^[（(](?:(?:\d{3,4}\.\d{1,2}\.\d{1,2})(?:\s*[~～—–-]\s*\d{3,4}\.\d{1,2}\.\d{1,2})?|旧记录时间不详|时间不详)[）)]\s*/;
+
+function formatBiographyDatePrefix(gameTime) {
+  if (!isPlainObject(gameTime)) return '（旧记录时间不详）';
+
+  const year = Number(gameTime.年);
+  const month = Number(gameTime.月);
+  const day = Number(gameTime.日);
+  if (
+    !Number.isInteger(year) || year < 100 || year > 9999 ||
+    !Number.isInteger(month) || month < 1 || month > 12 ||
+    !Number.isInteger(day) || day < 1 || day > 30
+  ) {
+    return '（旧记录时间不详）';
+  }
+
+  return `（${year}.${month}.${day}）`;
+}
+
+function normalizeBiographyExperienceValue(value, gameTime) {
+  if (typeof value !== 'string' || !value.trim()) return value;
+
+  const trimmed = value.trim();
+  if (BIOGRAPHY_DATE_PREFIX_RE.test(trimmed)) return value;
+  return `${formatBiographyDatePrefix(gameTime)}${trimmed}`;
+}
+
+function normalizeLegacyBiographyText(value, gameTime) {
+  return value.split(/\r?\n/).map(line => {
+    if (!line.trim()) return line;
+    return normalizeBiographyExperienceValue(line, gameTime);
+  }).join('\n');
+}
+
+export function normalizeCharacterDeltaForEvent(delta, eventName, gameTime, normalizeBiographyDates = true) {
   const normalizedDelta = cloneJson(delta || {});
-  if (!isPlainObject(normalizedDelta?.人物经历)) {
+  const biography = normalizedDelta?.人物经历;
+
+  if (typeof biography === 'string') {
+    if (normalizeBiographyDates) {
+      normalizedDelta.人物经历 = normalizeLegacyBiographyText(biography, gameTime);
+    }
+    return normalizedDelta;
+  }
+
+  if (!isPlainObject(biography)) {
     return normalizedDelta;
   }
 
   const normalizedExperiences = {};
-  for (const [recordName, recordValue] of Object.entries(normalizedDelta.人物经历)) {
-    normalizedExperiences[normalizeEventRecordName(eventName, recordName)] = recordValue;
+  for (const [recordName, recordValue] of Object.entries(biography)) {
+    normalizedExperiences[normalizeEventRecordName(eventName, recordName)] = normalizeBiographyDates
+      ? normalizeBiographyExperienceValue(recordValue, gameTime)
+      : recordValue;
   }
   normalizedDelta.人物经历 = normalizedExperiences;
   return normalizedDelta;
@@ -239,8 +292,8 @@ function mergePlainObject(target, source) {
   return target;
 }
 
-function mergeCharacterDeltaForEvent(target, source, eventName) {
-  return mergePlainObject(target, normalizeCharacterDeltaForEvent(source, eventName));
+function mergeCharacterDeltaForEvent(target, source, eventName, gameTime) {
+  return mergePlainObject(target, normalizeCharacterDeltaForEvent(source, eventName, gameTime));
 }
 
 function isEmptyPlainObject(value) {
@@ -288,7 +341,8 @@ function getInitialParticipationActionDiff(eventData, actionKey, eventName) {
   return Object.fromEntries(
     Object.entries(delta).map(([characterName, characterDelta]) => [
       characterName,
-      normalizeCharacterDeltaForEvent(characterDelta, eventName),
+      // 这里只快照参与事件的差分，不写入角色数据；等事件结算时再按结算游戏时间补齐日期。
+      normalizeCharacterDeltaForEvent(characterDelta, eventName, undefined, false),
     ]),
   );
 }
@@ -306,7 +360,12 @@ function mergeEventActionDelta(mergedDiff, actionKey, delta, eventName, statData
       continue;
     }
 
-    const normalizedPatch = normalizeCharacterDeltaForEvent(delta[charName], eventName);
+    const normalizedPatch = normalizeCharacterDeltaForEvent(
+      delta[charName],
+      eventName,
+      statData?.世界信息?.时间,
+      actionKey !== 'delete',
+    );
     if (actionKey === 'insert' && characterExists) {
       const split = splitInsertPatchAgainstExisting(normalizedPatch, statData.角色数据[charName]);
       if (!isEmptyPlainObject(split.insert)) {
@@ -427,10 +486,11 @@ export async function initializeEventList(eventDefinitions, options = {}) {
         }
 
         statData.事件系统.已完成事件[eventName] = 0;
+        const biographyTime = endTime || getSingleConditionTimeAnchor(eventData?.触发条件) || currentTime;
         if (isDebutEvent(eventData)) {
-          applyOpeningDebutDelta(statData, eventData, eventName);
+          applyOpeningDebutDelta(statData, eventData, eventName, biographyTime);
         } else {
-          applyOpeningCharacterDelta(statData, eventData, eventName);
+          applyOpeningCharacterDelta(statData, eventData, eventName, biographyTime);
           if (!isWorldEventRecord(statData.世界事件[eventName])) {
             statData.世界事件[eventName] = buildWorldEventRecord(eventData, undefined, endTime);
           }
@@ -638,7 +698,7 @@ export async function batchStartEvents(eventNames, eventDefinitions, options = {
       for (const [name, patch] of Object.entries(debutData.insert)) {
         if (!isPlainObject(patch)) throw new Error(`配套登场事件 ${debutName} 人物 ${name} 档案无效`);
         if (!debutCharacterInserts[name]) debutCharacterInserts[name] = {};
-        mergeCharacterDeltaForEvent(debutCharacterInserts[name], patch, debutName);
+        mergeCharacterDeltaForEvent(debutCharacterInserts[name], patch, debutName, startTime);
       }
       未发生删除对象[debutName] = {};
     }
@@ -793,7 +853,12 @@ export async function batchCompleteDebutEvents(eventNames, eventDefinitions) {
         if (!登场事件差分.insert[charName]) {
           登场事件差分.insert[charName] = {};
         }
-        mergeCharacterDeltaForEvent(登场事件差分.insert[charName], delta[charName], eventName);
+        mergeCharacterDeltaForEvent(
+          登场事件差分.insert[charName],
+          delta[charName],
+          eventName,
+          beforeDebut?.世界信息?.时间,
+        );
         log(`[登场事件 INSERT] 准备新增角色: ${charName}`);
       }
 
