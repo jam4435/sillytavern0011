@@ -1095,6 +1095,21 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   }, []);
 
+  const handleCopyManualSummaryTraceText = useCallback(async (text: string, label: string) => {
+    try {
+      await copyTextToClipboard(text);
+      setManualSummaryTraceStatus(`${label}已复制到剪贴板`);
+    } catch (error) {
+      setManualSummaryTraceStatus(`复制失败：${getErrorMessage(error)}`);
+    }
+  }, []);
+
+  const handleClearManualSummaryTrace = useCallback(() => {
+    clearLatestManualSummaryTrace();
+    setManualSummaryTrace(null);
+    setManualSummaryTraceStatus('已清除当前聊天的手动总结记录');
+  }, []);
+
   const updateAutoAdvanceResult = useCallback((id: string, updates: Partial<AutoAdvanceResult>) => {
     setAutoAdvanceResults(previousResults =>
       previousResults.map(result => (result.id === id ? { ...result, ...updates } : result)),
