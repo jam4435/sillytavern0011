@@ -800,7 +800,7 @@ export function parseSummaryResponse(response: string, maxStageMemories?: number
       throw new Error(`阶段记忆“${key}”必须对应非空字符串。`);
     }
 
-    const cleanValue = value.trim();
+    const cleanValue = value.trim().replace(/[\u0000-\u001F\u007F]+/g, ' ');
     if (!SUMMARY_DATE_PREFIX_RE.test(cleanValue)) {
       throw new Error(
         `阶段记忆“${key}”缺少有效的游戏内时间前缀；请使用“（1200.11.1~1200.11.5）”或“（旧记录时间不详）”。`,
