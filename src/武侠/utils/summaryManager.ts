@@ -778,7 +778,12 @@ export function parseSummaryResponse(response: string, maxStageMemories?: number
   }
 
   const sourceDateBounds = sourceEntries ? getSourceDateBounds(sourceEntries) : null;
-  const missingDatePrefix = sourceDateBounds
+  const sourceEntriesHaveCompleteDates = Boolean(
+    sourceEntries &&
+    Object.keys(sourceEntries).length > 0 &&
+    Object.values(sourceEntries).every(value => parseGameDateRange(value) !== null),
+  );
+  const missingDatePrefix = sourceDateBounds && sourceEntriesHaveCompleteDates
     ? `（${formatGameDateNumber(sourceDateBounds.start)}~${formatGameDateNumber(sourceDateBounds.end)}）`
     : '（旧记录时间不详）';
   const result: Record<string, string> = {};
