@@ -814,7 +814,7 @@ export function parseSummaryResponse(response: string, maxStageMemories?: number
       throw new Error(`阶段记忆“${key}”必须对应非空字符串。`);
     }
 
-    const cleanValue = value.trim().replace(/[\\u0000-\\u001F\\u007F]+/g, ' ');
+    const cleanValue = value.trim().replace(/[\u0000-\u001F\u007F]+/g, ' ');
     const normalizedValue = SUMMARY_DATE_PREFIX_RE.test(cleanValue)
       ? cleanValue
       : `${missingDatePrefix} ${cleanValue}`;
