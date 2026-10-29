@@ -45,7 +45,6 @@ export interface SummaryTriggerResult {
  */
 export interface ManualSummaryAuditRecord {
   sourceEntries: Record<string, string>;
-  sourceText: string;
   prompt: string;
   modelOutput: string;
   finalOutput: string;
@@ -164,7 +163,12 @@ function cloneSummaryProgressSnapshot(snapshot: SummaryProgressSnapshot): Summar
 function cloneManualSummaryTrace(snapshot: ManualSummaryTraceSnapshot): ManualSummaryTraceSnapshot {
   return {
     ...snapshot,
-    results: snapshot.results.map(cloneCharacterSummaryResult),
+    results: snapshot.results.map(result => {
+      const cloned = cloneCharacterSummaryResult(result);
+      // summaryContent 与 audit.finalOutput 内容相同；持久化时只保留一份，控制 localStorage 体积。
+      delete cloned.summaryContent;
+      return cloned;
+    }),
   };
 }
 
@@ -1091,12 +1095,10 @@ export async function executeSummary(
     };
 
     // 1. 将该人物的全部经历（包括已有阶段记忆）一次性发送给模型。
-    const sourceText = formatBiographyForPrompt(compressionPlan.sourceEntries);
     const prompt = formatPromptForCharacter(settings.promptTemplate, sourceCharacter);
     if (captureAudit) {
       result.audit = {
         sourceEntries: { ...compressionPlan.sourceEntries },
-        sourceText,
         prompt,
         modelOutput: '',
         finalOutput: '',
