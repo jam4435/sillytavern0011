@@ -79,9 +79,14 @@ import {
   getIsSummarizing,
   getSummaryProgressSnapshot,
   subscribeSummaryProgress,
+  getLatestManualSummaryTrace,
+  clearLatestManualSummaryTrace,
+  estimateApproxTokenCount,
+  MANUAL_SUMMARY_TRACE_EVENT,
   type SummaryProgressSnapshot,
   type SummaryTriggerResult,
   type BatchSummaryResult,
+  type ManualSummaryTraceSnapshot,
 } from '../utils/summaryManager';
 import type { VariableEditorCapability } from '../utils/variableEditorPolicy';
 import {
@@ -328,6 +333,13 @@ const copyTextToClipboard = async (text: string): Promise<void> => {
   textarea.remove();
 };
 
+const formatManualSummaryAuditSource = (sourceEntries: Record<string, string>): string => {
+  const entries = Object.entries(sourceEntries);
+  return entries.length > 0
+    ? entries.map(([key, value]) => `- ${key}: ${value}`).join('\n')
+    : '（无经历记录）';
+};
+
 const clampAutoAdvanceCount = (value: number): number => {
   if (!Number.isFinite(value)) {
     return 1;
@@ -471,6 +483,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [isSummaryRunning, setIsSummaryRunning] = useState(false);
   const [summaryProgress, setSummaryProgress] = useState<SummaryProgressSnapshot>(() => getSummaryProgressSnapshot());
   const [summaryResult, setSummaryResult] = useState<BatchSummaryResult | null>(null);
+  const [manualSummaryTrace, setManualSummaryTrace] = useState<ManualSummaryTraceSnapshot | null>(
+    () => getLatestManualSummaryTrace(),
+  );
+  const [manualSummaryTraceStatus, setManualSummaryTraceStatus] = useState('');
   const [summaryModelOptions, setSummaryModelOptions] = useState<string[]>([]);
   const [summaryModelStatus, setSummaryModelStatus] = useState('');
   const [isSummaryModelLoading, setIsSummaryModelLoading] = useState(false);
@@ -498,6 +514,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const refreshConversationSummaryTrace = useCallback(() => {
     setConversationSummaryTrace(getLatestConversationSummaryPromptTrace());
+  }, []);
+
+  const refreshManualSummaryTrace = useCallback(() => {
+    setManualSummaryTrace(getLatestManualSummaryTrace());
   }, []);
 
   const syncSmallSummaryBackfillSnapshot = useCallback(() => {
@@ -529,6 +549,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   }, [refreshSmallSummaryBackfillWorkbench, syncSmallSummaryBackfillSnapshot]);
 
   useEffect(() => subscribeSummaryProgress(setSummaryProgress), []);
+
+  useEffect(() => {
+    refreshManualSummaryTrace();
+    window.addEventListener(MANUAL_SUMMARY_TRACE_EVENT, refreshManualSummaryTrace);
+    return () => window.removeEventListener(MANUAL_SUMMARY_TRACE_EVENT, refreshManualSummaryTrace);
+  }, [refreshManualSummaryTrace]);
 
   // 变量编辑相关状态
   const [variableBaseStatData, setVariableBaseStatData] = useState<Record<string, unknown> | null>(null);
@@ -707,6 +733,40 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const summaryApiValidationMessage = hasApiDraftContent
     ? validateSummaryApiConfig(apiProfileDraft.apiConfig, { requireModel: true })
     : '';
+  const manualSummaryTraceResults = manualSummaryTrace?.results || [];
+  const manualSummaryTraceAudits = manualSummaryTraceResults.filter(result => result.audit);
+  const manualSummaryInputChars = manualSummaryTraceAudits.reduce(
+    (total, result) => total + (result.audit?.prompt.length || 0),
+    0,
+  );
+  const manualSummaryInputTokens = manualSummaryTraceAudits.reduce(
+    (total, result) => total + estimateApproxTokenCount(result.audit?.prompt || ''),
+    0,
+  );
+  const manualSummaryModelOutputChars = manualSummaryTraceAudits.reduce(
+    (total, result) => total + (result.audit?.modelOutput.length || 0),
+    0,
+  );
+  const manualSummaryModelOutputTokens = manualSummaryTraceAudits.reduce(
+    (total, result) => total + estimateApproxTokenCount(result.audit?.modelOutput || ''),
+    0,
+  );
+  const manualSummaryComparableAudits = manualSummaryTraceAudits.filter(
+    result => Boolean(result.audit?.finalOutput || result.summaryContent),
+  );
+  const manualSummarySourceTokens = manualSummaryComparableAudits.reduce(
+    (total, result) => total + estimateApproxTokenCount(
+      formatManualSummaryAuditSource(result.audit?.sourceEntries || {}),
+    ),
+    0,
+  );
+  const manualSummaryFinalTokens = manualSummaryComparableAudits.reduce(
+    (total, result) => total + estimateApproxTokenCount(result.audit?.finalOutput || result.summaryContent || ''),
+    0,
+  );
+  const manualSummaryCompressionPercent = manualSummarySourceTokens > 0
+    ? Math.round((1 - manualSummaryFinalTokens / manualSummarySourceTokens) * 100)
+    : null;
   const smallSummaryItems = smallSummaryBackfillSnapshot?.items || [];
   const smallSummaryTotalCount = smallSummaryItems.length;
   const smallSummaryPresentCount = smallSummaryItems.filter(item => item.hasSummary).length;
@@ -1045,6 +1105,21 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       setVariableStatus('error');
       setVariableStatusText(`复制失败：${getErrorMessage(error)}`);
     }
+  }, []);
+
+  const handleCopyManualSummaryTraceText = useCallback(async (text: string, label: string) => {
+    try {
+      await copyTextToClipboard(text);
+      setManualSummaryTraceStatus(`${label}已复制到剪贴板`);
+    } catch (error) {
+      setManualSummaryTraceStatus(`复制失败：${getErrorMessage(error)}`);
+    }
+  }, []);
+
+  const handleClearManualSummaryTrace = useCallback(() => {
+    clearLatestManualSummaryTrace();
+    setManualSummaryTrace(null);
+    setManualSummaryTraceStatus('已清除当前聊天的手动总结记录');
   }, []);
 
   const updateAutoAdvanceResult = useCallback((id: string, updates: Partial<AutoAdvanceResult>) => {
@@ -3429,6 +3504,201 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                           <strong>{summaryResult.totalFailed}</strong>
                         </div>
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {manualSummaryTrace && (
+                  <div className="summary-audit">
+                    <div className="summary-audit-header">
+                      <div>
+                        <strong>手动总结输入 / 输出留档</strong>
+                        <span>
+                          {new Date(manualSummaryTrace.startedAt).toLocaleString()}
+                          {manualSummaryTrace.completedAt ? ' · 已结束' : ' · 进行中'}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="settings-action-btn"
+                        onClick={handleClearManualSummaryTrace}
+                      >
+                        清除记录
+                      </button>
+                    </div>
+
+                    <div className="summary-audit-body">
+                      <div className="summary-audit-stats">
+                        <div>
+                          <span>实际输入提示词</span>
+                          <strong>{manualSummaryInputChars.toLocaleString()} 字符</strong>
+                          <small>约 {manualSummaryInputTokens.toLocaleString()} tokens</small>
+                        </div>
+                        <div>
+                          <span>模型返回文本</span>
+                          <strong>{manualSummaryModelOutputChars.toLocaleString()} 字符</strong>
+                          <small>约 {manualSummaryModelOutputTokens.toLocaleString()} tokens</small>
+                        </div>
+                        <div>
+                          <span>原始经历 → 阶段记忆</span>
+                          <strong>
+                            {manualSummarySourceTokens.toLocaleString()} → {manualSummaryFinalTokens.toLocaleString()} tokens
+                          </strong>
+                          <small>
+                            {manualSummaryCompressionPercent === null
+                              ? '暂无可比较的完整输出'
+                              : manualSummaryCompressionPercent >= 0
+                                ? `估算减少 ${manualSummaryCompressionPercent}%`
+                                : `估算增加 ${Math.abs(manualSummaryCompressionPercent)}%`}
+                          </small>
+                        </div>
+                        <div>
+                          <span>处理人物</span>
+                          <strong>{manualSummaryTraceResults.length}</strong>
+                          <small>
+                            成功 {manualSummaryTraceResults.filter(result => result.success).length}
+                            {' · '}
+                            失败 {manualSummaryTraceResults.filter(result => !result.success).length}
+                          </small>
+                        </div>
+                      </div>
+
+                      <p className="summary-audit-note">
+                        输入保存的是实际送给总结模型的完整提示词；输出保存模型返回文本及解析后的阶段记忆。
+                        每个聊天仅保留最近一次手动总结记录，保存在当前浏览器本地；不会写入 ERA 变量或后续剧情上下文。
+                        Token 数为统一规则下的粗略估算，不等同于服务端 tokenizer 或账单统计。
+                      </p>
+
+                      <div className="summary-audit-actions">
+                        <button
+                          type="button"
+                          className="settings-action-btn"
+                          onClick={() => void handleCopyManualSummaryTraceText(
+                            manualSummaryTraceResults.map(result =>
+                              `### ${result.displayName}\n\n${result.audit?.prompt || '（本条未生成输入提示词）'}`,
+                            ).join('\n\n---\n\n'),
+                            '全部输入',
+                          )}
+                        >
+                          复制全部输入
+                        </button>
+                        <button
+                          type="button"
+                          className="settings-action-btn"
+                          onClick={() => void handleCopyManualSummaryTraceText(
+                            manualSummaryTraceResults.map(result =>
+                              `### ${result.displayName}\n\n## 模型返回文本\n${result.audit?.modelOutput || '（无模型返回文本）'}\n\n## 阶段记忆预览\n${result.audit?.finalOutput || result.summaryContent || '（没有可用的阶段记忆输出）'}`,
+                            ).join('\n\n---\n\n'),
+                            '全部输出',
+                          )}
+                        >
+                          复制全部输出
+                        </button>
+                        <button
+                          type="button"
+                          className="settings-action-btn primary"
+                          onClick={() => void handleCopyManualSummaryTraceText(
+                            JSON.stringify(manualSummaryTrace, null, 2),
+                            '完整对比 JSON',
+                          )}
+                        >
+                          复制完整对比 JSON
+                        </button>
+                      </div>
+                      {manualSummaryTraceStatus && (
+                        <p className="summary-audit-status">{manualSummaryTraceStatus}</p>
+                      )}
+
+                      <div className="summary-audit-characters">
+                        {manualSummaryTraceResults.map(result => (
+                          <details className="summary-audit-character" key={result.characterId}>
+                            <summary>
+                              <strong>{result.displayName}</strong>
+                              <span>
+                                {result.success ? '总结成功' : '总结失败'}
+                                {result.audit ? ` · 输入 ${result.audit.prompt.length.toLocaleString()} 字符` : ''}
+                              </span>
+                            </summary>
+                            {result.audit ? (
+                              <div className="summary-audit-character-body">
+                                <div className="summary-audit-character-metrics">
+                                  <span>
+                                    原始经历：{formatManualSummaryAuditSource(result.audit.sourceEntries).length.toLocaleString()} 字符
+                                  </span>
+                                  <span>送模提示词：{result.audit.prompt.length.toLocaleString()} 字符</span>
+                                  <span>模型返回：{result.audit.modelOutput.length.toLocaleString()} 字符</span>
+                                  <span>阶段记忆预览：{result.audit.finalOutput.length.toLocaleString()} 字符</span>
+                                </div>
+                                <div className="summary-audit-actions">
+                                  <button
+                                    type="button"
+                                    className="settings-action-btn"
+                                    onClick={() => void handleCopyManualSummaryTraceText(
+                                      JSON.stringify(result.audit?.sourceEntries || {}, null, 2),
+                                      `${result.displayName}原始经历`,
+                                    )}
+                                  >
+                                    复制原始经历
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="settings-action-btn"
+                                    onClick={() => void handleCopyManualSummaryTraceText(
+                                      result.audit?.prompt || '',
+                                      `${result.displayName}输入`,
+                                    )}
+                                  >
+                                    复制输入提示词
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="settings-action-btn"
+                                    onClick={() => void handleCopyManualSummaryTraceText(
+                                      result.audit?.modelOutput || '',
+                                      `${result.displayName}模型输出`,
+                                    )}
+                                  >
+                                    复制模型输出
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="settings-action-btn"
+                                    onClick={() => void handleCopyManualSummaryTraceText(
+                                      result.audit?.finalOutput || result.summaryContent || '',
+                                      `${result.displayName}阶段记忆`,
+                                    )}
+                                  >
+                                    复制阶段记忆
+                                  </button>
+                                </div>
+                                <details className="summary-audit-payload">
+                                  <summary>查看原始经历</summary>
+                                  <pre>{JSON.stringify(result.audit.sourceEntries, null, 2)}</pre>
+                                </details>
+                                <details className="summary-audit-payload">
+                                  <summary>查看完整输入提示词</summary>
+                                  <pre>{result.audit.prompt}</pre>
+                                </details>
+                                <details className="summary-audit-payload">
+                                  <summary>查看模型返回文本</summary>
+                                  <pre>{result.audit.modelOutput || '（请求失败或模型未返回文本）'}</pre>
+                                </details>
+                                <details className="summary-audit-payload">
+                                  <summary>查看阶段记忆预览</summary>
+                                  <pre>{result.audit.finalOutput || result.summaryContent || '（尚无可用输出）'}</pre>
+                                </details>
+                                {!result.success && result.error && (
+                                  <p className="summary-audit-error">失败原因：{result.error}</p>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="summary-audit-error">
+                                {result.error || '未生成可供检查的输入输出记录。'}
+                              </p>
+                            )}
+                          </details>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
