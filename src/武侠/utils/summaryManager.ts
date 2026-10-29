@@ -652,8 +652,8 @@ export function formatPromptForCharacter(
  */
 function formatSummaryResponsePreview(response: string): string {
   const compact = response
-    .replace(/[\\u0000-\\u001F\\u007F]/g, ' ')
-    .replace(/\\s+/g, ' ')
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
   if (!compact) return '（空响应）';
   if (compact.length <= 220) return compact;
