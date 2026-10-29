@@ -327,7 +327,6 @@ describe('summaryManager biography compression', () => {
   it('rejects non-JSON, invalid keys, and non-contiguous stage numbers', () => {
     expect(() => parseSummaryResponse('<summary>不是 JSON</summary>')).toThrow(/合法 JSON/);
     expect(() => parseSummaryResponse('{"经历1":"（1200.11.1）内容"}')).toThrow(/键名/);
-    // Missing prefixes are filled by the parser instead of rejecting an otherwise valid summary.
     expect(() => parseSummaryResponse('{"阶段经历1-一":"（1200.11.1）一","阶段经历3-三":"（1200.11.3）三"}')).toThrow(/连续递增/);
     expect(() => parseSummaryResponse('{"阶段经历1-一":"（1200.11.1）一","阶段经历1-重复":"（1200.11.2）二"}')).toThrow(/连续递增/);
     expect(() => parseSummaryResponse('{"阶段经历1-一":"（1200.11.1）一","阶段经历2-二":"（1200.11.2）二"}', 1)).toThrow(/多于本批/);
