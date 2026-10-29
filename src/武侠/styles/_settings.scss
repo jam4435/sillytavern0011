@@ -2798,6 +2798,11 @@
   gap: 0.2rem;
 }
 
+.summary-progress-failures li span {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .summary-progress-error {
   color: $red-500;
 }
