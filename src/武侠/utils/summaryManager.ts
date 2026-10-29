@@ -642,7 +642,8 @@ export function formatPromptForCharacter(
     template.includes('单行 JSON 字符串') &&
     template.includes('严禁写成') &&
     template.includes('不得将小说章节号、回目编号或集数当作游戏内日期') &&
-    template.includes('日期前缀可以省略')
+    template.includes('日期前缀可以省略') &&
+    template.includes('程序会自动补齐缺失的时间前缀')
   ) {
     return formattedPrompt;
   }
