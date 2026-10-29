@@ -744,12 +744,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     (total, result) => total + estimateApproxTokenCount(result.audit?.modelOutput || ''),
     0,
   );
-  const manualSummarySourceTokens = manualSummaryTraceAudits.reduce(
+  const manualSummaryComparableAudits = manualSummaryTraceAudits.filter(
+    result => Boolean(result.audit?.finalOutput || result.summaryContent),
+  );
+  const manualSummarySourceTokens = manualSummaryComparableAudits.reduce(
     (total, result) => total + estimateApproxTokenCount(result.audit?.sourceText || ''),
     0,
   );
-  const manualSummaryFinalTokens = manualSummaryTraceAudits.reduce(
-    (total, result) => total + estimateApproxTokenCount(result.audit?.finalOutput || ''),
+  const manualSummaryFinalTokens = manualSummaryComparableAudits.reduce(
+    (total, result) => total + estimateApproxTokenCount(result.audit?.finalOutput || result.summaryContent || ''),
     0,
   );
   const manualSummaryCompressionPercent = manualSummarySourceTokens > 0
@@ -3553,7 +3556,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
                       <p className="summary-audit-note">
                         输入保存的是实际送给总结模型的完整提示词；输出保存模型返回文本及解析后的阶段记忆。
-                        记录按聊天保存在当前浏览器本地，不写入 ERA 变量，也不会进入后续剧情上下文。
+                        每个聊天仅保留最近一次手动总结记录，保存在当前浏览器本地；不会写入 ERA 变量或后续剧情上下文。
                         Token 数为统一规则下的粗略估算，不等同于服务端 tokenizer 或账单统计。
                       </p>
 
