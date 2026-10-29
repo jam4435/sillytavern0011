@@ -256,7 +256,7 @@ function normalizeLegacyBiographyText(value, gameTime) {
   }).join('\n');
 }
 
-function normalizeCharacterDeltaForEvent(delta, eventName, gameTime, normalizeBiographyDates = true) {
+export function normalizeCharacterDeltaForEvent(delta, eventName, gameTime, normalizeBiographyDates = true) {
   const normalizedDelta = cloneJson(delta || {});
   const biography = normalizedDelta?.人物经历;
 
@@ -334,14 +334,15 @@ function getParticipationActionDiff(participationEntry, actionKey) {
   return isPlainObject(diff) ? diff : {};
 }
 
-function getInitialParticipationActionDiff(eventData, actionKey, eventName, gameTime) {
+function getInitialParticipationActionDiff(eventData, actionKey, eventName) {
   const delta = eventData?.[actionKey];
   if (!isPlainObject(delta)) return {};
 
   return Object.fromEntries(
     Object.entries(delta).map(([characterName, characterDelta]) => [
       characterName,
-      normalizeCharacterDeltaForEvent(characterDelta, eventName, gameTime, actionKey !== 'delete'),
+      // 这里只快照参与事件的差分，不写入角色数据；等事件结算时再按结算游戏时间补齐日期。
+      normalizeCharacterDeltaForEvent(characterDelta, eventName, undefined, false),
     ]),
   );
 }
@@ -971,9 +972,9 @@ export function buildPlayerParticipationEntry(eventName, eventData, currentTime,
     ...(typeof eventData?.事件地点 === 'string' && eventData.事件地点.trim()
       ? { 地点: eventData.事件地点.trim() }
       : {}),
-    insert: getInitialParticipationActionDiff(eventData, 'insert', eventName, currentTime),
-    update: getInitialParticipationActionDiff(eventData, 'update', eventName, currentTime),
-    delete: getInitialParticipationActionDiff(eventData, 'delete', eventName, currentTime),
+    insert: getInitialParticipationActionDiff(eventData, 'insert', eventName),
+    update: getInitialParticipationActionDiff(eventData, 'update', eventName),
+    delete: getInitialParticipationActionDiff(eventData, 'delete', eventName),
     ...(Object.keys(branchMarkers).length > 0 ? { 分支标记: cloneJson(branchMarkers) } : {}),
   };
 }
