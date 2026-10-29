@@ -627,11 +627,14 @@ export function formatPromptForCharacter(
     .replace(/\{\{characterName\}\}/g, character.displayName)
     .replace(/\{\{biographyEntries\}\}/g, biographyText);
 
-  // 自定义旧模板可能仍要求保留近期条目；代码现在会替换全部输入经历，因此追加强制规则防止遗漏。
+  // 只有模板已经包含全部新增格式约束时才跳过追加，避免旧版默认模板漏掉 JSON 修正规则。
   if (
     template.includes('一次性压缩全部输入经历') &&
     template.includes('不得只总结其中一部分') &&
-    template.includes('虽然所有输入经历都要重新组织')
+    template.includes('虽然所有输入经历都要重新组织') &&
+    template.includes('单行 JSON 字符串') &&
+    template.includes('严禁写成') &&
+    template.includes('不得将小说章节号、回目编号或集数当作游戏内日期')
   ) {
     return formattedPrompt;
   }
