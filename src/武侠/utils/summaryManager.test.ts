@@ -269,7 +269,7 @@ describe('summaryManager biography compression', () => {
   });
 
   it('includes parser details and a bounded response preview for invalid JSON', () => {
-    const response = `前言：${'x'.repeat(300)}\\n尾部标记`;
+    const response = `前言：${'x'.repeat(300)}\n尾部标记`;
     let thrown: unknown;
 
     try {
