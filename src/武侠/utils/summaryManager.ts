@@ -147,11 +147,16 @@ function cloneCharacterSummaryResult(result: CharacterSummaryResult): CharacterS
   };
 }
 
+function cloneSummaryProgressResult(result: CharacterSummaryResult): CharacterSummaryResult {
+  const { audit: _audit, ...progressResult } = result;
+  return progressResult;
+}
+
 function cloneSummaryProgressSnapshot(snapshot: SummaryProgressSnapshot): SummaryProgressSnapshot {
   return {
     ...snapshot,
     activeCharacters: snapshot.activeCharacters.map(character => ({ ...character })),
-    results: snapshot.results.map(cloneCharacterSummaryResult),
+    results: snapshot.results.map(cloneSummaryProgressResult),
   };
 }
 
@@ -251,7 +256,7 @@ function publishSummaryProgress(patch: Partial<SummaryProgressSnapshot>): void {
     activeCharacters: patch.activeCharacters
       ? patch.activeCharacters.map(character => ({ ...character }))
       : summaryProgressSnapshot.activeCharacters,
-    results: patch.results ? patch.results.map(cloneCharacterSummaryResult) : summaryProgressSnapshot.results,
+    results: patch.results ? patch.results.map(cloneSummaryProgressResult) : summaryProgressSnapshot.results,
     updatedAt: Date.now(),
   };
   const snapshot = cloneSummaryProgressSnapshot(summaryProgressSnapshot);
@@ -1407,7 +1412,11 @@ export async function executeAllPendingSummaries(
     isSummarizing = false;
   }
 
-  return result;
+  return {
+    ...result,
+    // 输入输出留档单独持久化；不把完整提示词附在 UI 普通进度结果上，避免重复占用内存。
+    results: result.results.map(cloneSummaryProgressResult),
+  };
 }
 
 /**
