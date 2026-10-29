@@ -1484,7 +1484,8 @@
 
   .summary-audit-header strong,
   .summary-audit-stats strong,
-  .summary-audit-character > summary strong {
+  .summary-audit-character > summary strong,
+  .summary-audit-payload > summary {
     color: #1a1410;
   }
 
