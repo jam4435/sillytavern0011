@@ -40,6 +40,17 @@ export interface SummaryTriggerResult {
 }
 
 /**
+ * 手动总结审计记录：保存实际送给模型的输入、模型返回文本和最终整理后的写回内容。
+ * 仅手动总结采集，自动总结不会保留完整提示词。
+ */
+export interface ManualSummaryAuditRecord {
+  sourceEntries: Record<string, string>;
+  prompt: string;
+  modelOutput: string;
+  finalOutput: string;
+}
+
+/**
  * 单个角色的总结结果
  */
 export interface CharacterSummaryResult {
@@ -49,6 +60,7 @@ export interface CharacterSummaryResult {
   originalCount: number;
   summaryContent?: string;
   error?: string;
+  audit?: ManualSummaryAuditRecord;
 }
 
 /**
@@ -72,6 +84,19 @@ export interface ActiveSummaryCharacter {
   index: number;
   phase: SummaryCharacterPhase;
 }
+
+export interface ManualSummaryTraceSnapshot {
+  /** 当前聊天 ID；无法读取时仅保留在本次页面运行内存中。 */
+  chatId: string | null;
+  startedAt: number;
+  updatedAt: number;
+  completedAt: number | null;
+  results: CharacterSummaryResult[];
+}
+
+export const MANUAL_SUMMARY_TRACE_EVENT = 'wuxia:manualSummaryTraceUpdated';
+const MANUAL_SUMMARY_TRACE_STORAGE_PREFIX = 'wuxia.manualSummaryTrace.v1:';
+let latestManualSummaryTrace: ManualSummaryTraceSnapshot | null = null;
 
 export interface SummaryProgressSnapshot {
   active: boolean;
@@ -107,12 +132,126 @@ const INITIAL_SUMMARY_PROGRESS: SummaryProgressSnapshot = {
 let summaryProgressSnapshot: SummaryProgressSnapshot = INITIAL_SUMMARY_PROGRESS;
 const summaryProgressListeners = new Set<(snapshot: SummaryProgressSnapshot) => void>();
 
+function cloneCharacterSummaryResult(result: CharacterSummaryResult): CharacterSummaryResult {
+  return {
+    ...result,
+    ...(result.audit
+      ? {
+          audit: {
+            ...result.audit,
+            sourceEntries: { ...result.audit.sourceEntries },
+          },
+        }
+      : {}),
+  };
+}
+
+function cloneSummaryProgressResult(result: CharacterSummaryResult): CharacterSummaryResult {
+  const progressResult = { ...result };
+  delete progressResult.audit;
+  return progressResult;
+}
+
 function cloneSummaryProgressSnapshot(snapshot: SummaryProgressSnapshot): SummaryProgressSnapshot {
   return {
     ...snapshot,
     activeCharacters: snapshot.activeCharacters.map(character => ({ ...character })),
-    results: snapshot.results.map(result => ({ ...result })),
+    results: snapshot.results.map(cloneSummaryProgressResult),
   };
+}
+
+function cloneManualSummaryTrace(snapshot: ManualSummaryTraceSnapshot): ManualSummaryTraceSnapshot {
+  return {
+    ...snapshot,
+    results: snapshot.results.map(result => {
+      const cloned = cloneCharacterSummaryResult(result);
+      // summaryContent 与 audit.finalOutput 内容相同；持久化时只保留一份，控制 localStorage 体积。
+      delete cloned.summaryContent;
+      return cloned;
+    }),
+  };
+}
+
+function getManualSummaryTraceStorageKey(chatId: string): string {
+  return `${MANUAL_SUMMARY_TRACE_STORAGE_PREFIX}${encodeURIComponent(chatId)}`;
+}
+
+function notifyManualSummaryTraceUpdated(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent(MANUAL_SUMMARY_TRACE_EVENT));
+  } catch {
+    // 非浏览器环境下忽略事件通知。
+  }
+}
+
+function publishManualSummaryTrace(snapshot: ManualSummaryTraceSnapshot): void {
+  latestManualSummaryTrace = cloneManualSummaryTrace(snapshot);
+  if (snapshot.chatId && typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(
+        getManualSummaryTraceStorageKey(snapshot.chatId),
+        JSON.stringify(latestManualSummaryTrace),
+      );
+    } catch (error) {
+      dataLogger.warn('[summaryManager] 无法持久化手动总结输入输出记录，将仅保留在当前页面内存中:', error);
+    }
+  }
+  notifyManualSummaryTraceUpdated();
+}
+
+export function getLatestManualSummaryTrace(): ManualSummaryTraceSnapshot | null {
+  const chatId = readCurrentSummaryChatId();
+  if (chatId && typeof window !== 'undefined') {
+    try {
+      const stored = window.localStorage.getItem(getManualSummaryTraceStorageKey(chatId));
+      if (stored) {
+        const parsed = JSON.parse(stored) as ManualSummaryTraceSnapshot;
+        if (
+          parsed &&
+          parsed.chatId === chatId &&
+          Number.isFinite(parsed.startedAt) &&
+          Array.isArray(parsed.results)
+        ) {
+          latestManualSummaryTrace = cloneManualSummaryTrace(parsed);
+          return cloneManualSummaryTrace(latestManualSummaryTrace);
+        }
+      }
+    } catch (error) {
+      dataLogger.warn('[summaryManager] 读取手动总结输入输出记录失败:', error);
+    }
+  }
+
+  if (latestManualSummaryTrace?.chatId === chatId) {
+    return cloneManualSummaryTrace(latestManualSummaryTrace);
+  }
+  return null;
+}
+
+export function clearLatestManualSummaryTrace(): void {
+  const chatId = readCurrentSummaryChatId();
+  if (chatId && typeof window !== 'undefined') {
+    try {
+      window.localStorage.removeItem(getManualSummaryTraceStorageKey(chatId));
+    } catch (error) {
+      dataLogger.warn('[summaryManager] 清除手动总结输入输出记录失败:', error);
+    }
+  }
+  if (latestManualSummaryTrace?.chatId === chatId) {
+    latestManualSummaryTrace = null;
+  }
+  notifyManualSummaryTraceUpdated();
+}
+
+/**
+ * 粗略估算 token，仅用于同一规则下比较压缩前后大小，不等同于模型 tokenizer 的计费 token。
+ * 中文汉字按约 1 token 估算，其余字符按每 4 个约 1 token 估算。
+ */
+export function estimateApproxTokenCount(value: string): number {
+  if (!value) return 0;
+  const cjkCharacters = value.match(/[\u2E80-\u9FFF\uF900-\uFAFF]/g)?.length || 0;
+  const otherCharacters = value.length - cjkCharacters;
+  return Math.ceil(cjkCharacters + otherCharacters / 4);
 }
 
 function publishSummaryProgress(patch: Partial<SummaryProgressSnapshot>): void {
@@ -122,7 +261,7 @@ function publishSummaryProgress(patch: Partial<SummaryProgressSnapshot>): void {
     activeCharacters: patch.activeCharacters
       ? patch.activeCharacters.map(character => ({ ...character }))
       : summaryProgressSnapshot.activeCharacters,
-    results: patch.results ? patch.results.map(result => ({ ...result })) : summaryProgressSnapshot.results,
+    results: patch.results ? patch.results.map(cloneSummaryProgressResult) : summaryProgressSnapshot.results,
     updatedAt: Date.now(),
   };
   const snapshot = cloneSummaryProgressSnapshot(summaryProgressSnapshot);
@@ -927,6 +1066,7 @@ export async function executeSummary(
   targetMessageId: number,
   onProgress?: (phase: SummaryCharacterPhase) => void,
   expectedChatId?: string | null,
+  captureAudit = false,
 ): Promise<CharacterSummaryResult> {
   onProgress?.('preparing');
   dataLogger.log(`[summaryManager] 开始总结角色: ${character.displayName}`);
@@ -956,6 +1096,14 @@ export async function executeSummary(
 
     // 1. 将该人物的全部经历（包括已有阶段记忆）一次性发送给模型。
     const prompt = formatPromptForCharacter(settings.promptTemplate, sourceCharacter);
+    if (captureAudit) {
+      result.audit = {
+        sourceEntries: { ...compressionPlan.sourceEntries },
+        prompt,
+        modelOutput: '',
+        finalOutput: '',
+      };
+    }
     dataLogger.log(`[summaryManager] 构建的提示词长度: ${prompt.length}`);
 
     // 2. 调用总结 API
@@ -967,11 +1115,13 @@ export async function executeSummary(
       stream: requestSettings.stream,
     });
     const response = await requestSummaryText({ prompt, settings });
+    if (result.audit) result.audit.modelOutput = response;
     dataLogger.log(`[summaryManager] 收到响应，长度: ${response.length}`);
 
     onProgress?.('validating');
     // 3. 严格解析模型返回的多条阶段记忆 JSON
     const summaryEntries = parseSummaryResponse(response, Object.keys(compressionPlan.sourceEntries).length, compressionPlan.sourceEntries);
+    if (result.audit) result.audit.finalOutput = JSON.stringify(summaryEntries, null, 2);
 
     // 模型请求并行，但每个人物的最终重读、冲突检查和 ERA 写回必须串行。
     // 在取得写回队列后再重读，确保等待队列期间新增的经历也能被保留。
@@ -998,6 +1148,7 @@ export async function executeSummary(
       };
       const rebasedStageEntries = rebaseStageMemoryKeys(summaryEntries, getRetainedBiography(writePlan));
       result.summaryContent = JSON.stringify(rebasedStageEntries, null, 2);
+      if (result.audit) result.audit.finalOutput = result.summaryContent;
       const operations = buildBiographyCompressionOperations(
         character.characterId,
         writePlan,
@@ -1089,6 +1240,16 @@ export async function executeAllPendingSummaries(
   isSummarizing = true;
   const startedAt = Date.now();
   const resultsByIndex: Array<CharacterSummaryResult | undefined> = new Array(targetCharacters.length);
+  let manualTrace: ManualSummaryTraceSnapshot | null = source === 'manual'
+    ? {
+        chatId: resolvedTargetChatId ?? null,
+        startedAt,
+        updatedAt: startedAt,
+        completedAt: null,
+        results: [],
+      }
+    : null;
+  if (manualTrace) publishManualSummaryTrace(manualTrace);
   publishSummaryProgress({
     active: true,
     source,
@@ -1147,6 +1308,7 @@ export async function executeAllPendingSummaries(
           resolvedTargetMessageId as number,
           phase => updateCharacterPhase(character.characterId, phase),
           resolvedTargetChatId,
+          source === 'manual',
         );
       } catch (error) {
         summaryResult = {
@@ -1163,6 +1325,16 @@ export async function executeAllPendingSummaries(
         (item): item is CharacterSummaryResult => item !== undefined,
       );
       const current = getSummaryProgressSnapshot();
+      if (manualTrace) {
+        manualTrace = {
+          ...manualTrace,
+          updatedAt: Date.now(),
+          completedAt: null,
+          results: completedResults.map(cloneCharacterSummaryResult),
+        };
+        publishManualSummaryTrace(manualTrace);
+      }
+
       publishSummaryProgress({
         totalProcessed: completedResults.length,
         totalSuccess: completedResults.filter(item => item.success).length,
@@ -1185,6 +1357,15 @@ export async function executeAllPendingSummaries(
     result.totalSuccess = result.results.filter(item => item.success).length;
     result.totalFailed = result.results.filter(item => !item.success).length;
     result.success = result.totalFailed === 0 && result.totalProcessed === targetCharacters.length;
+    if (manualTrace) {
+      manualTrace = {
+        ...manualTrace,
+        updatedAt: Date.now(),
+        completedAt: Date.now(),
+        results: result.results.map(cloneCharacterSummaryResult),
+      };
+      publishManualSummaryTrace(manualTrace);
+    }
 
     // 本轮所有待处理人物都已尝试完成；后续回合会重新计算阈值和队列。
     pendingQueue = [];
@@ -1211,6 +1392,15 @@ export async function executeAllPendingSummaries(
     result.totalSuccess = result.results.filter(item => item.success).length;
     result.totalFailed = result.results.filter(item => !item.success).length;
     result.success = false;
+    if (manualTrace) {
+      manualTrace = {
+        ...manualTrace,
+        updatedAt: Date.now(),
+        completedAt: Date.now(),
+        results: result.results.map(cloneCharacterSummaryResult),
+      };
+      publishManualSummaryTrace(manualTrace);
+    }
     publishSummaryProgress({
       active: false,
       phase: 'failed',
@@ -1225,7 +1415,11 @@ export async function executeAllPendingSummaries(
     isSummarizing = false;
   }
 
-  return result;
+  return {
+    ...result,
+    // 输入输出留档单独持久化；不把完整提示词附在 UI 普通进度结果上，避免重复占用内存。
+    results: result.results.map(cloneSummaryProgressResult),
+  };
 }
 
 /**
