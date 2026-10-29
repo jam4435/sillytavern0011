@@ -111,7 +111,7 @@ describe('summaryManager biography compression', () => {
 
   it('adds a full-history safety rule to legacy custom prompts', () => {
     const prompt = formatPromptForCharacter(
-      'Custom old prompt for {{characterName}}:\n{{biographyEntries}}\nDo not rewrite recent experiences.',
+      '一次性压缩全部输入经历。不得只总结其中一部分。虽然所有输入经历都要重新组织。\nCustom old prompt for {{characterName}}:\n{{biographyEntries}}\nDo not rewrite recent experiences.',
       {
         characterId: 'character:段誉',
         displayName: '段誉',
