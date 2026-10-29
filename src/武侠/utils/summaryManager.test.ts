@@ -111,7 +111,7 @@ describe('summaryManager biography compression', () => {
 
   it('adds a full-history safety rule to legacy custom prompts', () => {
     const prompt = formatPromptForCharacter(
-      'Custom old prompt for {{characterName}}:\n{{biographyEntries}}\nDo not rewrite recent experiences.',
+      '一次性压缩全部输入经历。不得只总结其中一部分。虽然所有输入经历都要重新组织。\nCustom old prompt for {{characterName}}:\n{{biographyEntries}}\nDo not rewrite recent experiences.',
       {
         characterId: 'character:段誉',
         displayName: '段誉',
@@ -128,6 +128,9 @@ describe('summaryManager biography compression', () => {
     expect(prompt).toContain('阶段经历1-旧阶段: （1200.10.1~1200.10.5）已有阶段记忆');
     expect(prompt).toContain('【本次压缩的强制要求】');
     expect(prompt).toContain('必须将全部输入条目中的重要事实整合进返回的阶段记忆');
+    expect(prompt).toContain('单行 JSON 字符串');
+    expect(prompt).toContain('严禁写成 \\~');
+    expect(prompt).toContain('不得将小说章节号、回目编号或集数当作游戏内日期');
   });
 
   it('does not count old or titled stage memories toward the raw-entry threshold', () => {
@@ -266,6 +269,20 @@ describe('summaryManager biography compression', () => {
       '初入江湖': '（1200.11.1~1200.11.2）建立了重要关系。',
       '关系变化': '（旧记录时间不详）确认了长期立场。',
     });
+  });
+
+  it('repairs literal line breaks and invalid escaped tildes inside summary JSON strings', () => {
+    const response = String.raw`{
+  "初入江湖": "（1200.11.1\~1200.11.2）先与钟灵相遇，
+随后进入万劫谷。"
+}`;
+    expect(parseSummaryResponse(response)).toEqual({
+      初入江湖: '（1200.11.1~1200.11.2）先与钟灵相遇， 随后进入万劫谷。',
+    });
+  });
+
+  it('does not silently repair unrelated invalid JSON escapes', () => {
+    expect(() => parseSummaryResponse(String.raw`{"初入江湖":"（1200.11.1）包含非法转义\q"}`)).toThrow(/合法 JSON/);
   });
 
   it('includes parser details and a bounded response preview for invalid JSON', () => {

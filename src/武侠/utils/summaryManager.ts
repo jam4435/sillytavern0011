@@ -282,7 +282,7 @@ export function rebaseStageMemoryKeys(
     }
     seenTitles.add(title);
 
-    const cleanValue = value.trim();
+    const cleanValue = value.trim().replace(/[\u0000-\u001F\u007F]+/g, ' ');
     if (!cleanValue) throw new Error(`阶段记忆“${key}”的内容为空。`);
 
     const rebasedKey = `阶段经历${nextNumber}-${title}`;
@@ -627,11 +627,14 @@ export function formatPromptForCharacter(
     .replace(/\{\{characterName\}\}/g, character.displayName)
     .replace(/\{\{biographyEntries\}\}/g, biographyText);
 
-  // 自定义旧模板可能仍要求保留近期条目；代码现在会替换全部输入经历，因此追加强制规则防止遗漏。
+  // 只有模板已经包含全部新增格式约束时才跳过追加，避免旧版默认模板漏掉 JSON 修正规则。
   if (
     template.includes('一次性压缩全部输入经历') &&
     template.includes('不得只总结其中一部分') &&
-    template.includes('虽然所有输入经历都要重新组织')
+    template.includes('虽然所有输入经历都要重新组织') &&
+    template.includes('单行 JSON 字符串') &&
+    template.includes('严禁写成') &&
+    template.includes('不得将小说章节号、回目编号或集数当作游戏内日期')
   ) {
     return formattedPrompt;
   }
@@ -639,7 +642,7 @@ export function formatPromptForCharacter(
   return `${formattedPrompt}
 
 【本次压缩的强制要求】
-本次输入包含该人物当前全部人物经历，包括原始经历和已有阶段记忆。写回时，这些输入条目会被整体替换。必须将全部输入条目中的重要事实整合进返回的阶段记忆，不得只总结一部分，也不得要求保留未总结的原始条目。近期经历也必须纳入总结，并保留其与当前剧情有关的关键细节、个人视角和心绪。只依据输入内容，不得编造事实。输出仍须为严格合法的 JSON 对象。`;
+本次输入包含该人物当前全部人物经历，包括原始经历和已有阶段记忆。写回时，这些输入条目会被整体替换。必须将全部输入条目中的重要事实整合进返回的阶段记忆，不得只总结一部分，也不得要求保留未总结的原始条目。近期经历也必须纳入总结，并保留其与当前剧情有关的关键细节、个人视角和心绪。只依据输入内容，不得编造事实。输出仍须为严格合法的 JSON 对象。每个值必须是单行 JSON 字符串，不得在引号内部直接换行或插入控制字符；需要断句时使用普通空格。日期范围分隔符必须直接写作 ~，严禁写成 \\~。不要在 ~、中文标点或普通文字前添加反斜杠。输出前检查整个对象能被 JSON.parse 直接解析。不得将小说章节号、回目编号或集数当作游戏内日期；若输入没有可识别的游戏内日期，必须使用“（旧记录时间不详）”，不得猜测日期。`;
 }
 
 // =========================================
@@ -660,19 +663,94 @@ function formatSummaryResponsePreview(response: string): string {
 }
 
 /**
+ * 修复总结模型常见的两种 JSON 格式瑕疵：
+ * 1. 字符串内部出现未转义的真实换行/控制字符；
+ * 2. 日期范围分隔符被错误地写成 \~。
+ *
+ * 仅修复这两种可明确判定的格式问题；其他非法 JSON 仍交由 JSON.parse 报错，
+ * 不尝试猜测或重写模型生成的内容。
+ */
+function normalizeSummaryJsonResponse(response: string): { text: string; repairs: string[] } {
+  let inString = false;
+  let escaped = false;
+  let text = '';
+  const repairs = new Set<string>();
+
+  for (let index = 0; index < response.length; index += 1) {
+    const character = response[index];
+
+    if (!inString) {
+      text += character;
+      if (character === '"') inString = true;
+      continue;
+    }
+
+    if (escaped) {
+      if (character === '~') {
+        // ~ 不需要 JSON 转义；移除模型多加的反斜杠。
+        text += '~';
+        repairs.add('将非法的 \\~ 日期分隔符规范为 ~');
+      } else {
+        // 保留其余转义原样；若转义本身非法，JSON.parse 仍会明确报错。
+        text += '\\' + character;
+      }
+      escaped = false;
+      continue;
+    }
+
+    if (character === '\\') {
+      escaped = true;
+      continue;
+    }
+
+    if (character === '"') {
+      text += character;
+      inString = false;
+      continue;
+    }
+
+    if (character.charCodeAt(0) <= 0x1f || character.charCodeAt(0) === 0x7f) {
+      // JSON 字符串不能包含字面控制字符。人物摘要无需保留硬换行，改为空格即可。
+      text += ' ';
+      repairs.add('将 JSON 字符串内的真实换行或控制字符替换为空格');
+      continue;
+    }
+
+    text += character;
+  }
+
+  if (escaped) text += '\\';
+
+  return { text, repairs: [...repairs] };
+}
+
+/**
  * 严格解析人物经历压缩模型返回的 JSON 键值对。
  * 格式错误时直接拒绝写回，避免把解释文字或错误结构写进人物经历。
  */
 export function parseSummaryResponse(response: string, maxStageMemories?: number, sourceEntries?: Record<string, string>): Record<string, string> {
   const raw = response.trim();
+  const normalized = normalizeSummaryJsonResponse(raw);
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(normalized.text);
   } catch (error) {
     const parseMessage = error instanceof Error ? error.message : String(error);
+    const repairNote = normalized.repairs.length > 0
+      ? '；已尝试格式修复：' + normalized.repairs.join('、')
+      : '';
     throw new Error(
-      `总结模型输出不是合法 JSON。解析器错误：${parseMessage}；响应长度：${raw.length} 字符；响应预览：${formatSummaryResponsePreview(raw)}。常见原因包括 Markdown 代码围栏、JSON 外的说明文字或输出截断。已取消写回以保护原始人物经历。`,
+      '总结模型输出不是合法 JSON。解析器错误：' + parseMessage +
+      '；响应长度：' + raw.length + ' 字符；响应预览：' + formatSummaryResponsePreview(raw) +
+      repairNote + '。常见原因包括 Markdown 代码围栏、JSON 外的说明文字、非法转义或输出截断。已取消写回以保护原始人物经历。',
     );
+  }
+
+  if (normalized.repairs.length > 0) {
+    dataLogger.log('[summaryManager] 已修复总结模型响应的 JSON 格式瑕疵', {
+      repairs: normalized.repairs,
+      responseLength: raw.length,
+    });
   }
 
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
@@ -725,7 +803,7 @@ export function parseSummaryResponse(response: string, maxStageMemories?: number
       throw new Error(`阶段记忆“${key}”必须对应非空字符串。`);
     }
 
-    const cleanValue = value.trim();
+    const cleanValue = value.trim().replace(/[\u0000-\u001F\u007F]+/g, ' ');
     if (!SUMMARY_DATE_PREFIX_RE.test(cleanValue)) {
       throw new Error(
         `阶段记忆“${key}”缺少有效的游戏内时间前缀；请使用“（1200.11.1~1200.11.5）”或“（旧记录时间不详）”。`,

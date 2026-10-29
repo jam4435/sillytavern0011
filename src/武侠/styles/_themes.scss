@@ -1348,11 +1348,88 @@
 
   // 额外模型、自动总结与额外变量
   .summary-api-fields,
+  .summary-progress,
   .summary-status,
   .summary-result,
   .summary-api-status {
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 58%), var(--wuxia-ink-paper);
     border-color: var(--wuxia-ink-border);
+  }
+
+  .summary-global-progress {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.42), transparent 60%), var(--wuxia-ink-paper-strong);
+    border-color: var(--wuxia-ink-border);
+    color: var(--wuxia-ink-text-strong);
+    box-shadow: 0 8px 24px rgba(61, 48, 40, 0.16);
+  }
+
+  .summary-global-progress-header span,
+  .summary-global-progress p {
+    color: var(--wuxia-ink-text-muted);
+  }
+
+  .summary-global-progress .summary-progress-track {
+    background: rgba(61, 48, 40, 0.14);
+  }
+
+  .summary-global-progress .summary-progress-fill {
+    background: var(--ui-accent);
+  }
+
+  .summary-progress-header {
+    color: var(--wuxia-ink-text-strong);
+    border-bottom-color: var(--wuxia-ink-border-soft);
+  }
+
+  .summary-progress-counts {
+    color: var(--wuxia-ink-text);
+  }
+
+  .summary-progress-counts strong {
+    color: var(--wuxia-ink-text-strong);
+  }
+
+  .summary-progress-message,
+  .summary-progress-active-list,
+  .summary-progress-failures {
+    color: var(--wuxia-ink-text-muted);
+  }
+
+  .summary-progress-active-list li,
+  .summary-progress-failures li {
+    color: var(--wuxia-ink-text);
+  }
+
+  .summary-progress-active-list,
+  .summary-progress-failures {
+    border-top-color: var(--wuxia-ink-border-soft);
+  }
+
+  .summary-progress-track {
+    background: rgba(61, 48, 40, 0.14);
+  }
+
+  .summary-progress-fill {
+    background: var(--ui-accent);
+  }
+
+  .summary-progress-badge.running {
+    background: rgba(139, 90, 10, 0.1);
+    color: #7a4d06;
+  }
+
+  .summary-progress-badge.warning {
+    background: rgba(139, 26, 26, 0.1);
+    color: #8b1a1a;
+  }
+
+  .summary-progress-badge.success {
+    background: rgba(47, 107, 56, 0.1);
+    color: #2f6b38;
+  }
+
+  .summary-progress-error {
+    color: #8b1a1a;
   }
 
   .summary-subsection-title,
