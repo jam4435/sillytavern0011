@@ -130,6 +130,7 @@ describe('summaryManager biography compression', () => {
     expect(prompt).toContain('必须将全部输入条目中的重要事实整合进返回的阶段记忆');
     expect(prompt).toContain('单行 JSON 字符串');
     expect(prompt).toContain('严禁写成 \\~');
+    expect(prompt).toContain('不得将小说章节号、回目编号或集数当作游戏内日期');
   });
 
   it('does not count old or titled stage memories toward the raw-entry threshold', () => {
