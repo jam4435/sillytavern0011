@@ -1357,23 +1357,23 @@
   }
 
   .summary-global-progress {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.42), transparent 60%), var(--wuxia-ink-paper-strong);
-    border-color: var(--wuxia-ink-border);
-    color: var(--wuxia-ink-text-strong);
-    box-shadow: 0 8px 24px rgba(61, 48, 40, 0.16);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.5), transparent 60%), #fffdf8;
+    border-color: rgba(61, 48, 40, 0.38);
+    color: #1a1410;
+    box-shadow: 0 8px 24px rgba(61, 48, 40, 0.2);
   }
 
   .summary-global-progress-header span,
   .summary-global-progress p {
-    color: var(--wuxia-ink-text-muted);
+    color: #4a3b31;
   }
 
   .summary-global-progress .summary-progress-track {
-    background: rgba(61, 48, 40, 0.14);
+    background: rgba(61, 48, 40, 0.22);
   }
 
   .summary-global-progress .summary-progress-fill {
-    background: var(--ui-accent);
+    background: #8b1a1a;
   }
 
   .summary-progress-header {
@@ -1426,6 +1426,43 @@
   .summary-progress-badge.success {
     background: rgba(47, 107, 56, 0.1);
     color: #2f6b38;
+  }
+
+  // 人物总结进度包含长错误信息与多层次状态，使用不透明宣纸底和深墨正文，避免背景山水透出后降低对比度。
+  .summary-progress {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.5), transparent 60%), #fffdf8;
+    border-color: rgba(61, 48, 40, 0.38);
+    color: #1a1410;
+    box-shadow: 0 6px 18px rgba(61, 48, 40, 0.12);
+  }
+
+  .summary-progress-header,
+  .summary-progress-body,
+  .summary-progress-counts,
+  .summary-progress-active-list,
+  .summary-progress-failures,
+  .summary-progress-active-list li,
+  .summary-progress-failures li {
+    color: #30251e;
+  }
+
+  .summary-progress-header,
+  .summary-progress-counts strong,
+  .summary-progress-active-list > strong,
+  .summary-progress-failures > strong {
+    color: #1a1410;
+  }
+
+  .summary-progress-message {
+    color: #4a3b31;
+  }
+
+  .summary-progress-track {
+    background: rgba(61, 48, 40, 0.22);
+  }
+
+  .summary-progress-fill {
+    background: #8b1a1a;
   }
 
   .summary-progress-error {
