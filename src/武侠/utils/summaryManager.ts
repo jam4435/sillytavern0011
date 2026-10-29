@@ -148,7 +148,8 @@ function cloneCharacterSummaryResult(result: CharacterSummaryResult): CharacterS
 }
 
 function cloneSummaryProgressResult(result: CharacterSummaryResult): CharacterSummaryResult {
-  const { audit: _audit, ...progressResult } = result;
+  const progressResult = { ...result };
+  delete progressResult.audit;
   return progressResult;
 }
 
