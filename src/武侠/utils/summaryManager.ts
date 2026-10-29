@@ -822,7 +822,7 @@ export function parseSummaryResponse(response: string, maxStageMemories?: number
     const cleanValue = value.trim().replace(/[\u0000-\u001F\u007F]+/g, ' ');
     const normalizedValue = SUMMARY_DATE_PREFIX_RE.test(cleanValue)
       ? cleanValue
-      : `${missingDatePrefix} ${cleanValue}`;
+      : `${missingDatePrefix}${cleanValue}`;
     if (normalizedValue !== cleanValue) {
       dataLogger.log('[summaryManager] 自动补齐阶段记忆时间前缀', {
         key: normalizedKey,
