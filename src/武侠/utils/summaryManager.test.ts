@@ -268,6 +268,25 @@ describe('summaryManager biography compression', () => {
     });
   });
 
+  it('includes parser details and a bounded response preview for invalid JSON', () => {
+    const response = `前言：${'x'.repeat(300)}\\n尾部标记`;
+    let thrown: unknown;
+
+    try {
+      parseSummaryResponse(response);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(Error);
+    const message = (thrown as Error).message;
+    expect(message).toContain('解析器错误：');
+    expect(message).toContain('响应长度：');
+    expect(message).toContain('响应预览：');
+    expect(message).toContain('尾部标记');
+    expect(message.length).toBeLessThan(700);
+  });
+
   it('rejects non-JSON, invalid keys, missing dates, and non-contiguous stage numbers', () => {
     expect(() => parseSummaryResponse('<summary>不是 JSON</summary>')).toThrow(/合法 JSON/);
     expect(() => parseSummaryResponse('{"经历1":"（1200.11.1）内容"}')).toThrow(/键名/);
