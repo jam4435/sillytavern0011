@@ -647,8 +647,7 @@ export function formatPromptForCharacter(
 // =========================================
 
 /**
- * 严格解析人物经历压缩模型返回的 JSON 键值对。
- * 格式错误时直接拒绝写回，避免把解释文字或错误结构写进人物经历。
+ * 将无效模型响应压缩为有限预览，避免错误信息携带整段输出。
  */
 function formatSummaryResponsePreview(response: string): string {
   const compact = response
@@ -660,6 +659,10 @@ function formatSummaryResponsePreview(response: string): string {
   return `${compact.slice(0, 160)} … [中间内容省略] … ${compact.slice(-60)}`;
 }
 
+/**
+ * 严格解析人物经历压缩模型返回的 JSON 键值对。
+ * 格式错误时直接拒绝写回，避免把解释文字或错误结构写进人物经历。
+ */
 export function parseSummaryResponse(response: string, maxStageMemories?: number, sourceEntries?: Record<string, string>): Record<string, string> {
   const raw = response.trim();
   let parsed: unknown;
