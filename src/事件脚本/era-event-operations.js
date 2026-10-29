@@ -246,7 +246,7 @@ function normalizeBiographyExperienceValue(value, gameTime) {
 
   const trimmed = value.trim();
   if (BIOGRAPHY_DATE_PREFIX_RE.test(trimmed)) return value;
-  return `${formatBiographyDatePrefix(gameTime)} ${trimmed}`;
+  return `${formatBiographyDatePrefix(gameTime)}${trimmed}`;
 }
 
 function normalizeLegacyBiographyText(value, gameTime) {
