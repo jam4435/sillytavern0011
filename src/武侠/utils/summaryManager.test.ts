@@ -318,7 +318,7 @@ describe('summaryManager biography compression', () => {
     expect(parseSummaryResponse(
       '{"阶段经历1-旧事回顾":"整合了旧事。"}',
       1,
-      { 经历1: '旧存档没有日期', 经历2: '另一条旧记录' },
+      { 经历1: '(1200.11.1) 一', 经历2: '另一条旧记录没有日期' },
     )).toEqual({
       '阶段经历1-旧事回顾': '（旧记录时间不详）整合了旧事。',
     });
