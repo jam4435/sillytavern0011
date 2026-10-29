@@ -324,6 +324,13 @@ function getSourceDateBounds(sourceEntries: Record<string, string>): { start: nu
   };
 }
 
+function formatGameDateNumber(value: number): string {
+  const year = Math.floor(value / 10000);
+  const month = Math.floor(value / 100) % 100;
+  const day = value % 100;
+  return `${year}.${month}.${day}`;
+}
+
 export function buildBiographyCompressionPlan(
   biography: Record<string, string> | string | undefined,
 ): BiographyCompressionPlan | null {
@@ -634,7 +641,8 @@ export function formatPromptForCharacter(
     template.includes('虽然所有输入经历都要重新组织') &&
     template.includes('单行 JSON 字符串') &&
     template.includes('严禁写成') &&
-    template.includes('不得将小说章节号、回目编号或集数当作游戏内日期')
+    template.includes('不得将小说章节号、回目编号或集数当作游戏内日期') &&
+    template.includes('日期前缀可以省略')
   ) {
     return formattedPrompt;
   }
@@ -642,7 +650,7 @@ export function formatPromptForCharacter(
   return `${formattedPrompt}
 
 【本次压缩的强制要求】
-本次输入包含该人物当前全部人物经历，包括原始经历和已有阶段记忆。写回时，这些输入条目会被整体替换。必须将全部输入条目中的重要事实整合进返回的阶段记忆，不得只总结一部分，也不得要求保留未总结的原始条目。近期经历也必须纳入总结，并保留其与当前剧情有关的关键细节、个人视角和心绪。只依据输入内容，不得编造事实。输出仍须为严格合法的 JSON 对象。每个值必须是单行 JSON 字符串，不得在引号内部直接换行或插入控制字符；需要断句时使用普通空格。日期范围分隔符必须直接写作 ~，严禁写成 \\~。不要在 ~、中文标点或普通文字前添加反斜杠。输出前检查整个对象能被 JSON.parse 直接解析。不得将小说章节号、回目编号或集数当作游戏内日期；若输入没有可识别的游戏内日期，必须使用“（旧记录时间不详）”，不得猜测日期。`;
+本次输入包含该人物当前全部人物经历，包括原始经历和已有阶段记忆。写回时，这些输入条目会被整体替换。必须将全部输入条目中的重要事实整合进返回的阶段记忆，不得只总结一部分，也不得要求保留未总结的原始条目。近期经历也必须纳入总结，并保留其与当前剧情有关的关键细节、个人视角和心绪。只依据输入内容，不得编造事实。输出仍须为严格合法的 JSON 对象。每个值必须是单行 JSON 字符串，不得在引号内部直接换行或插入控制字符；需要断句时使用普通空格。日期前缀可以省略，不要求模型为每条阶段记忆强制生成日期。若能准确识别输入中的游戏内日期，可以给出对应日期范围，但只能沿用输入日期，不得猜测或扩展范围；若未输出有效日期前缀，程序会自动补齐缺失的时间前缀：根据本批输入中可识别的最早与最晚游戏内日期生成范围，完全没有可识别日期时使用“（旧记录时间不详）”。本条规则优先于模板中旧的、要求每条值都必须带日期前缀的说明。日期范围分隔符直接写作 ~，严禁写成反斜杠加波浪号。不要将小说章节号、回目编号或集数当作游戏内日期。输出前检查整个对象能被 JSON.parse 直接解析。`;
 }
 
 // =========================================
@@ -770,6 +778,9 @@ export function parseSummaryResponse(response: string, maxStageMemories?: number
   }
 
   const sourceDateBounds = sourceEntries ? getSourceDateBounds(sourceEntries) : null;
+  const missingDatePrefix = sourceDateBounds
+    ? `（${formatGameDateNumber(sourceDateBounds.start)}~${formatGameDateNumber(sourceDateBounds.end)}）`
+    : '（旧记录时间不详）';
   const result: Record<string, string> = {};
   const seenStageTitles = new Set<string>();
   entries.forEach(([key, value], index) => {
@@ -803,14 +814,19 @@ export function parseSummaryResponse(response: string, maxStageMemories?: number
       throw new Error(`阶段记忆“${key}”必须对应非空字符串。`);
     }
 
-    const cleanValue = value.trim().replace(/[\u0000-\u001F\u007F]+/g, ' ');
-    if (!SUMMARY_DATE_PREFIX_RE.test(cleanValue)) {
-      throw new Error(
-        `阶段记忆“${key}”缺少有效的游戏内时间前缀；请使用“（1200.11.1~1200.11.5）”或“（旧记录时间不详）”。`,
-      );
+    const cleanValue = value.trim().replace(/[\\u0000-\\u001F\\u007F]+/g, ' ');
+    const normalizedValue = SUMMARY_DATE_PREFIX_RE.test(cleanValue)
+      ? cleanValue
+      : `${missingDatePrefix} ${cleanValue}`;
+    if (normalizedValue !== cleanValue) {
+      dataLogger.log('[summaryManager] 自动补齐阶段记忆时间前缀', {
+        key: normalizedKey,
+        prefix: missingDatePrefix,
+        sourceDateBoundsAvailable: Boolean(sourceDateBounds),
+      });
     }
 
-    const outputDateRange = parseGameDateRange(cleanValue);
+    const outputDateRange = parseGameDateRange(normalizedValue);
     if (outputDateRange && sourceEntries) {
       if (!sourceDateBounds) {
         throw new Error(`阶段记忆“${key}”使用了日期，但输入经历中没有可识别的游戏内日期。`);
@@ -818,10 +834,10 @@ export function parseSummaryResponse(response: string, maxStageMemories?: number
       if (outputDateRange.start < sourceDateBounds.start || outputDateRange.end > sourceDateBounds.end) {
         throw new Error(`阶段记忆“${key}”的日期范围超出本批原始经历，已取消写回。`);
       }
-    } else if (!outputDateRange && !/^[（(](?:旧记录时间不详|时间不详)[）)]/.test(cleanValue)) {
+    } else if (!outputDateRange && !/^[（(](?:旧记录时间不详|时间不详)[）)]/.test(normalizedValue)) {
       throw new Error(`阶段记忆“${key}”的日期范围无效或结束时间早于开始时间。`);
     }
-    result[normalizedKey] = cleanValue;
+    result[normalizedKey] = normalizedValue;
   });
   return result;
 }
