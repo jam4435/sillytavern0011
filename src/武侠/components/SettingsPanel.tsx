@@ -333,6 +333,13 @@ const copyTextToClipboard = async (text: string): Promise<void> => {
   textarea.remove();
 };
 
+const formatManualSummaryAuditSource = (sourceEntries: Record<string, string>): string => {
+  const entries = Object.entries(sourceEntries);
+  return entries.length > 0
+    ? entries.map(([key, value]) => `- ${key}: ${value}`).join('\n')
+    : '（无经历记录）';
+};
+
 const clampAutoAdvanceCount = (value: number): number => {
   if (!Number.isFinite(value)) {
     return 1;
@@ -748,7 +755,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     result => Boolean(result.audit?.finalOutput || result.summaryContent),
   );
   const manualSummarySourceTokens = manualSummaryComparableAudits.reduce(
-    (total, result) => total + estimateApproxTokenCount(result.audit?.sourceText || ''),
+    (total, result) => total + estimateApproxTokenCount(
+      formatManualSummaryAuditSource(result.audit?.sourceEntries || {}),
+    ),
     0,
   );
   const manualSummaryFinalTokens = manualSummaryComparableAudits.reduce(
@@ -3613,7 +3622,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                             {result.audit ? (
                               <div className="summary-audit-character-body">
                                 <div className="summary-audit-character-metrics">
-                                  <span>原始经历：{result.audit.sourceText.length.toLocaleString()} 字符</span>
+                                  <span>
+                                    原始经历：{formatManualSummaryAuditSource(result.audit.sourceEntries).length.toLocaleString()} 字符
+                                  </span>
                                   <span>送模提示词：{result.audit.prompt.length.toLocaleString()} 字符</span>
                                   <span>模型返回：{result.audit.modelOutput.length.toLocaleString()} 字符</span>
                                   <span>阶段记忆预览：{result.audit.finalOutput.length.toLocaleString()} 字符</span>
