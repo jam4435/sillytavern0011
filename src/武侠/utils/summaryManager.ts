@@ -650,13 +650,26 @@ export function formatPromptForCharacter(
  * 严格解析人物经历压缩模型返回的 JSON 键值对。
  * 格式错误时直接拒绝写回，避免把解释文字或错误结构写进人物经历。
  */
+function formatSummaryResponsePreview(response: string): string {
+  const compact = response
+    .replace(/[\\u0000-\\u001F\\u007F]/g, ' ')
+    .replace(/\\s+/g, ' ')
+    .trim();
+  if (!compact) return '（空响应）';
+  if (compact.length <= 220) return compact;
+  return `${compact.slice(0, 160)} … [中间内容省略] … ${compact.slice(-60)}`;
+}
+
 export function parseSummaryResponse(response: string, maxStageMemories?: number, sourceEntries?: Record<string, string>): Record<string, string> {
   const raw = response.trim();
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
-  } catch {
-    throw new Error('总结模型输出不是合法 JSON；已取消写回以保护原始人物经历。');
+  } catch (error) {
+    const parseMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `总结模型输出不是合法 JSON。解析器错误：${parseMessage}；响应长度：${raw.length} 字符；响应预览：${formatSummaryResponsePreview(raw)}。常见原因包括 Markdown 代码围栏、JSON 外的说明文字或输出截断。已取消写回以保护原始人物经历。`,
+    );
   }
 
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
