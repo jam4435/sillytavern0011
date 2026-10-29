@@ -79,9 +79,14 @@ import {
   getIsSummarizing,
   getSummaryProgressSnapshot,
   subscribeSummaryProgress,
+  getLatestManualSummaryTrace,
+  clearLatestManualSummaryTrace,
+  estimateApproxTokenCount,
+  MANUAL_SUMMARY_TRACE_EVENT,
   type SummaryProgressSnapshot,
   type SummaryTriggerResult,
   type BatchSummaryResult,
+  type ManualSummaryTraceSnapshot,
 } from '../utils/summaryManager';
 import type { VariableEditorCapability } from '../utils/variableEditorPolicy';
 import {
@@ -471,6 +476,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [isSummaryRunning, setIsSummaryRunning] = useState(false);
   const [summaryProgress, setSummaryProgress] = useState<SummaryProgressSnapshot>(() => getSummaryProgressSnapshot());
   const [summaryResult, setSummaryResult] = useState<BatchSummaryResult | null>(null);
+  const [manualSummaryTrace, setManualSummaryTrace] = useState<ManualSummaryTraceSnapshot | null>(
+    () => getLatestManualSummaryTrace(),
+  );
+  const [manualSummaryTraceStatus, setManualSummaryTraceStatus] = useState('');
   const [summaryModelOptions, setSummaryModelOptions] = useState<string[]>([]);
   const [summaryModelStatus, setSummaryModelStatus] = useState('');
   const [isSummaryModelLoading, setIsSummaryModelLoading] = useState(false);
@@ -498,6 +507,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const refreshConversationSummaryTrace = useCallback(() => {
     setConversationSummaryTrace(getLatestConversationSummaryPromptTrace());
+  }, []);
+
+  const refreshManualSummaryTrace = useCallback(() => {
+    setManualSummaryTrace(getLatestManualSummaryTrace());
   }, []);
 
   const syncSmallSummaryBackfillSnapshot = useCallback(() => {
@@ -529,6 +542,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   }, [refreshSmallSummaryBackfillWorkbench, syncSmallSummaryBackfillSnapshot]);
 
   useEffect(() => subscribeSummaryProgress(setSummaryProgress), []);
+
+  useEffect(() => {
+    refreshManualSummaryTrace();
+    window.addEventListener(MANUAL_SUMMARY_TRACE_EVENT, refreshManualSummaryTrace);
+    return () => window.removeEventListener(MANUAL_SUMMARY_TRACE_EVENT, refreshManualSummaryTrace);
+  }, [refreshManualSummaryTrace]);
 
   // 变量编辑相关状态
   const [variableBaseStatData, setVariableBaseStatData] = useState<Record<string, unknown> | null>(null);
@@ -707,6 +726,35 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const summaryApiValidationMessage = hasApiDraftContent
     ? validateSummaryApiConfig(apiProfileDraft.apiConfig, { requireModel: true })
     : '';
+  const manualSummaryTraceResults = manualSummaryTrace?.results || [];
+  const manualSummaryTraceAudits = manualSummaryTraceResults.filter(result => result.audit);
+  const manualSummaryInputChars = manualSummaryTraceAudits.reduce(
+    (total, result) => total + (result.audit?.prompt.length || 0),
+    0,
+  );
+  const manualSummaryInputTokens = manualSummaryTraceAudits.reduce(
+    (total, result) => total + estimateApproxTokenCount(result.audit?.prompt || ''),
+    0,
+  );
+  const manualSummaryModelOutputChars = manualSummaryTraceAudits.reduce(
+    (total, result) => total + (result.audit?.modelOutput.length || 0),
+    0,
+  );
+  const manualSummaryModelOutputTokens = manualSummaryTraceAudits.reduce(
+    (total, result) => total + estimateApproxTokenCount(result.audit?.modelOutput || ''),
+    0,
+  );
+  const manualSummarySourceTokens = manualSummaryTraceAudits.reduce(
+    (total, result) => total + estimateApproxTokenCount(result.audit?.sourceText || ''),
+    0,
+  );
+  const manualSummaryFinalTokens = manualSummaryTraceAudits.reduce(
+    (total, result) => total + estimateApproxTokenCount(result.audit?.finalOutput || ''),
+    0,
+  );
+  const manualSummaryCompressionPercent = manualSummarySourceTokens > 0
+    ? Math.round((1 - manualSummaryFinalTokens / manualSummarySourceTokens) * 100)
+    : null;
   const smallSummaryItems = smallSummaryBackfillSnapshot?.items || [];
   const smallSummaryTotalCount = smallSummaryItems.length;
   const smallSummaryPresentCount = smallSummaryItems.filter(item => item.hasSummary).length;
