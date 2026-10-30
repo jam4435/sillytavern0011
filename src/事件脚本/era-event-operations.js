@@ -248,6 +248,7 @@ function formatBiographyDatePrefix(gameTime) {
 export function resolveEventSettlementGameTime(eventName, eventData, statData) {
   const candidates = [
     statData?.事件系统?.进行中事件?.[eventName],
+    statData?.世界事件?.[eventName]?.时间,
     getEndTime(eventData || {}),
     statData?.世界信息?.时间,
   ];
