@@ -596,6 +596,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     return () => window.removeEventListener(SUMMARY_AUDIT_TRACE_EVENT, refreshSummaryAuditTrace);
   }, [refreshSummaryAuditTrace]);
 
+  // 新的人物总结批次产生时自动展开所在设置区，让自动总结的审计结果能直接被看到。
+  useEffect(() => {
+    if (!summaryAuditTrace) return;
+    setOpenSettingBlocks(current =>
+      current.extraModelSummary ? current : { ...current, extraModelSummary: true },
+    );
+  }, [summaryAuditTrace?.startedAt]);
+
   // 变量编辑相关状态
   const [variableBaseStatData, setVariableBaseStatData] = useState<Record<string, unknown> | null>(null);
   const [statData, setStatData] = useState<Record<string, unknown> | null>(null);
