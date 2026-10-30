@@ -221,6 +221,11 @@ export function getLatestSummaryAuditTrace(): SummaryAuditTraceSnapshot | null {
           Array.isArray(parsed.results)
         ) {
           latestSummaryAuditTrace = cloneSummaryAuditTrace(parsed);
+          // 读取旧版记录时立即回存精简结构，移除历史提示词与 finalOutput 等冗余内容。
+          window.localStorage.setItem(
+            getSummaryAuditTraceStorageKey(chatId),
+            JSON.stringify(latestSummaryAuditTrace),
+          );
           return cloneSummaryAuditTrace(latestSummaryAuditTrace);
         }
       }
@@ -1389,7 +1394,7 @@ export async function executeAllPendingSummaries(
 
   return {
     ...result,
-    // 输入输出留档单独持久化；不把完整提示词附在 UI 普通进度结果上，避免重复占用内存。
+    // 输入与模型原始输出单独持久化；普通进度结果不携带审计正文。
     results: result.results.map(cloneSummaryProgressResult),
   };
 }
