@@ -94,7 +94,7 @@ export interface SummaryAuditTraceSnapshot {
   results: SummaryAuditCharacterRecord[];
 }
 
-export const SUMMARY_AUDIT_TRACE_EVENT = 'wuxia:manualSummaryTraceUpdated';
+export const SUMMARY_AUDIT_TRACE_EVENT = 'wuxia:summaryAuditTraceUpdated';
 // 保留旧版 key，确保此前已保存的手动总结记录可以继续读取。
 const SUMMARY_AUDIT_TRACE_STORAGE_PREFIX = 'wuxia.manualSummaryTrace.v1:';
 let latestSummaryAuditTrace: SummaryAuditTraceSnapshot | null = null;
@@ -222,10 +222,14 @@ export function getLatestSummaryAuditTrace(): SummaryAuditTraceSnapshot | null {
         ) {
           latestSummaryAuditTrace = cloneSummaryAuditTrace(parsed);
           // 读取旧版记录时立即回存精简结构，移除历史提示词与 finalOutput 等冗余内容。
-          window.localStorage.setItem(
-            getSummaryAuditTraceStorageKey(chatId),
-            JSON.stringify(latestSummaryAuditTrace),
-          );
+          try {
+            window.localStorage.setItem(
+              getSummaryAuditTraceStorageKey(chatId),
+              JSON.stringify(latestSummaryAuditTrace),
+            );
+          } catch (error) {
+            dataLogger.warn('[summaryManager] 无法精简旧版人物总结留档:', error);
+          }
           return cloneSummaryAuditTrace(latestSummaryAuditTrace);
         }
       }
