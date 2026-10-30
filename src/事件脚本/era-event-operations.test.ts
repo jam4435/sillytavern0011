@@ -55,6 +55,20 @@ describe('event biography date prefixes', () => {
     });
   });
 
+  it('prefers the archived actual event date when the active event record is gone', () => {
+    const archivedTime = { 年: 1202, 月: 3, 日: 15, 时: 13, 分: 30 };
+    const gameTime = resolveEventSettlementGameTime(
+      eventName,
+      { 事件结束时间: { 年: 1202, 月: 3, 日: 14, 时: 13, 分: 30 } },
+      {
+        世界信息: { 时间: { 年: 1202, 月: 3, 日: 18, 时: 9 } },
+        世界事件: { [eventName]: { 时间: archivedTime } },
+      },
+    );
+
+    expect(gameTime).toEqual(archivedTime);
+  });
+
   it('uses the event definition end date for historical events without an active record', () => {
     const plannedEndTime = { 年: 1202, 月: 3, 日: 15, 时: 13, 分: 30 };
     const gameTime = resolveEventSettlementGameTime(
