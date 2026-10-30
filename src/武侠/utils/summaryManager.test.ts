@@ -6,6 +6,7 @@ import {
   formatPromptForCharacter,
   checkSummaryTrigger,
   getBiographyEntryCount,
+  normalizeBiography,
   mergeBiographyCompression,
   runWithConcurrencyLimit,
 } from './summaryManager';
@@ -127,7 +128,7 @@ describe('summaryManager biography compression', () => {
     expect(prompt).toContain('阶段经历1-旧阶段: （1200.10.1~1200.10.5）已有阶段记忆');
     expect(prompt).toContain('【本次压缩的强制要求】');
     expect(prompt).toContain('必须将全部输入条目中的重要事实整合进返回的阶段记忆');
-    expect(prompt).toContain('单行 JSON 字符串');
+    expect(prompt).toContain('程序只解析 JSON 结构并做基本键值校验');
     expect(prompt).toContain('模型返回的键名和值按原样写回');
     expect(prompt).toContain('不要添加“阶段经历N-”编号前缀');
     expect(prompt).toContain('程序不会重命名键、清理或改写值、补写日期');
@@ -338,6 +339,8 @@ describe('summaryManager biography compression', () => {
       '$summaryStageMemoryKeys': '["初入江湖"]',
     };
     expect(getBiographyEntryCount(biography)).toBe(1);
+    const normalizedBiography = normalizeBiography(biography);
+    expect(getBiographyEntryCount(normalizedBiography)).toBe(1);
 
     const prompt = formatPromptForCharacter(
       '全部经历：{{biographyEntries}}',
@@ -345,7 +348,7 @@ describe('summaryManager biography compression', () => {
         characterId: 'character:段誉',
         displayName: '段誉',
         entriesCount: 1,
-        biography,
+        biography: normalizedBiography,
       },
     );
     expect(prompt).toContain('初入江湖: （1200.11.1~1200.11.5）已压缩阶段记忆');
