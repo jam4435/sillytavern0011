@@ -40,10 +40,10 @@ export interface SummaryTriggerResult {
 }
 
 /**
- * 手动总结审计记录：保存实际送给模型的输入、模型返回文本和最终整理后的写回内容。
- * 仅手动总结采集，自动总结不会保留完整提示词。
+ * 人物总结审计记录：保存实际送给模型的输入、模型返回文本和最终整理后的写回内容。
+ * 自动总结和手动总结均采集，且只保留当前聊天最近一次总结批次。
  */
-export interface ManualSummaryAuditRecord {
+export interface SummaryAuditRecord {
   sourceEntries: Record<string, string>;
   prompt: string;
   modelOutput: string;
@@ -60,7 +60,7 @@ export interface CharacterSummaryResult {
   originalCount: number;
   summaryContent?: string;
   error?: string;
-  audit?: ManualSummaryAuditRecord;
+  audit?: SummaryAuditRecord;
 }
 
 /**
@@ -85,18 +85,21 @@ export interface ActiveSummaryCharacter {
   phase: SummaryCharacterPhase;
 }
 
-export interface ManualSummaryTraceSnapshot {
+export interface SummaryAuditTraceSnapshot {
   /** 当前聊天 ID；无法读取时仅保留在本次页面运行内存中。 */
   chatId: string | null;
+  /** 本次总结的触发来源。 */
+  source: SummaryProgressSource;
   startedAt: number;
   updatedAt: number;
   completedAt: number | null;
   results: CharacterSummaryResult[];
 }
 
-export const MANUAL_SUMMARY_TRACE_EVENT = 'wuxia:manualSummaryTraceUpdated';
-const MANUAL_SUMMARY_TRACE_STORAGE_PREFIX = 'wuxia.manualSummaryTrace.v1:';
-let latestManualSummaryTrace: ManualSummaryTraceSnapshot | null = null;
+export const SUMMARY_AUDIT_TRACE_EVENT = 'wuxia:manualSummaryTraceUpdated';
+// 保留旧版 key，确保此前已保存的手动总结记录可以继续读取。
+const SUMMARY_AUDIT_TRACE_STORAGE_PREFIX = 'wuxia.manualSummaryTrace.v1:';
+let latestSummaryAuditTrace: SummaryAuditTraceSnapshot | null = null;
 
 export interface SummaryProgressSnapshot {
   active: boolean;
@@ -160,9 +163,11 @@ function cloneSummaryProgressSnapshot(snapshot: SummaryProgressSnapshot): Summar
   };
 }
 
-function cloneManualSummaryTrace(snapshot: ManualSummaryTraceSnapshot): ManualSummaryTraceSnapshot {
+function cloneSummaryAuditTrace(snapshot: SummaryAuditTraceSnapshot): SummaryAuditTraceSnapshot {
   return {
     ...snapshot,
+    // 旧版手动总结记录没有 source 字段，读取时按手动总结兼容。
+    source: snapshot.source === 'automatic' ? 'automatic' : 'manual',
     results: snapshot.results.map(result => {
       const cloned = cloneCharacterSummaryResult(result);
       // summaryContent 与 audit.finalOutput 内容相同；持久化时只保留一份，控制 localStorage 体积。
@@ -172,75 +177,75 @@ function cloneManualSummaryTrace(snapshot: ManualSummaryTraceSnapshot): ManualSu
   };
 }
 
-function getManualSummaryTraceStorageKey(chatId: string): string {
-  return `${MANUAL_SUMMARY_TRACE_STORAGE_PREFIX}${encodeURIComponent(chatId)}`;
+function getSummaryAuditTraceStorageKey(chatId: string): string {
+  return `${SUMMARY_AUDIT_TRACE_STORAGE_PREFIX}${encodeURIComponent(chatId)}`;
 }
 
-function notifyManualSummaryTraceUpdated(): void {
+function notifySummaryAuditTraceUpdated(): void {
   if (typeof window === 'undefined') return;
   try {
-    window.dispatchEvent(new CustomEvent(MANUAL_SUMMARY_TRACE_EVENT));
+    window.dispatchEvent(new CustomEvent(SUMMARY_AUDIT_TRACE_EVENT));
   } catch {
     // 非浏览器环境下忽略事件通知。
   }
 }
 
-function publishManualSummaryTrace(snapshot: ManualSummaryTraceSnapshot): void {
-  latestManualSummaryTrace = cloneManualSummaryTrace(snapshot);
+function publishSummaryAuditTrace(snapshot: SummaryAuditTraceSnapshot): void {
+  latestSummaryAuditTrace = cloneSummaryAuditTrace(snapshot);
   if (snapshot.chatId && typeof window !== 'undefined') {
     try {
       window.localStorage.setItem(
-        getManualSummaryTraceStorageKey(snapshot.chatId),
-        JSON.stringify(latestManualSummaryTrace),
+        getSummaryAuditTraceStorageKey(snapshot.chatId),
+        JSON.stringify(latestSummaryAuditTrace),
       );
     } catch (error) {
-      dataLogger.warn('[summaryManager] 无法持久化手动总结输入输出记录，将仅保留在当前页面内存中:', error);
+      dataLogger.warn('[summaryManager] 无法持久化人物总结输入输出记录，将仅保留在当前页面内存中:', error);
     }
   }
-  notifyManualSummaryTraceUpdated();
+  notifySummaryAuditTraceUpdated();
 }
 
-export function getLatestManualSummaryTrace(): ManualSummaryTraceSnapshot | null {
+export function getLatestSummaryAuditTrace(): SummaryAuditTraceSnapshot | null {
   const chatId = readCurrentSummaryChatId();
   if (chatId && typeof window !== 'undefined') {
     try {
-      const stored = window.localStorage.getItem(getManualSummaryTraceStorageKey(chatId));
+      const stored = window.localStorage.getItem(getSummaryAuditTraceStorageKey(chatId));
       if (stored) {
-        const parsed = JSON.parse(stored) as ManualSummaryTraceSnapshot;
+        const parsed = JSON.parse(stored) as SummaryAuditTraceSnapshot;
         if (
           parsed &&
           parsed.chatId === chatId &&
           Number.isFinite(parsed.startedAt) &&
           Array.isArray(parsed.results)
         ) {
-          latestManualSummaryTrace = cloneManualSummaryTrace(parsed);
-          return cloneManualSummaryTrace(latestManualSummaryTrace);
+          latestSummaryAuditTrace = cloneSummaryAuditTrace(parsed);
+          return cloneSummaryAuditTrace(latestSummaryAuditTrace);
         }
       }
     } catch (error) {
-      dataLogger.warn('[summaryManager] 读取手动总结输入输出记录失败:', error);
+      dataLogger.warn('[summaryManager] 读取人物总结输入输出记录失败:', error);
     }
   }
 
-  if (latestManualSummaryTrace?.chatId === chatId) {
-    return cloneManualSummaryTrace(latestManualSummaryTrace);
+  if (latestSummaryAuditTrace?.chatId === chatId) {
+    return cloneSummaryAuditTrace(latestSummaryAuditTrace);
   }
   return null;
 }
 
-export function clearLatestManualSummaryTrace(): void {
+export function clearLatestSummaryAuditTrace(): void {
   const chatId = readCurrentSummaryChatId();
   if (chatId && typeof window !== 'undefined') {
     try {
-      window.localStorage.removeItem(getManualSummaryTraceStorageKey(chatId));
+      window.localStorage.removeItem(getSummaryAuditTraceStorageKey(chatId));
     } catch (error) {
-      dataLogger.warn('[summaryManager] 清除手动总结输入输出记录失败:', error);
+      dataLogger.warn('[summaryManager] 清除人物总结输入输出记录失败:', error);
     }
   }
-  if (latestManualSummaryTrace?.chatId === chatId) {
-    latestManualSummaryTrace = null;
+  if (latestSummaryAuditTrace?.chatId === chatId) {
+    latestSummaryAuditTrace = null;
   }
-  notifyManualSummaryTraceUpdated();
+  notifySummaryAuditTraceUpdated();
 }
 
 /**
@@ -1240,16 +1245,15 @@ export async function executeAllPendingSummaries(
   isSummarizing = true;
   const startedAt = Date.now();
   const resultsByIndex: Array<CharacterSummaryResult | undefined> = new Array(targetCharacters.length);
-  let manualTrace: ManualSummaryTraceSnapshot | null = source === 'manual'
-    ? {
-        chatId: resolvedTargetChatId ?? null,
-        startedAt,
-        updatedAt: startedAt,
-        completedAt: null,
-        results: [],
-      }
-    : null;
-  if (manualTrace) publishManualSummaryTrace(manualTrace);
+  let auditTrace: SummaryAuditTraceSnapshot = {
+    chatId: resolvedTargetChatId ?? null,
+    source,
+    startedAt,
+    updatedAt: startedAt,
+    completedAt: null,
+    results: [],
+  };
+  publishSummaryAuditTrace(auditTrace);
   publishSummaryProgress({
     active: true,
     source,
@@ -1308,7 +1312,7 @@ export async function executeAllPendingSummaries(
           resolvedTargetMessageId as number,
           phase => updateCharacterPhase(character.characterId, phase),
           resolvedTargetChatId,
-          source === 'manual',
+          true,
         );
       } catch (error) {
         summaryResult = {
@@ -1325,14 +1329,14 @@ export async function executeAllPendingSummaries(
         (item): item is CharacterSummaryResult => item !== undefined,
       );
       const current = getSummaryProgressSnapshot();
-      if (manualTrace) {
-        manualTrace = {
-          ...manualTrace,
+      if (auditTrace) {
+        auditTrace = {
+          ...auditTrace,
           updatedAt: Date.now(),
           completedAt: null,
           results: completedResults.map(cloneCharacterSummaryResult),
         };
-        publishManualSummaryTrace(manualTrace);
+        publishSummaryAuditTrace(auditTrace);
       }
 
       publishSummaryProgress({
@@ -1357,14 +1361,14 @@ export async function executeAllPendingSummaries(
     result.totalSuccess = result.results.filter(item => item.success).length;
     result.totalFailed = result.results.filter(item => !item.success).length;
     result.success = result.totalFailed === 0 && result.totalProcessed === targetCharacters.length;
-    if (manualTrace) {
-      manualTrace = {
-        ...manualTrace,
+    if (auditTrace) {
+      auditTrace = {
+        ...auditTrace,
         updatedAt: Date.now(),
         completedAt: Date.now(),
         results: result.results.map(cloneCharacterSummaryResult),
       };
-      publishManualSummaryTrace(manualTrace);
+      publishSummaryAuditTrace(auditTrace);
     }
 
     // 本轮所有待处理人物都已尝试完成；后续回合会重新计算阈值和队列。
@@ -1392,14 +1396,14 @@ export async function executeAllPendingSummaries(
     result.totalSuccess = result.results.filter(item => item.success).length;
     result.totalFailed = result.results.filter(item => !item.success).length;
     result.success = false;
-    if (manualTrace) {
-      manualTrace = {
-        ...manualTrace,
+    if (auditTrace) {
+      auditTrace = {
+        ...auditTrace,
         updatedAt: Date.now(),
         completedAt: Date.now(),
         results: result.results.map(cloneCharacterSummaryResult),
       };
-      publishManualSummaryTrace(manualTrace);
+      publishSummaryAuditTrace(auditTrace);
     }
     publishSummaryProgress({
       active: false,
