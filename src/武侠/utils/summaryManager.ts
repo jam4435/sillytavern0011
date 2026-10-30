@@ -572,7 +572,7 @@ export function normalizeBiography(biography: Record<string, string> | string | 
  * @returns 格式化后的文本
  */
 function formatBiographyForPrompt(biography: Record<string, string>): string {
-  const entries = Object.entries(biography);
+  const entries = Object.entries(biography).filter(([key]) => isBiographyExperienceKey(key));
   if (entries.length === 0) return '（无经历记录）';
 
   return entries.map(([key, value]) => `- ${key}: ${value}`).join('\n');
@@ -742,19 +742,6 @@ export function formatPromptForCharacter(
 // =========================================
 // 总结执行
 // =========================================
-
-/**
- * 将无效模型响应压缩为有限预览，避免错误信息携带整段输出。
- */
-function formatSummaryResponsePreview(response: string): string {
-  const compact = response
-    .replace(/[\u0000-\u001F\u007F]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (!compact) return '（空响应）';
-  if (compact.length <= 220) return compact;
-  return `${compact.slice(0, 160)} … [中间内容省略] … ${compact.slice(-60)}`;
-}
 
 /**
  * 将无效模型响应压缩为有限预览，避免错误信息携带整段输出。
