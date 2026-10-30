@@ -3,7 +3,7 @@ import HtmlInlineScriptWebpackPlugin from 'html-inline-script-webpack-plugin';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import _ from 'lodash';
 import MiniCssExtractPlugin from 'mini-css-extract-plugin';
-import { ChildProcess, execFile, spawn } from 'node:child_process';
+import { ChildProcess, execFile, execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -32,6 +32,49 @@ interface Entry {
 type WebpackEnv = Record<string, string | boolean | undefined>;
 
 const EVENT_DATA_SOURCE_DIRECTORY = path.join(import.meta.dirname, 'src', '事件脚本', 'generated', 'event-data');
+
+function run_git_command(args: string[]) {
+  return execFileSync('git', args, {
+    cwd: import.meta.dirname,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
+}
+
+function get_git_commit() {
+  try {
+    return run_git_command(['rev-parse', 'HEAD']);
+  } catch {
+    return 'unknown';
+  }
+}
+
+function get_git_commit_watch_files() {
+  try {
+    const resolve_git_path = (target: string) =>
+      path.resolve(import.meta.dirname, run_git_command(['rev-parse', '--git-path', target]));
+    const watch_files = new Set<string>();
+
+    for (const target of ['HEAD', 'packed-refs']) {
+      const file_path = resolve_git_path(target);
+      if (fs.existsSync(file_path)) watch_files.add(file_path);
+    }
+
+    try {
+      const branch = run_git_command(['symbolic-ref', '--quiet', '--short', 'HEAD']);
+      if (branch) {
+        const branch_ref = resolve_git_path(`refs/heads/${branch}`);
+        if (fs.existsSync(branch_ref)) watch_files.add(branch_ref);
+      }
+    } catch {
+      // HEAD may be detached; the HEAD file remains a watched dependency.
+    }
+
+    return [...watch_files];
+  } catch {
+    return [];
+  }
+}
 
 class EventDataAssetPlugin {
   apply(compiler: webpack.Compiler) {
@@ -276,6 +319,8 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
     .includes('@obfuscate');
   const script_filepath = path.parse(entry.script);
   const configurationName = `${script_filepath.dir}-${script_filepath.name}`.replaceAll(/[\\/]/g, '-');
+  const is_wuxia_entry = path.normalize(entry.script).startsWith(`${path.normalize('src/武侠')}${path.sep}`);
+  const git_commit_watch_files = is_wuxia_entry ? get_git_commit_watch_files() : [];
 
   return (env, argv) => {
     const is_fast_build = env_flag_enabled(env, 'fast');
@@ -585,6 +630,15 @@ function parse_configuration(entry: Entry): (env: WebpackEnv | undefined, argv: 
           }),
           new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 1 }),
           new webpack.DefinePlugin({
+            __WUXIA_BUILD_COMMIT__: is_wuxia_entry
+              ? webpack.DefinePlugin.runtimeValue(
+                  () => JSON.stringify(get_git_commit()),
+                  {
+                    fileDependencies: git_commit_watch_files,
+                    version: get_git_commit,
+                  },
+                )
+              : JSON.stringify('unknown'),
             __VUE_OPTIONS_API__: false,
             __VUE_PROD_DEVTOOLS__: process.env.CI !== 'true',
             __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,

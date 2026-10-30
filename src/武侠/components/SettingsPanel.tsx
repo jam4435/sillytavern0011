@@ -114,8 +114,14 @@ import {
 import { Icons } from './Icons';
 import type { AutoAdvanceTurnResult, LatestDebugRound } from '../hooks';
 import { uiLogger } from '../utils/logger';
+import {
+  compareWuxiaBuildCommit,
+  fetchLatestWuxiaCommit,
+  WUXIA_BUILD_COMMIT,
+} from '../utils/versionStatus';
 
 type SettingsTab = 'appearance' | 'regex' | 'summary' | 'variables' | 'advance' | 'debug';
+type VersionIndicatorStatus = 'checking' | 'latest' | 'outdated' | 'error' | 'unknown';
 type VariableStatus = 'idle' | 'success' | 'error';
 type AutoAdvanceStatus = 'idle' | 'running' | 'stopping' | 'done' | 'error';
 type AutoAdvanceResultStatus = 'running' | 'success' | 'error';
@@ -471,6 +477,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   isGenerating = false,
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('appearance');
+  const [versionIndicatorStatus, setVersionIndicatorStatus] =
+    useState<VersionIndicatorStatus>('checking');
+  const [latestGithubCommit, setLatestGithubCommit] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [debugCopyMessage, setDebugCopyMessage] = useState('');
@@ -549,6 +558,37 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   }, [refreshSmallSummaryBackfillWorkbench, syncSmallSummaryBackfillSnapshot]);
 
   useEffect(() => subscribeSummaryProgress(setSummaryProgress), []);
+
+  useEffect(() => {
+    let isActive = true;
+    let activeController: AbortController | null = null;
+
+    const checkVersion = async () => {
+      activeController?.abort();
+      const controller = new AbortController();
+      activeController = controller;
+
+      try {
+        const latestCommit = await fetchLatestWuxiaCommit(controller.signal);
+        if (!isActive) return;
+        setLatestGithubCommit(latestCommit);
+        setVersionIndicatorStatus(compareWuxiaBuildCommit(WUXIA_BUILD_COMMIT, latestCommit));
+      } catch (error) {
+        if (!isActive || controller.signal.aborted) return;
+        console.warn('[wuxia-version] 检查 GitHub 远端版本失败:', error);
+        setVersionIndicatorStatus('error');
+      }
+    };
+
+    void checkVersion();
+    const intervalId = window.setInterval(() => void checkVersion(), 10 * 60 * 1000);
+
+    return () => {
+      isActive = false;
+      activeController?.abort();
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   useEffect(() => {
     refreshManualSummaryTrace();
@@ -2172,6 +2212,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       ]
     : [];
 
+  const versionIndicatorLabel = {
+    checking: '检查中',
+    latest: '已是最新',
+    outdated: '待更新',
+    error: '检查失败',
+    unknown: '版本未知',
+  }[versionIndicatorStatus];
+  const versionIndicatorTitle = [
+    `当前运行版本：${WUXIA_BUILD_COMMIT}`,
+    latestGithubCommit ? `GitHub main：${latestGithubCommit}` : 'GitHub main：未获取',
+  ].join('\n');
+
   return (
     <div className="settings-panel">
       {/* 设置内容区域 */}
@@ -2234,6 +2286,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               调试
             </span>
           </button>
+          <span
+            className={`settings-version-indicator settings-version-indicator--${versionIndicatorStatus}`}
+            title={versionIndicatorTitle}
+            role="status"
+            aria-live="polite"
+            data-wuxia-version-status={versionIndicatorStatus}
+          >
+            <span className="settings-version-indicator__dot" aria-hidden="true" />
+            {versionIndicatorLabel}
+          </span>
         </div>
 
         {/* 外观设置 */}

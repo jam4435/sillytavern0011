@@ -78,6 +78,46 @@
   min-width: 0;
 }
 
+.settings-version-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  align-self: center;
+  flex-shrink: 0;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-secondary);
+  font-family: $font-serif;
+  font-size: 0.7rem;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.settings-version-indicator__dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  flex: 0 0 0.4rem;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.settings-version-indicator--latest {
+  color: #15803d;
+  border-color: rgba(22, 163, 74, 0.24);
+  background: rgba(22, 163, 74, 0.08);
+}
+
+.settings-version-indicator--outdated {
+  color: #b45309;
+  border-color: rgba(217, 119, 6, 0.28);
+  background: rgba(217, 119, 6, 0.08);
+}
+
 @media (max-width: $breakpoint-md) {
   .settings-tabs {
     display: grid;
@@ -120,6 +160,14 @@
       line-height: 1.1;
       white-space: nowrap;
     }
+  }
+}
+
+@media (max-width: $breakpoint-md) {
+  .settings-version-indicator {
+    grid-column: 1 / -1;
+    justify-self: end;
+    margin-left: 0;
   }
 }
 
