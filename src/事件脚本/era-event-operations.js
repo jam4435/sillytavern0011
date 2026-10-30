@@ -241,6 +241,21 @@ function formatBiographyDatePrefix(gameTime) {
   return `（${year}.${month}.${day}）`;
 }
 
+/**
+ * 事件结算时优先使用该事件实际保存的结束时间，而不是可能已经推进到更晚日期的世界时钟。
+ * 历史事件没有“进行中”记录时退回事件定义的结束时间，最后才退回当前世界时间。
+ */
+export function resolveEventSettlementGameTime(eventName, eventData, statData) {
+  const candidates = [
+    statData?.事件系统?.进行中事件?.[eventName],
+    getEndTime(eventData || {}),
+    statData?.世界信息?.时间,
+  ];
+  return candidates.find(candidate => formatBiographyDatePrefix(candidate) !== '（旧记录时间不详）')
+    || candidates[0]
+    || undefined;
+}
+
 function normalizeBiographyExperienceValue(value, gameTime) {
   if (typeof value !== 'string' || !value.trim()) return value;
 
@@ -347,7 +362,7 @@ function getInitialParticipationActionDiff(eventData, actionKey, eventName) {
   );
 }
 
-function mergeEventActionDelta(mergedDiff, actionKey, delta, eventName, statData, sourceLabel) {
+function mergeEventActionDelta(mergedDiff, actionKey, delta, eventName, gameTime, sourceLabel) {
   if (!isPlainObject(delta) || Object.keys(delta).length === 0) {
     return;
   }
@@ -363,7 +378,7 @@ function mergeEventActionDelta(mergedDiff, actionKey, delta, eventName, statData
     const normalizedPatch = normalizeCharacterDeltaForEvent(
       delta[charName],
       eventName,
-      statData?.世界信息?.时间,
+      gameTime,
       actionKey !== 'delete',
     );
     if (actionKey === 'insert' && characterExists) {
@@ -1136,6 +1151,7 @@ export async function batchEndEvents(eventNames, eventDefinitions, options = {})
       const participationEntry = hasParticipationEntry(参与事件, eventName)
         ? getParticipationEntry(参与事件, eventName)
         : null;
+      const biographyDateTime = resolveEventSettlementGameTime(eventName, eventData, statData);
       const frozenMarkers = isPlainObject(statData?.前端变量?.事件结算进度?.[eventName]?.分支标记)
         ? normalizeBranchMarkers(statData.前端变量.事件结算进度[eventName].分支标记)
         : buildSettlementBranchSnapshot(eventName, eventData, statData);
@@ -1150,12 +1166,12 @@ export async function batchEndEvents(eventNames, eventDefinitions, options = {})
               actionKey,
               participationDelta,
               eventName,
-              statData,
+              biographyDateTime,
               `参与事件.${actionKey}`,
             );
           }
         } else {
-          mergeEventActionDelta(合并后的差分, actionKey, eventData[actionKey] || {}, eventName, statData, actionKey);
+          mergeEventActionDelta(合并后的差分, actionKey, eventData[actionKey] || {}, eventName, biographyDateTime, actionKey);
         }
       }
 
