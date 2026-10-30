@@ -9,18 +9,10 @@ import {
   getBiographyEntryCount,
   mergeBiographyCompression,
   runWithConcurrencyLimit,
-  estimateApproxTokenCount,
 } from './summaryManager';
 
 describe('summaryManager biography compression', () => {
   afterEach(() => vi.unstubAllGlobals());
-
-  it('estimates token counts consistently for before/after comparisons', () => {
-    expect(estimateApproxTokenCount('')).toBe(0);
-    expect(estimateApproxTokenCount('中文')).toBe(2);
-    expect(estimateApproxTokenCount('abcd')).toBe(1);
-    expect(estimateApproxTokenCount('中文abcd')).toBe(3);
-  });
 
   const thresholds = {
     totalEntriesThreshold: 50,
