@@ -80,8 +80,6 @@ import {
   getSummaryProgressSnapshot,
   subscribeSummaryProgress,
   getLatestSummaryAuditTrace,
-  clearLatestSummaryAuditTrace,
-  estimateApproxTokenCount,
   SUMMARY_AUDIT_TRACE_EVENT,
   type SummaryProgressSnapshot,
   type SummaryTriggerResult,
@@ -339,13 +337,6 @@ const copyTextToClipboard = async (text: string): Promise<void> => {
   textarea.remove();
 };
 
-const formatSummaryAuditSource = (sourceEntries: Record<string, string>): string => {
-  const entries = Object.entries(sourceEntries);
-  return entries.length > 0
-    ? entries.map(([key, value]) => `- ${key}: ${value}`).join('\n')
-    : '（无经历记录）';
-};
-
 const clampAutoAdvanceCount = (value: number): number => {
   if (!Number.isFinite(value)) {
     return 1;
@@ -495,7 +486,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [summaryAuditTrace, setSummaryAuditTrace] = useState<SummaryAuditTraceSnapshot | null>(
     () => getLatestSummaryAuditTrace(),
   );
-  const [summaryAuditTraceStatus, setSummaryAuditTraceStatus] = useState('');
   const [summaryModelOptions, setSummaryModelOptions] = useState<string[]>([]);
   const [summaryModelStatus, setSummaryModelStatus] = useState('');
   const [isSummaryModelLoading, setIsSummaryModelLoading] = useState(false);
@@ -598,11 +588,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   // 新的人物总结批次产生时自动展开所在设置区，让自动总结的审计结果能直接被看到。
   useEffect(() => {
-    if (summaryAuditTrace?.startedAt === undefined) return;
+    if (!summaryAuditTrace?.results.length) return;
     setOpenSettingBlocks(current =>
       current.extraModelSummary ? current : { ...current, extraModelSummary: true },
     );
-  }, [summaryAuditTrace?.startedAt]);
+  }, [summaryAuditTrace?.results.length]);
 
   // 变量编辑相关状态
   const [variableBaseStatData, setVariableBaseStatData] = useState<Record<string, unknown> | null>(null);
@@ -781,40 +771,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const summaryApiValidationMessage = hasApiDraftContent
     ? validateSummaryApiConfig(apiProfileDraft.apiConfig, { requireModel: true })
     : '';
-  const summaryAuditTraceResults = summaryAuditTrace?.results || [];
-  const summaryAuditTraceAudits = summaryAuditTraceResults.filter(result => result.audit);
-  const summaryAuditInputChars = summaryAuditTraceAudits.reduce(
-    (total, result) => total + (result.audit?.prompt.length || 0),
-    0,
-  );
-  const summaryAuditInputTokens = summaryAuditTraceAudits.reduce(
-    (total, result) => total + estimateApproxTokenCount(result.audit?.prompt || ''),
-    0,
-  );
-  const summaryAuditModelOutputChars = summaryAuditTraceAudits.reduce(
-    (total, result) => total + (result.audit?.modelOutput.length || 0),
-    0,
-  );
-  const summaryAuditModelOutputTokens = summaryAuditTraceAudits.reduce(
-    (total, result) => total + estimateApproxTokenCount(result.audit?.modelOutput || ''),
-    0,
-  );
-  const summaryAuditComparableAudits = summaryAuditTraceAudits.filter(
-    result => Boolean(result.audit?.finalOutput || result.summaryContent),
-  );
-  const summaryAuditSourceTokens = summaryAuditComparableAudits.reduce(
-    (total, result) => total + estimateApproxTokenCount(
-      formatSummaryAuditSource(result.audit?.sourceEntries || {}),
-    ),
-    0,
-  );
-  const summaryAuditFinalTokens = summaryAuditComparableAudits.reduce(
-    (total, result) => total + estimateApproxTokenCount(result.audit?.finalOutput || result.summaryContent || ''),
-    0,
-  );
-  const summaryAuditCompressionPercent = summaryAuditSourceTokens > 0
-    ? Math.round((1 - summaryAuditFinalTokens / summaryAuditSourceTokens) * 100)
-    : null;
   const smallSummaryItems = smallSummaryBackfillSnapshot?.items || [];
   const smallSummaryTotalCount = smallSummaryItems.length;
   const smallSummaryPresentCount = smallSummaryItems.filter(item => item.hasSummary).length;
@@ -1153,21 +1109,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       setVariableStatus('error');
       setVariableStatusText(`复制失败：${getErrorMessage(error)}`);
     }
-  }, []);
-
-  const handleCopySummaryAuditTraceText = useCallback(async (text: string, label: string) => {
-    try {
-      await copyTextToClipboard(text);
-      setSummaryAuditTraceStatus(`${label}已复制到剪贴板`);
-    } catch (error) {
-      setSummaryAuditTraceStatus(`复制失败：${getErrorMessage(error)}`);
-    }
-  }, []);
-
-  const handleClearSummaryAuditTrace = useCallback(() => {
-    clearLatestSummaryAuditTrace();
-    setSummaryAuditTrace(null);
-    setSummaryAuditTraceStatus('已清除当前聊天的人物总结记录');
   }, []);
 
   const updateAutoAdvanceResult = useCallback((id: string, updates: Partial<AutoAdvanceResult>) => {
@@ -3578,199 +3519,29 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   </div>
                 )}
 
-                {summaryAuditTrace && (
+                {summaryAuditTrace && summaryAuditTrace.results.length > 0 && (
                   <div className="summary-audit">
                     <div className="summary-audit-header">
-                      <div>
-                        <strong>人物总结输入 / 输出留档</strong>
-                        <span>
-                          {summaryAuditTrace.source === 'automatic' ? '自动总结' : '手动总结'}
-                          {' · '}
-                          {new Date(summaryAuditTrace.startedAt).toLocaleString()}
-                          {summaryAuditTrace.completedAt ? ' · 已结束' : ' · 进行中'}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        className="settings-action-btn"
-                        onClick={handleClearSummaryAuditTrace}
-                      >
-                        清除记录
-                      </button>
+                      <strong>人物总结输入 / 输出留档</strong>
                     </div>
-
-                    <div className="summary-audit-body">
-                      <div className="summary-audit-stats">
-                        <div>
-                          <span>实际输入提示词</span>
-                          <strong>{summaryAuditInputChars.toLocaleString()} 字符</strong>
-                          <small>约 {summaryAuditInputTokens.toLocaleString()} tokens</small>
-                        </div>
-                        <div>
-                          <span>模型返回文本</span>
-                          <strong>{summaryAuditModelOutputChars.toLocaleString()} 字符</strong>
-                          <small>约 {summaryAuditModelOutputTokens.toLocaleString()} tokens</small>
-                        </div>
-                        <div>
-                          <span>原始经历 → 阶段记忆</span>
-                          <strong>
-                            {summaryAuditSourceTokens.toLocaleString()} → {summaryAuditFinalTokens.toLocaleString()} tokens
-                          </strong>
-                          <small>
-                            {summaryAuditCompressionPercent === null
-                              ? '暂无可比较的完整输出'
-                              : summaryAuditCompressionPercent >= 0
-                                ? `估算减少 ${summaryAuditCompressionPercent}%`
-                                : `估算增加 ${Math.abs(summaryAuditCompressionPercent)}%`}
-                          </small>
-                        </div>
-                        <div>
-                          <span>处理人物</span>
-                          <strong>{summaryAuditTraceResults.length}</strong>
-                          <small>
-                            成功 {summaryAuditTraceResults.filter(result => result.success).length}
-                            {' · '}
-                            失败 {summaryAuditTraceResults.filter(result => !result.success).length}
-                          </small>
-                        </div>
-                      </div>
-
-                      <p className="summary-audit-note">
-                        输入保存的是实际送给总结模型的完整提示词；输出保存模型返回文本及解析后的阶段记忆。
-                        每个聊天仅保留最近一次人物总结记录（自动或手动），保存在当前浏览器本地；不会写入 ERA 变量或后续剧情上下文。
-                        Token 数为统一规则下的粗略估算，不等同于服务端 tokenizer 或账单统计。
-                      </p>
-
-                      <div className="summary-audit-actions">
-                        <button
-                          type="button"
-                          className="settings-action-btn"
-                          onClick={() => void handleCopySummaryAuditTraceText(
-                            summaryAuditTraceResults.map(result =>
-                              `### ${result.displayName}\n\n${result.audit?.prompt || '（本条未生成输入提示词）'}`,
-                            ).join('\n\n---\n\n'),
-                            '全部输入',
-                          )}
-                        >
-                          复制全部输入
-                        </button>
-                        <button
-                          type="button"
-                          className="settings-action-btn"
-                          onClick={() => void handleCopySummaryAuditTraceText(
-                            summaryAuditTraceResults.map(result =>
-                              `### ${result.displayName}\n\n## 模型返回文本\n${result.audit?.modelOutput || '（无模型返回文本）'}\n\n## 阶段记忆预览\n${result.audit?.finalOutput || result.summaryContent || '（没有可用的阶段记忆输出）'}`,
-                            ).join('\n\n---\n\n'),
-                            '全部输出',
-                          )}
-                        >
-                          复制全部输出
-                        </button>
-                        <button
-                          type="button"
-                          className="settings-action-btn primary"
-                          onClick={() => void handleCopySummaryAuditTraceText(
-                            JSON.stringify(summaryAuditTrace, null, 2),
-                            '完整对比 JSON',
-                          )}
-                        >
-                          复制完整对比 JSON
-                        </button>
-                      </div>
-                      {summaryAuditTraceStatus && (
-                        <p className="summary-audit-status">{summaryAuditTraceStatus}</p>
-                      )}
-
-                      <div className="summary-audit-characters">
-                        {summaryAuditTraceResults.map(result => (
-                          <details className="summary-audit-character" key={result.characterId}>
-                            <summary>
-                              <strong>{result.displayName}</strong>
-                              <span>
-                                {result.success ? '总结成功' : '总结失败'}
-                                {result.audit ? ` · 输入 ${result.audit.prompt.length.toLocaleString()} 字符` : ''}
-                              </span>
-                            </summary>
-                            {result.audit ? (
-                              <div className="summary-audit-character-body">
-                                <div className="summary-audit-character-metrics">
-                                  <span>
-                                    原始经历：{formatSummaryAuditSource(result.audit.sourceEntries).length.toLocaleString()} 字符
-                                  </span>
-                                  <span>送模提示词：{result.audit.prompt.length.toLocaleString()} 字符</span>
-                                  <span>模型返回：{result.audit.modelOutput.length.toLocaleString()} 字符</span>
-                                  <span>阶段记忆预览：{result.audit.finalOutput.length.toLocaleString()} 字符</span>
-                                </div>
-                                <div className="summary-audit-actions">
-                                  <button
-                                    type="button"
-                                    className="settings-action-btn"
-                                    onClick={() => void handleCopySummaryAuditTraceText(
-                                      JSON.stringify(result.audit?.sourceEntries || {}, null, 2),
-                                      `${result.displayName}原始经历`,
-                                    )}
-                                  >
-                                    复制原始经历
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="settings-action-btn"
-                                    onClick={() => void handleCopySummaryAuditTraceText(
-                                      result.audit?.prompt || '',
-                                      `${result.displayName}输入`,
-                                    )}
-                                  >
-                                    复制输入提示词
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="settings-action-btn"
-                                    onClick={() => void handleCopySummaryAuditTraceText(
-                                      result.audit?.modelOutput || '',
-                                      `${result.displayName}模型输出`,
-                                    )}
-                                  >
-                                    复制模型输出
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="settings-action-btn"
-                                    onClick={() => void handleCopySummaryAuditTraceText(
-                                      result.audit?.finalOutput || result.summaryContent || '',
-                                      `${result.displayName}阶段记忆`,
-                                    )}
-                                  >
-                                    复制阶段记忆
-                                  </button>
-                                </div>
-                                <details className="summary-audit-payload">
-                                  <summary>查看原始经历</summary>
-                                  <pre>{JSON.stringify(result.audit.sourceEntries, null, 2)}</pre>
-                                </details>
-                                <details className="summary-audit-payload">
-                                  <summary>查看完整输入提示词</summary>
-                                  <pre>{result.audit.prompt}</pre>
-                                </details>
-                                <details className="summary-audit-payload">
-                                  <summary>查看模型返回文本</summary>
-                                  <pre>{result.audit.modelOutput || '（请求失败或模型未返回文本）'}</pre>
-                                </details>
-                                <details className="summary-audit-payload">
-                                  <summary>查看阶段记忆预览</summary>
-                                  <pre>{result.audit.finalOutput || result.summaryContent || '（尚无可用输出）'}</pre>
-                                </details>
-                                {!result.success && result.error && (
-                                  <p className="summary-audit-error">失败原因：{result.error}</p>
-                                )}
-                              </div>
-                            ) : (
-                              <p className="summary-audit-error">
-                                {result.error || '未生成可供检查的输入输出记录。'}
-                              </p>
-                            )}
-                          </details>
-                        ))}
-                      </div>
+                    <div className="summary-audit-characters">
+                      {summaryAuditTrace.results.map(result => (
+                        <details className="summary-audit-character" key={result.characterId}>
+                          <summary>
+                            <strong>{result.displayName}</strong>
+                          </summary>
+                          <div className="summary-audit-character-body">
+                            <section className="summary-audit-memory">
+                              <strong>输入记忆（sourceEntries）</strong>
+                              <pre>{JSON.stringify(result.sourceEntries, null, 2)}</pre>
+                            </section>
+                            <section className="summary-audit-memory">
+                              <strong>输出记忆（modelOutput）</strong>
+                              <pre>{result.modelOutput || '（模型未返回输出）'}</pre>
+                            </section>
+                          </div>
+                        </details>
+                      ))}
                     </div>
                   </div>
                 )}
