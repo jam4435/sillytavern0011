@@ -4,7 +4,6 @@ import {
   buildBiographyCompressionOperations,
   parseSummaryResponse,
   formatPromptForCharacter,
-  rebaseStageMemoryKeys,
   checkSummaryTrigger,
   getBiographyEntryCount,
   mergeBiographyCompression,
@@ -129,10 +128,10 @@ describe('summaryManager biography compression', () => {
     expect(prompt).toContain('【本次压缩的强制要求】');
     expect(prompt).toContain('必须将全部输入条目中的重要事实整合进返回的阶段记忆');
     expect(prompt).toContain('单行 JSON 字符串');
-    expect(prompt).toContain('日期前缀可以省略');
-    expect(prompt).toContain('程序会自动补齐缺失的时间前缀');
-    expect(prompt).toContain('严禁写成反斜杠加波浪号');
-    expect(prompt).toContain('不得将小说章节号、回目编号或集数当作游戏内日期');
+    expect(prompt).toContain('模型返回的键名和值按原样写回');
+    expect(prompt).toContain('不要添加“阶段经历N-”编号前缀');
+    expect(prompt).toContain('程序不会重命名键、清理或改写值、补写日期');
+    expect(prompt).not.toContain('程序会自动补齐缺失的时间前缀');
   });
 
   it('does not count old or titled stage memories toward the raw-entry threshold', () => {
@@ -171,8 +170,9 @@ describe('summaryManager biography compression', () => {
     });
 
     expect(merged).toEqual({
-      '阶段经历1-初入江湖': '（1200.10.1~1200.11.3）前期经历的完整阶段记忆。',
-      '阶段经历2-关系变化': '（1200.11.4~1200.11.10）后续经历的完整阶段记忆。',
+      '初入江湖': '（1200.10.1~1200.11.3）前期经历的完整阶段记忆。',
+      '关系变化': '（1200.11.4~1200.11.10）后续经历的完整阶段记忆。',
+      '$summaryStageMemoryKeys': '["初入江湖","关系变化"]',
     });
     expect(getBiographyEntryCount(merged)).toBe(0);
   });
@@ -207,8 +207,9 @@ describe('summaryManager biography compression', () => {
       Object.fromEntries(Object.keys(biography).map(key => [key, {}])),
     );
     expect((operations[1].payload as any).角色数据.包惜弱.人物经历).toEqual({
-      '阶段经历1-初入江湖': '（1200.10.1~1200.11.3）前期经历总结',
-      '阶段经历2-关系变化': '（1200.11.4~1200.11.10）后续经历总结',
+      '初入江湖': '（1200.10.1~1200.11.3）前期经历总结',
+      '关系变化': '（1200.11.4~1200.11.10）后续经历总结',
+      '$summaryStageMemoryKeys': '["初入江湖","关系变化"]',
     });
   });
 
@@ -226,8 +227,13 @@ describe('summaryManager biography compression', () => {
       { 初入江湖: '（1200.11.1~1200.11.11）旧经历阶段总结' },
     );
     const deleted = (operations[0].payload as any).角色数据.段誉.人物经历;
+    const inserted = (operations[1].payload as any).角色数据.段誉.人物经历;
     expect(deleted).not.toHaveProperty('经历12');
     expect(Object.keys(deleted)).toHaveLength(11);
+    expect(inserted).toEqual({
+      初入江湖: '（1200.11.1~1200.11.11）旧经历阶段总结',
+      '$summaryStageMemoryKeys': '["初入江湖"]',
+    });
   });
 
   it('replaces every legacy string biography line with stage memories in one pass', () => {
@@ -254,8 +260,9 @@ describe('summaryManager biography compression', () => {
     expect((operations[0].payload as any).user数据.人物经历).toEqual({});
     const inserted = (operations[1].payload as any).user数据.人物经历;
     expect(inserted).toEqual({
-      '阶段经历1-旧事回顾': '（1200.11.1~1200.11.4）旧记录总结',
-      '阶段经历2-人物关系': '（1200.11.5~1200.11.7）另一条阶段记忆',
+      '旧事回顾': '（1200.11.1~1200.11.4）旧记录总结',
+      '人物关系': '（1200.11.5~1200.11.7）另一条阶段记忆',
+      '$summaryStageMemoryKeys': '["旧事回顾","人物关系"]',
     });
     expect(getBiographyEntryCount(inserted)).toBe(0);
   });
@@ -273,18 +280,23 @@ describe('summaryManager biography compression', () => {
     });
   });
 
-  it('repairs literal line breaks and invalid escaped tildes inside summary JSON strings', () => {
+  it('does not repair invalid JSON or rewrite model-provided memory values', () => {
     const response = String.raw`{
-  "初入江湖": "（1200.11.1\~1200.11.2）先与钟灵相遇，
-随后进入万劫谷。"
+  "初入江湖": "  模型原样输出的内容  ",
+  "关系变化": "没有日期前缀的记忆"
 }`;
     expect(parseSummaryResponse(response)).toEqual({
-      初入江湖: '（1200.11.1~1200.11.2）先与钟灵相遇， 随后进入万劫谷。',
+      初入江湖: '  模型原样输出的内容  ',
+      关系变化: '没有日期前缀的记忆',
     });
+
+    expect(() => parseSummaryResponse(String.raw`{"初入江湖":"日期分隔符非法\\~1200.11.2"}`)).toThrow(/合法 JSON/);
+    expect(() => parseSummaryResponse('{"初入江湖":"第一行
+第二行"}')).toThrow(/合法 JSON/);
   });
 
   it('does not silently repair unrelated invalid JSON escapes', () => {
-    expect(() => parseSummaryResponse(String.raw`{"初入江湖":"（1200.11.1）包含非法转义\q"}`)).toThrow(/合法 JSON/);
+    expect(() => parseSummaryResponse(String.raw`{"初入江湖":"（1200.11.1）包含非法转义\\q"}`)).toThrow(/合法 JSON/);
   });
 
   it('includes parser details and a bounded response preview for invalid JSON', () => {
@@ -306,41 +318,47 @@ describe('summaryManager biography compression', () => {
     expect(message.length).toBeLessThan(700);
   });
 
-  it('automatically fills missing stage-memory date prefixes from source dates or the legacy fallback', () => {
-    expect(parseSummaryResponse(
-      '{"阶段经历1-补齐日期":"整合了事件。"}',
-      1,
-      { 经历1: '(1200.11.1) 一', 经历2: '(1200.11.5) 五' },
-    )).toEqual({
-      '阶段经历1-补齐日期': '（1200.11.1~1200.11.5）整合了事件。',
-    });
-
-    expect(parseSummaryResponse(
-      '{"阶段经历1-旧事回顾":"整合了旧事。"}',
-      1,
-      { 经历1: '(1200.11.1) 一', 经历2: '另一条旧记录没有日期' },
-    )).toEqual({
-      '阶段经历1-旧事回顾': '（旧记录时间不详）整合了旧事。',
-    });
+  it('keeps the model output object keys and values unchanged when parsing', () => {
+    const output = {
+      初入江湖: '（1200.11.1~1200.11.5）完整阶段记忆。',
+      关系变化: '这条模型输出没有日期，也应原样保留。',
+    };
+    const modelOutput = JSON.stringify(output);
+    expect(parseSummaryResponse(modelOutput, 2)).toEqual(output);
   });
 
-  it('rejects non-JSON, invalid keys, and non-contiguous stage numbers', () => {
+  it('rejects malformed JSON, reserved keys, invalid values, duplicate keys, and excessive output count', () => {
     expect(() => parseSummaryResponse('<summary>不是 JSON</summary>')).toThrow(/合法 JSON/);
-    expect(() => parseSummaryResponse('{"经历1":"（1200.11.1）内容"}')).toThrow(/键名/);
-    expect(() => parseSummaryResponse('{"阶段经历1-一":"（1200.11.1）一","阶段经历3-三":"（1200.11.3）三"}')).toThrow(/连续递增/);
-    expect(() => parseSummaryResponse('{"阶段经历1-一":"（1200.11.1）一","阶段经历1-重复":"（1200.11.2）二"}')).toThrow(/连续递增/);
-    expect(() => parseSummaryResponse('{"阶段经历1-一":"（1200.11.1）一","阶段经历2-二":"（1200.11.2）二"}', 1)).toThrow(/多于本批/);
-    expect(() => parseSummaryResponse(
-      '{"阶段经历1-超出范围":"（1200.11.1~1200.11.20）日期不应超出输入"}',
-      1,
-      { 经历1: '(1200.11.1) 一', 经历2: '(1200.11.5) 五' },
-    )).toThrow(/超出本批/);
-    expect(() => parseSummaryResponse(
-      '{"阶段经历1-无来源日期":"（1200.11.1）不应编造日期"}',
-      1,
-      { 经历1: '旧存档没有日期', 经历2: '另一条也没有日期' },
-    )).toThrow(/没有可识别的游戏内日期/);
+    expect(() => parseSummaryResponse('[]')).toThrow(/JSON 对象/);
+    expect(() => parseSummaryResponse('{}')).toThrow(/空 JSON 对象/);
+    expect(() => parseSummaryResponse('{"$summaryStageMemoryKeys":"[]"}')).toThrow(/保留键/);
+    expect(() => parseSummaryResponse('{"初入江湖":12}')).toThrow(/非空字符串/);
+    expect(() => parseSummaryResponse('{"初入江湖":"一","初入江湖":"二"}')).toThrow(/重复键/);
+    expect(() => parseSummaryResponse('{"初入江湖":"一","关系变化":"二"}', 1)).toThrow(/多于本批/);
   });
+
+  it('uses hidden metadata to exclude verbatim stage keys from future raw-entry counts and prompts', () => {
+    const biography = {
+      经历1: '（1200.11.1）原始经历',
+      初入江湖: '（1200.11.1~1200.11.5）已压缩阶段记忆',
+      '$summaryStageMemoryKeys': '["初入江湖"]',
+    };
+    expect(getBiographyEntryCount(biography)).toBe(1);
+
+    const prompt = formatPromptForCharacter(
+      '全部经历：{{biographyEntries}}',
+      {
+        characterId: 'character:段誉',
+        displayName: '段誉',
+        entriesCount: 1,
+        biography,
+      },
+    );
+    expect(prompt).toContain('初入江湖: （1200.11.1~1200.11.5）已压缩阶段记忆');
+    expect(prompt).toContain('经历1: （1200.11.1）原始经历');
+    expect(prompt).not.toContain('$summaryStageMemoryKeys');
+  });
+});
 
   it('rebases stage-summary-name keys into internal numbered storage keys', () => {
     expect(rebaseStageMemoryKeys({
