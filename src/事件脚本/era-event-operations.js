@@ -362,7 +362,7 @@ function getInitialParticipationActionDiff(eventData, actionKey, eventName) {
   );
 }
 
-function mergeEventActionDelta(mergedDiff, actionKey, delta, eventName, gameTime, sourceLabel) {
+function mergeEventActionDelta(mergedDiff, actionKey, delta, eventName, statData, gameTime, sourceLabel) {
   if (!isPlainObject(delta) || Object.keys(delta).length === 0) {
     return;
   }
@@ -1166,12 +1166,13 @@ export async function batchEndEvents(eventNames, eventDefinitions, options = {})
               actionKey,
               participationDelta,
               eventName,
+              statData,
               biographyDateTime,
               `参与事件.${actionKey}`,
             );
           }
         } else {
-          mergeEventActionDelta(合并后的差分, actionKey, eventData[actionKey] || {}, eventName, biographyDateTime, actionKey);
+          mergeEventActionDelta(合并后的差分, actionKey, eventData[actionKey] || {}, eventName, statData, biographyDateTime, actionKey);
         }
       }
 
