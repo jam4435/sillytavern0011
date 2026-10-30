@@ -237,6 +237,20 @@ describe('summaryManager biography compression', () => {
     });
   });
 
+  it('does not overwrite an event entry appended during summarization when the model reuses its key', () => {
+    const originalBiography = makeBiography(11);
+    const plan = buildBiographyCompressionPlan(originalBiography)!;
+    const latestBiography = {
+      ...originalBiography,
+      初入江湖: '（1200.11.12）总结期间新增的事件经历',
+    };
+    expect(() => buildBiographyCompressionOperations(
+      'character:段誉',
+      { ...plan, originalBiography: latestBiography },
+      { 初入江湖: '模型生成的阶段记忆' },
+    )).toThrow(/与总结期间新增的人物经历冲突/);
+  });
+
   it('replaces every legacy string biography line with stage memories in one pass', () => {
     const plan = buildBiographyCompressionPlan({
       条目1: '(1200.11.1) 一',
