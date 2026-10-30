@@ -3,6 +3,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getEventAssetGenerationPlan } from './lib/event-asset-build.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,8 +15,14 @@ const IGNORED_ENTRY_ROOT_DIRECTORIES = new Set([path.normalize('示例')]);
 const EVENT_SOURCE_DIRECTORY = path.join(rootDir, '世界书');
 const EVENT_DATA_DIRECTORY = path.join(rootDir, 'src', '事件脚本', 'generated', 'event-data');
 const EVENT_SUMMARY_PATH = path.join(rootDir, 'src', '武侠', 'data', '事件信息汇总.json');
+const EVENT_FRONTEND_OUTPUT_PATHS = [
+  EVENT_SUMMARY_PATH,
+  path.join(rootDir, 'src', '武侠', 'data', '后续事件地点.generated.json'),
+  path.join(rootDir, 'src', '武侠', 'data', '事件展示元数据.generated.json'),
+];
 const EVENT_GENERATOR_INPUTS = [
   path.join(rootDir, 'scripts', 'generate-wuxia-event-assets.mjs'),
+  path.join(rootDir, 'scripts', 'lib', 'event-asset-build.mjs'),
   path.join(rootDir, 'scripts', 'lib', 'wuxia-event-summary.mjs'),
   path.join(rootDir, 'src', '事件脚本', 'era-event-schema.js'),
   path.join(rootDir, 'src', 'shared', 'locationPath.js'),
@@ -35,27 +42,37 @@ function collect_files(directory, predicate) {
   return result;
 }
 
-function read_event_output_paths() {
+function read_event_frontend_output_paths() {
+  return EVENT_FRONTEND_OUTPUT_PATHS.every(file => fs.existsSync(file)) ? EVENT_FRONTEND_OUTPUT_PATHS : null;
+}
+
+function read_event_runtime_output_paths() {
   const manifestPath = path.join(EVENT_DATA_DIRECTORY, 'manifest.json');
-  if (!fs.existsSync(manifestPath) || !fs.existsSync(EVENT_SUMMARY_PATH)) return null;
+  if (!fs.existsSync(manifestPath)) return null;
   try {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    const referenced = [
-      ...(Array.isArray(manifest.shards) ? manifest.shards.map(item => item?.file) : []),
-      ...(Array.isArray(manifest.checkpoints) ? manifest.checkpoints.map(item => item?.file) : []),
-    ]
-      .filter(file => typeof file === 'string' && file.length > 0)
-      .map(file => path.join(EVENT_DATA_DIRECTORY, file));
-    const outputs = [manifestPath, EVENT_SUMMARY_PATH, ...referenced];
-    return outputs.every(fs.existsSync) ? outputs : null;
+    if (!Array.isArray(manifest.shards) || !Array.isArray(manifest.checkpoints)) return null;
+    const referencedFiles = [
+      ...manifest.shards.map(item => item?.file),
+      ...manifest.checkpoints.map(item => item?.file),
+    ];
+    if (referencedFiles.some(file => typeof file !== 'string' || file.length === 0)) return null;
+    const outputs = [manifestPath, ...referencedFiles.map(file => path.join(EVENT_DATA_DIRECTORY, file))];
+    return outputs.every(file => fs.existsSync(file)) ? outputs : null;
   } catch {
     return null;
   }
 }
 
-function get_event_asset_state() {
-  const outputs = read_event_output_paths();
-  if (!outputs) return { needsGeneration: true, reason: '生成产物缺失或 manifest 不完整' };
+function get_event_asset_state(kind) {
+  const isFrontend = kind === 'frontend';
+  const outputs = isFrontend ? read_event_frontend_output_paths() : read_event_runtime_output_paths();
+  if (!outputs) {
+    return {
+      needsGeneration: true,
+      reason: isFrontend ? '武侠前端事件数据缺失或不完整' : 'ERA 运行时事件资产缺失或 manifest 不完整',
+    };
+  }
 
   const missingInput = EVENT_GENERATOR_INPUTS.find(file => !fs.existsSync(file));
   if (missingInput) {
@@ -72,7 +89,10 @@ function get_event_asset_state() {
   if (oldestOutput < newestInput) {
     return { needsGeneration: true, reason: '事件 YAML / 地点表 / 生成器代码有更新' };
   }
-  return { needsGeneration: false, reason: '事件生成输入未变化' };
+  return {
+    needsGeneration: false,
+    reason: isFrontend ? '武侠前端事件数据未变化' : 'ERA 运行时事件数据未变化',
+  };
 }
 
 function common_path(lhs, rhs) {
@@ -253,29 +273,52 @@ function main() {
     console.log(`  - \x1b[32m${e.configName}\x1b[0m (${e.script})`);
   }
 
-  // Check if events generation is needed. Only Wuxia / event-script targets depend on it.
-  const needsEvents = uniqueMatched.some(e => e.script.includes('武侠') || e.script.includes('事件脚本'));
+  // The Wuxia UI and ERA runtime consume different generated event assets.
+  const needsWuxiaFrontendAssets = uniqueMatched.some(e => e.script.startsWith('src/武侠/'));
+  const needsEventRuntimeAssets = uniqueMatched.some(e => e.script.startsWith('src/事件脚本/'));
 
-  if (needsEvents) {
-    const eventAssetState = get_event_asset_state();
-    if (eventAssetState.needsGeneration) {
+  if (needsWuxiaFrontendAssets || needsEventRuntimeAssets) {
+    const frontendState = needsWuxiaFrontendAssets ? get_event_asset_state('frontend') : null;
+    const runtimeState = needsEventRuntimeAssets ? get_event_asset_state('runtime') : null;
+    const plan = getEventAssetGenerationPlan({
+      needsWuxiaFrontendAssets,
+      needsEventRuntimeAssets,
+      frontendNeedsGeneration: frontendState?.needsGeneration ?? false,
+      runtimeNeedsGeneration: runtimeState?.needsGeneration ?? false,
+    });
+
+    if (plan.mode !== 'none') {
+      const generatorArgs = [
+        path.join(rootDir, 'scripts', 'generate-wuxia-event-assets.mjs'),
+        ...(plan.mode === 'frontend' ? ['--frontend-only'] : []),
+        ...(plan.mode === 'runtime' ? ['--runtime-only'] : []),
+      ];
+      const labels = [
+        ...(plan.generateFrontend ? ['武侠前端事件数据'] : []),
+        ...(plan.generateRuntime ? ['ERA 运行时事件数据'] : []),
+      ];
+      const reasons = [
+        ...(plan.generateFrontend && frontendState ? [frontendState.reason] : []),
+        ...(plan.generateRuntime && runtimeState ? [runtimeState.reason] : []),
+      ];
       console.log(
-        `\x1b[36m[build:only]\x1b[0m 正在生成事件资产 (generate:events)：${eventAssetState.reason}...`,
+        `\x1b[36m[build:only]\x1b[0m 正在生成${labels.join(' + ')}：${reasons.join('；')}...`,
       );
       try {
-        execFileSync(process.execPath, [path.join(rootDir, 'scripts', 'generate-wuxia-event-assets.mjs')], {
+        execFileSync(process.execPath, generatorArgs, {
           cwd: rootDir,
           stdio: 'inherit',
         });
       } catch (err) {
-        console.error('\x1b[31m[build:only]\x1b[0m generate:events 执行失败');
+        console.error(`\x1b[31m[build:only]\x1b[0m ${labels.join(' + ')}生成失败`);
         process.exit(1);
       }
     } else {
-      console.log(`\x1b[36m[build:only]\x1b[0m 跳过 generate:events（${eventAssetState.reason}）`);
+      const reasons = [frontendState?.reason, runtimeState?.reason].filter(Boolean);
+      console.log(`\x1b[36m[build:only]\x1b[0m 跳过事件资产生成（${reasons.join('；')}）`);
     }
   } else {
-    console.log('\x1b[36m[build:only]\x1b[0m 跳过 generate:events（当前构建目标不依赖事件资产）');
+    console.log('\x1b[36m[build:only]\x1b[0m 跳过事件资产生成（当前构建目标不依赖事件资产）');
   }
 
   // Build webpack command arguments

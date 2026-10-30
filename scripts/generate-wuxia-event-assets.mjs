@@ -28,6 +28,7 @@ import {
   stripEventFileSuffix,
 } from '../src/shared/eventKey.js';
 import { totalHoursToWuxiaCalendarTime, wuxiaCalendarTimeToTotalHours } from '../src/shared/wuxiaCalendar.js';
+import { resolveEventGenerationMode } from './lib/event-asset-build.mjs';
 
 const root = process.cwd();
 const sourceRoot = path.join(root, '世界书');
@@ -583,21 +584,28 @@ function writeAssets(events, unresolvedReferences) {
 }
 
 function main() {
+  const generationMode = resolveEventGenerationMode(process.argv.slice(2));
   const { events, unresolvedReferences } = collectEvents();
-  const manifest = writeAssets(events, unresolvedReferences);
-  const openingEventSummary = writeOpeningEventSummary(events);
-  const followupLocationSources = writeFollowupLocationIndex(events);
-  const presentationEvents = writeEventPresentationIndex(events);
-  console.log(
-    `生成事件运行时资产: ${manifest.eventCount} 个事件, ${manifest.shardCount} 个分片, ${manifest.checkpoints.length} 个检查点`,
-  );
-  console.log(`同步开局事件汇总: ${openingEventSummary.length} 个普通事件`);
-  console.log(`同步后续事件地点索引: ${followupLocationSources} 个来源事件`);
-  console.log(`同步事件展示元数据: ${presentationEvents} 条`);
-  console.log(`manifest hash: ${manifest.contentHash}`);
+
+  if (generationMode.generateRuntime) {
+    const manifest = writeAssets(events, unresolvedReferences);
+    console.log(
+      `生成事件运行时资产: ${manifest.eventCount} 个事件, ${manifest.shardCount} 个分片, ${manifest.checkpoints.length} 个检查点`,
+    );
+    console.log(`manifest hash: ${manifest.contentHash}`);
+  }
+
+  if (generationMode.generateFrontend) {
+    const openingEventSummary = writeOpeningEventSummary(events);
+    const followupLocationSources = writeFollowupLocationIndex(events);
+    const presentationEvents = writeEventPresentationIndex(events);
+    console.log(`同步开局事件汇总: ${openingEventSummary.length} 个普通事件`);
+    console.log(`同步后续事件地点索引: ${followupLocationSources} 个来源事件`);
+    console.log(`同步事件展示元数据: ${presentationEvents} 条`);
+  }
+
   if (unresolvedReferences.length > 0) {
     console.warn(`警告: ${unresolvedReferences.length} 条后续事件引用在当前源文件中找不到目标，已保留为非图边。`);
   }
 }
-
 main();
