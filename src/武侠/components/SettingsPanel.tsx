@@ -492,10 +492,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [isSummaryRunning, setIsSummaryRunning] = useState(false);
   const [summaryProgress, setSummaryProgress] = useState<SummaryProgressSnapshot>(() => getSummaryProgressSnapshot());
   const [summaryResult, setSummaryResult] = useState<BatchSummaryResult | null>(null);
-  const [summaryAuditTrace, setManualSummaryTrace] = useState<SummaryAuditTraceSnapshot | null>(
+  const [summaryAuditTrace, setSummaryAuditTrace] = useState<SummaryAuditTraceSnapshot | null>(
     () => getLatestSummaryAuditTrace(),
   );
-  const [summaryAuditTraceStatus, setManualSummaryTraceStatus] = useState('');
+  const [summaryAuditTraceStatus, setSummaryAuditTraceStatus] = useState('');
   const [summaryModelOptions, setSummaryModelOptions] = useState<string[]>([]);
   const [summaryModelStatus, setSummaryModelStatus] = useState('');
   const [isSummaryModelLoading, setIsSummaryModelLoading] = useState(false);
@@ -526,7 +526,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   }, []);
 
   const refreshSummaryAuditTrace = useCallback(() => {
-    setManualSummaryTrace(getLatestSummaryAuditTrace());
+    setSummaryAuditTrace(getLatestSummaryAuditTrace());
   }, []);
 
   const syncSmallSummaryBackfillSnapshot = useCallback(() => {
@@ -1150,16 +1150,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const handleCopySummaryAuditTraceText = useCallback(async (text: string, label: string) => {
     try {
       await copyTextToClipboard(text);
-      setManualSummaryTraceStatus(`${label}已复制到剪贴板`);
+      setSummaryAuditTraceStatus(`${label}已复制到剪贴板`);
     } catch (error) {
-      setManualSummaryTraceStatus(`复制失败：${getErrorMessage(error)}`);
+      setSummaryAuditTraceStatus(`复制失败：${getErrorMessage(error)}`);
     }
   }, []);
 
   const handleClearSummaryAuditTrace = useCallback(() => {
     clearLatestSummaryAuditTrace();
-    setManualSummaryTrace(null);
-    setManualSummaryTraceStatus('已清除当前聊天的手动总结记录');
+    setSummaryAuditTrace(null);
+    setSummaryAuditTraceStatus('已清除当前聊天的人物总结记录');
   }, []);
 
   const updateAutoAdvanceResult = useCallback((id: string, updates: Partial<AutoAdvanceResult>) => {
