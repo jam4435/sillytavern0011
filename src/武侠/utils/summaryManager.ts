@@ -728,7 +728,7 @@ export function formatPromptForCharacter(
     template.includes('不得只总结其中一部分') &&
     template.includes('单行 JSON 字符串') &&
     template.includes('模型输出的键名和值会原样写回') &&
-    template.includes('日期前缀必须由模型自行提供')
+    template.includes('日期前缀必须由模型根据输入自行提供')
   ) {
     return formattedPrompt;
   }
