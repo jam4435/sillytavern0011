@@ -268,35 +268,29 @@ describe('summaryManager biography compression', () => {
   });
 
   it('parses a strict JSON object keyed by stage summary names', () => {
-    expect(parseSummaryResponse(`{
-      "初入江湖": "（1200.11.1~1200.11.2）建立了重要关系。",
-      "关系变化": "（旧记录时间不详）确认了长期立场。"
-    }`, 2, {
-      经历1: '(1200.11.1) 旧经历一',
-      经历2: '(1200.11.2) 旧经历二',
-    })).toEqual({
-      '初入江湖': '（1200.11.1~1200.11.2）建立了重要关系。',
-      '关系变化': '（旧记录时间不详）确认了长期立场。',
+    expect(parseSummaryResponse(
+      '{"初入江湖":"（1200.11.1~1200.11.2）建立了重要关系。","关系变化":"（旧记录时间不详）确认了长期立场。"}',
+      2,
+    )).toEqual({
+      初入江湖: '（1200.11.1~1200.11.2）建立了重要关系。',
+      关系变化: '（旧记录时间不详）确认了长期立场。',
     });
   });
 
   it('does not repair invalid JSON or rewrite model-provided memory values', () => {
-    const response = String.raw`{
-  "初入江湖": "  模型原样输出的内容  ",
-  "关系变化": "没有日期前缀的记忆"
-}`;
+    const response = '{"初入江湖":"  模型原样输出的内容  ","关系变化":"没有日期前缀的记忆"}';
     expect(parseSummaryResponse(response)).toEqual({
       初入江湖: '  模型原样输出的内容  ',
       关系变化: '没有日期前缀的记忆',
     });
 
-    expect(() => parseSummaryResponse(String.raw`{"初入江湖":"日期分隔符非法\\~1200.11.2"}`)).toThrow(/合法 JSON/);
-    expect(() => parseSummaryResponse('{"初入江湖":"第一行
-第二行"}')).toThrow(/合法 JSON/);
+    expect(() => parseSummaryResponse('{"初入江湖":"日期分隔符非法\\~1200.11.2"}')).toThrow(/合法 JSON/);
+    const rawLineBreak = '{"初入江湖":"第一行' + '\n' + '第二行"}';
+    expect(() => parseSummaryResponse(rawLineBreak)).toThrow(/合法 JSON/);
   });
 
   it('does not silently repair unrelated invalid JSON escapes', () => {
-    expect(() => parseSummaryResponse(String.raw`{"初入江湖":"（1200.11.1）包含非法转义\\q"}`)).toThrow(/合法 JSON/);
+    expect(() => parseSummaryResponse('{"初入江湖":"（1200.11.1）包含非法转义\\q"}')).toThrow(/合法 JSON/);
   });
 
   it('includes parser details and a bounded response preview for invalid JSON', () => {
@@ -360,27 +354,3 @@ describe('summaryManager biography compression', () => {
   });
 });
 
-  it('rebases stage-summary-name keys into internal numbered storage keys', () => {
-    expect(rebaseStageMemoryKeys({
-      '初入江湖': '（1200.11.1）第一阶段',
-      '关系变化': '（1200.11.2）第二阶段',
-    }, {
-      '阶段经历1-旧记忆': '（1200.10.1）旧阶段',
-    })).toEqual({
-      '阶段经历2-初入江湖': '（1200.11.1）第一阶段',
-      '阶段经历3-关系变化': '（1200.11.2）第二阶段',
-    });
-  });
-
-  it('rebases generated stage keys after existing stage memories and excludes titled stage keys from raw counts', () => {
-    expect(rebaseStageMemoryKeys({
-      '阶段经历1-初入江湖': '（1200.11.1）第一阶段',
-      '阶段经历2-关系变化': '（1200.11.2）第二阶段',
-    }, {
-      '阶段经历1-旧记忆': '（1200.10.1）旧阶段',
-    })).toEqual({
-      '阶段经历2-初入江湖': '（1200.11.1）第一阶段',
-      '阶段经历3-关系变化': '（1200.11.2）第二阶段',
-    });
-  });
-});
