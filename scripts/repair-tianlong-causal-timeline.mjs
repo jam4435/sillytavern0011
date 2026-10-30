@@ -134,8 +134,6 @@ for (const [index,key] of order.entries()) {
   for (const stamp of [data.触发条件,data.事件结束时间]) {
     for (const [field,min,max] of [['月',1,12],['日',1,30],['时',0,23],['分',0,59]]) assert.ok(Number.isInteger(stamp[field] ?? 0) && (stamp[field] ?? 0) >= min && (stamp[field] ?? 0) <= max, `${key}: ${field}`);
   }
-  const next = order[index+1];
-  data.后续事件 = next ? { [next]: definitions.get(next).事件引子 } : { 全书完: '群峰依旧，往事留待后人追思。' };
 }
 // NPC initialization belongs before its first actual participation or delta.
 const debutEntries = [...definitions.entries()].filter(([,data]) => data.事件类型 === '登场事件');
@@ -188,6 +186,11 @@ const recovered = definitions.get(keyFor('十七',1));
 recovered.update ||= {}; recovered.update.乔峰 ||= {};
 recovered.update.乔峰.状态 = '四处刀伤已敷药包扎，内力仍可运转，尚待调养';
 
+// Build hooks after all wording normalization, so a second run is unchanged.
+for (const [index,key] of order.entries()) {
+  const next=order[index+1];
+  definitions.get(key).后续事件=next?{[next]:definitions.get(next).事件引子}:{全书完:'群峰依旧，往事留待后人追思。'};
+}
 for (const [key,data] of definitions) put(path.join(dir,`${key}.yaml`),`${JSON.stringify(data,null,2)}\n`);
 // Remap machine references in other source entries, preserving their contents.
 for (const file of fs.readdirSync(dir).filter(f => f.endsWith('.yaml') && !f.startsWith('天龙'))) {
@@ -220,4 +223,5 @@ put(migrationPath,`${JSON.stringify(migration,null,2)}\n`);
 const planPath=path.join(root,'scripts/data/tianlong-causal-order.json');
 put(planPath,`${JSON.stringify({version:2,calendar:'360-day',accession,abdication,aliases,order},null,2)}\n`);
 if(apply){for(const[file,content]of pending)fs.writeFileSync(file,content);const oldPath=path.join(dir,oldPalmKey+'.yaml');if(fs.existsSync(oldPath))fs.unlinkSync(oldPath);}
+for (const file of pending.keys()) console.log(`${apply?'changed':'would-change'}: ${path.relative(root,file)}`);
 console.log(`${apply?'changed':'would-change'} files: ${pending.size}; retained ordinary: ${ordinary.length}; aliases: ${Object.keys(aliases).length}; order, calendar and minimum duration: PASS`);

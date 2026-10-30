@@ -1,3 +1,5 @@
+raise SystemExit('一次性内容迁移已完成，禁止复跑；当前排期请使用 scripts/repair-tianlong-causal-timeline.mjs')
+
 import json
 from pathlib import Path
 

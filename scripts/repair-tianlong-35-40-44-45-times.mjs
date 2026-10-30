@@ -1,4 +1,8 @@
 // Explicit event-detail anchors. Dry-run by default; --apply writes time blocks only.
+// Historical round-1 schedule; round 2 owns the current causal timeline.
+if (process.argv.includes('--apply')) {
+  throw new Error('旧排期已停用，请使用 scripts/repair-tianlong-causal-timeline.mjs --apply');
+}
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
