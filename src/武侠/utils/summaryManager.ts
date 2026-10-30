@@ -342,8 +342,9 @@ async function withSummaryWriteLock<T>(task: () => Promise<T>): Promise<T> {
 }
 
 const LEGACY_SUMMARY_META_KEY = '【总结】';
-// 用隐藏元数据记录哪些键来自总结模型，避免将模型原样命名的阶段记忆重新计入原始经历阈值。
+/** 人物对象上的内部索引，不属于人物经历，也不会发送给总结模型。 */
 const SUMMARY_STAGE_MEMORY_KEYS_META_KEY = '$summaryStageMemoryKeys';
+// 兼容历史版本已经写回的编号式阶段记忆。
 const COMPRESSED_BIOGRAPHY_KEY_RE = /^阶段经历(\d+)/;
 
 export interface BiographyCompressionPlan {
@@ -360,9 +361,9 @@ function isBiographyExperienceKey(key: string): boolean {
   return !key.startsWith('$') && key !== LEGACY_SUMMARY_META_KEY;
 }
 
-function getSummaryStageMemoryKeys(biography: Record<string, string>): Set<string> {
-  const raw = biography[SUMMARY_STAGE_MEMORY_KEYS_META_KEY];
-  if (!raw) return new Set();
+function getSummaryStageMemoryKeys(character: CharacterDataForSummary | undefined): Set<string> {
+  const raw = character?.[SUMMARY_STAGE_MEMORY_KEYS_META_KEY];
+  if (typeof raw !== 'string') return new Set();
   try {
     const parsed: unknown = JSON.parse(raw);
     return Array.isArray(parsed)
@@ -373,10 +374,65 @@ function getSummaryStageMemoryKeys(biography: Record<string, string>): Set<strin
   }
 }
 
-function isCountedBiographyKey(key: string, summaryStageMemoryKeys: Set<string>): boolean {
+function isCountedBiographyKey(key: string, summaryStageMemoryKeys: ReadonlySet<string>): boolean {
   return isBiographyExperienceKey(key) &&
     !isCompressedBiographyKey(key) &&
     !summaryStageMemoryKeys.has(key);
+}
+
+export interface BiographyCompressionPlan {
+  originalBiography: Record<string, string>;
+  sourceEntries: Record<string, string>;
+  sourceKeys: string[];
+}
+
+/**
+ * 构建本次压缩计划。已有阶段记忆也会随全部人物经历一起送模并整体替换。
+ */
+export function buildBiographyCompressionPlan(
+  biography: Record<string, string> | string | undefined,
+): BiographyCompressionPlan | null {
+  const originalBiography = normalizeBiography(biography);
+  const sourceEntries = Object.fromEntries(
+    Object.entries(originalBiography).filter(([key]) => isBiographyExperienceKey(key)),
+  );
+  if (Object.keys(sourceEntries).length === 0) return null;
+
+  return {
+    originalBiography,
+    sourceEntries,
+    sourceKeys: Object.keys(sourceEntries),
+  };
+}
+
+function getRetainedBiography(plan: BiographyCompressionPlan): Record<string, string> {
+  const sourceKeys = new Set(plan.sourceKeys);
+  const retained: Record<string, string> = {};
+  for (const [key, value] of Object.entries(plan.originalBiography)) {
+    if (!sourceKeys.has(key) && key !== LEGACY_SUMMARY_META_KEY) {
+      retained[key] = value;
+    }
+  }
+  return retained;
+}
+
+/**
+ * 不改写模型返回的键和值。只拒绝与总结期间新追加的经历发生键冲突的结果，
+ * 避免 ERA insert 静默保留新经历而丢弃模型输出。
+ */
+function createStageMemoryWriteback(
+  stageMemories: Record<string, string>,
+  retainedBiography: Record<string, string>,
+): Record<string, string> {
+  const conflicts = Object.keys(stageMemories).filter(key =>
+    Object.prototype.hasOwnProperty.call(retainedBiography, key),
+  );
+  if (conflicts.length > 0) {
+    throw new Error(
+      `总结模型返回的阶段记忆键与总结期间新增的人物经历冲突（${conflicts.join('、')}），已取消写回以保护新增经历；请重新执行总结。`,
+    );
+  }
+  return stageMemories;
 }
 
 export function mergeBiographyCompression(
@@ -390,8 +446,7 @@ export function mergeBiographyCompression(
   let inserted = false;
 
   for (const [key, value] of Object.entries(plan.originalBiography)) {
-    if (key === LEGACY_SUMMARY_META_KEY || key === SUMMARY_STAGE_MEMORY_KEYS_META_KEY) continue;
-
+    if (key === LEGACY_SUMMARY_META_KEY) continue;
     if (sourceKeys.has(key)) {
       if (!inserted) {
         Object.assign(result, writeback);
@@ -399,7 +454,6 @@ export function mergeBiographyCompression(
       }
       continue;
     }
-
     result[key] = value;
   }
 
@@ -410,8 +464,8 @@ export function mergeBiographyCompression(
 /**
  * 构造总结回写的 ERA 操作。
  *
- * 模型返回的阶段记忆键和值原样写回，不重编号、不改写内容。
- * 隐藏元数据只记录这些键名，用于后续阈值统计，不进入模型上下文。
+ * 模型 JSON 中的键和值直接写入人物经历，不重编号、不清理、不补日期、不二次改写。
+ * 已总结键名单独保存在人物对象的内部元数据字段中，不混入人物经历或总结提示词。
  */
 export function buildBiographyCompressionOperations(
   characterId: string,
@@ -422,27 +476,34 @@ export function buildBiographyCompressionOperations(
   const characterName = characterId.startsWith('character:')
     ? characterId.slice('character:'.length)
     : characterId;
+  const retainedBiography = getRetainedBiography(plan);
+  const writeback = createStageMemoryWriteback(stageMemories, retainedBiography);
+  const summaryStageMemoryKeys = JSON.stringify(Object.keys(stageMemories));
 
-  const makePayload = (biographyEntries: Record<string, unknown>): Record<string, unknown> => {
+  const makePayload = (
+    biographyEntries: Record<string, unknown>,
+    summaryStageMemoryKeysPatch: unknown,
+  ): Record<string, unknown> => {
+    const characterPatch = {
+      人物经历: biographyEntries,
+      [SUMMARY_STAGE_MEMORY_KEYS_META_KEY]: summaryStageMemoryKeysPatch,
+    };
     if (characterId === 'user') {
-      return { user数据: { 人物经历: biographyEntries } };
+      return { user数据: characterPatch };
     }
     return {
       角色数据: {
-        [characterName]: { 人物经历: biographyEntries },
+        [characterName]: characterPatch,
       },
     };
   };
 
-  const retainedBiography = getRetainedBiography(plan);
-  const writeback = createStageMemoryWriteback(stageMemories, retainedBiography);
-
   if (options.replaceLegacyString) {
     return [
-      { type: 'delete', payload: makePayload({}) },
+      { type: 'delete', payload: makePayload({}, {}) },
       {
         type: 'insert',
-        payload: makePayload(writeback),
+        payload: makePayload(writeback, summaryStageMemoryKeys),
       },
     ];
   }
@@ -451,16 +512,13 @@ export function buildBiographyCompressionOperations(
   if (Object.prototype.hasOwnProperty.call(plan.originalBiography, LEGACY_SUMMARY_META_KEY)) {
     keysToDelete.push(LEGACY_SUMMARY_META_KEY);
   }
-  if (Object.prototype.hasOwnProperty.call(plan.originalBiography, SUMMARY_STAGE_MEMORY_KEYS_META_KEY)) {
-    keysToDelete.push(SUMMARY_STAGE_MEMORY_KEYS_META_KEY);
-  }
   const deleteEntries = Object.fromEntries(keysToDelete.map(key => [key, {}]));
 
   return [
-    { type: 'delete', payload: makePayload(deleteEntries) },
+    { type: 'delete', payload: makePayload(deleteEntries, {}) },
     {
       type: 'insert',
-      payload: makePayload(writeback),
+      payload: makePayload(writeback, summaryStageMemoryKeys),
     },
   ];
 }
@@ -468,19 +526,22 @@ export function buildBiographyCompressionOperations(
 /**
  * 计算人物经历的条目数
  * @param biography 人物经历数据（可能是 Record 或 string）
+ * @param summaryStageMemoryKeys 已由人物总结生成的键名，不计入原始经历触发阈值
  * @returns 条目数量
  */
-export function getBiographyEntryCount(biography: Record<string, string> | string | undefined): number {
+export function getBiographyEntryCount(
+  biography: Record<string, string> | string | undefined,
+  summaryStageMemoryKeys: ReadonlySet<string> = new Set(),
+): number {
   if (!biography) return 0;
 
   if (typeof biography === 'string') {
-    // 如果是字符串，按行计数（非空行）
     return biography.split('\n').filter(line => line.trim()).length;
   }
 
-  // 兼容旧版“阶段经历N”键；新版用隐藏键名清单标记模型原样输出的阶段记忆。
-  const summaryStageMemoryKeys = getSummaryStageMemoryKeys(biography);
-  return Object.keys(biography).filter(key => isCountedBiographyKey(key, summaryStageMemoryKeys)).length;
+  return Object.keys(biography).filter(key =>
+    isCountedBiographyKey(key, summaryStageMemoryKeys),
+  ).length;
 }
 
 /**
@@ -492,7 +553,6 @@ export function normalizeBiography(biography: Record<string, string> | string | 
   if (!biography) return {};
 
   if (typeof biography === 'string') {
-    // 将字符串按行转换为 Record
     const result: Record<string, string> = {};
     const lines = biography.split('\n').filter(line => line.trim());
     lines.forEach((line, index) => {
@@ -501,12 +561,11 @@ export function normalizeBiography(biography: Record<string, string> | string | 
     return result;
   }
 
-  // 过滤掉其他特殊键，但保留总结阶段记忆的隐藏键名清单供阈值统计使用。
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(biography)) {
-    if (key === SUMMARY_STAGE_MEMORY_KEYS_META_KEY && typeof value === 'string') {
-      result[key] = value;
-    } else if (!key.startsWith('
+    if (isBiographyExperienceKey(key)) result[key] = value;
+  }
+  return result;
 }
 
 /**
@@ -558,7 +617,14 @@ export function checkSummaryTrigger(thresholds: SummaryThresholds): SummaryTrigg
       biography: Record<string, string> | string | undefined,
     ) => {
       if (!biography) return;
-      const count = getBiographyEntryCount(biography);
+      const summaryStageMemoryKeys = characterId === 'user'
+        ? getSummaryStageMemoryKeys(userData)
+        : getSummaryStageMemoryKeys(
+          (statData.角色数据 as Record<string, CharacterDataForSummary> | undefined)?.[
+            characterId.replace('character:', '')
+          ],
+        );
+      const count = getBiographyEntryCount(biography, summaryStageMemoryKeys);
 
       // 只有原始经历数严格超过单角色阈值的人物，才进入待处理名单并计入总量。
       if (count <= thresholds.perCharacterEntriesThreshold) return;
@@ -697,94 +763,26 @@ function formatSummaryResponsePreview(response: string): string {
 }
 
 /**
- * 修复总结模型常见的两种 JSON 格式瑕疵：
- * 1. 字符串内部出现未转义的真实换行/控制字符；
- * 2. 日期范围分隔符被错误地写成 \~。
+ * 严格解析模型返回的阶段记忆 JSON。
  *
- * 仅修复这两种可明确判定的格式问题；其他非法 JSON 仍交由 JSON.parse 报错，
- * 不尝试猜测或重写模型生成的内容。
+ * JSON.parse 只负责把 JSON 解码为对象；键名和值都保持模型给出的内容，
+ * 不做 trim、重命名、重编号、日期补齐或内容清洗。
  */
-function normalizeSummaryJsonResponse(response: string): { text: string; repairs: string[] } {
-  let inString = false;
-  let escaped = false;
-  let text = '';
-  const repairs = new Set<string>();
-
-  for (let index = 0; index < response.length; index += 1) {
-    const character = response[index];
-
-    if (!inString) {
-      text += character;
-      if (character === '"') inString = true;
-      continue;
-    }
-
-    if (escaped) {
-      if (character === '~') {
-        // ~ 不需要 JSON 转义；移除模型多加的反斜杠。
-        text += '~';
-        repairs.add('将非法的 \\~ 日期分隔符规范为 ~');
-      } else {
-        // 保留其余转义原样；若转义本身非法，JSON.parse 仍会明确报错。
-        text += '\\' + character;
-      }
-      escaped = false;
-      continue;
-    }
-
-    if (character === '\\') {
-      escaped = true;
-      continue;
-    }
-
-    if (character === '"') {
-      text += character;
-      inString = false;
-      continue;
-    }
-
-    if (character.charCodeAt(0) <= 0x1f || character.charCodeAt(0) === 0x7f) {
-      // JSON 字符串不能包含字面控制字符。人物摘要无需保留硬换行，改为空格即可。
-      text += ' ';
-      repairs.add('将 JSON 字符串内的真实换行或控制字符替换为空格');
-      continue;
-    }
-
-    text += character;
-  }
-
-  if (escaped) text += '\\';
-
-  return { text, repairs: [...repairs] };
-}
-
-/**
- * 严格解析人物经历压缩模型返回的 JSON 键值对。
- * 格式错误时直接拒绝写回，避免把解释文字或错误结构写进人物经历。
- */
-export function parseSummaryResponse(response: string, maxStageMemories?: number, sourceEntries?: Record<string, string>): Record<string, string> {
-  const raw = response.trim();
-  const normalized = normalizeSummaryJsonResponse(raw);
+export function parseSummaryResponse(
+  response: string,
+  maxStageMemories?: number,
+): Record<string, string> {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(normalized.text);
+    parsed = JSON.parse(response);
   } catch (error) {
     const parseMessage = error instanceof Error ? error.message : String(error);
-    const repairNote = normalized.repairs.length > 0
-      ? '；已尝试格式修复：' + normalized.repairs.join('、')
-      : '';
     throw new Error(
       '总结模型输出不是合法 JSON。解析器错误：' + parseMessage +
-      '；响应长度：' + raw.length + ' 字符；响应预览：' + formatSummaryResponsePreview(raw) +
-      repairNote + '。常见原因包括 Markdown 代码围栏、JSON 外的说明文字、非法转义或输出截断。已取消写回以保护原始人物经历。',
+      '；响应长度：' + response.length + ' 字符；响应预览：' +
+      formatSummaryResponsePreview(response) +
+      '。请只返回严格合法的 JSON 对象；已取消写回以保护原始人物经历。',
     );
-  }
-
-  if (normalized.repairs.length > 0) {
-    dataLogger.log('[summaryManager] 已修复总结模型响应的 JSON 格式瑕疵', {
-      repairs: normalized.repairs,
-      responseLength: raw.length,
-    });
   }
 
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
@@ -797,80 +795,43 @@ export function parseSummaryResponse(response: string, maxStageMemories?: number
     throw new Error(`总结模型返回了 ${entries.length} 条阶段记忆，多于本批 ${maxStageMemories} 条输入经历；已取消写回。`);
   }
 
-  // JSON.parse 会静默覆盖重复键，因此额外检查原始文本中的键数量。
-  const rawKeys = [...raw.matchAll(/"((?:\\.|[^"\\])*)"\s*:/g)];
-  if (rawKeys.length !== entries.length) {
-    throw new Error('总结 JSON 存在重复键或非预期的嵌套结构；已取消写回。');
-  }
-
-  const sourceDateBounds = sourceEntries ? getSourceDateBounds(sourceEntries) : null;
-  const sourceEntriesHaveCompleteDates = Boolean(
-    sourceEntries &&
-    Object.keys(sourceEntries).length > 0 &&
-    Object.values(sourceEntries).every(value => parseGameDateRange(value) !== null),
-  );
-  const missingDatePrefix = sourceDateBounds && sourceEntriesHaveCompleteDates
-    ? `（${formatGameDateNumber(sourceDateBounds.start)}~${formatGameDateNumber(sourceDateBounds.end)}）`
-    : '（旧记录时间不详）';
   const result: Record<string, string> = {};
-  const seenStageTitles = new Set<string>();
-  entries.forEach(([key, value], index) => {
-    const normalizedKey = key.trim();
-    const legacyMatch = normalizedKey.match(SUMMARY_STAGE_KEY_RE);
-    if (!normalizedKey) {
-      throw new Error('总结 JSON 的阶段总结名称不能为空。');
-    }
-    if (legacyMatch && Number(legacyMatch[1]) !== index + 1) {
-      throw new Error('旧版阶段经历编号必须从 1 开始，按输出顺序连续递增。');
-    }
+  for (const [key, value] of entries) {
+    if (!key.trim()) throw new Error('总结 JSON 的阶段记忆名称不能为空。');
     if (
-      !legacyMatch &&
-      (/^阶段经历\d*/.test(normalizedKey) || /^(?:经历|条目)\d+$/.test(normalizedKey))
+      key.startsWith('$') ||
+      key === LEGACY_SUMMARY_META_KEY ||
+      key === '__proto__' ||
+      key === 'constructor' ||
+      key === 'prototype'
     ) {
-      throw new Error(
-        `总结 JSON 的键名“${key}”无效；请直接使用简洁、具体的阶段总结名称，不要使用原始经历编号。`,
-      );
+      throw new Error(`总结 JSON 的键名“${key}”属于保留键，不能作为阶段记忆名称。`);
     }
-
-    const stageTitle = (legacyMatch ? legacyMatch[2] : normalizedKey)
-      .replace(/^[\s\-—–:：]+/, '')
-      .trim();
-    if (!stageTitle) throw new Error(`总结 JSON 的键名“${key}”缺少阶段总结名称。`);
-    if (seenStageTitles.has(stageTitle)) {
-      throw new Error(`总结 JSON 的阶段总结名称重复：“${stageTitle}”。`);
-    }
-    seenStageTitles.add(stageTitle);
-
     if (typeof value !== 'string' || !value.trim()) {
       throw new Error(`阶段记忆“${key}”必须对应非空字符串。`);
     }
+    Object.defineProperty(result, key, {
+      value,
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+  }
 
-    const cleanValue = value.trim().replace(/[\u0000-\u001F\u007F]+/g, ' ');
-    const normalizedValue = SUMMARY_DATE_PREFIX_RE.test(cleanValue)
-      ? cleanValue
-      : `${missingDatePrefix}${cleanValue}`;
-    if (normalizedValue !== cleanValue) {
-      dataLogger.log('[summaryManager] 自动补齐阶段记忆时间前缀', {
-        key: normalizedKey,
-        prefix: missingDatePrefix,
-        sourceDateBoundsAvailable: Boolean(sourceDateBounds),
-      });
-    }
-
-    const outputDateRange = parseGameDateRange(normalizedValue);
-    if (outputDateRange && sourceEntries) {
-      if (!sourceDateBounds) {
-        throw new Error(`阶段记忆“${key}”使用了日期，但输入经历中没有可识别的游戏内日期。`);
-      }
-      if (outputDateRange.start < sourceDateBounds.start || outputDateRange.end > sourceDateBounds.end) {
-        throw new Error(`阶段记忆“${key}”的日期范围超出本批原始经历，已取消写回。`);
-      }
-    } else if (!outputDateRange && !/^[（(](?:旧记录时间不详|时间不详)[）)]/.test(normalizedValue)) {
-      throw new Error(`阶段记忆“${key}”的日期范围无效或结束时间早于开始时间。`);
-    }
-    result[normalizedKey] = normalizedValue;
-  });
   return result;
+}
+
+function readCurrentCharacterSummaryStageMemoryKeys(characterId: string): Set<string> {
+  const variables = getVariables({ type: 'chat' }) as Record<string, unknown>;
+  const statData = variables?.stat_data as Record<string, unknown> | undefined;
+  if (!statData) return new Set();
+
+  const characterData = characterId === 'user'
+    ? statData.user数据 as CharacterDataForSummary | undefined
+    : (statData.角色数据 as Record<string, CharacterDataForSummary> | undefined)?.[
+      characterId.replace('character:', '')
+    ];
+  return getSummaryStageMemoryKeys(characterData);
 }
 
 function readCurrentCharacterBiographyValue(
@@ -966,7 +927,8 @@ export async function executeSummary(
 
   try {
     const initialBiography = readCurrentCharacterBiography(character.characterId);
-    result.originalCount = getBiographyEntryCount(initialBiography);
+    const summaryStageMemoryKeys = readCurrentCharacterSummaryStageMemoryKeys(character.characterId);
+    result.originalCount = getBiographyEntryCount(initialBiography, summaryStageMemoryKeys);
     const compressionPlan = buildBiographyCompressionPlan(initialBiography);
     if (!compressionPlan) {
       result.success = true;
@@ -1004,7 +966,7 @@ export async function executeSummary(
 
     onProgress?.('validating');
     // 3. 严格解析模型返回的多条阶段记忆 JSON
-    const summaryEntries = parseSummaryResponse(response, Object.keys(compressionPlan.sourceEntries).length, compressionPlan.sourceEntries);
+    const summaryEntries = parseSummaryResponse(response, Object.keys(compressionPlan.sourceEntries).length);
 
     // 模型请求并行，但每个人物的最终重读、冲突检查和 ERA 写回必须串行。
     // 在取得写回队列后再重读，确保等待队列期间新增的经历也能被保留。
@@ -1046,7 +1008,7 @@ export async function executeSummary(
         targetMessageId,
         characterId: character.characterId,
         deletedKeys: writePlan.sourceKeys,
-        insertedKeys: Object.keys(rebasedStageEntries),
+        insertedKeys: Object.keys(summaryEntries),
         legacyStringBiography: typeof latestRawBiography === 'string',
       });
 
