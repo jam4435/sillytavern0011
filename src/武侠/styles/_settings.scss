@@ -2911,100 +2911,17 @@
   }
 }
 
-// 手动人物总结输入 / 输出审计
+// 人物总结只展示原始输入记忆与模型原始输出记忆
 .summary-audit {
+  display: grid;
+  gap: 0.65rem;
   margin-top: 1rem;
-  border: 1px solid $stone-800;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.025);
   color: $stone-300;
 }
 
-.summary-audit-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-
-  > div {
-    display: grid;
-    gap: 0.25rem;
-    min-width: 0;
-  }
-
-  strong {
-    color: $stone-200;
-    font-size: 0.9rem;
-  }
-
-  span {
-    color: $stone-400;
-    font-size: 0.75rem;
-  }
-}
-
-.summary-audit-body {
-  display: grid;
-  gap: 0.75rem;
-  padding: 0.75rem;
-}
-
-.summary-audit-stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.65rem;
-
-  > div {
-    display: grid;
-    gap: 0.25rem;
-    min-width: 0;
-    padding: 0.65rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 4px;
-  }
-
-  span,
-  small {
-    color: $stone-400;
-    font-size: 0.75rem;
-  }
-
-  strong {
-    color: $stone-200;
-    font-size: 0.9rem;
-    overflow-wrap: anywhere;
-  }
-}
-
-.summary-audit-note,
-.summary-audit-status,
-.summary-audit-error {
-  margin: 0;
-  font-size: 0.78rem;
-  line-height: 1.55;
-  overflow-wrap: anywhere;
-}
-
-.summary-audit-note {
-  color: $stone-400;
-}
-
-.summary-audit-status {
-  color: $green-500;
-}
-
-.summary-audit-error {
-  color: $red-500;
-  padding: 0.5rem 0;
-}
-
-.summary-audit-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin: 0;
+.summary-audit-header strong {
+  color: $stone-200;
+  font-size: 0.9rem;
 }
 
 .summary-audit-characters {
@@ -3012,61 +2929,45 @@
   gap: 0.5rem;
 }
 
-.summary-audit-character,
-.summary-audit-payload {
+.summary-audit-character {
   min-width: 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 4px;
 }
 
-.summary-audit-character > summary,
-.summary-audit-payload > summary {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.75rem;
+.summary-audit-character > summary {
   padding: 0.65rem;
   cursor: pointer;
-  list-style-position: inside;
-  color: $stone-300;
+  color: $stone-200;
   font-size: 0.82rem;
   overflow-wrap: anywhere;
 }
 
-.summary-audit-character > summary strong {
-  color: $stone-200;
-}
-
-.summary-audit-character > summary span {
-  color: $stone-400;
-  text-align: right;
-}
-
 .summary-audit-character-body {
   display: grid;
-  gap: 0.65rem;
+  gap: 0.75rem;
   padding: 0.65rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.summary-audit-character-metrics {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem 0.75rem;
-  color: $stone-400;
-  font-size: 0.75rem;
+.summary-audit-memory {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
 }
 
-.summary-audit-payload {
-  background: rgba(0, 0, 0, 0.12);
+.summary-audit-memory strong {
+  color: $stone-300;
+  font-size: 0.78rem;
 }
 
-.summary-audit-payload pre {
+.summary-audit-memory pre {
   max-height: 24rem;
   margin: 0;
-  padding: 0.75rem;
+  padding: 0.65rem;
   overflow: auto;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.14);
   color: $stone-300;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.75rem;
