@@ -22,6 +22,7 @@ const EVENT_FRONTEND_OUTPUT_PATHS = [
 ];
 const EVENT_GENERATOR_INPUTS = [
   path.join(rootDir, 'scripts', 'generate-wuxia-event-assets.mjs'),
+  path.join(rootDir, 'scripts', 'lib', 'event-asset-build.mjs'),
   path.join(rootDir, 'scripts', 'lib', 'wuxia-event-summary.mjs'),
   path.join(rootDir, 'src', '事件脚本', 'era-event-schema.js'),
   path.join(rootDir, 'src', 'shared', 'locationPath.js'),
@@ -301,7 +302,7 @@ function main() {
         ...(plan.generateRuntime && runtimeState ? [runtimeState.reason] : []),
       ];
       console.log(
-        `\\x1b[36m[build:only]\\x1b[0m 正在生成${labels.join(' + ')}：${reasons.join('；')}...`,
+        `\x1b[36m[build:only]\x1b[0m 正在生成${labels.join(' + ')}：${reasons.join('；')}...`,
       );
       try {
         execFileSync(process.execPath, generatorArgs, {
@@ -309,15 +310,15 @@ function main() {
           stdio: 'inherit',
         });
       } catch (err) {
-        console.error(`\\x1b[31m[build:only]\\x1b[0m ${labels.join(' + ')}生成失败`);
+        console.error(`\x1b[31m[build:only]\x1b[0m ${labels.join(' + ')}生成失败`);
         process.exit(1);
       }
     } else {
       const reasons = [frontendState?.reason, runtimeState?.reason].filter(Boolean);
-      console.log(`\\x1b[36m[build:only]\\x1b[0m 跳过事件资产生成（${reasons.join('；')}）`);
+      console.log(`\x1b[36m[build:only]\x1b[0m 跳过事件资产生成（${reasons.join('；')}）`);
     }
   } else {
-    console.log('\\x1b[36m[build:only]\\x1b[0m 跳过事件资产生成（当前构建目标不依赖事件资产）');
+    console.log('\x1b[36m[build:only]\x1b[0m 跳过事件资产生成（当前构建目标不依赖事件资产）');
   }
 
   // Build webpack command arguments
