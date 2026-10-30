@@ -298,6 +298,6 @@ describe('summaryManager biography compression', () => {
     expect(() => parseSummaryResponse('{"阶段":1}')).toThrow(/非空字符串/);
     expect(() => parseSummaryResponse('{"$internal":"保留键"}')).toThrow(/保留键/);
     expect(() => parseSummaryResponse('{"第一段":"一","第二段":"二"}', 1)).toThrow(/多于本批/);
-    expect(() => parseSummaryResponse(String.raw`{"阶段":"日期范围\\~分隔符"}`)).toThrow(/合法 JSON/);
+    expect(() => parseSummaryResponse('{"阶段":"日期范围\\\\~分隔符"}')).toThrow(/合法 JSON/);
   });
 });
