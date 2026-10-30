@@ -356,7 +356,7 @@ function getInitialParticipationActionDiff(eventData, actionKey, eventName) {
   return Object.fromEntries(
     Object.entries(delta).map(([characterName, characterDelta]) => [
       characterName,
-      // 这里只快照参与事件的差分，不写入角色数据；等事件结算时再按结算游戏时间补齐日期。
+      // 这里只快照参与事件的差分，不写入角色数据；等事件结算时再按该事件实际结束日期补齐前缀。
       normalizeCharacterDeltaForEvent(characterDelta, eventName, undefined, false),
     ]),
   );
