@@ -598,7 +598,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   // 新的人物总结批次产生时自动展开所在设置区，让自动总结的审计结果能直接被看到。
   useEffect(() => {
-    if (!summaryAuditTrace) return;
+    if (summaryAuditTrace?.startedAt === undefined) return;
     setOpenSettingBlocks(current =>
       current.extraModelSummary ? current : { ...current, extraModelSummary: true },
     );
