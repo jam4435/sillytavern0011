@@ -131,7 +131,7 @@ describe('summaryManager biography compression', () => {
     expect(prompt).toContain('程序只解析 JSON 结构并做基本键值校验');
     expect(prompt).toContain('模型返回的键名和值按原样写回');
     expect(prompt).toContain('不要添加“阶段经历N-”编号前缀');
-    expect(prompt).toContain('程序不会重命名键、清理或改写值、补写日期');
+    expect(prompt).toContain('不会重命名键、清理或改写值、补写日期');
     expect(prompt).not.toContain('程序会自动补齐缺失的时间前缀');
   });
 
