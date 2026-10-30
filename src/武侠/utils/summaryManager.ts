@@ -755,94 +755,22 @@ function formatSummaryResponsePreview(response: string): string {
 }
 
 /**
- * 修复总结模型常见的两种 JSON 格式瑕疵：
- * 1. 字符串内部出现未转义的真实换行/控制字符；
- * 2. 日期范围分隔符被错误地写成 \~。
+ * 解析模型返回的阶段记忆 JSON 对象。
  *
- * 仅修复这两种可明确判定的格式问题；其他非法 JSON 仍交由 JSON.parse 报错，
- * 不尝试猜测或重写模型生成的内容。
+ * 这里只做 JSON 结构解码与必要的安全校验；不重命名键、不清理或改写值、
+ * 不自动补日期，也不调整模型输出的日期范围。
  */
-function normalizeSummaryJsonResponse(response: string): { text: string; repairs: string[] } {
-  let inString = false;
-  let escaped = false;
-  let text = '';
-  const repairs = new Set<string>();
-
-  for (let index = 0; index < response.length; index += 1) {
-    const character = response[index];
-
-    if (!inString) {
-      text += character;
-      if (character === '"') inString = true;
-      continue;
-    }
-
-    if (escaped) {
-      if (character === '~') {
-        // ~ 不需要 JSON 转义；移除模型多加的反斜杠。
-        text += '~';
-        repairs.add('将非法的 \\~ 日期分隔符规范为 ~');
-      } else {
-        // 保留其余转义原样；若转义本身非法，JSON.parse 仍会明确报错。
-        text += '\\' + character;
-      }
-      escaped = false;
-      continue;
-    }
-
-    if (character === '\\') {
-      escaped = true;
-      continue;
-    }
-
-    if (character === '"') {
-      text += character;
-      inString = false;
-      continue;
-    }
-
-    if (character.charCodeAt(0) <= 0x1f || character.charCodeAt(0) === 0x7f) {
-      // JSON 字符串不能包含字面控制字符。人物摘要无需保留硬换行，改为空格即可。
-      text += ' ';
-      repairs.add('将 JSON 字符串内的真实换行或控制字符替换为空格');
-      continue;
-    }
-
-    text += character;
-  }
-
-  if (escaped) text += '\\';
-
-  return { text, repairs: [...repairs] };
-}
-
-/**
- * 严格解析人物经历压缩模型返回的 JSON 键值对。
- * 格式错误时直接拒绝写回，避免把解释文字或错误结构写进人物经历。
- */
-export function parseSummaryResponse(response: string, maxStageMemories?: number, sourceEntries?: Record<string, string>): Record<string, string> {
-  const raw = response.trim();
-  const normalized = normalizeSummaryJsonResponse(raw);
+export function parseSummaryResponse(response: string, maxStageMemories?: number): Record<string, string> {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(normalized.text);
+    parsed = JSON.parse(response);
   } catch (error) {
     const parseMessage = error instanceof Error ? error.message : String(error);
-    const repairNote = normalized.repairs.length > 0
-      ? '；已尝试格式修复：' + normalized.repairs.join('、')
-      : '';
     throw new Error(
       '总结模型输出不是合法 JSON。解析器错误：' + parseMessage +
-      '；响应长度：' + raw.length + ' 字符；响应预览：' + formatSummaryResponsePreview(raw) +
-      repairNote + '。常见原因包括 Markdown 代码围栏、JSON 外的说明文字、非法转义或输出截断。已取消写回以保护原始人物经历。',
+      '；响应长度：' + response.length + ' 字符；响应预览：' + formatSummaryResponsePreview(response) +
+      '。请只返回严格合法的 JSON 对象；已取消写回以保护原始人物经历。',
     );
-  }
-
-  if (normalized.repairs.length > 0) {
-    dataLogger.log('[summaryManager] 已修复总结模型响应的 JSON 格式瑕疵', {
-      repairs: normalized.repairs,
-      responseLength: raw.length,
-    });
   }
 
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
@@ -852,82 +780,40 @@ export function parseSummaryResponse(response: string, maxStageMemories?: number
   const entries = Object.entries(parsed as Record<string, unknown>);
   if (entries.length === 0) throw new Error('总结模型返回了空 JSON 对象。');
   if (maxStageMemories !== undefined && entries.length > maxStageMemories) {
-    throw new Error(`总结模型返回了 ${entries.length} 条阶段记忆，多于本批 ${maxStageMemories} 条输入经历；已取消写回。`);
+    throw new Error('总结模型返回了 ' + entries.length + ' 条阶段记忆，多于本批 ' +
+      maxStageMemories + ' 条输入经历；已取消写回。');
   }
 
   // JSON.parse 会静默覆盖重复键，因此额外检查原始文本中的键数量。
-  const rawKeys = [...raw.matchAll(/"((?:\\.|[^"\\])*)"\s*:/g)];
+  const rawKeys = [...response.matchAll(/"((?:\\.|[^"\\])*)"\s*:/g)];
   if (rawKeys.length !== entries.length) {
     throw new Error('总结 JSON 存在重复键或非预期的嵌套结构；已取消写回。');
   }
 
-  const sourceDateBounds = sourceEntries ? getSourceDateBounds(sourceEntries) : null;
-  const sourceEntriesHaveCompleteDates = Boolean(
-    sourceEntries &&
-    Object.keys(sourceEntries).length > 0 &&
-    Object.values(sourceEntries).every(value => parseGameDateRange(value) !== null),
-  );
-  const missingDatePrefix = sourceDateBounds && sourceEntriesHaveCompleteDates
-    ? `（${formatGameDateNumber(sourceDateBounds.start)}~${formatGameDateNumber(sourceDateBounds.end)}）`
-    : '（旧记录时间不详）';
   const result: Record<string, string> = {};
-  const seenStageTitles = new Set<string>();
-  entries.forEach(([key, value], index) => {
-    const normalizedKey = key.trim();
-    const legacyMatch = normalizedKey.match(SUMMARY_STAGE_KEY_RE);
-    if (!normalizedKey) {
-      throw new Error('总结 JSON 的阶段总结名称不能为空。');
-    }
-    if (legacyMatch && Number(legacyMatch[1]) !== index + 1) {
-      throw new Error('旧版阶段经历编号必须从 1 开始，按输出顺序连续递增。');
-    }
+  for (const [key, value] of entries) {
+    if (!key.trim()) throw new Error('总结 JSON 的阶段总结名称不能为空。');
     if (
-      !legacyMatch &&
-      (/^阶段经历\d*/.test(normalizedKey) || /^(?:经历|条目)\d+$/.test(normalizedKey))
+      key.startsWith('$') ||
+      key === LEGACY_SUMMARY_META_KEY ||
+      key === SUMMARY_STAGE_MEMORY_KEYS_META_KEY ||
+      key === '__proto__' ||
+      key === 'constructor' ||
+      key === 'prototype'
     ) {
-      throw new Error(
-        `总结 JSON 的键名“${key}”无效；请直接使用简洁、具体的阶段总结名称，不要使用原始经历编号。`,
-      );
+      throw new Error('总结 JSON 的键名“' + key + '”属于保留键，不能作为阶段记忆名称。');
     }
-
-    const stageTitle = (legacyMatch ? legacyMatch[2] : normalizedKey)
-      .replace(/^[\s\-—–:：]+/, '')
-      .trim();
-    if (!stageTitle) throw new Error(`总结 JSON 的键名“${key}”缺少阶段总结名称。`);
-    if (seenStageTitles.has(stageTitle)) {
-      throw new Error(`总结 JSON 的阶段总结名称重复：“${stageTitle}”。`);
-    }
-    seenStageTitles.add(stageTitle);
-
     if (typeof value !== 'string' || !value.trim()) {
-      throw new Error(`阶段记忆“${key}”必须对应非空字符串。`);
+      throw new Error('阶段记忆“' + key + '”必须对应非空字符串。');
     }
+    Object.defineProperty(result, key, {
+      value,
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+  }
 
-    const cleanValue = value.trim().replace(/[\u0000-\u001F\u007F]+/g, ' ');
-    const normalizedValue = SUMMARY_DATE_PREFIX_RE.test(cleanValue)
-      ? cleanValue
-      : `${missingDatePrefix}${cleanValue}`;
-    if (normalizedValue !== cleanValue) {
-      dataLogger.log('[summaryManager] 自动补齐阶段记忆时间前缀', {
-        key: normalizedKey,
-        prefix: missingDatePrefix,
-        sourceDateBoundsAvailable: Boolean(sourceDateBounds),
-      });
-    }
-
-    const outputDateRange = parseGameDateRange(normalizedValue);
-    if (outputDateRange && sourceEntries) {
-      if (!sourceDateBounds) {
-        throw new Error(`阶段记忆“${key}”使用了日期，但输入经历中没有可识别的游戏内日期。`);
-      }
-      if (outputDateRange.start < sourceDateBounds.start || outputDateRange.end > sourceDateBounds.end) {
-        throw new Error(`阶段记忆“${key}”的日期范围超出本批原始经历，已取消写回。`);
-      }
-    } else if (!outputDateRange && !/^[（(](?:旧记录时间不详|时间不详)[）)]/.test(normalizedValue)) {
-      throw new Error(`阶段记忆“${key}”的日期范围无效或结束时间早于开始时间。`);
-    }
-    result[normalizedKey] = normalizedValue;
-  });
   return result;
 }
 
@@ -1062,7 +948,7 @@ export async function executeSummary(
 
     onProgress?.('validating');
     // 3. 严格解析模型返回的多条阶段记忆 JSON
-    const summaryEntries = parseSummaryResponse(response, Object.keys(compressionPlan.sourceEntries).length, compressionPlan.sourceEntries);
+    const summaryEntries = parseSummaryResponse(response, Object.keys(compressionPlan.sourceEntries).length);
 
     // 模型请求并行，但每个人物的最终重读、冲突检查和 ERA 写回必须串行。
     // 在取得写回队列后再重读，确保等待队列期间新增的经历也能被保留。
@@ -1104,7 +990,7 @@ export async function executeSummary(
         targetMessageId,
         characterId: character.characterId,
         deletedKeys: writePlan.sourceKeys,
-        insertedKeys: Object.keys(rebasedStageEntries),
+        insertedKeys: Object.keys(summaryEntries),
         legacyStringBiography: typeof latestRawBiography === 'string',
       });
 
