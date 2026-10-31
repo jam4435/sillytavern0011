@@ -86,6 +86,11 @@ import {
   type BatchSummaryResult,
   type SummaryAuditTraceSnapshot,
 } from '../utils/summaryManager';
+import {
+  getLatestWorldHistoryAuditTrace,
+  WORLD_HISTORY_AUDIT_TRACE_EVENT,
+  type WorldHistoryAuditTraceSnapshot,
+} from '../utils/worldHistoryMemoryManager';
 import type { VariableEditorCapability } from '../utils/variableEditorPolicy';
 import {
   areVariablePathsEqual,
@@ -503,6 +508,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     useState<SmallSummaryBackfillSnapshot | null>(() => getLatestSmallSummaryBackfillSnapshot());
   const [conversationSummaryTrace, setConversationSummaryTrace] =
     useState<ConversationSummaryPromptTraceSnapshot | null>(() => getLatestConversationSummaryPromptTrace());
+  const [worldHistoryAuditTrace, setWorldHistoryAuditTrace] =
+    useState<WorldHistoryAuditTraceSnapshot | null>(() => getLatestWorldHistoryAuditTrace());
   const [editingApiProfileId, setEditingApiProfileId] = useState<string | null>(
     () => settings.summarySettings.apiProfiles[0]?.id || null,
   );
@@ -517,6 +524,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const refreshSummaryAuditTrace = useCallback(() => {
     setSummaryAuditTrace(getLatestSummaryAuditTrace());
+  }, []);
+
+  const refreshWorldHistoryAuditTrace = useCallback(() => {
+    setWorldHistoryAuditTrace(getLatestWorldHistoryAuditTrace());
   }, []);
 
   const syncSmallSummaryBackfillSnapshot = useCallback(() => {
@@ -585,6 +596,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     window.addEventListener(SUMMARY_AUDIT_TRACE_EVENT, refreshSummaryAuditTrace);
     return () => window.removeEventListener(SUMMARY_AUDIT_TRACE_EVENT, refreshSummaryAuditTrace);
   }, [refreshSummaryAuditTrace]);
+
+  useEffect(() => {
+    refreshWorldHistoryAuditTrace();
+    window.addEventListener(WORLD_HISTORY_AUDIT_TRACE_EVENT, refreshWorldHistoryAuditTrace);
+    return () => window.removeEventListener(WORLD_HISTORY_AUDIT_TRACE_EVENT, refreshWorldHistoryAuditTrace);
+  }, [refreshWorldHistoryAuditTrace]);
+
+  useEffect(() => {
+    if (!worldHistoryAuditTrace?.records.length) return;
+    setOpenSettingBlocks(current =>
+      current.conversationSummary ? current : { ...current, conversationSummary: true },
+    );
+  }, [worldHistoryAuditTrace?.records[0]?.id]);
 
   // 新的人物总结批次产生时自动展开所在设置区，让自动总结的审计结果能直接被看到。
   useEffect(() => {
@@ -3224,6 +3248,91 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       />
                     </div>
                   </>
+                )}
+              </div>
+
+              <div className="summary-audit world-history-audit">
+                <div className="summary-audit-header world-history-audit-header">
+                  <div>
+                    <strong>世界历史总结输入 / 完整提示词 / 输出留档</strong>
+                    <p className="settings-hint">
+                      按当前聊天留存最近 8 次章节归档或总览合并。提示词展示实际发送给模型的完整 user 消息，而不是模板预览。
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="settings-action-btn summary-trace-refresh"
+                    onClick={refreshWorldHistoryAuditTrace}
+                  >
+                    <Icons.Refresh size={14} />
+                    <span>刷新</span>
+                  </button>
+                </div>
+                {!worldHistoryAuditTrace || worldHistoryAuditTrace.records.length === 0 ? (
+                  <div className="summary-trace-empty">尚无世界历史总结记录。自动总结执行后，输入、完整提示词、模型输出和失败信息会显示在这里。</div>
+                ) : (
+                  <div className="summary-audit-characters">
+                    {worldHistoryAuditTrace.records.map(record => (
+                      <details className="summary-audit-character world-history-audit-record" key={record.id}>
+                        <summary>
+                          <strong>{record.kind === 'chapter' ? '章节归档' : '长期总览合并'}</strong>
+                          <span className={'summary-trace-badge ' + (
+                            record.status === 'success' ? 'ok' : record.status === 'error' ? 'error' : 'missing'
+                          )}>
+                            {record.status === 'success' ? '成功' : record.status === 'error' ? '失败' : '执行中'}
+                          </span>
+                          <span>{new Date(record.startedAt).toLocaleString('zh-CN')}</span>
+                          <span>{record.rangeStart} — {record.rangeEnd}</span>
+                          <span>
+                            {record.kind === 'chapter'
+                              ? `原始事件 ${record.eventCount} 条`
+                              : `章节 ${record.chapterCount || 0} 个 · 覆盖事件 ${record.eventCount} 条`}
+                          </span>
+                        </summary>
+                        <div className="summary-audit-character-body">
+                          <section className="summary-audit-memory">
+                            <strong>执行信息</strong>
+                            <pre>{JSON.stringify({
+                              类型: record.kind === 'chapter' ? '章节归档' : '长期总览合并',
+                              状态: record.status,
+                              开始时间: new Date(record.startedAt).toLocaleString('zh-CN'),
+                              完成时间: record.finishedAt ? new Date(record.finishedAt).toLocaleString('zh-CN') : '尚未完成',
+                              时间范围: record.rangeStart + ' — ' + record.rangeEnd,
+                              原始事件数量: record.eventCount,
+                              合并章节数量: record.chapterCount,
+                              API模式: record.apiMode,
+                              API渠道: record.apiSource,
+                              模型: record.model,
+                            }, null, 2)}</pre>
+                          </section>
+                          <section className="summary-audit-memory">
+                            <strong>原始输入数据</strong>
+                            <pre>{record.input || '（无输入数据）'}</pre>
+                          </section>
+                          <section className="summary-audit-memory">
+                            <strong>完整提示词（实际发送给模型的 user 消息）</strong>
+                            <pre>{record.prompt || '（无提示词记录）'}</pre>
+                          </section>
+                          <section className="summary-audit-memory">
+                            <strong>模型原始输出</strong>
+                            <pre>{record.modelOutput || '（模型尚未返回输出）'}</pre>
+                          </section>
+                          {record.savedSummary && (
+                            <section className="summary-audit-memory">
+                              <strong>解析后的摘要内容</strong>
+                              <pre>{record.savedSummary}</pre>
+                            </section>
+                          )}
+                          {record.error && (
+                            <section className="summary-audit-memory">
+                              <strong>失败信息</strong>
+                              <pre>{record.error}</pre>
+                            </section>
+                          )}
+                        </div>
+                      </details>
+                    ))}
+                  </div>
                 )}
               </div>
 

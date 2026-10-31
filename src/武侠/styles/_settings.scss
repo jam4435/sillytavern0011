@@ -2936,6 +2936,33 @@
   font-size: 0.9rem;
 }
 
+.world-history-audit-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+
+  > div {
+    min-width: 0;
+  }
+}
+
+.world-history-audit-record > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.55rem;
+
+  > strong {
+    margin-right: auto;
+  }
+
+  > span:not(.summary-trace-badge) {
+    color: $stone-500;
+    font-size: 0.7rem;
+  }
+}
+
 .summary-audit-characters {
   display: grid;
   gap: 0.5rem;
