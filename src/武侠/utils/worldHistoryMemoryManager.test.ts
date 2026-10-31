@@ -50,6 +50,63 @@ describe('worldHistoryMemoryManager', () => {
     expect(selected[selected.length - 1].record.时间.日).toBe(12);
   });
 
+  it('drains repeated 12-event batches from the high watermark to the low watermark', () => {
+    const worldEvents = createWorldEvents(60);
+    const archivedEvents: Record<string, number> = {};
+    const batchSizes: number[] = [];
+    let triggerThreshold = 24;
+
+    while (true) {
+      const batch = selectWorldEventsForArchive(
+        worldEvents,
+        archivedEvents,
+        triggerThreshold,
+        12,
+        12,
+      );
+      if (batch.length === 0) break;
+
+      batchSizes.push(batch.length);
+      batch.forEach(item => {
+        archivedEvents[item.eventName] = 1;
+      });
+      triggerThreshold = 12;
+    }
+
+    expect(batchSizes).toEqual([12, 12, 12, 12]);
+    expect(Object.keys(archivedEvents)).toHaveLength(48);
+    expect(selectWorldEventsForArchive(worldEvents, archivedEvents, 12, 12, 12)).toHaveLength(0);
+  });
+
+  it('drains the final partial batch without archiving the 12 newest events', () => {
+    const worldEvents = createWorldEvents(25);
+    const archivedEvents: Record<string, number> = {};
+    let triggerThreshold = 24;
+    const batchSizes: number[] = [];
+
+    while (true) {
+      const batch = selectWorldEventsForArchive(
+        worldEvents,
+        archivedEvents,
+        triggerThreshold,
+        12,
+        12,
+      );
+      if (batch.length === 0) break;
+
+      batchSizes.push(batch.length);
+      batch.forEach(item => {
+        archivedEvents[item.eventName] = 1;
+      });
+      triggerThreshold = 12;
+    }
+
+    expect(batchSizes).toEqual([12, 1]);
+    expect(Object.keys(archivedEvents)).toHaveLength(13);
+    expect(archivedEvents['事件13']).toBe(1);
+    expect(archivedEvents['事件14']).toBeUndefined();
+  });
+
   it('does not summarize events already covered by a chapter', () => {
     const selected = selectWorldEventsForArchive(
       createWorldEvents(28),

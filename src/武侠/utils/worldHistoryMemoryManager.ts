@@ -222,6 +222,7 @@ export function selectWorldEventsForArchive(
   archivedEvents: unknown,
   threshold = DEFAULT_WORLD_HISTORY_THRESHOLD,
   batchSize = DEFAULT_WORLD_HISTORY_BATCH_SIZE,
+  retainCount?: number,
 ): WorldHistoryArchiveItem[] {
   if (!isRecord(worldEvents)) return [];
 
@@ -247,9 +248,12 @@ export function selectWorldEventsForArchive(
   if (records.length <= safeThreshold) return [];
 
   const safeBatchSize = Math.max(1, Math.floor(Number(batchSize) || DEFAULT_WORLD_HISTORY_BATCH_SIZE));
-  // 每次归档后至少保留阈值的一半作为详细历史，避免把刚发生的事件全部压成摘要。
-  const retainCount = Math.max(1, Math.floor(safeThreshold / 2));
-  const archiveCount = Math.min(safeBatchSize, records.length - retainCount);
+  // 触发阈值与最终保留数量分离：允许首次越过高水位后连续归档，直到降至低水位。
+  const safeRetainCount = Math.max(
+    1,
+    Math.floor(Number(retainCount) || Math.floor(safeThreshold / 2)),
+  );
+  const archiveCount = Math.min(safeBatchSize, records.length - safeRetainCount);
 
   return records.slice(0, Math.max(1, archiveCount)).map(([eventName, record]) => ({
     eventName,
@@ -483,17 +487,31 @@ export async function maybeArchiveWorldHistory({
   const auditChatId = readCurrentWorldHistoryChatId();
   let activeAuditRecord: WorldHistoryAuditRecord | null = null;
   try {
-    const { statData, memory } = readCurrentState();
-    const worldEvents = isRecord(statData.世界事件) ? statData.世界事件 : {};
-    const archivedNames = getArchivedEventNames(memory);
-    const archivedMap = Object.fromEntries([...archivedNames].map(name => [name, 1]));
-    const batch = selectWorldEventsForArchive(
-      worldEvents,
-      archivedMap,
-      settings.worldHistoryArchiveThreshold,
-      settings.worldHistoryArchiveBatchSize,
+    const highWatermark = Math.max(
+      1,
+      Math.floor(Number(settings.worldHistoryArchiveThreshold) || DEFAULT_WORLD_HISTORY_THRESHOLD),
     );
-    if (batch.length > 0) {
+    const lowWatermark = Math.max(1, Math.floor(highWatermark / 2));
+    let nextTriggerThreshold = highWatermark;
+    let archivedEventCount = 0;
+    let archivedChapterCount = 0;
+    let lastChapterKey: string | undefined;
+
+    // 首次超过高水位时启动归档；之后逐批重读并确认写入，直到未归档事件降至低水位。
+    while (true) {
+      const { statData, memory } = readCurrentState();
+      const worldEvents = isRecord(statData.世界事件) ? statData.世界事件 : {};
+      const archivedNames = getArchivedEventNames(memory);
+      const archivedMap = Object.fromEntries([...archivedNames].map(name => [name, 1]));
+      const batch = selectWorldEventsForArchive(
+        worldEvents,
+        archivedMap,
+        nextTriggerThreshold,
+        settings.worldHistoryArchiveBatchSize,
+        lowWatermark,
+      );
+      if (batch.length === 0) break;
+
       const frontendVariables = isRecord(statData.前端变量) ? statData.前端变量 : {};
       const statuses = isRecord(frontendVariables.事件结局状态)
         ? frontendVariables.事件结局状态
@@ -536,6 +554,7 @@ export async function maybeArchiveWorldHistory({
       const summary = parseWorldHistorySummary(response);
       activeAuditRecord.savedSummary = summary;
       publishWorldHistoryAuditRecord(activeAuditRecord, auditChatId);
+
       const existingChapters = isRecord(memory.章节摘要)
         ? memory.章节摘要 as Record<string, WorldHistoryChapterRecord>
         : {};
@@ -589,15 +608,35 @@ export async function maybeArchiveWorldHistory({
         activeAuditRecord.finishedAt = Date.now();
         publishWorldHistoryAuditRecord(activeAuditRecord, auditChatId);
       }
+      activeAuditRecord = null;
+      archivedEventCount += batch.length;
+      archivedChapterCount += 1;
+      lastChapterKey = chapterKey;
       dataLogger.log('[worldHistoryMemory] 世界历史章节归档完成', {
         chapterKey,
         eventCount: batch.length,
+        archivedEventCount,
+        archivedChapterCount,
         firstEvent: batch[0].eventName,
         lastEvent: batch[batch.length - 1].eventName,
+        highWatermark,
+        lowWatermark,
       });
-      return { archived: true, kind: 'chapter', recordCount: batch.length, chapterKey };
+
+      // 首批触发后改用低水位作为继续条件，避免每个回合只处理一批。
+      nextTriggerThreshold = lowWatermark;
     }
 
+    if (archivedEventCount > 0) {
+      return {
+        archived: true,
+        kind: 'chapter',
+        recordCount: archivedEventCount,
+        chapterKey: lastChapterKey,
+      };
+    }
+
+    const { memory } = readCurrentState();
     const chapters = isRecord(memory.章节摘要) ? memory.章节摘要 as Record<string, WorldHistoryChapterRecord> : {};
     const selectedChapters = selectWorldHistoryChaptersForConsolidation(chapters);
     if (selectedChapters.length === 0) return { archived: false };
