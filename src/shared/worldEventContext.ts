@@ -91,37 +91,23 @@ function getTimeSortValue(value: WorldEventRecord): number {
 export function selectWorldEventsForPrompt(
   worldEvents: unknown,
   outcomeStatuses: unknown,
-  { limit = 16, priorityLimit = 8 }: { limit?: number; priorityLimit?: number } = {},
+  archivedEvents: unknown = {},
 ): Record<string, WorldEventRecord> {
-  if (!isRecord(worldEvents) || limit <= 0) {
+  if (!isRecord(worldEvents)) {
     return {};
   }
 
-  const statuses = isRecord(outcomeStatuses) ? outcomeStatuses : {};
+  // 结局状态仍由归档器写入摘要内容；提示词不再用它筛掉任何未归档事件。
+  void outcomeStatuses;
+  const archived = isRecord(archivedEvents) ? archivedEvents : {};
   const records = Object.entries(worldEvents)
-    .filter((entry): entry is [string, WorldEventRecord] => isWorldEventRecord(entry[1]))
+    .filter(([eventName, record]): record is [string, WorldEventRecord] =>
+      !Object.prototype.hasOwnProperty.call(archived, eventName) && isWorldEventRecord(record),
+    )
     .sort((left, right) => {
-      const timeDiff = getTimeSortValue(right[1]) - getTimeSortValue(left[1]);
+      const timeDiff = getTimeSortValue(left[1]) - getTimeSortValue(right[1]);
       return timeDiff || left[0].localeCompare(right[0]);
     });
 
-  const selected = new Map<string, WorldEventRecord>();
-  for (const [eventName, record] of records) {
-    if (selected.size >= Math.min(priorityLimit, limit)) break;
-    if (statuses[eventName] === '偏离' || statuses[eventName] === '未知') {
-      selected.set(eventName, record);
-    }
-  }
-
-  for (const [eventName, record] of records) {
-    if (selected.size >= limit) break;
-    selected.set(eventName, record);
-  }
-
-  return Object.fromEntries(
-    [...selected.entries()].sort((left, right) => {
-      const timeDiff = getTimeSortValue(left[1]) - getTimeSortValue(right[1]);
-      return timeDiff || left[0].localeCompare(right[0]);
-    }),
-  );
+  return Object.fromEntries(records);
 }
