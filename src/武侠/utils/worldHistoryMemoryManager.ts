@@ -315,9 +315,8 @@ export async function maybeArchiveWorldHistory({
       settings.worldHistoryArchiveThreshold,
       settings.worldHistoryArchiveBatchSize,
     );
-    const requestSettings = resolveConfiguredTextSettings(settings, 'summary');
-
     if (batch.length > 0) {
+      const requestSettings = resolveConfiguredTextSettings(settings, 'summary');
       const frontendVariables = isRecord(statData.前端变量) ? statData.前端变量 : {};
       const statuses = isRecord(frontendVariables.事件结局状态)
         ? frontendVariables.事件结局状态
@@ -390,6 +389,7 @@ export async function maybeArchiveWorldHistory({
     if (selectedChapters.length === 0) return { archived: false };
 
     const existingOverview = isRecord(memory.总览摘要) ? memory.总览摘要 as WorldHistoryOverviewRecord : null;
+    const requestSettings = resolveConfiguredTextSettings(settings, 'summary');
     const response = await requestConfiguredText({
       prompt: buildWorldHistoryOverviewPrompt(existingOverview, selectedChapters),
       settings: requestSettings,
