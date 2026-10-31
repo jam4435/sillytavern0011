@@ -252,6 +252,23 @@ function readCurrentState(): { statData: Record<string, unknown>; memory: WorldH
   return { statData, memory };
 }
 
+function readLatestAssistantMessageId(): number | null {
+  try {
+    const messages = getChatMessages('0-{{lastMessageId}}', {
+      role: 'all',
+      hide_state: 'unhidden',
+      include_swipes: true,
+    }) as Array<{ message_id?: number; role?: string }>;
+    const latest = messages
+      .filter(message => message.role === 'assistant' && Number.isInteger(message.message_id))
+      .sort((left, right) => Number(left.message_id) - Number(right.message_id))
+      .pop();
+    return latest?.message_id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function createTransactionId(): string {
   try {
     if (typeof crypto?.randomUUID === 'function') return 'world-history-' + crypto.randomUUID();
@@ -293,9 +310,13 @@ export async function maybeArchiveWorldHistory({
   latestAssistantMessageId,
 }: {
   settings: SummarySettings;
-  latestAssistantMessageId: number;
+  latestAssistantMessageId?: number;
 }): Promise<WorldHistoryArchiveResult> {
-  if (!settings.worldHistoryArchiveEnabled || !Number.isInteger(latestAssistantMessageId) || latestAssistantMessageId < 0) {
+  const targetMessageId =
+    Number.isInteger(latestAssistantMessageId) && Number(latestAssistantMessageId) >= 0
+      ? Number(latestAssistantMessageId)
+      : readLatestAssistantMessageId();
+  if (!settings.worldHistoryArchiveEnabled || targetMessageId === null) {
     return { archived: false };
   }
   if (worldHistoryArchiveBusy || getIsSummarizing()) {
@@ -361,7 +382,7 @@ export async function maybeArchiveWorldHistory({
           eventName: 'era:transactionByObject',
           attribution: 'background',
           detail: { transactionId, operations },
-          expectedMessageId: latestAssistantMessageId,
+          expectedMessageId: targetMessageId,
           expectedAction: 'apiWrite',
           expectedTransactionId: transactionId,
           timeoutMs: 10000,
