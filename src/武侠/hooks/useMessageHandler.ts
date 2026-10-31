@@ -32,6 +32,7 @@ import { finalizeCurrentTurn } from '../utils/saveLoadManager';
 import { completeTurnEventsAndWait } from '../../shared/turnEventSettlement';
 import { WUXIA_INPUT_HISTORY_DATA_KEY } from '../utils/inputHistory';
 import { maybeArchiveConversationSummaries } from '../utils/narrativeMemoryManager';
+import { maybeArchiveWorldHistory } from '../utils/worldHistoryMemoryManager';
 import type { LatestDebugRoundPatch } from './useDebugLogs';
 
 type ChatRole = 'system' | 'assistant' | 'user';
@@ -576,6 +577,19 @@ export function useMessageHandler({
       try {
         turnLockRequestStarted = true;
         await acquireWuxiaTurnLock(debugRoundId, turnChatId);
+
+        if (summarySettings.worldHistoryArchiveEnabled) {
+          try {
+            const worldHistoryResult = await maybeArchiveWorldHistory({ settings: summarySettings });
+            if (worldHistoryResult.archived) {
+              messageLogger.log('📜 发送前世界历史自动归档完成:', worldHistoryResult);
+            }
+          } catch (error) {
+            // 发送前压缩失败不阻止玩家行动；原始事件会完整进入本轮上下文并在后续重试。
+            messageLogger.warn('发送前世界历史预压缩失败，继续使用原始世界事件:', error);
+          }
+        }
+
         extraVariableUpdateReservation = await prepareExtraVariableUpdateForDecision(extraVariableDecision);
         const beforeSendLastMessageId = getLatestMessageId();
         onVariableTurnStart?.(extraVariableDecision.modeSnapshot);
@@ -933,6 +947,21 @@ export function useMessageHandler({
               });
               eventsSettled = true;
               await finalizeHistoryNodeAfterEvents();
+
+              if (summarySettings.worldHistoryArchiveEnabled) {
+                try {
+                  const worldHistoryResult = await maybeArchiveWorldHistory({
+                    settings: summarySettings,
+                    latestAssistantMessageId: completedMessageId,
+                  });
+                  if (worldHistoryResult.archived) {
+                    messageLogger.log('📜 世界历史自动归档完成:', worldHistoryResult);
+                  }
+                } catch (error) {
+                  // 世界史压缩失败时保留全部原始事件，下次成功回合继续重试，不影响本回合结算。
+                  messageLogger.warn('世界历史自动总结失败，原始世界事件仍完整保留:', error);
+                }
+              }
             } catch (error) {
               turnFinalizationFailed = true;
               messageLogger.error('回合已完成，但事件稳定确认或历史封存失败:', error);
@@ -1252,6 +1281,21 @@ export function useMessageHandler({
           });
           eventsSettled = true;
           await finalizeHistoryNodeAfterEvents();
+
+          if (summarySettings.worldHistoryArchiveEnabled) {
+            try {
+              const worldHistoryResult = await maybeArchiveWorldHistory({
+                settings: summarySettings,
+                latestAssistantMessageId: targetAssistantMessageId,
+              });
+              if (worldHistoryResult.archived) {
+                messageLogger.log('📜 世界历史自动归档完成:', worldHistoryResult);
+              }
+            } catch (error) {
+              // 重生成后的世界史压缩失败不回滚正文或原始世界事件。
+              messageLogger.warn('重生成后的世界历史自动总结失败，原始世界事件仍完整保留:', error);
+            }
+          }
         } catch (error) {
           turnFinalizationFailed = true;
           messageLogger.error('重新生成已完成，但事件稳定确认或历史封存失败:', error);

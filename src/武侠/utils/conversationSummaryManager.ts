@@ -39,6 +39,37 @@ export const CONVERSATION_SUMMARY_ENTRY_CONTENT = `<对话摘要协议>
 
 export const CONVERSATION_MEMORY_ENTRY_NAME = '记忆区';
 export const CONVERSATION_MEMORY_ENTRY_CONTENT = `<%
+const 世界史记忆 = getvar('stat_data.世界史记忆', { scope: 'local' });
+const 世界史总览 = 世界史记忆 && 世界史记忆.总览摘要;
+if (世界史总览 && typeof 世界史总览.摘要 === 'string' && 世界史总览.摘要.trim()) {
+-%>
+<长期世界史总览>
+以下是较早世界事件的压缩总览，属于已经发生的客观历史，不要把其中事件当作本轮新发生。
+<%- 世界史总览.摘要.trim() %>
+</长期世界史总览>
+<% } -%>
+
+<%
+const 世界史章节 = 世界史记忆 && 世界史记忆.章节摘要;
+if (世界史章节 && typeof 世界史章节 === 'object' && Object.keys(世界史章节).length > 0) {
+  const 世界史时间值 = time => {
+    const value = time && typeof time === 'object' ? time : {};
+    return (Number(value.年) || 0) * 1000000 + (Number(value.月) || 0) * 10000 +
+      (Number(value.日) || 0) * 100 + (Number(value.时) || 0);
+  };
+  const 排序世界史章节 = Object.entries(世界史章节)
+    .filter(([, 章节]) => 章节 && typeof 章节 === 'object' && typeof 章节.摘要 === 'string' && 章节.摘要.trim())
+    .sort((左, 右) => 世界史时间值(左[1].起始时间) - 世界史时间值(右[1].起始时间));
+-%>
+<长期世界史章节记忆>
+以下是按发生时间排列的较早世界事件章节摘要。它们用于替代已经归档的详细事件记录，不要把其中事件当作本轮新发生。
+<% for (const [, 章节] of 排序世界史章节) { -%>
+<%- 章节.摘要.trim() %>
+<% } -%>
+</长期世界史章节记忆>
+<% } -%>
+
+<%
 const 章节摘要 = getvar('stat_data.叙事记忆.章节摘要', { scope: 'local' });
 if (章节摘要 && typeof 章节摘要 === 'object' && Object.keys(章节摘要).length > 0) {
   const 排序章节 = Object.values(章节摘要)
@@ -52,7 +83,6 @@ if (章节摘要 && typeof 章节摘要 === 'object' && Object.keys(章节摘要
 <% } -%>
 </长期叙事记忆>
 <% } -%>`;
-
 function clampRecentReplies(value: number): number {
   if (!Number.isFinite(value)) return DEFAULT_CONVERSATION_SUMMARY_RECENT_REPLIES;
   return Math.max(1, Math.min(20, Math.floor(value)));

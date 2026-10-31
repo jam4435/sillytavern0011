@@ -3169,6 +3169,64 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 </div>
               )}
 
+              <div className="summary-archive-panel">
+                <div className="summary-archive-header">
+                  <div>
+                    <h5>世界历史自动总结</h5>
+                    <p>完整世界事件仍保存在世界事件档案中；达到阈值后，自动把较早事件压缩为长期世界史记忆，近期事件继续保留详细记录。</p>
+                  </div>
+                  <label className="summary-archive-toggle">
+                    <input
+                      type="checkbox"
+                      checked={settings.summarySettings.worldHistoryArchiveEnabled}
+                      onChange={e => updateSummarySetting('worldHistoryArchiveEnabled', e.target.checked)}
+                    />
+                    <span>{settings.summarySettings.worldHistoryArchiveEnabled ? '已启用' : '未启用'}</span>
+                  </label>
+                </div>
+
+                {settings.summarySettings.worldHistoryArchiveEnabled && (
+                  <>
+                    <div className="summary-inline-field">
+                      <label htmlFor="world-history-archive-threshold">未归档事件达到多少条时触发</label>
+                      <input
+                        id="world-history-archive-threshold"
+                        type="number"
+                        min="16"
+                        max="200"
+                        value={settings.summarySettings.worldHistoryArchiveThreshold}
+                        onChange={e =>
+                          updateSummarySetting(
+                            'worldHistoryArchiveThreshold',
+                            Math.max(16, Math.min(200, parseInt(e.target.value) || 24)),
+                          )
+                        }
+                        className="settings-number-input summary-inline-number"
+                        title="达到该数量后，自动总结最早的一批世界事件。"
+                      />
+                    </div>
+                    <div className="summary-inline-field">
+                      <label htmlFor="world-history-archive-batch-size">每次总结事件数</label>
+                      <input
+                        id="world-history-archive-batch-size"
+                        type="number"
+                        min="5"
+                        max="30"
+                        value={settings.summarySettings.worldHistoryArchiveBatchSize}
+                        onChange={e =>
+                          updateSummarySetting(
+                            'worldHistoryArchiveBatchSize',
+                            Math.max(5, Math.min(30, parseInt(e.target.value) || 12)),
+                          )
+                        }
+                        className="settings-number-input summary-inline-number"
+                        title="每次由总结模型处理的最早世界事件数量。"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+
               {settings.summarySettings.conversationSummaryMode === 'off' && (
                 <div className="summary-mode-note">
                   逐轮小总结的 prompt 压缩已关闭；手动“小总结补完”仍可执行，已经生成的大总结仍由“记忆区”独立接管。

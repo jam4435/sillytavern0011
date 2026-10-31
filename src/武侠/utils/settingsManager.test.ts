@@ -258,6 +258,9 @@ describe('settingsManager ui theme', () => {
     expect(defaults.conversationSummaryPresetTag).toBe('summary');
     expect(defaults.conversationArchiveEnabled).toBe(false);
     expect(defaults.conversationArchiveBatchSize).toBe(10);
+    expect(defaults.worldHistoryArchiveEnabled).toBe(true);
+    expect(defaults.worldHistoryArchiveThreshold).toBe(24);
+    expect(defaults.worldHistoryArchiveBatchSize).toBe(12);
 
     window.localStorage.setItem(
       'wuxia_display_settings',
@@ -268,6 +271,9 @@ describe('settingsManager ui theme', () => {
           conversationSummaryPresetTag: '<memory>',
           conversationArchiveEnabled: true,
           conversationArchiveBatchSize: 12,
+          worldHistoryArchiveEnabled: false,
+          worldHistoryArchiveThreshold: 40,
+          worldHistoryArchiveBatchSize: 15,
         },
       }),
     );
@@ -277,6 +283,9 @@ describe('settingsManager ui theme', () => {
     expect(loaded.conversationSummaryPresetTag).toBe('<memory>');
     expect(loaded.conversationArchiveEnabled).toBe(true);
     expect(loaded.conversationArchiveBatchSize).toBe(12);
+    expect(loaded.worldHistoryArchiveEnabled).toBe(false);
+    expect(loaded.worldHistoryArchiveThreshold).toBe(40);
+    expect(loaded.worldHistoryArchiveBatchSize).toBe(15);
 
     window.localStorage.setItem(
       'wuxia_display_settings',
@@ -285,6 +294,8 @@ describe('settingsManager ui theme', () => {
           conversationSummaryMode: 'invalid',
           conversationSummaryRecentReplies: 999,
           conversationArchiveBatchSize: 1,
+          worldHistoryArchiveThreshold: 1,
+          worldHistoryArchiveBatchSize: 999,
         },
       }),
     );
@@ -292,6 +303,8 @@ describe('settingsManager ui theme', () => {
     expect(invalid.conversationSummaryMode).toBe('off');
     expect(invalid.conversationSummaryRecentReplies).toBe(20);
     expect(invalid.conversationArchiveBatchSize).toBe(5);
+    expect(invalid.worldHistoryArchiveThreshold).toBe(16);
+    expect(invalid.worldHistoryArchiveBatchSize).toBe(30);
   });
 
   it('defaults and persists the extra-variable body cleaning rules', () => {

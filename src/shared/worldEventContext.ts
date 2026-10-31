@@ -91,37 +91,38 @@ function getTimeSortValue(value: WorldEventRecord): number {
 export function selectWorldEventsForPrompt(
   worldEvents: unknown,
   outcomeStatuses: unknown,
-  { limit = 16, priorityLimit = 8 }: { limit?: number; priorityLimit?: number } = {},
+  archivedEvents: unknown = {},
 ): Record<string, WorldEventRecord> {
-  if (!isRecord(worldEvents) || limit <= 0) {
+  if (!isRecord(worldEvents)) {
     return {};
   }
 
-  const statuses = isRecord(outcomeStatuses) ? outcomeStatuses : {};
+  // 结局状态仍由归档器写入摘要内容；提示词不再用它筛掉任何未归档事件。
+  void outcomeStatuses;
+  const archivedNames = new Set<string>();
+  if (isRecord(archivedEvents)) {
+    const hasMemoryShape = isRecord(archivedEvents.已归档事件) || isRecord(archivedEvents.章节摘要);
+    const archivedIndex = hasMemoryShape
+      ? (isRecord(archivedEvents.已归档事件) ? archivedEvents.已归档事件 : {})
+      : archivedEvents;
+    Object.keys(archivedIndex).forEach(name => archivedNames.add(name));
+    if (isRecord(archivedEvents.章节摘要)) {
+      for (const chapter of Object.values(archivedEvents.章节摘要)) {
+        if (!isRecord(chapter) || !Array.isArray(chapter.来源事件名)) continue;
+        chapter.来源事件名.forEach(name => {
+          if (typeof name === 'string' && name.trim()) archivedNames.add(name);
+        });
+      }
+    }
+  }
   const records = Object.entries(worldEvents)
-    .filter((entry): entry is [string, WorldEventRecord] => isWorldEventRecord(entry[1]))
+    .filter((entry): entry is [string, WorldEventRecord] =>
+      !archivedNames.has(entry[0]) && isWorldEventRecord(entry[1]),
+    )
     .sort((left, right) => {
-      const timeDiff = getTimeSortValue(right[1]) - getTimeSortValue(left[1]);
+      const timeDiff = getTimeSortValue(left[1]) - getTimeSortValue(right[1]);
       return timeDiff || left[0].localeCompare(right[0]);
     });
 
-  const selected = new Map<string, WorldEventRecord>();
-  for (const [eventName, record] of records) {
-    if (selected.size >= Math.min(priorityLimit, limit)) break;
-    if (statuses[eventName] === '偏离' || statuses[eventName] === '未知') {
-      selected.set(eventName, record);
-    }
-  }
-
-  for (const [eventName, record] of records) {
-    if (selected.size >= limit) break;
-    selected.set(eventName, record);
-  }
-
-  return Object.fromEntries(
-    [...selected.entries()].sort((left, right) => {
-      const timeDiff = getTimeSortValue(left[1]) - getTimeSortValue(right[1]);
-      return timeDiff || left[0].localeCompare(right[0]);
-    }),
-  );
+  return Object.fromEntries(records);
 }
