@@ -43,12 +43,136 @@ export interface WorldHistoryArchiveResult {
   chapterKey?: string;
 }
 
+export type WorldHistoryAuditKind = 'chapter' | 'overview';
+export type WorldHistoryAuditStatus = 'running' | 'success' | 'error';
+
+export interface WorldHistoryAuditRecord {
+  id: string;
+  kind: WorldHistoryAuditKind;
+  status: WorldHistoryAuditStatus;
+  startedAt: number;
+  finishedAt?: number;
+  eventCount: number;
+  chapterCount?: number;
+  rangeStart: string;
+  rangeEnd: string;
+  input: string;
+  prompt: string;
+  modelOutput: string;
+  savedSummary?: string;
+  apiMode?: string;
+  apiSource?: string;
+  model?: string;
+  error?: string;
+}
+
+export interface WorldHistoryAuditTraceSnapshot {
+  chatId: string | null;
+  records: WorldHistoryAuditRecord[];
+}
+
+export const WORLD_HISTORY_AUDIT_TRACE_EVENT = 'wuxia:worldHistoryAuditTraceUpdated';
+
+const WORLD_HISTORY_AUDIT_TRACE_STORAGE_PREFIX = 'wuxia.worldHistoryAuditTrace.v1:';
+const MAX_WORLD_HISTORY_AUDIT_RECORDS = 8;
+
 const DEFAULT_WORLD_HISTORY_THRESHOLD = 24;
 const DEFAULT_WORLD_HISTORY_BATCH_SIZE = 12;
 const WORLD_HISTORY_OVERVIEW_TRIGGER_CHAPTERS = 20;
 const WORLD_HISTORY_OVERVIEW_BATCH_SIZE = 8;
 
 let worldHistoryArchiveBusy = false;
+let latestWorldHistoryAuditTrace: WorldHistoryAuditTraceSnapshot | null = null;
+
+function readCurrentWorldHistoryChatId(): string | null {
+  try {
+    type WorldHistoryTavernApi = { getCurrentChatId?: () => string | number | null | undefined };
+    const currentWindow = globalThis as typeof globalThis & { SillyTavern?: WorldHistoryTavernApi };
+    const parentWindow = typeof window !== 'undefined'
+      ? window.parent as Window & typeof globalThis & { SillyTavern?: WorldHistoryTavernApi }
+      : undefined;
+    const chatId = currentWindow.SillyTavern?.getCurrentChatId?.()
+      ?? parentWindow?.SillyTavern?.getCurrentChatId?.();
+    if (typeof chatId === 'string') return chatId.trim() || null;
+    if (typeof chatId === 'number' && Number.isFinite(chatId)) return String(chatId);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function getWorldHistoryAuditStorageKey(chatId: string): string {
+  return WORLD_HISTORY_AUDIT_TRACE_STORAGE_PREFIX + encodeURIComponent(chatId);
+}
+
+function cloneWorldHistoryAuditTrace(
+  snapshot: WorldHistoryAuditTraceSnapshot,
+): WorldHistoryAuditTraceSnapshot {
+  return {
+    chatId: snapshot.chatId,
+    records: snapshot.records.map(record => ({ ...record })),
+  };
+}
+
+function notifyWorldHistoryAuditTraceUpdated(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent(WORLD_HISTORY_AUDIT_TRACE_EVENT));
+  } catch {
+    // 非浏览器环境下忽略事件通知。
+  }
+}
+
+function publishWorldHistoryAuditRecord(record: WorldHistoryAuditRecord): void {
+  const chatId = readCurrentWorldHistoryChatId();
+  const previousRecords = latestWorldHistoryAuditTrace?.chatId === chatId
+    ? latestWorldHistoryAuditTrace.records
+    : [];
+  const records = [
+    { ...record },
+    ...previousRecords.filter(item => item.id !== record.id),
+  ].slice(0, MAX_WORLD_HISTORY_AUDIT_RECORDS);
+  latestWorldHistoryAuditTrace = { chatId, records };
+
+  if (chatId && typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(
+        getWorldHistoryAuditStorageKey(chatId),
+        JSON.stringify(latestWorldHistoryAuditTrace),
+      );
+    } catch (error) {
+      dataLogger.warn('[worldHistoryMemory] 无法持久化世界历史总结输入输出记录，将仅保留在当前页面内存中:', error);
+    }
+  }
+  notifyWorldHistoryAuditTraceUpdated();
+}
+
+export function getLatestWorldHistoryAuditTrace(): WorldHistoryAuditTraceSnapshot | null {
+  const chatId = readCurrentWorldHistoryChatId();
+  if (chatId && typeof window !== 'undefined') {
+    try {
+      const stored = window.localStorage.getItem(getWorldHistoryAuditStorageKey(chatId));
+      if (stored) {
+        const parsed = JSON.parse(stored) as WorldHistoryAuditTraceSnapshot;
+        if (parsed && parsed.chatId === chatId && Array.isArray(parsed.records)) {
+          latestWorldHistoryAuditTrace = cloneWorldHistoryAuditTrace(parsed);
+          return cloneWorldHistoryAuditTrace(latestWorldHistoryAuditTrace);
+        }
+      }
+    } catch (error) {
+      dataLogger.warn('[worldHistoryMemory] 读取世界历史总结输入输出记录失败:', error);
+    }
+  }
+
+  if (latestWorldHistoryAuditTrace?.chatId === chatId) {
+    return cloneWorldHistoryAuditTrace(latestWorldHistoryAuditTrace);
+  }
+  return null;
+}
+
+function createWorldHistoryAuditId(): string {
+  return 'world-history-audit-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -132,6 +256,18 @@ export function selectWorldEventsForArchive(
   }));
 }
 
+export function buildWorldHistoryArchiveInput(items: WorldHistoryArchiveItem[]): string {
+  return JSON.stringify({
+    待归档事件: items.map(item => ({
+      事件名称: item.eventName,
+      时间: item.record.时间,
+      地点: item.record.地点,
+      结局状态: item.status,
+      概要: item.record.概要,
+    })),
+  }, null, 2);
+}
+
 export function buildWorldHistoryArchivePrompt(items: WorldHistoryArchiveItem[]): string {
   const source = items.map(item => [
     '事件名称：' + item.eventName,
@@ -192,6 +328,23 @@ export function selectWorldHistoryChaptersForConsolidation(
   if (ordered.length <= maxRetained) return [];
   const count = Math.min(Math.max(1, Math.floor(batchSize)), ordered.length - 12);
   return ordered.slice(0, Math.max(1, count));
+}
+
+export function buildWorldHistoryOverviewInput(
+  existingOverview: WorldHistoryOverviewRecord | null,
+  chapters: Array<[string, WorldHistoryChapterRecord]>,
+): string {
+  return JSON.stringify({
+    此前世界史总览: existingOverview,
+    本次并入章节: chapters.map(([chapterName, chapter]) => ({
+      章节名称: chapterName,
+      起始时间: chapter.起始时间,
+      结束时间: chapter.结束时间,
+      事件数量: chapter.事件数量,
+      来源事件名: chapter.来源事件名,
+      摘要: chapter.摘要,
+    })),
+  }, null, 2);
 }
 
 export function buildWorldHistoryOverviewPrompt(
@@ -325,6 +478,7 @@ export async function maybeArchiveWorldHistory({
   }
 
   worldHistoryArchiveBusy = true;
+  let activeAuditRecord: WorldHistoryAuditRecord | null = null;
   try {
     const { statData, memory } = readCurrentState();
     const worldEvents = isRecord(statData.世界事件) ? statData.世界事件 : {};
@@ -337,7 +491,27 @@ export async function maybeArchiveWorldHistory({
       settings.worldHistoryArchiveBatchSize,
     );
     if (batch.length > 0) {
+      const prompt = buildWorldHistoryArchivePrompt(batch);
+      activeAuditRecord = {
+        id: createWorldHistoryAuditId(),
+        kind: 'chapter',
+        status: 'running',
+        startedAt: Date.now(),
+        eventCount: batch.length,
+        rangeStart: formatWorldTime(batch[0].record.时间),
+        rangeEnd: formatWorldTime(batch[batch.length - 1].record.时间),
+        input: buildWorldHistoryArchiveInput(batch),
+        prompt,
+        modelOutput: '',
+      };
+      publishWorldHistoryAuditRecord(activeAuditRecord);
+
       const requestSettings = resolveConfiguredTextSettings(settings, 'summary');
+      activeAuditRecord.apiMode = requestSettings.apiMode;
+      activeAuditRecord.apiSource = requestSettings.apiConfig.source || requestSettings.apiMode;
+      activeAuditRecord.model = requestSettings.apiConfig.model || '';
+      publishWorldHistoryAuditRecord(activeAuditRecord);
+
       const frontendVariables = isRecord(statData.前端变量) ? statData.前端变量 : {};
       const statuses = isRecord(frontendVariables.事件结局状态)
         ? frontendVariables.事件结局状态
@@ -348,13 +522,17 @@ export async function maybeArchiveWorldHistory({
       });
 
       const response = await requestConfiguredText({
-        prompt: buildWorldHistoryArchivePrompt(batch),
+        prompt,
         settings: requestSettings,
         shouldStream: false,
         generationIdPrefix: 'wuxia-world-history-archive',
         skipWorldInfoAndAuthorNote: true,
       });
+      activeAuditRecord.modelOutput = response;
+      publishWorldHistoryAuditRecord(activeAuditRecord);
       const summary = parseWorldHistorySummary(response);
+      activeAuditRecord.savedSummary = summary;
+      publishWorldHistoryAuditRecord(activeAuditRecord);
       const existingChapters = isRecord(memory.章节摘要)
         ? memory.章节摘要 as Record<string, WorldHistoryChapterRecord>
         : {};
@@ -403,6 +581,11 @@ export async function maybeArchiveWorldHistory({
         throw new Error('世界历史章节摘要写后校验失败。');
       }
 
+      if (activeAuditRecord) {
+        activeAuditRecord.status = 'success';
+        activeAuditRecord.finishedAt = Date.now();
+        publishWorldHistoryAuditRecord(activeAuditRecord);
+      }
       dataLogger.log('[worldHistoryMemory] 世界历史章节归档完成', {
         chapterKey,
         eventCount: batch.length,
@@ -417,15 +600,43 @@ export async function maybeArchiveWorldHistory({
     if (selectedChapters.length === 0) return { archived: false };
 
     const existingOverview = isRecord(memory.总览摘要) ? memory.总览摘要 as WorldHistoryOverviewRecord : null;
+    const prompt = buildWorldHistoryOverviewPrompt(existingOverview, selectedChapters);
+    activeAuditRecord = {
+      id: createWorldHistoryAuditId(),
+      kind: 'overview',
+      status: 'running',
+      startedAt: Date.now(),
+      eventCount: selectedChapters.reduce(
+        (total, [, chapter]) => total + Math.max(0, Number(chapter.事件数量) || 0),
+        0,
+      ),
+      chapterCount: selectedChapters.length,
+      rangeStart: formatWorldTime(existingOverview?.起始时间 || selectedChapters[0][1].起始时间),
+      rangeEnd: formatWorldTime(selectedChapters[selectedChapters.length - 1][1].结束时间),
+      input: buildWorldHistoryOverviewInput(existingOverview, selectedChapters),
+      prompt,
+      modelOutput: '',
+    };
+    publishWorldHistoryAuditRecord(activeAuditRecord);
+
     const requestSettings = resolveConfiguredTextSettings(settings, 'summary');
+    activeAuditRecord.apiMode = requestSettings.apiMode;
+    activeAuditRecord.apiSource = requestSettings.apiConfig.source || requestSettings.apiMode;
+    activeAuditRecord.model = requestSettings.apiConfig.model || '';
+    publishWorldHistoryAuditRecord(activeAuditRecord);
+
     const response = await requestConfiguredText({
-      prompt: buildWorldHistoryOverviewPrompt(existingOverview, selectedChapters),
+      prompt,
       settings: requestSettings,
       shouldStream: false,
       generationIdPrefix: 'wuxia-world-history-overview',
       skipWorldInfoAndAuthorNote: true,
     });
+    activeAuditRecord.modelOutput = response;
+    publishWorldHistoryAuditRecord(activeAuditRecord);
     const summary = parseWorldHistoryOverview(response);
+    activeAuditRecord.savedSummary = summary;
+    publishWorldHistoryAuditRecord(activeAuditRecord);
     const firstChapter = selectedChapters[0][1];
     const lastChapter = selectedChapters[selectedChapters.length - 1][1];
     const overview: WorldHistoryOverviewRecord = {
@@ -471,11 +682,24 @@ export async function maybeArchiveWorldHistory({
       throw new Error('世界史总览压缩写后校验失败。');
     }
 
+    if (activeAuditRecord) {
+      activeAuditRecord.status = 'success';
+      activeAuditRecord.finishedAt = Date.now();
+      publishWorldHistoryAuditRecord(activeAuditRecord);
+    }
     dataLogger.log('[worldHistoryMemory] 世界史章节已合并为长期总览', {
       consolidatedChapterCount: removedChapterKeys.length,
       coveredEventCount: overview.覆盖事件数,
     });
     return { archived: true, kind: 'overview', recordCount: removedChapterKeys.length };
+  } catch (error) {
+    if (activeAuditRecord) {
+      activeAuditRecord.status = 'error';
+      activeAuditRecord.finishedAt = Date.now();
+      activeAuditRecord.error = error instanceof Error ? error.message : String(error);
+      publishWorldHistoryAuditRecord(activeAuditRecord);
+    }
+    throw error;
   } finally {
     worldHistoryArchiveBusy = false;
   }
