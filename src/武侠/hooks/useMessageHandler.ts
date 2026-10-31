@@ -577,6 +577,19 @@ export function useMessageHandler({
       try {
         turnLockRequestStarted = true;
         await acquireWuxiaTurnLock(debugRoundId, turnChatId);
+
+        if (summarySettings.worldHistoryArchiveEnabled) {
+          try {
+            const worldHistoryResult = await maybeArchiveWorldHistory({ settings: summarySettings });
+            if (worldHistoryResult.archived) {
+              messageLogger.log('📜 发送前世界历史自动归档完成:', worldHistoryResult);
+            }
+          } catch (error) {
+            // 发送前压缩失败不阻止玩家行动；原始事件会完整进入本轮上下文并在后续重试。
+            messageLogger.warn('发送前世界历史预压缩失败，继续使用原始世界事件:', error);
+          }
+        }
+
         extraVariableUpdateReservation = await prepareExtraVariableUpdateForDecision(extraVariableDecision);
         const beforeSendLastMessageId = getLatestMessageId();
         onVariableTurnStart?.(extraVariableDecision.modeSnapshot);
