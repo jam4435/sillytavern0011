@@ -109,8 +109,8 @@ export function selectWorldEventsForArchive(
   }
 
   const records = Object.entries(worldEvents)
-    .filter(([eventName, record]): record is WorldEventRecord =>
-      !archivedNames.has(eventName) && isWorldEventRecord(record),
+    .filter((entry): entry is [string, WorldEventRecord] =>
+      !archivedNames.has(entry[0]) && isWorldEventRecord(entry[1]),
     )
     .sort((left, right) => {
       const timeDiff = getWorldTimeSortValue(left[1].时间) - getWorldTimeSortValue(right[1].时间);
@@ -266,7 +266,9 @@ async function isArchivePersisted(
   chapter: WorldHistoryChapterRecord,
 ): Promise<boolean> {
   const { memory } = readCurrentState();
-  const chapters = isRecord(memory.章节摘要) ? memory.章节摘要 : {};
+  const chapters = isRecord(memory.章节摘要)
+    ? memory.章节摘要 as Record<string, WorldHistoryChapterRecord>
+    : {};
   const archivedEvents = isRecord(memory.已归档事件) ? memory.已归档事件 : {};
   return (
     chapters[chapterKey]?.摘要 === chapter.摘要 &&
