@@ -318,8 +318,9 @@ export async function maybeArchiveWorldHistory({
     const requestSettings = resolveConfiguredTextSettings(settings, 'summary');
 
     if (batch.length > 0) {
-      const statuses = isRecord(statData.前端变量) && isRecord(statData.前端变量.事件结局状态)
-        ? statData.前端变量.事件结局状态
+      const frontendVariables = isRecord(statData.前端变量) ? statData.前端变量 : {};
+      const statuses = isRecord(frontendVariables.事件结局状态)
+        ? frontendVariables.事件结局状态
         : {};
       batch.forEach(item => {
         const status = statuses[item.eventName];
@@ -334,7 +335,9 @@ export async function maybeArchiveWorldHistory({
         skipWorldInfoAndAuthorNote: true,
       });
       const summary = parseWorldHistorySummary(response);
-      const existingChapters = isRecord(memory.章节摘要) ? memory.章节摘要 : {};
+      const existingChapters = isRecord(memory.章节摘要)
+        ? memory.章节摘要 as Record<string, WorldHistoryChapterRecord>
+        : {};
       const chapterKey = getNextChapterKey(existingChapters);
       const chapter: WorldHistoryChapterRecord = {
         起始时间: { ...batch[0].record.时间 },
