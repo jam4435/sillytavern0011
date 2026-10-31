@@ -1268,6 +1268,21 @@ export function useMessageHandler({
           });
           eventsSettled = true;
           await finalizeHistoryNodeAfterEvents();
+
+          if (summarySettings.worldHistoryArchiveEnabled) {
+            try {
+              const worldHistoryResult = await maybeArchiveWorldHistory({
+                settings: summarySettings,
+                latestAssistantMessageId: targetAssistantMessageId,
+              });
+              if (worldHistoryResult.archived) {
+                messageLogger.log('📜 世界历史自动归档完成:', worldHistoryResult);
+              }
+            } catch (error) {
+              // 重生成后的世界史压缩失败不回滚正文或原始世界事件。
+              messageLogger.warn('重生成后的世界历史自动总结失败，原始世界事件仍完整保留:', error);
+            }
+          }
         } catch (error) {
           turnFinalizationFailed = true;
           messageLogger.error('重新生成已完成，但事件稳定确认或历史封存失败:', error);
