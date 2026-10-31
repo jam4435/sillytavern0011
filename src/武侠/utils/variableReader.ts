@@ -580,29 +580,11 @@ function parseTimeToHour(时辰?: string): number {
 function formatGameTime(worldTime?: WorldTime): string {
   if (!worldTime) return '未知时间';
 
-  const 天干 = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
-  const 地支 = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
-  const 月份 = ['正月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '冬月', '腊月'];
-  const 时辰名 = ['子时', '丑时', '寅时', '卯时', '辰时', '巳时', '午时', '未时', '申时', '酉时', '戌时', '亥时'];
-
-  const yearIndex = (worldTime.year - 4) % 60;
-  const ganIndex = yearIndex % 10;
-  const zhiIndex = yearIndex % 12;
-  const yearName = 天干[ganIndex] + 地支[zhiIndex] + '年';
-
-  const monthName = 月份[(worldTime.month - 1) % 12] || '正月';
-  const dayName =
-    worldTime.day <= 10
-      ? `初${['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'][worldTime.day - 1]}`
-      : worldTime.day <= 20
-        ? `${['十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十'][worldTime.day - 11]}`
-        : worldTime.day <= 30
-          ? `${['廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'][worldTime.day - 21]}`
-          : '三十';
-  const hourName = 时辰名[Math.floor(worldTime.hour / 2) % 12];
+  const dateText = `${worldTime.year}年${worldTime.month}月${worldTime.day}日`;
+  const hourText = String(worldTime.hour).padStart(2, '0');
   const minuteText = String(worldTime.minute).padStart(2, '0');
 
-  return `${yearName} ${monthName} ${dayName} ${hourName} ${worldTime.hour}时${minuteText}分`;
+  return `${dateText} ${hourText}:${minuteText}`;
 }
 
 /**
