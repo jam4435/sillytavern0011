@@ -122,6 +122,12 @@ export interface SummarySettings {
   conversationArchiveEnabled: boolean;
   /** 每个长期章节摘要包含的旧逐轮摘要数量 */
   conversationArchiveBatchSize: number;
+  /** 是否自动把过多的旧世界事件压缩为长期世界史记忆 */
+  worldHistoryArchiveEnabled: boolean;
+  /** 未归档世界事件达到该数量时触发自动总结 */
+  worldHistoryArchiveThreshold: number;
+  /** 每次世界史自动总结处理的事件数量 */
+  worldHistoryArchiveBatchSize: number;
   /** 已保存的额外模型 API */
   apiProfiles: SummaryApiProfile[];
   /** 自动总结使用的 API */
@@ -548,6 +554,9 @@ export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
   conversationSummaryBackfillBatchSize: 8,
   conversationArchiveEnabled: false,
   conversationArchiveBatchSize: 10,
+  worldHistoryArchiveEnabled: true,
+  worldHistoryArchiveThreshold: 24,
+  worldHistoryArchiveBatchSize: 12,
   apiProfiles: [],
   summaryApiSelection: PRESET_SUMMARY_API_SELECTION,
   variableApiSelection: PRESET_SUMMARY_API_SELECTION,
@@ -1128,6 +1137,20 @@ function normalizeSummarySettings(summarySettings: StoredSummarySettings | undef
       Number.isFinite(summarySettings.conversationArchiveBatchSize)
         ? Math.max(5, Math.min(50, Math.floor(summarySettings.conversationArchiveBatchSize)))
         : defaults.conversationArchiveBatchSize,
+    worldHistoryArchiveEnabled:
+      typeof summarySettings.worldHistoryArchiveEnabled === 'boolean'
+        ? summarySettings.worldHistoryArchiveEnabled
+        : defaults.worldHistoryArchiveEnabled,
+    worldHistoryArchiveThreshold:
+      typeof summarySettings.worldHistoryArchiveThreshold === 'number' &&
+      Number.isFinite(summarySettings.worldHistoryArchiveThreshold)
+        ? Math.max(16, Math.min(200, Math.floor(summarySettings.worldHistoryArchiveThreshold)))
+        : defaults.worldHistoryArchiveThreshold,
+    worldHistoryArchiveBatchSize:
+      typeof summarySettings.worldHistoryArchiveBatchSize === 'number' &&
+      Number.isFinite(summarySettings.worldHistoryArchiveBatchSize)
+        ? Math.max(5, Math.min(30, Math.floor(summarySettings.worldHistoryArchiveBatchSize)))
+        : defaults.worldHistoryArchiveBatchSize,
     apiProfiles: apiProfiles.map(cloneSummaryApiProfile),
     summaryApiSelection: normalizeSummaryApiSelection(summarySettings.summaryApiSelection, profileIds, legacySelection),
     variableApiSelection: normalizeSummaryApiSelection(
