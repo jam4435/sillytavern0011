@@ -457,7 +457,7 @@ export async function maybeArchiveWorldHistory({
         eventName: 'era:transactionByObject',
         attribution: 'background',
         detail: { transactionId, operations },
-        expectedMessageId: latestAssistantMessageId,
+        expectedMessageId: targetMessageId,
         expectedAction: 'apiWrite',
         expectedTransactionId: transactionId,
         timeoutMs: 10000,
