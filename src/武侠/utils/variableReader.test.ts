@@ -1469,7 +1469,7 @@ describe('readGameDataSync world time projection', () => {
     const result = readGameDataSync();
 
     expect(result?.worldTime).toEqual({ year: 1219, month: 10, day: 20, hour: 13, minute: 37 });
-    expect(result?.gameTime).toContain('13时37分');
+    expect(result?.gameTime).toBe('1219年10月20日 13:37');
   });
 
   it('旧存档缺分时按0读取，并保留午夜0时', () => {
@@ -1483,7 +1483,7 @@ describe('readGameDataSync world time projection', () => {
     const result = readGameDataSync();
 
     expect(result?.worldTime).toEqual({ year: 1219, month: 10, day: 20, hour: 0, minute: 0 });
-    expect(result?.gameTime).toContain('0时00分');
+    expect(result?.gameTime).toBe('1219年10月20日 00:00');
   });
 });
 
