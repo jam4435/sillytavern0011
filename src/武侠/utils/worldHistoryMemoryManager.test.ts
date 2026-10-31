@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildWorldHistoryArchivePrompt,
   buildWorldHistoryOverviewPrompt,
+  parseWorldHistorySummary,
   selectWorldEventsForArchive,
   selectWorldHistoryChaptersForConsolidation,
   type WorldHistoryChapterRecord,
@@ -57,6 +58,16 @@ describe('worldHistoryMemoryManager', () => {
 
     expect(selected).toHaveLength(12);
     expect(selected[0].eventName).toBe('事件04');
+  });
+
+  it('accepts only a non-empty tagged world-history summary', () => {
+    expect(parseWorldHistorySummary(
+      '<world_history_summary>这段历史保留了明确日期、地点与人物因果。</world_history_summary>',
+    )).toBe('这段历史保留了明确日期、地点与人物因果。');
+    expect(() => parseWorldHistorySummary('模型返回了无标签的普通文本。')).toThrow();
+    expect(() => parseWorldHistorySummary(
+      '<world_history_summary>' + '史'.repeat(2001) + '</world_history_summary>',
+    )).toThrow();
   });
 
   it('builds a world-history prompt that preserves deviation status and source facts', () => {
