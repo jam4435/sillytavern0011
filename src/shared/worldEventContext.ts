@@ -101,8 +101,8 @@ export function selectWorldEventsForPrompt(
   void outcomeStatuses;
   const archived = isRecord(archivedEvents) ? archivedEvents : {};
   const records = Object.entries(worldEvents)
-    .filter(([eventName, record]): record is [string, WorldEventRecord] =>
-      !Object.prototype.hasOwnProperty.call(archived, eventName) && isWorldEventRecord(record),
+    .filter((entry): entry is [string, WorldEventRecord] =>
+      !Object.prototype.hasOwnProperty.call(archived, entry[0]) && isWorldEventRecord(entry[1]),
     )
     .sort((left, right) => {
       const timeDiff = getTimeSortValue(left[1]) - getTimeSortValue(right[1]);
