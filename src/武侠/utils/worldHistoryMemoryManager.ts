@@ -123,8 +123,10 @@ function notifyWorldHistoryAuditTraceUpdated(): void {
   }
 }
 
-function publishWorldHistoryAuditRecord(record: WorldHistoryAuditRecord): void {
-  const chatId = readCurrentWorldHistoryChatId();
+function publishWorldHistoryAuditRecord(
+  record: WorldHistoryAuditRecord,
+  chatId = readCurrentWorldHistoryChatId(),
+): void {
   const previousRecords = latestWorldHistoryAuditTrace?.chatId === chatId
     ? latestWorldHistoryAuditTrace.records
     : [];
@@ -478,6 +480,7 @@ export async function maybeArchiveWorldHistory({
   }
 
   worldHistoryArchiveBusy = true;
+  const auditChatId = readCurrentWorldHistoryChatId();
   let activeAuditRecord: WorldHistoryAuditRecord | null = null;
   try {
     const { statData, memory } = readCurrentState();
@@ -491,6 +494,15 @@ export async function maybeArchiveWorldHistory({
       settings.worldHistoryArchiveBatchSize,
     );
     if (batch.length > 0) {
+      const frontendVariables = isRecord(statData.前端变量) ? statData.前端变量 : {};
+      const statuses = isRecord(frontendVariables.事件结局状态)
+        ? frontendVariables.事件结局状态
+        : {};
+      batch.forEach(item => {
+        const status = statuses[item.eventName];
+        item.status = status === '偏离' || status === '未知' ? status : '原定';
+      });
+
       const prompt = buildWorldHistoryArchivePrompt(batch);
       activeAuditRecord = {
         id: createWorldHistoryAuditId(),
@@ -504,22 +516,13 @@ export async function maybeArchiveWorldHistory({
         prompt,
         modelOutput: '',
       };
-      publishWorldHistoryAuditRecord(activeAuditRecord);
+      publishWorldHistoryAuditRecord(activeAuditRecord, auditChatId);
 
       const requestSettings = resolveConfiguredTextSettings(settings, 'summary');
       activeAuditRecord.apiMode = requestSettings.apiMode;
       activeAuditRecord.apiSource = requestSettings.apiConfig.source || requestSettings.apiMode;
       activeAuditRecord.model = requestSettings.apiConfig.model || '';
-      publishWorldHistoryAuditRecord(activeAuditRecord);
-
-      const frontendVariables = isRecord(statData.前端变量) ? statData.前端变量 : {};
-      const statuses = isRecord(frontendVariables.事件结局状态)
-        ? frontendVariables.事件结局状态
-        : {};
-      batch.forEach(item => {
-        const status = statuses[item.eventName];
-        item.status = status === '偏离' || status === '未知' ? status : '原定';
-      });
+      publishWorldHistoryAuditRecord(activeAuditRecord, auditChatId);
 
       const response = await requestConfiguredText({
         prompt,
@@ -529,10 +532,10 @@ export async function maybeArchiveWorldHistory({
         skipWorldInfoAndAuthorNote: true,
       });
       activeAuditRecord.modelOutput = response;
-      publishWorldHistoryAuditRecord(activeAuditRecord);
+      publishWorldHistoryAuditRecord(activeAuditRecord, auditChatId);
       const summary = parseWorldHistorySummary(response);
       activeAuditRecord.savedSummary = summary;
-      publishWorldHistoryAuditRecord(activeAuditRecord);
+      publishWorldHistoryAuditRecord(activeAuditRecord, auditChatId);
       const existingChapters = isRecord(memory.章节摘要)
         ? memory.章节摘要 as Record<string, WorldHistoryChapterRecord>
         : {};
@@ -584,7 +587,7 @@ export async function maybeArchiveWorldHistory({
       if (activeAuditRecord) {
         activeAuditRecord.status = 'success';
         activeAuditRecord.finishedAt = Date.now();
-        publishWorldHistoryAuditRecord(activeAuditRecord);
+        publishWorldHistoryAuditRecord(activeAuditRecord, auditChatId);
       }
       dataLogger.log('[worldHistoryMemory] 世界历史章节归档完成', {
         chapterKey,
@@ -617,13 +620,13 @@ export async function maybeArchiveWorldHistory({
       prompt,
       modelOutput: '',
     };
-    publishWorldHistoryAuditRecord(activeAuditRecord);
+    publishWorldHistoryAuditRecord(activeAuditRecord, auditChatId);
 
     const requestSettings = resolveConfiguredTextSettings(settings, 'summary');
     activeAuditRecord.apiMode = requestSettings.apiMode;
     activeAuditRecord.apiSource = requestSettings.apiConfig.source || requestSettings.apiMode;
     activeAuditRecord.model = requestSettings.apiConfig.model || '';
-    publishWorldHistoryAuditRecord(activeAuditRecord);
+    publishWorldHistoryAuditRecord(activeAuditRecord, auditChatId);
 
     const response = await requestConfiguredText({
       prompt,
@@ -633,10 +636,10 @@ export async function maybeArchiveWorldHistory({
       skipWorldInfoAndAuthorNote: true,
     });
     activeAuditRecord.modelOutput = response;
-    publishWorldHistoryAuditRecord(activeAuditRecord);
+    publishWorldHistoryAuditRecord(activeAuditRecord, auditChatId);
     const summary = parseWorldHistoryOverview(response);
     activeAuditRecord.savedSummary = summary;
-    publishWorldHistoryAuditRecord(activeAuditRecord);
+    publishWorldHistoryAuditRecord(activeAuditRecord, auditChatId);
     const firstChapter = selectedChapters[0][1];
     const lastChapter = selectedChapters[selectedChapters.length - 1][1];
     const overview: WorldHistoryOverviewRecord = {
@@ -685,7 +688,7 @@ export async function maybeArchiveWorldHistory({
     if (activeAuditRecord) {
       activeAuditRecord.status = 'success';
       activeAuditRecord.finishedAt = Date.now();
-      publishWorldHistoryAuditRecord(activeAuditRecord);
+      publishWorldHistoryAuditRecord(activeAuditRecord, auditChatId);
     }
     dataLogger.log('[worldHistoryMemory] 世界史章节已合并为长期总览', {
       consolidatedChapterCount: removedChapterKeys.length,
@@ -697,7 +700,7 @@ export async function maybeArchiveWorldHistory({
       activeAuditRecord.status = 'error';
       activeAuditRecord.finishedAt = Date.now();
       activeAuditRecord.error = error instanceof Error ? error.message : String(error);
-      publishWorldHistoryAuditRecord(activeAuditRecord);
+      publishWorldHistoryAuditRecord(activeAuditRecord, auditChatId);
     }
     throw error;
   } finally {
