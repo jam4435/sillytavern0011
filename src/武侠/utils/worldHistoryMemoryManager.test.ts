@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildWorldHistoryArchiveInput,
   buildWorldHistoryArchivePrompt,
+  buildWorldHistoryOverviewInput,
   buildWorldHistoryOverviewPrompt,
   parseWorldHistorySummary,
   selectWorldEventsForArchive,
@@ -70,6 +72,23 @@ describe('worldHistoryMemoryManager', () => {
     )).toThrow();
   });
 
+  it('builds an auditable source input for every archived world event', () => {
+    const events = createWorldEvents(1);
+    const input = JSON.parse(buildWorldHistoryArchiveInput([{
+      eventName: '萧峰救阿紫',
+      record: events.事件01,
+      status: '偏离',
+    }]));
+
+    expect(input.待归档事件).toEqual([{
+      事件名称: '萧峰救阿紫',
+      时间: { 年: 1200, 月: 1, 日: 1, 时: 12 },
+      地点: '大宋/临安府',
+      结局状态: '偏离',
+      概要: '第01个事件已经完成并留下长期影响。',
+    }]);
+  });
+
   it('builds a world-history prompt that preserves deviation status and source facts', () => {
     const events = createWorldEvents(1);
     const prompt = buildWorldHistoryArchivePrompt([{
@@ -82,6 +101,24 @@ describe('worldHistoryMemoryManager', () => {
     expect(prompt).toContain('1200年1月1日 12时');
     expect(prompt).toContain('偏离');
     expect(prompt).toContain('不得补写原著');
+  });
+
+  it('builds an auditable input for a long-term overview merge', () => {
+    const chapters = [
+      ['史册001', createChapter(1)] as [string, WorldHistoryChapterRecord],
+      ['史册002', createChapter(2)] as [string, WorldHistoryChapterRecord],
+    ];
+    const input = JSON.parse(buildWorldHistoryOverviewInput({
+      起始时间: { 年: 1199 },
+      结束时间: { 年: 1199 },
+      覆盖事件数: 8,
+      摘要: '此前已经压缩的世界史总览。',
+    }, chapters));
+
+    expect(input.此前世界史总览.摘要).toBe('此前已经压缩的世界史总览。');
+    expect(input.本次并入章节).toHaveLength(2);
+    expect(input.本次并入章节[0].章节名称).toBe('史册001');
+    expect(input.本次并入章节[1].摘要).toBe('世界史章节2');
   });
 
   it('consolidates the oldest chapters only after the chapter threshold is exceeded', () => {
