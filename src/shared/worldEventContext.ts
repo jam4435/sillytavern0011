@@ -99,10 +99,25 @@ export function selectWorldEventsForPrompt(
 
   // 结局状态仍由归档器写入摘要内容；提示词不再用它筛掉任何未归档事件。
   void outcomeStatuses;
-  const archived = isRecord(archivedEvents) ? archivedEvents : {};
+  const archivedNames = new Set<string>();
+  if (isRecord(archivedEvents)) {
+    const hasMemoryShape = isRecord(archivedEvents.已归档事件) || isRecord(archivedEvents.章节摘要);
+    const archivedIndex = hasMemoryShape
+      ? (isRecord(archivedEvents.已归档事件) ? archivedEvents.已归档事件 : {})
+      : archivedEvents;
+    Object.keys(archivedIndex).forEach(name => archivedNames.add(name));
+    if (isRecord(archivedEvents.章节摘要)) {
+      for (const chapter of Object.values(archivedEvents.章节摘要)) {
+        if (!isRecord(chapter) || !Array.isArray(chapter.来源事件名)) continue;
+        chapter.来源事件名.forEach(name => {
+          if (typeof name === 'string' && name.trim()) archivedNames.add(name);
+        });
+      }
+    }
+  }
   const records = Object.entries(worldEvents)
     .filter((entry): entry is [string, WorldEventRecord] =>
-      !Object.prototype.hasOwnProperty.call(archived, entry[0]) && isWorldEventRecord(entry[1]),
+      !archivedNames.has(entry[0]) && isWorldEventRecord(entry[1]),
     )
     .sort((left, right) => {
       const timeDiff = getTimeSortValue(left[1]) - getTimeSortValue(right[1]);
