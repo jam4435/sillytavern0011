@@ -25,36 +25,37 @@ function buildPromptRandomNumbers(count = 5) {
   ).join('\n');
 }
 
-function selectWorldEventsForPrompt(worldEvents, outcomeStatuses, limit = 16, priorityLimit = 8) {
+function selectWorldEventsForPrompt(worldEvents, archivedEvents, archivedChapters) {
   if (!worldEvents || typeof worldEvents !== 'object' || Array.isArray(worldEvents)) return [];
-  const statuses = outcomeStatuses && typeof outcomeStatuses === 'object' && !Array.isArray(outcomeStatuses)
-    ? outcomeStatuses
-    : {};
-  const records = Object.entries(worldEvents)
-    .filter(([, record]) => record && typeof record === 'object' && !Array.isArray(record) &&
+  const archivedNames = new Set();
+  if (archivedEvents && typeof archivedEvents === 'object' && !Array.isArray(archivedEvents)) {
+    Object.keys(archivedEvents).forEach(name => archivedNames.add(name));
+  }
+  if (archivedChapters && typeof archivedChapters === 'object' && !Array.isArray(archivedChapters)) {
+    for (const chapter of Object.values(archivedChapters)) {
+      if (!chapter || typeof chapter !== 'object' || !Array.isArray(chapter.来源事件名)) continue;
+      chapter.来源事件名.forEach(name => {
+        if (typeof name === 'string' && name.trim()) archivedNames.add(name);
+      });
+    }
+  }
+  return Object.entries(worldEvents)
+    .filter(([eventName, record]) => !archivedNames.has(eventName) &&
+      record && typeof record === 'object' && !Array.isArray(record) &&
       record.时间 && typeof record.时间 === 'object' && typeof record.地点 === 'string' &&
       typeof record.概要 === 'string' && record.概要.trim())
-    .sort((left, right) => getEventTimeValue(right[1]) - getEventTimeValue(left[1]) || left[0].localeCompare(right[0]));
-  const selected = new Map();
-  for (const [eventName, record] of records) {
-    if (selected.size >= Math.min(priorityLimit, limit)) break;
-    if (statuses[eventName] === '偏离' || statuses[eventName] === '未知') selected.set(eventName, record);
-  }
-  for (const [eventName, record] of records) {
-    if (selected.size >= limit) break;
-    selected.set(eventName, record);
-  }
-  return [...selected.entries()]
-    .sort((left, right) => getEventTimeValue(left[1]) - getEventTimeValue(right[1]) || left[0].localeCompare(right[0]));
+    .sort((left, right) => getEventTimeValue(left[1]) - getEventTimeValue(right[1]) ||
+      left[0].localeCompare(right[0]));
 }
 
 const 本轮随机数 = buildPromptRandomNumbers();
 const 原始世界事件 = getvar('stat_data.世界事件', { scope: 'local' });
-const 事件结局状态 = getvar('stat_data.前端变量.事件结局状态', { scope: 'local' });
-const 世界事件上下文 = selectWorldEventsForPrompt(原始世界事件, 事件结局状态);
+const 已归档世界事件 = getvar('stat_data.世界史记忆.已归档事件', { scope: 'local' });
+const 世界史章节摘要 = getvar('stat_data.世界史记忆.章节摘要', { scope: 'local' });
+const 世界事件上下文 = selectWorldEventsForPrompt(原始世界事件, 已归档世界事件, 世界史章节摘要);
 if (世界事件上下文.length > 0) {
 -%>
-# 世界历史（只读）
+# 世界历史（近期详细记录，只读）
 <% for (const [, 事件] of 世界事件上下文) { -%>
 <%- formatPromptDate(事件.时间) %>|<%- compactPromptField(事件.地点) %>|<%- compactPromptField(事件.概要) %>
 <% } -%>
