@@ -92,6 +92,24 @@ describe('selectWorldEventsForPrompt', () => {
     });
   });
 
+  it('also derives archived names from chapter source lists', () => {
+    const worldEvents = {
+      旧事件: { 时间: { 年: 1199 }, 地点: '大宋/临安府', 概要: '已被章节摘要覆盖。' },
+      新事件: { 时间: { 年: 1200 }, 地点: '大宋/临安府', 概要: '仍需详细注入。' },
+    };
+
+    const selected = selectWorldEventsForPrompt(worldEvents, {}, {
+      章节摘要: {
+        史册001: {
+          来源事件名: ['旧事件'],
+          摘要: '旧事件摘要。',
+        },
+      },
+    });
+
+    expect(Object.keys(selected)).toEqual(['新事件']);
+  });
+
   it('drops malformed records without exposing unrelated state', () => {
     const selected = selectWorldEventsForPrompt(
       {
