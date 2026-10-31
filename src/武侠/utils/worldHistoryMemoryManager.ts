@@ -163,7 +163,7 @@ export function buildWorldHistoryArchivePrompt(items: WorldHistoryArchiveItem[])
 }
 
 export function parseWorldHistorySummary(response: string): string {
-  const summary = response.match(/<world_history_summary>([\\s\\S]*?)<\\/world_history_summary>/i)?.[1]?.trim() || '';
+  const summary = response.match(/<world_history_summary>([\s\S]*?)<\/world_history_summary>/i)?.[1]?.trim() || '';
   if (!summary) throw new Error('世界历史章节摘要为空或未按指定标签输出。');
   if (summary.length > 2000) throw new Error('世界历史章节摘要超出长度限制，未归档原始事件。');
   return summary;
@@ -231,7 +231,7 @@ export function buildWorldHistoryOverviewPrompt(
 }
 
 function parseWorldHistoryOverview(response: string): string {
-  const summary = response.match(/<world_history_overview>([\\s\\S]*?)<\\/world_history_overview>/i)?.[1]?.trim() || '';
+  const summary = response.match(/<world_history_overview>([\s\S]*?)<\/world_history_overview>/i)?.[1]?.trim() || '';
   if (!summary) throw new Error('长期世界史总览为空或未按指定标签输出。');
   if (summary.length > 4000) throw new Error('长期世界史总览超出长度限制，未替换原有总览。');
   return summary;
