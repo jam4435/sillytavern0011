@@ -59,7 +59,7 @@ describe('hasEventOutcomeChanged', () => {
 });
 
 describe('selectWorldEventsForPrompt', () => {
-  it('prioritizes changed history and enforces the hard limit', () => {
+  it('keeps every valid unarchived event without a hard limit', () => {
     const worldEvents = Object.fromEntries(
       Array.from({ length: 24 }, (_, index) => [
         `事件${index + 1}`,
@@ -70,24 +70,26 @@ describe('selectWorldEventsForPrompt', () => {
         },
       ]),
     );
-    const statuses = {
-      事件1: '偏离',
-      事件2: '未知',
-      事件3: '偏离',
-      事件4: '未知',
-      事件5: '偏离',
-      事件6: '未知',
-      事件7: '偏离',
-      事件8: '未知',
-      事件9: '偏离',
+
+    const selected = selectWorldEventsForPrompt(worldEvents, {});
+
+    expect(Object.keys(selected)).toHaveLength(24);
+    expect(selected).toHaveProperty('事件1');
+    expect(selected).toHaveProperty('事件24');
+    expect(Object.keys(selected)[0]).toBe('事件1');
+  });
+
+  it('omits only events already covered by world-history summaries', () => {
+    const worldEvents = {
+      旧事件: { 时间: { 年: 1199, 月: 12, 日: 30 }, 地点: '大宋/临安府', 概要: '旧事已有章节摘要。' },
+      新事件: { 时间: { 年: 1200, 月: 1, 日: 1 }, 地点: '大宋/临安府', 概要: '新近发生的事件。' },
     };
 
-    const selected = selectWorldEventsForPrompt(worldEvents, statuses);
+    const selected = selectWorldEventsForPrompt(worldEvents, {}, { 旧事件: 1 });
 
-    expect(Object.keys(selected)).toHaveLength(16);
-    expect(selected).toHaveProperty('事件9');
-    expect(selected).not.toHaveProperty('事件1');
-    expect(selected).toHaveProperty('事件24');
+    expect(selected).toEqual({
+      新事件: worldEvents.新事件,
+    });
   });
 
   it('drops malformed records without exposing unrelated state', () => {
