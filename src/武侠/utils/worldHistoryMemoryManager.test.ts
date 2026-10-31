@@ -49,7 +49,7 @@ describe('worldHistoryMemoryManager', () => {
 
   it('does not summarize events already covered by a chapter', () => {
     const selected = selectWorldEventsForArchive(
-      createWorldEvents(25),
+      createWorldEvents(28),
       { 事件01: 1, 事件02: 1, 事件03: 1 },
       24,
       12,
