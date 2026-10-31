@@ -368,8 +368,15 @@ export async function maybeArchiveWorldHistory({
       };
       const archivedEventPatch = Object.fromEntries(batch.map(item => [item.eventName, 1]));
       const operations = [
-        { type: 'insert' as const, payload: { 世界史记忆: { 章节摘要: { [chapterKey]: chapter } } } },
-        { type: 'insert' as const, payload: { 世界史记忆: { 已归档事件: archivedEventPatch } } },
+        {
+          type: 'insert' as const,
+          payload: {
+            世界史记忆: {
+              章节摘要: { [chapterKey]: chapter },
+              已归档事件: archivedEventPatch,
+            },
+          },
+        },
       ];
       const transactionId = createTransactionId();
 
