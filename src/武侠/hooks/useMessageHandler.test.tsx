@@ -80,6 +80,10 @@ vi.mock('../utils/logger', () => ({
   },
 }));
 
+vi.mock('../utils/worldHistoryMemoryManager', () => ({
+  maybeArchiveWorldHistory: vi.fn(async () => ({ archived: false })),
+}));
+
 import { DEFAULT_SUMMARY_SETTINGS } from '../utils/settingsManager';
 import { useMessageHandler } from './useMessageHandler';
 import {
