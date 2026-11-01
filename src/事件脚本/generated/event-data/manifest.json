@@ -31980,19 +31980,19 @@
         "类型": "时间",
         "年": 1244,
         "月": 9,
-        "日": 18,
-        "时": 8
+        "日": 16,
+        "时": 13
       },
-      "triggerHour": 10754336,
+      "triggerHour": 10754293,
       "endTime": {
         "年": 1244,
-        "月": 9,
-        "日": 18,
-        "时": 9
+        "月": 10,
+        "日": 15,
+        "时": 8
       },
-      "endHour": 10754337,
-      "durationHours": 1,
-      "discoveryHour": 10754096,
+      "endHour": 10754984,
+      "durationHours": 691,
+      "discoveryHour": 10754053,
       "location": "大宋/河南府/武关",
       "intro": "武关一战后，杨过见郭芙与武氏兄弟亲密相伴，旧日怨愤翻涌，忽然独自向西北荒野狂奔；前路风雪渐盛，他尚不知会走到何处……",
       "summary": "杨过离群独上华山，并因洪七公指点食蜈蚣疗寒，身心都被逼入新的转折点。",
@@ -32003,7 +32003,7 @@
       "followups": {
         "神雕第十回08-洪七公大睡杨过独守三日": "洪七公吃罢蜈蚣心满意足，倒在雪地中大睡——吩咐杨过守他三日，便是天塌下来也别吵醒"
       },
-      "hash": "134f9c76b210bfb07c0a8a2dc7ce360ad4701b6f84a0b7c8a3759369bd6c0146",
+      "hash": "ccafc97f2e9b9b27e21a917d84d597a5643a1a859df7c036491046d218860a7d",
       "shardId": "shard-0016"
     },
     {
@@ -32018,20 +32018,20 @@
       "triggerTime": {
         "类型": "时间",
         "年": 1244,
-        "月": 9,
-        "日": 19,
+        "月": 10,
+        "日": 15,
         "时": 8
       },
-      "triggerHour": 10754360,
+      "triggerHour": 10754984,
       "endTime": {
         "年": 1244,
-        "月": 9,
-        "日": 22,
+        "月": 10,
+        "日": 18,
         "时": 8
       },
-      "endHour": 10754432,
+      "endHour": 10755056,
       "durationHours": 72,
-      "discoveryHour": 10754120,
+      "discoveryHour": 10754744,
       "location": "大宋/华山/华山绝顶",
       "intro": "你听说洪七公吃罢蜈蚣倒在雪地中大睡，竟如死去一般——杨过在旁守护，不料藏边五丑半夜摸上山来，见老叫化僵卧雪中以为已死便要将他乱刀分尸……",
       "summary": "杨过为守洪七公死守华山窄道三日，守诺之心与独胆担当由此真正立定。",
@@ -32039,7 +32039,7 @@
         "洪七公",
         "杨过"
       ],
-      "hash": "7d9712051072c374a9f494ec884d6919759e76c085060ce745fbd0a8fbdcb558",
+      "hash": "bf2b1c503ddf9787e6b326319e57bb7f06e7d1949a065cf81ee9dc3683cc24a1",
       "shardId": "shard-0016"
     },
     {
@@ -45098,7 +45098,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "神雕第六回12-石床机关断隔杨过割腕喂血",
       "lastRuntimeKey": "神雕第十一回06-杨过华山葬双雄救瘦马结伴南行",
-      "byteLength": 234525
+      "byteLength": 234529
     },
     {
       "id": "shard-0017",
@@ -45204,19 +45204,19 @@
       "id": "checkpoint-0008",
       "file": "checkpoints/checkpoint-0008.json",
       "completedCount": 800,
-      "throughHour": 10754960
+      "throughHour": 10755560
     },
     {
       "id": "checkpoint-0009",
       "file": "checkpoints/checkpoint-0009.json",
       "completedCount": 900,
-      "throughHour": 10756306
+      "throughHour": 10756906
     },
     {
       "id": "checkpoint-0010",
       "file": "checkpoints/checkpoint-0010.json",
       "completedCount": 1000,
-      "throughHour": 10757577
+      "throughHour": 10758177
     }
   ],
   "indexes": {
@@ -48382,11 +48382,11 @@
         "runtimeKey": "神雕第十回06-武关酒楼群侠大战李莫愁"
       },
       {
-        "hour": 10754336,
+        "hour": 10754293,
         "runtimeKey": "神雕第十回07-杨过登华山遇洪七公啖蜈蚣"
       },
       {
-        "hour": 10754360,
+        "hour": 10754984,
         "runtimeKey": "神雕第十回08-洪七公大睡杨过独守三日"
       },
       {
@@ -52724,11 +52724,11 @@
         "runtimeKey": "神雕第十回06-武关酒楼群侠大战李莫愁"
       },
       {
-        "hour": 10754096,
+        "hour": 10754053,
         "runtimeKey": "神雕第十回07-杨过登华山遇洪七公啖蜈蚣"
       },
       {
-        "hour": 10754120,
+        "hour": 10754744,
         "runtimeKey": "神雕第十回08-洪七公大睡杨过独守三日"
       },
       {
@@ -56782,11 +56782,11 @@
         "runtimeKey": "神雕第十回06-武关酒楼群侠大战李莫愁"
       },
       {
-        "hour": 10754337,
+        "hour": 10754984,
         "runtimeKey": "神雕第十回07-杨过登华山遇洪七公啖蜈蚣"
       },
       {
-        "hour": 10754432,
+        "hour": 10755056,
         "runtimeKey": "神雕第十回08-洪七公大睡杨过独守三日"
       },
       {
@@ -59228,5 +59228,5 @@
     ]
   },
   "unresolvedReferences": [],
-  "contentHash": "40d66da961059779d30f7ec93a7267f5d4fcda2fb1c74740a98881d17592c157"
+  "contentHash": "960bf0ae00e2b32011d89c13458eb8b076c4e074e340d38643c8264b9af22188"
 }
