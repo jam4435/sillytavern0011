@@ -207,29 +207,71 @@ function updateFollowupReferences(renameMap) {
   let changedFiles = 0;
   for (const filename of filenames) {
     const data = readEvent(filename);
-    if (!data.后续事件 || typeof data.后续事件 !== 'object' || Array.isArray(data.后续事件)) {
-      continue;
-    }
-    const next = {};
+    const eventKey = path.basename(filename, path.extname(filename));
     let changed = false;
-    for (const [oldKey, oldValue] of Object.entries(data.后续事件)) {
-      const newKey = renameMap[oldKey] || oldKey;
-      let newValue = oldValue;
-      if (typeof newValue === 'string') {
-        for (const [oldName, newName] of Object.entries(renameMap)) {
-          newValue = newValue.replaceAll(oldName, newName);
+
+    // Character-experience deltas must point to the canonical event filename.
+    for (const action of ['insert', 'update', 'delete']) {
+      const actionDeltas = data[action];
+      if (!actionDeltas || typeof actionDeltas !== 'object') continue;
+      for (const delta of Object.values(actionDeltas)) {
+        if (!delta || typeof delta !== 'object' || Array.isArray(delta)) continue;
+        const experience = delta.人物经历;
+        if (!experience || typeof experience !== 'object' || Array.isArray(experience)) continue;
+        const keys = Object.keys(experience);
+        if (keys.length > 1) {
+          throw new Error('Multiple 人物经历 keys in ' + filename + '; refusing to discard data.');
+        }
+        if (keys.length === 1 && keys[0] !== eventKey) {
+          delta.人物经历 = { [eventKey]: experience[keys[0]] };
+          changed = true;
         }
       }
-      next[newKey] = newValue;
-      if (newKey !== oldKey || newValue !== oldValue) changed = true;
     }
+
+    if (data.后续事件 && typeof data.后续事件 === 'object' && !Array.isArray(data.后续事件)) {
+      const next = {};
+      for (const [oldKey, oldValue] of Object.entries(data.后续事件)) {
+        const newKey = renameMap[oldKey] || oldKey;
+        let newValue = oldValue;
+        if (typeof newValue === 'string') {
+          for (const [oldName, newName] of Object.entries(renameMap)) {
+            newValue = newValue.replaceAll(oldName, newName);
+          }
+        }
+        next[newKey] = newValue;
+        if (newKey !== oldKey || newValue !== oldValue) changed = true;
+      }
+      if (changed) data.后续事件 = next;
+    }
+
     if (changed) {
-      data.后续事件 = next;
       writeEvent(filename, data);
       changedFiles += 1;
     }
   }
   return changedFiles;
+}
+
+function updateCanonicalIndexes(renameMap) {
+  const indexPaths = [
+    path.join(root, '世界书', '金庸群侠传1', 'index.yaml'),
+    path.join(root, '角色卡', '金庸群侠传', 'index.yaml'),
+  ];
+  let updated = 0;
+  for (const indexPath of indexPaths) {
+    if (!fs.existsSync(indexPath)) continue;
+    let content = fs.readFileSync(indexPath, 'utf8');
+    const original = content;
+    for (const [oldName, newName] of Object.entries(renameMap)) {
+      content = content.replaceAll(oldName, newName);
+    }
+    if (content !== original) {
+      fs.writeFileSync(indexPath, content, 'utf8');
+      updated += 1;
+    }
+  }
+  return updated;
 }
 
 function prependNotice(relativePath, marker, notice) {
@@ -415,6 +457,8 @@ setEventTimes(
 const renameMap = {
   '天龙第十一回02-鸠摩智携段誉抵太湖遇崔百泉过彦之':
     '天龙第十一回02-鸠摩智抵苏州城外遇崔百泉过彦之',
+  '天龙第十一回02-鸠摩智常熟雇舟载段誉入太湖':
+    '天龙第十一回02-鸠摩智抵苏州城外遇崔百泉过彦之',
   '天龙第十一回05-阿碧引舟穿芦苇荡登听香水榭':
     '天龙第十一回05-阿碧引舟穿荷荡芦苇抵达琴韵小筑',
   '天龙第十一回06-鸠摩智道明来意红裳少女现身':
@@ -423,7 +467,8 @@ const renameMap = {
 for (const [oldName, newName] of Object.entries(renameMap)) {
   renameEvent(oldName, newName);
 }
-const updatedFollowupFiles = updateFollowupReferences(renameMap);
+const updatedReferenceFiles = updateFollowupReferences(renameMap);
+const updatedIndexFiles = updateCanonicalIndexes(renameMap);
 
 // Add the actual novel location to the strict location table.
 const locationTablePath = path.join(root, 'src', '武侠', '武侠地点表.yaml');
@@ -480,14 +525,14 @@ prependNotice(
 
 const finalReport = fs.readFileSync(reportPath, 'utf8');
 const appliedStatus =
-  '执行状态：已应用（第十二至第五十回顺延事件文件 ' +
+  '执行状态：已应用（第十二至第五十回顺延事件文件 '
   shiftedEventFiles +
   ' 个；触发时间对象 ' +
   shiftedTriggerObjects +
   ' 个；结束时间对象 ' +
   shiftedEndObjects +
-  ' 个；特殊事件与地点修正已完成；后续引用更新文件 ' +
-  updatedFollowupFiles +
+  ' 个；特殊事件与地点修正已完成；事件引用/人物经历键更新文件 ' +
+  updatedReferenceFiles +
   ' 个）';
 fs.writeFileSync(
   reportPath,
@@ -501,7 +546,8 @@ console.log(
       shiftedEventFiles,
       shiftedTriggerObjects,
       shiftedEndObjects,
-      updatedFollowupFiles,
+      updatedReferenceFiles,
+      updatedIndexFiles,
       downstreamShiftDays: DOWNSTREAM_SHIFT_DAYS,
       firstLegEnd: '1202/04/15 20:00',
       secondLegArrivalAnchor: '1202/05/07 06:00',
