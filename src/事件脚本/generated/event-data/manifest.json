@@ -2986,7 +2986,7 @@
       "followups": {
         "天龙第八回02-四大恶人林道现身拦路寻仇": "万劫谷外密林幽暗沉寂，四野忽起龙吟般的刺耳啸音，震落漫山黄叶，杀机陡现。"
       },
-      "hash": "9d3c6840fc0dbfd57e93242817ec69d0713359742cc671c9fa4f4bc15e731070",
+      "hash": "beec164ec50c798fb240aea4e76ebb4c3c099cabd524a2a8e072e06d2f24e1bb",
       "shardId": "shard-0002"
     },
     {
@@ -44986,7 +44986,7 @@
       "eventCount": 50,
       "firstRuntimeKey": "天龙第五回05-婉清指点段誉步生真气",
       "lastRuntimeKey": "天龙第十一回02-鸠摩智常熟雇舟载段誉入太湖",
-      "byteLength": 165003
+      "byteLength": 165000
     },
     {
       "id": "shard-0003",
@@ -59228,5 +59228,5 @@
     ]
   },
   "unresolvedReferences": [],
-  "contentHash": "1b401871119e0e0a7a399ab7f188a2ce0f05f1a2f15ab0711d6519385d9bb9d8"
+  "contentHash": "d1d9142e9846a3337ef85e1fe845506fa744a0d40e3f5dbca82c08b3c8e1d572"
 }
