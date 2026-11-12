@@ -1,0 +1,59 @@
+name: regenerate-shendiao-event-assets
+
+on:
+  push:
+    branches:
+      - fix/shendiao-chapter-07-night-timeline-20261101
+    paths:
+      - '世界书/金庸群侠传1/世界书/**'
+      - '世界书/金庸群侠传1/index.yaml'
+      - '角色卡/金庸群侠传/index.yaml'
+      - 'scripts/generate-wuxia-event-assets.mjs'
+      - 'scripts/shift-tianlong-event-timeline-batch15.mjs'
+      - 'src/武侠/武侠地点表.yaml'
+      - '.github/workflows/regenerate-shendiao-event-assets.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: regenerate-shendiao-event-assets
+  cancel-in-progress: false
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - run: pnpm install --frozen-lockfile
+      - name: Apply the source-backed Tianlong Chapter 11 timeline correction
+        run: node scripts/shift-tianlong-event-timeline-batch15.mjs
+      - name: Regenerate runtime event assets
+        run: pnpm generate:events
+      - name: Commit corrected source events and generated assets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- \
+            '世界书/金庸群侠传1/世界书/天龙第*.yaml' \
+            '世界书/金庸群侠传1/index.yaml' \
+            '角色卡/金庸群侠传/index.yaml' \
+            'src/武侠/武侠地点表.yaml' \
+            'plans/武侠事件时长审计/分批修复记录/批次*.md' \
+            'plans/武侠事件时长审计/天龙八部全量时间审计汇总.md' \
+            src/事件脚本/generated/event-data \
+            src/武侠/data/事件信息汇总.json \
+            src/武侠/data/后续事件地点.generated.json \
+            src/武侠/data/事件展示元数据.generated.json
+          if git diff --cached --quiet; then
+            echo "Source event files and generated assets already up to date."
+          else
+            git commit -m "fix: correct two-stage Tianlong Chapter 11 journey timeline"
+            git push origin HEAD:$GITHUB_REF_NAME
+          fi
