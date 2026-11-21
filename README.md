@@ -44,7 +44,7 @@ git update-index --skip-worktree .vscode/launch.json
 
 ### 示例文件夹
 
-请不要删除`示例`文件夹, AI 需要参考其中的代码; 但你可以在 `webpack.config.ts` 中将 54 行左右的 `{示例,src}/` 改为 `src/` 来避免打包它们.
+请保留`示例`文件夹, AI 可以参考其中的代码。当前 `webpack.config.ts` 的入口扫描只包含 `src/**/index.{ts,tsx,js,jsx}`, 并明确排除`示例`; 无需手动修改 webpack 配置来避免打包示例。
 
 #### 利用 jsdelivr 实现前端界面或脚本的自动更新
 
@@ -74,8 +74,8 @@ import 'https://testingcf.jsdelivr.net/gh/StageDog/tavern_resource/dist/酒馆�
 
 **`bundle.yaml`**
 
-- 自动打包 `src` 文件夹中的代码到 `dist` 文件夹中, 并自动递增版本号从而让 jsdelivr 更快更新缓存;
-- 自动将 `tavern_sync.yaml` 中[已经配置好了的角色卡、世界书或预设](https://stagedog.github.io/青空莉/工具经验/实时编写角色卡、世界书或预设/)打包成可以被酒馆导入的文件.
+- 运行 `pnpm build`, 先生成事件数据, 再将正式源码构建到 `dist` 文件夹;
+- 当前工作流不会执行 `tavern_sync.mjs bundle`, 因此不会根据 `tavern_sync.yaml` 自动打包角色卡、世界书或预设; 这些内容需要通过 tavern_sync 对应命令单独打包。
 
 **`bump_deps.yaml`**
 
@@ -89,9 +89,9 @@ import 'https://testingcf.jsdelivr.net/gh/StageDog/tavern_resource/dist/酒馆�
 
 ### 打包冲突问题
 
-为了自动更新和打包一些东西, 本项目直接打包源代码在 `dist/` 文件夹中并随仓库上传, 而这会让开发时经常出现分支冲突.
+Webpack 会将构建产物写入 `dist/`。但当前仓库的 `.gitignore` 忽略了该目录, 且 `bundle.yaml` 的提交步骤没有对 `dist/` 执行强制添加, 因此当前工作流不会把生成的 `dist/` 提交到仓库。若希望通过 GitHub/jsDelivr 发布这些产物, 需要在工作流中明确只对 `dist/` 执行强制添加, 而不是全局强制添加所有忽略文件.
 
-为了解决这一点, 仓库在 `.gitattribute` 中设置了对于 `dist/` 文件夹中的冲突总是使用当前版本. 这不会有什么问题: 在上传后, ci 会将 `dist/` 文件夹重新打包成最新版本, 因而你上传的 `dist/` 文件夹内容如何无关紧要.
+仓库在 `.gitattributes` 中设置了 `dist/` 文件夹的冲突处理规则。若以后启用 `dist/` 提交, 请同时保留该规则并执行一次以下命令:
 
 为了启用这个功能, 请执行一次以下命令:
 
